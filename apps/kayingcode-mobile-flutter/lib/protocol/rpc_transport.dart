@@ -1,0 +1,248 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'crc32.dart';
+
+/// Reimplementation of the rpc-frame fragmentation transport
+/// (`Xf`/`Zf` schemas, `sp()`/`lp()` in the web client).
+///
+/// Logical messages are split into frames so the JSON envelope stays below
+/// [maxPhysicalFrameBytes]; each message carries a crc32 checksum; the
+/// receiver acknowledges assembled messages with `rpc-frame-ack`.
+class RpcFrameTransport {
+  static const maxPhysicalFrameBytes = 1024 * 1024;
+  static const maxMessageBytes = 16 * 1024 * 1024;
+  static const maxFragments = 64;
+
+  /// Raw bytes per fragment; base64 expands by 4/3, keep envelope < 1 MiB.
+  static const _fragmentPayloadBytes = 512 * 1024;
+  static const _maxInboundAssemblies = 32;
+  static const _maxInboundAssemblyBytes = 32 * 1024 * 1024;
+
+  final String bridgeSessionId;
+  final int? bridgeGeneration;
+  final String? recoveryId;
+  final void Function(Map<String, dynamic> payload) sendPayload;
+  final void Function(String line)? onLog;
+
+  int _seq = 0;
+  int _messageSeq = 0;
+
+  final _messageController = StreamController<Uint8List>.broadcast();
+  Stream<Uint8List> get messages => _messageController.stream;
+
+  final _assemblies = <int, _Assembly>{};
+  int _inboundAssemblyBytes = 0;
+  Timer? _assemblyCleanupTimer;
+  bool _disposed = false;
+
+  RpcFrameTransport({
+    required this.bridgeSessionId,
+    required this.sendPayload,
+    this.bridgeGeneration,
+    this.recoveryId,
+    this.onLog,
+  }) {
+    _assemblyCleanupTimer =
+        Timer.periodic(const Duration(seconds: 30), (_) => _purgeStale());
+  }
+
+  void _purgeStale() {
+    final stale = <int>[];
+    final now = DateTime.now();
+    _assemblies.forEach((seq, a) {
+      if (now.difference(a.createdAt).inSeconds > 60) stale.add(seq);
+    });
+    for (final seq in stale) {
+      final assembly = _assemblies.remove(seq);
+      if (assembly != null) _inboundAssemblyBytes -= assembly.receivedBytes;
+      onLog?.call('[rpc] purged stale assembly $seq');
+    }
+  }
+
+  void _dropAssembly(int messageSeq) {
+    final assembly = _assemblies.remove(messageSeq);
+    if (assembly != null) _inboundAssemblyBytes -= assembly.receivedBytes;
+  }
+
+  Map<String, dynamic> get _identity => {
+        'bridgeSessionId': bridgeSessionId,
+        if (bridgeGeneration != null) 'bridgeGeneration': bridgeGeneration,
+        if (recoveryId != null) 'recoveryId': recoveryId,
+      };
+
+  /// Fragment and send one logical message.
+  void sendMessage(Uint8List bytes) {
+    if (_disposed) return;
+    if (bytes.isEmpty) throw StateError('remote.rpcFrame.emptyMessage');
+    if (bytes.length > maxMessageBytes) {
+      throw StateError('remote.rpcFrame.messageTooLarge');
+    }
+    final messageSeq = ++_messageSeq;
+    final checksum = Crc32.hexOf(bytes);
+    final fragmentCount =
+        (bytes.length + _fragmentPayloadBytes - 1) ~/ _fragmentPayloadBytes;
+    if (fragmentCount > maxFragments) {
+      throw StateError('remote.rpcFrame.fragmentLimitExceeded');
+    }
+    for (var i = 0; i < fragmentCount; i++) {
+      final start = i * _fragmentPayloadBytes;
+      final end =
+          start + _fragmentPayloadBytes > bytes.length ? bytes.length : start + _fragmentPayloadBytes;
+      final chunk = Uint8List.sublistView(bytes, start, end);
+      _seq += 1;
+      sendPayload({
+        'zcode_type': 'rpc-frame',
+        ..._identity,
+        'seq': _seq,
+        'messageSeq': messageSeq,
+        'fragmentIndex': i,
+        'fragmentCount': fragmentCount,
+        'messageBytes': bytes.length,
+        'checksum': {'algorithm': 'crc32', 'value': checksum},
+        'dataBase64': base64.encode(chunk),
+      });
+    }
+  }
+
+  /// Feed a relay payload. Returns true if it was an rpc-frame(-ack).
+  bool acceptPayload(Map<String, dynamic> payload) {
+    if (_disposed) return true;
+    final type = payload['zcode_type'];
+    if (type == 'rpc-frame-ack') return true;
+    if (type != 'rpc-frame') return false;
+    if (payload['bridgeSessionId'] != bridgeSessionId) return false;
+
+    final messageSeq = (payload['messageSeq'] as num?)?.toInt();
+    final fragmentIndex = (payload['fragmentIndex'] as num?)?.toInt();
+    final fragmentCount = (payload['fragmentCount'] as num?)?.toInt();
+    final messageBytes = (payload['messageBytes'] as num?)?.toInt();
+    final dataBase64 = payload['dataBase64'] as String?;
+    final checksum = (payload['checksum'] as Map?)?['value'] as String?;
+    if (messageSeq == null ||
+        fragmentIndex == null ||
+        fragmentCount == null ||
+        messageBytes == null ||
+        dataBase64 == null) {
+      return true;
+    }
+    if (messageSeq < 0 ||
+        fragmentIndex < 0 ||
+        fragmentCount <= 0 ||
+        fragmentCount > maxFragments ||
+        messageBytes <= 0 ||
+        messageBytes > maxMessageBytes) {
+      onLog?.call('[rpc] invalid inbound fragment bounds');
+      _dropAssembly(messageSeq);
+      return true;
+    }
+
+    Uint8List chunk;
+    try {
+      chunk = base64.decode(dataBase64);
+    } catch (_) {
+      _dropAssembly(messageSeq);
+      return true;
+    }
+    if (chunk.isEmpty || chunk.length > _fragmentPayloadBytes) {
+      onLog?.call('[rpc] invalid inbound fragment size');
+      _dropAssembly(messageSeq);
+      return true;
+    }
+
+    var assembly = _assemblies[messageSeq];
+    if (assembly == null) {
+      if (_assemblies.length >= _maxInboundAssemblies ||
+          _inboundAssemblyBytes + chunk.length > _maxInboundAssemblyBytes) {
+        onLog?.call('[rpc] inbound assembly limit reached');
+        return true;
+      }
+      assembly = _Assembly(fragmentCount, messageBytes, checksum);
+      _assemblies[messageSeq] = assembly;
+    } else if (!assembly.matches(fragmentCount, messageBytes, checksum)) {
+      onLog?.call('[rpc] inbound fragment metadata mismatch');
+      _dropAssembly(messageSeq);
+      return true;
+    }
+    if (fragmentIndex >= fragmentCount) return true;
+    final added = assembly.add(fragmentIndex, chunk);
+    if (added) _inboundAssemblyBytes += chunk.length;
+    if (assembly.receivedBytes > messageBytes) {
+      onLog?.call('[rpc] inbound assembly exceeds declared size');
+      _dropAssembly(messageSeq);
+      return true;
+    }
+    if (assembly.isComplete) {
+      _dropAssembly(messageSeq);
+      final message = assembly.assemble();
+      if (message.length != messageBytes) {
+        onLog?.call('[rpc] inbound assembly size mismatch');
+        return true;
+      }
+      if (assembly.checksum == null ||
+          Crc32.hexOf(message) == assembly.checksum) {
+        onLog?.call(
+            '[rpc] message $messageSeq assembled (${message.length} bytes)');
+        _messageController.add(message);
+        // ack 必须与 rpc-frame 同源带全身份：宿主按 bridgeSessionId +
+        // bridgeGeneration + recoveryId 三项严格比对入站帧，缺项的 ack 会被静默
+        // 丢弃，宿主重放缓冲永不释放，45s 宽限后把桥判死并反复重开。
+        sendPayload({
+          'zcode_type': 'rpc-frame-ack',
+          ..._identity,
+          'ackMessageSeq': messageSeq,
+        });
+      } else {
+        onLog?.call('[rpc] message $messageSeq checksum mismatch');
+      }
+    }
+    return true;
+  }
+
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    _assemblyCleanupTimer?.cancel();
+    _assemblies.clear();
+    _inboundAssemblyBytes = 0;
+    await _messageController.close();
+  }
+}
+
+class _Assembly {
+  final int fragmentCount;
+  final int messageBytes;
+  final String? checksum;
+  final List<Uint8List?> fragments;
+  final DateTime createdAt = DateTime.now();
+  int received = 0;
+
+  _Assembly(this.fragmentCount, this.messageBytes, this.checksum)
+      : fragments = List<Uint8List?>.filled(fragmentCount, null);
+
+  int get receivedBytes =>
+      fragments.fold<int>(0, (sum, fragment) => sum + (fragment?.length ?? 0));
+
+  bool matches(int count, int bytes, String? crc) =>
+      fragmentCount == count && messageBytes == bytes && checksum == crc;
+
+  bool add(int index, Uint8List data) {
+    if (index < 0 || index >= fragmentCount || fragments[index] != null) {
+      return false;
+    }
+    fragments[index] = data;
+    received += 1;
+    return true;
+  }
+
+  bool get isComplete => received == fragmentCount;
+
+  Uint8List assemble() {
+    final builder = BytesBuilder();
+    for (final f in fragments) {
+      if (f != null) builder.add(f);
+    }
+    return builder.toBytes();
+  }
+}

@@ -1,0 +1,49 @@
+name: Source checks
+
+on:
+  pull_request:
+    branches: [kaying-code-dev, kaying-code-release]
+  push:
+    branches: [kaying-code-dev, kaying-code-release]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  source:
+    name: Source checks (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      HUSKY: "0"
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24.14.0"
+          package-manager-cache: false
+      - name: Install workspace dependencies
+        run: |
+          npm install --global pnpm@10.31.0
+          pnpm install --frozen-lockfile --child-concurrency=1
+      - name: Check source layout and public snapshot
+        run: |
+          pnpm run public:snapshot:check
+          pnpm run source:check
+          node --test scripts/check-public-snapshot.test.mjs
+      - name: Check types, lint and architecture
+        run: |
+          pnpm run typecheck
+          pnpm run lint
+          pnpm run architecture:check
+      - name: Check versions and run Taro tests
+        run: |
+          node --test scripts/first-public-release.test.mjs
+          pnpm --dir apps/kayingcode-mobile-taro run test

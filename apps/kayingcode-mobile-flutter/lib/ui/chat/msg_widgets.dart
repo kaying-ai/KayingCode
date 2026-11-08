@@ -1,0 +1,3054 @@
+// 此文件是 chat_page.dart 的一部分(part):同库共享导入与私有类可见。
+part of '../chat_page.dart';
+
+class _ModeBanner extends StatelessWidget {
+  final String mode;
+
+  const _ModeBanner({required this.mode});
+
+  @override
+  Widget build(BuildContext context) {
+    // full 是部分宿主对 yolo 的别名,一并认作免确认横幅。
+    final yolo = mode == 'yolo' || mode == 'full';
+    final plan = mode == 'plan';
+    if (!yolo && !plan) return const SizedBox.shrink();
+    final colors = EmberColors.of(context);
+    final color = yolo ? colors.err : colors.warn;
+    // 横幅复用 modeLabelOf/modeDescriptionOf,与桌面 locale 和模式菜单同一套文案,
+    // 避免同一模式在菜单里叫「完全访问」而横幅里叫「YOLO 模式」。
+    // 横幅额外补一句操作提醒(确认作用域),描述文案本身不重复。
+    final label = modeLabelOf(mode);
+    final text =
+        '$label · '
+        '${yolo ? tr(context, 'chat.content.modeYoloNotice') : tr(context, 'chat.content.modePlanNotice')}';
+    return Container(
+      width: double.infinity,
+      color: color.withValues(alpha: 0.15),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      child: Row(
+        children: [
+          Icon(
+            yolo ? Icons.warning_amber_rounded : Icons.visibility_outlined,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: EmberSpacing.gapS),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(fontSize: EmberType.secondary, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shows while the bridge is degraded (relay drop / recovery in progress)
+/// so the user knows a send may be paused waiting to reconnect.
+class _ReconnectBanner extends StatelessWidget {
+  final BridgeSession bridge;
+
+  const _ReconnectBanner({required this.bridge});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: bridge.degraded,
+      builder: (context, degraded, _) {
+        // Bridge hiccups that recover within 5s (lock/unlock resume, quick
+        // network flap) never surface.
+        return DelayedVisibility(
+          visible: degraded != null,
+          delay: const Duration(seconds: 5),
+          builder: (context) => Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            color: EmberColors.of(context).warn.withValues(alpha: 0.15),
+            child: Row(
+              children: [
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 1.5),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    tr(context, 'chat.content.reconnectBanner'),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: EmberColors.of(context).textSoft,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// One ordered piece of an assistant turn: either a merged text segment
+/// (kind == 'text') or a non-text row (kind == 'row').
+typedef AssistantPart = ({
+  String kind,
+  String? text,
+  Map<String, dynamic>? row,
+  bool streaming,
+});
+
+/// Splits an assistant-turn group into ORDERED parts — consecutive
+/// assistantText rows merge into one text segment, while reasoning/tool/
+/// subagent rows stay exactly where they occurred in the stream (so
+/// "thinking → tool → answer" never renders as "answer → thinking").
+typedef AssistantTurnParts = ({
+  List<AssistantPart> parts,
+  Map<String, dynamic>? header,
+  bool streaming,
+});
+
+AssistantTurnParts assistantTurnParts(List<Map<String, dynamic>> rows) {
+  final parts = <AssistantPart>[];
+  Map<String, dynamic>? header;
+  StringBuffer? buf;
+  Map<String, dynamic>? template;
+  var anyStream = false;
+  var sawStreaming = false;
+
+  void flushText() {
+    if (template != null) {
+      final text = buf!.toString().trim();
+      if (text.isNotEmpty) {
+        parts.add((
+          kind: 'text',
+          text: text,
+          row: template,
+          streaming: anyStream,
+        ));
+      }
+      buf = null;
+      template = null;
+      anyStream = false;
+    }
+  }
+
+  for (final row in rows) {
+    final kind = row['kind'];
+    if (kind == 'assistantText') {
+      template ??= row;
+      buf ??= StringBuffer();
+      final t = row['text'] as String? ?? '';
+      if (buf!.isNotEmpty) buf!.write('\n\n');
+      buf!.write(t);
+      if (row['state'] == 'streaming') {
+        anyStream = true;
+        sawStreaming = true;
+      }
+    } else if (kind == 'turnHeader') {
+      header = row;
+    } else {
+      flushText();
+      parts.add((kind: 'row', text: null, row: row, streaming: false));
+    }
+  }
+  flushText();
+  return (parts: parts, header: header, streaming: sawStreaming);
+}
+
+/// Groups rows into turns (mirrors the web timeline): a user message starts
+/// a new group; assistant text/reasoning/tool rows that follow belong to
+/// the same turn and render as ONE message instead of many bubbles.
+///
+/// A new group starts only on a user message (or the first assistant row
+/// after one). Consecutive assistant rows are merged into a single group
+/// EVEN IF the server bumps `turnId` mid-response, so one answer never
+/// splits into several bubbles each carrying its own feedback buttons.
+List<List<Map<String, dynamic>>> _groupRows(List<Map<String, dynamic>> rows) {
+  final groups = <List<Map<String, dynamic>>>[];
+  List<Map<String, dynamic>>? current;
+  for (final row in rows) {
+    final kind = row['kind'];
+    if (kind == 'timelineMarker') {
+      current = null;
+      groups.add([row]);
+      continue;
+    }
+    final isUser = kind == 'userInput';
+    final startsGroup =
+        isUser || current == null || current.first['kind'] == 'userInput';
+    if (startsGroup) {
+      current = [row];
+      groups.add(current);
+    } else {
+      current.add(row);
+    }
+  }
+  return groups;
+}
+
+ConversationState? _groupCacheState;
+int _groupCacheVersion = -1;
+List<List<Map<String, dynamic>>>? _groupCache;
+
+/// Reuses row grouping while the state has not published a row mutation.
+/// Echoes and control-only updates are outside this cache's input.
+List<List<Map<String, dynamic>>> cachedGroupRows(ConversationState state) {
+  if (identical(_groupCacheState, state) &&
+      _groupCacheVersion == state.rowsVersion &&
+      _groupCache != null) {
+    return _groupCache!;
+  }
+  final groups = _groupRows(state.rows);
+  _groupCacheState = state;
+  _groupCacheVersion = state.rowsVersion;
+  _groupCache = groups;
+  return groups;
+}
+
+void clearGroupRowsCache() {
+  _groupCacheState = null;
+  _groupCacheVersion = -1;
+  _groupCache = null;
+}
+
+class _TurnGroupWidget extends StatelessWidget {
+  final List<Map<String, dynamic>> rows;
+  final ConversationTransport transport;
+  final String sessionId;
+  final Future<void> Function(String, Future<dynamic> Function()) onAction;
+  final ConversationState state;
+  final bool Function()? isSourceCurrent;
+  final int Function()? beginFileChangesOperation;
+  final bool Function(int operationGeneration)? isFileChangesOperationCurrent;
+
+  /// 分叉成功后的宿主跳转回调(透传给助手气泡的 fork 按钮)。
+  final void Function(String newSessionId)? onForkedSession;
+
+  const _TurnGroupWidget({
+    super.key,
+    required this.rows,
+    required this.transport,
+    required this.sessionId,
+    required this.onAction,
+    required this.state,
+    this.isSourceCurrent,
+    this.beginFileChangesOperation,
+    this.isFileChangesOperationCurrent,
+    this.onForkedSession,
+  });
+
+  /// First error snippet among this turn's failed tool calls — shown on the
+  /// 本轮失败 header so failures are self-explaining.
+  String? _errorSummary() {
+    for (final r in rows) {
+      if (r['kind'] != 'toolCall' || r['status'] != 'error') continue;
+      var s = '';
+      final e = r['error'];
+      if (e is Map) {
+        s = '${e['message'] ?? e['text'] ?? e}';
+      } else if (e != null) {
+        s = '$e';
+      }
+      s = s.trim();
+      if (s.isEmpty || s == 'null') {
+        final out = r['output'];
+        if (out is Map) s = '${out['text'] ?? ''}'.trim();
+      }
+      if (s.isNotEmpty) {
+        return s.length > 160 ? '${s.substring(0, 160)}…' : s;
+      }
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // single timeline marker
+    if (rows.length == 1 && rows.first['kind'] == 'timelineMarker') {
+      return _TimelineMarkerWidget(row: rows.first);
+    }
+    final first = rows.first;
+    if (first['kind'] == 'userInput') {
+      // "Processing" badge: this is the newest user message and its turn
+      // is currently running. The badge clears when the turn completes.
+      final processing =
+          state.isRunning && first['rowId'] == lastUserInputRowId(state.rows);
+      // user message + anything attached to the same turn
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _RowWidget(
+            row: first,
+            transport: transport,
+            sessionId: sessionId,
+            onAction: onAction,
+            state: state,
+            isSourceCurrent: isSourceCurrent,
+            badge: processing ? 'processing' : null,
+          ),
+          for (final row in rows.skip(1))
+            _RowWidget(
+              row: row,
+              transport: transport,
+              sessionId: sessionId,
+              onAction: onAction,
+              state: state,
+              isSourceCurrent: isSourceCurrent,
+              onForkedSession: onForkedSession,
+            ),
+        ],
+      );
+    }
+    // assistant turn: render parts in original order (reasoning → text →
+    // tool → text …); feedback buttons appear only on the LAST text segment.
+    final parts = assistantTurnParts(rows);
+    var lastTextIdx = -1;
+    for (var i = 0; i < parts.parts.length; i++) {
+      if (parts.parts[i].kind == 'text') lastTextIdx = i;
+    }
+    final children = <Widget>[];
+    for (var i = 0; i < parts.parts.length; i++) {
+      final p = parts.parts[i];
+      if (p.kind == 'text') {
+        children.add(
+          _RowWidget(
+            row: {
+              ...?p.row,
+              'kind': 'assistantText',
+              'text': p.text,
+              if (p.streaming) 'state': 'streaming',
+            },
+            showFeedback: i == lastTextIdx,
+            transport: transport,
+            sessionId: sessionId,
+            onAction: onAction,
+            state: state,
+            isSourceCurrent: isSourceCurrent,
+            beginFileChangesOperation: beginFileChangesOperation,
+            isFileChangesOperationCurrent: isFileChangesOperationCurrent,
+            onForkedSession: onForkedSession,
+          ),
+        );
+      } else {
+        children.add(
+          _RowWidget(
+            row: p.row!,
+            showFeedback: false,
+            transport: transport,
+            sessionId: sessionId,
+            onAction: onAction,
+            state: state,
+            isSourceCurrent: isSourceCurrent,
+            beginFileChangesOperation: beginFileChangesOperation,
+            isFileChangesOperationCurrent: isFileChangesOperationCurrent,
+            onForkedSession: onForkedSession,
+          ),
+        );
+      }
+    }
+    final header = parts.header;
+    if (header != null) {
+      children.add(
+        _TurnHeader(
+          row: header,
+          errorSummary: (header['state'] as String?) == 'failed'
+              ? _errorSummary()
+              : null,
+        ),
+      );
+      // 文件变更条(桌面同款):回合有文件改动时显示可点卡片。
+      final fileChanges = header['fileChanges'];
+      if (fileChanges is Map &&
+          ((fileChanges['files'] as num?)?.toInt() ?? 0) > 0) {
+        children.add(
+          _FileChangesCard(
+            header: header,
+            transport: transport,
+            sessionId: sessionId,
+            beginFileChangesOperation: beginFileChangesOperation,
+            isFileChangesOperationCurrent: isFileChangesOperationCurrent,
+            isSourceCurrent: isSourceCurrent,
+          ),
+        );
+      }
+    }
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
+    );
+  }
+}
+
+class _RowWidget extends StatelessWidget {
+  final Map<String, dynamic> row;
+  final ConversationTransport transport;
+  final String sessionId;
+  final Future<void> Function(String, Future<dynamic> Function()) onAction;
+  final ConversationState state;
+  final bool Function()? isSourceCurrent;
+  final int Function()? beginFileChangesOperation;
+  final bool Function(int operationGeneration)? isFileChangesOperationCurrent;
+  final bool showFeedback;
+
+  /// Delivery badge for user rows (see [_MsgBadge]).
+  final String? badge;
+
+  /// 分叉成功后的宿主跳转回调(仅助手气泡使用)。
+  final void Function(String newSessionId)? onForkedSession;
+
+  const _RowWidget({
+    required this.row,
+    required this.transport,
+    required this.sessionId,
+    required this.onAction,
+    required this.state,
+    this.isSourceCurrent,
+    this.beginFileChangesOperation,
+    this.isFileChangesOperationCurrent,
+    this.showFeedback = true,
+    this.badge,
+    this.onForkedSession,
+  });
+
+  Map<String, dynamic> get _target => {
+    'rowId': row['rowId'],
+    if (row['entityId'] != null) 'entityId': row['entityId'],
+  };
+
+  void _showActions(BuildContext context) {
+    final kind = row['kind'];
+    if (kind != 'userInput' && kind != 'assistantText') return;
+    if (isSourceCurrent != null && !isSourceCurrent!()) return;
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (kind == 'userInput')
+              ListTile(
+                leading: const Icon(Icons.edit_outlined, size: 20),
+                title: Text(tr(context, 'chat.content.editAndResend')),
+                onTap: () {
+                  Navigator.pop(context);
+                  _editQuery(context);
+                },
+              ),
+            ListTile(
+              leading: const Icon(Icons.replay, size: 20),
+              title: Text(tr(context, 'chat.content.retryTurn')),
+              onTap: () {
+                Navigator.pop(context);
+                if (isSourceCurrent != null && !isSourceCurrent!()) return;
+                onAction(
+                  tr(context, 'chat.content.retryFailed'),
+                  () => transport.retryTurn(sessionId, _target),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.fork_right, size: 20),
+              title: Text(tr(context, 'chat.content.forkConversation')),
+              onTap: () {
+                Navigator.pop(context);
+                if (isSourceCurrent != null && !isSourceCurrent!()) return;
+                onAction(
+                  tr(context, 'chat.content.forkFailed'),
+                  () => transport.forkAssistant(sessionId, _target),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history, size: 20),
+              title: Text(tr(context, 'chat.content.rewindFiles')),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmRewind(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.difference_outlined, size: 20),
+              title: Text(tr(context, 'chat.content.viewFileChanges')),
+              onTap: () {
+                Navigator.pop(context);
+                _showFileChanges(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _editQuery(BuildContext context) async {
+    if (isSourceCurrent != null && !isSourceCurrent!()) return;
+    final text = await TextInputDialog.show(
+      context,
+      title: tr(context, 'chat.content.editMessage'),
+      initial: row['text'] as String? ?? '',
+      maxLines: 5,
+      confirmLabel: tr(context, 'chat.content.resend'),
+    );
+    if (text == null ||
+        text.isEmpty ||
+        (isSourceCurrent != null && !isSourceCurrent!())) {
+      return;
+    }
+    await onAction(
+      t('chat.content.editFailed'),
+      () => transport.editUserQuery(sessionId, _target, text),
+    );
+  }
+
+  Future<void> _confirmRewind(BuildContext context) async {
+    if (isSourceCurrent != null && !isSourceCurrent!()) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(tr(context, 'chat.content.rewindTitle')),
+        content: Text(tr(context, 'chat.content.rewindBody')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(tr(context, 'chat.content.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(tr(context, 'chat.content.rewind')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || (isSourceCurrent != null && !isSourceCurrent!())) {
+      return;
+    }
+    await onAction(
+      t('chat.content.rewindFailed'),
+      () => transport.applyFileRewind(sessionId, _target),
+    );
+  }
+
+  Future<void> _showFileChanges(BuildContext context) async {
+    // The server guard accepts turnHeader targets only — resolve this
+    // row's turn header (rows carry the same turnId).
+    final turnId = row['turnId'];
+    Map<String, dynamic>? header;
+    for (final r in state.rows) {
+      if (r['kind'] == 'turnHeader' &&
+          r['rowId'] != null &&
+          r['entityId'] is String) {
+        if (turnId == null || r['turnId'] == turnId) header = r;
+      }
+    }
+    if (header == null) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(
+          SnackBar(
+            content: Text(
+              tr(context, 'chat.content.noQueryableFileChanges'),
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    await showTurnFileChangesSheet(
+      context,
+      transport: transport,
+      sessionId: sessionId,
+      header: header,
+      beginFileChangesOperation: beginFileChangesOperation,
+      isFileChangesOperationCurrent: isFileChangesOperationCurrent,
+      isSourceCurrent: isSourceCurrent,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final widget_ = switch (row['kind']) {
+      'userInput' => _UserBubble(
+        row: row,
+        transport: transport,
+        sessionId: sessionId,
+        badge: badge,
+        isSourceCurrent: isSourceCurrent,
+      ),
+      'assistantText' => _AssistantBubble(
+        row: row,
+        transport: transport,
+        sessionId: sessionId,
+        state: state,
+        showFeedback: showFeedback,
+        isSourceCurrent: isSourceCurrent,
+        onForkedSession: onForkedSession,
+      ),
+      'reasoning' => _ReasoningTile(
+        text: row['text'] as String? ?? '',
+        streaming: row['state'] == 'streaming',
+        rowTs: _rowTsOf(row),
+      ),
+      'toolCall' => _ToolCallTile(row: row),
+      'turnHeader' => _TurnHeader(row: row),
+      'subagent' => _SubagentTile(row: row),
+      'timelineMarker' => _TimelineMarkerWidget(row: row),
+      _ => const SizedBox.shrink(),
+    };
+    final kind = row['kind'];
+    if (kind != 'userInput' && kind != 'assistantText') return widget_;
+    return GestureDetector(
+      onLongPress: () => _showActions(context),
+      child: widget_,
+    );
+  }
+}
+
+/// Delivery badge under a user bubble. States: `sending` (command in
+/// flight), `sent` (server accepted), `processing` (this message's turn
+/// is running), `failed` (tap to retry).
+class _MsgBadge extends StatelessWidget {
+  final String status;
+  final VoidCallback? onRetry;
+
+  const _MsgBadge({required this.status, this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final failed = status == 'failed';
+    final Widget content;
+    switch (status) {
+      case 'sending':
+        content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.schedule,
+              size: 11,
+              color: EmberColors.of(context).textFaint,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              tr(context, 'chat.content.sending'),
+              style: TextStyle(
+                fontSize: 9.5,
+                color: EmberColors.of(context).textFaint,
+              ),
+            ),
+          ],
+        );
+      case 'sent':
+        content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check,
+              size: 11,
+              color: EmberColors.of(context).textFaint,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              tr(context, 'chat.content.sent'),
+              style: TextStyle(
+                fontSize: 9.5,
+                color: EmberColors.of(context).textFaint,
+              ),
+            ),
+          ],
+        );
+      case 'processing':
+        content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 11,
+              height: 11,
+              child: CircularProgressIndicator(strokeWidth: 1.4),
+            ),
+            const SizedBox(width: 3),
+            Text(
+              tr(context, 'chat.content.processing'),
+              style: TextStyle(
+                fontSize: 9.5,
+                color: EmberColors.of(context).run,
+              ),
+            ),
+          ],
+        );
+      default: // failed
+        content = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 12,
+              color: EmberColors.of(context).err,
+            ),
+            const SizedBox(width: 3),
+            Text(
+              tr(context, 'chat.content.sendFailedRetry'),
+              style: TextStyle(
+                fontSize: 9.5,
+                color: EmberColors.of(context).err,
+              ),
+            ),
+          ],
+        );
+    }
+    if (!failed) {
+      return Padding(padding: const EdgeInsets.only(top: 3), child: content);
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onRetry,
+        child: content,
+      ),
+    );
+  }
+}
+
+class _UserBubble extends StatelessWidget {
+  final Map<String, dynamic> row;
+  final ConversationTransport transport;
+  final String sessionId;
+  final bool Function()? isSourceCurrent;
+
+  /// Delivery badge (see [_MsgBadge]); null renders none.
+  final String? badge;
+
+  /// Retry callback shown when [badge] is `failed`.
+  final VoidCallback? onRetry;
+
+  const _UserBubble({
+    required this.row,
+    required this.transport,
+    required this.sessionId,
+    this.badge,
+    this.onRetry,
+    this.isSourceCurrent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = row['text'] as String? ?? '';
+    final attachments = row['attachments'];
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.only(left: 56, top: 4, bottom: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: EmberColors.of(context).raise,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(EmberRadius.content),
+                  topRight: Radius.circular(EmberRadius.content),
+                  bottomLeft: Radius.circular(EmberRadius.content),
+                  bottomRight: Radius.circular(EmberRadius.bubbleTail),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (attachments is List)
+                    for (final a in attachments)
+                      if (a is Map)
+                        _AttachmentView(
+                          attachment: a.cast<String, dynamic>(),
+                          transport: transport,
+                          sessionId: sessionId,
+                          isSourceCurrent: isSourceCurrent,
+                        ),
+                  if (text.isNotEmpty)
+                    SelectableText(
+                      text,
+                      style: TextStyle(
+                        fontSize: EmberType.body,
+                        height: EmberType.lineHeight,
+                        color: EmberColors.of(context).textSolid,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            // 徽标挂在气泡外的 bg 上(时间戳位):faint/run/err 相对 bg
+            // 才有正常对比度,独立于消息灰底，保持状态语义清晰。
+            if (badge != null) _MsgBadge(status: badge!, onRetry: onRetry),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachmentView extends StatefulWidget {
+  final Map<String, dynamic> attachment;
+  final ConversationTransport transport;
+  final String sessionId;
+  final bool Function()? isSourceCurrent;
+
+  const _AttachmentView({
+    required this.attachment,
+    required this.transport,
+    required this.sessionId,
+    this.isSourceCurrent,
+  });
+
+  @override
+  State<_AttachmentView> createState() => _AttachmentViewState();
+}
+
+class _AttachmentViewState extends State<_AttachmentView> {
+  Uint8List? _imageBytes;
+  bool _failed = false;
+  int _loadGeneration = 0;
+
+  bool get _isImage =>
+      '${widget.attachment['mime'] ?? ''}'.startsWith('image/');
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isImage) _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AttachmentView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.transport != widget.transport ||
+        oldWidget.sessionId != widget.sessionId ||
+        oldWidget.attachment['ref'] != widget.attachment['ref']) {
+      _loadGeneration++;
+      _imageBytes = null;
+      _failed = false;
+      if (_isImage) _load();
+    }
+  }
+
+  @override
+  void dispose() {
+    _loadGeneration++;
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    final generation = ++_loadGeneration;
+    final ref = widget.attachment['ref'] as String?;
+    final sessionId = widget.sessionId;
+    final transport = widget.transport;
+    bool current() =>
+        mounted &&
+        generation == _loadGeneration &&
+        transport == widget.transport &&
+        sessionId == widget.sessionId &&
+        (widget.isSourceCurrent?.call() ?? true);
+    if (ref == null || !current()) return;
+    try {
+      final res = await transport.attachmentRead(sessionId, ref: ref);
+      if (!current()) return;
+      setState(() => _imageBytes = res.bytes);
+    } catch (_) {
+      if (current()) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fileName = '${widget.attachment['fileName'] ?? tr(context, 'chat.content.attachment')}';
+    if (!_isImage) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: EmberColors.of(context).raise,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.insert_drive_file_outlined, size: 16),
+            const SizedBox(width: 6),
+            Flexible(
+              child: Text(
+                fileName,
+                style: const TextStyle(fontSize: 12),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_failed) {
+      return Text(
+        tr(
+          context,
+          'chat.content.imageLoadFailed',
+          args: {'name': fileName},
+        ),
+        style: TextStyle(
+          fontSize: 11,
+          color: EmberColors.of(context).textFaint,
+        ),
+      );
+    }
+    if (_imageBytes == null) {
+      return const Padding(
+        padding: EdgeInsets.all(12),
+        child: SizedBox(
+          width: 16,
+          height: 16,
+          child: CircularProgressIndicator(strokeWidth: 1.5),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.memory(
+          _imageBytes!,
+          width: 220,
+          fit: BoxFit.cover,
+          // Decode at DISPLAY size, not source size — a 12MP photo is
+          // ~48MB RGBA at full decode; this caps it at 220 logical px.
+          cacheWidth: (220 * MediaQuery.devicePixelRatioOf(context)).round(),
+        ),
+      ),
+    );
+  }
+}
+
+class _StreamingMarkdown extends StatefulWidget {
+  final String text;
+  final bool streaming;
+
+  const _StreamingMarkdown({
+    super.key,
+    required this.text,
+    required this.streaming,
+  });
+
+  @override
+  State<_StreamingMarkdown> createState() => _StreamingMarkdownState();
+}
+
+class _StreamingMarkdownState extends State<_StreamingMarkdown> {
+  static const _window = Duration(milliseconds: 250);
+
+  late String _renderedText = widget.text;
+  late String _latestText = widget.text;
+  Timer? _timer;
+
+  @override
+  void didUpdateWidget(covariant _StreamingMarkdown oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _latestText = widget.text;
+    if (!widget.streaming) {
+      _timer?.cancel();
+      _timer = null;
+      _renderedText = widget.text;
+      return;
+    }
+    if (widget.text != _renderedText && _timer == null) {
+      _timer = Timer(_window, () {
+        _timer = null;
+        if (!mounted || _latestText == _renderedText) return;
+        setState(() => _renderedText = _latestText);
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _timer = null;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      ZflowMarkdown(_renderedText, fontSize: 13);
+}
+
+@visibleForTesting
+Widget streamingMarkdownForTest({
+  Key? key,
+  required String text,
+  required bool streaming,
+}) => _StreamingMarkdown(key: key, text: text, streaming: streaming);
+
+Key? _assistantMarkdownKey(Map<String, dynamic> row) {
+  final rowId = row['rowId'];
+  if (rowId == null) return null;
+  return ValueKey('assistant-md:$rowId:${row['entityId'] ?? ''}');
+}
+
+class _AssistantBubble extends StatelessWidget {
+  final Map<String, dynamic> row;
+  final ConversationTransport transport;
+  final String sessionId;
+  final ConversationState state;
+  final bool showFeedback;
+  final bool Function()? isSourceCurrent;
+
+  /// 分叉成功后的宿主跳转回调(ChatPage → RootShell 切新会话)。
+  final void Function(String newSessionId)? onForkedSession;
+
+  const _AssistantBubble({
+    required this.row,
+    required this.transport,
+    required this.sessionId,
+    required this.state,
+    this.showFeedback = true,
+    this.isSourceCurrent,
+    this.onForkedSession,
+  });
+
+  /// 分叉(桌面端同款):以此消息为断点创建新会话;accepted/duplicate
+  /// 均为成功,成功取 result.sessionId 交给宿主跳转;拒绝弹 toast。
+  Map<String, dynamic> get _target => {
+    'rowId': row['rowId'],
+    if (row['entityId'] != null) 'entityId': row['entityId'],
+  };
+
+  Future<void> _fork(BuildContext context) async {
+    if (sessionId.isEmpty || (isSourceCurrent != null && !isSourceCurrent!())) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final res = await transport.forkAssistant(sessionId, _target);
+      if (!isRpcSuccess(res)) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              t(
+                'chat.content.forkRejected',
+                args: {'reason': rpcFailureReason(res)},
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+      final result = res['result'];
+      final newSessionId = result is Map
+          ? result['sessionId'] as String?
+          : null;
+      if (newSessionId == null || onForkedSession == null) return;
+      onForkedSession!(newSessionId);
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${t('chat.content.forkFailed')}: $e',
+          ),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = row['text'] as String? ?? '';
+    final streaming = row['state'] == 'streaming';
+    final rowTs = _rowTsOf(row);
+    return Container(
+      margin: const EdgeInsets.only(right: 24, top: 4, bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: EmberColors.of(context).card,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(EmberRadius.content),
+          topRight: Radius.circular(EmberRadius.content),
+          bottomRight: Radius.circular(EmberRadius.content),
+          bottomLeft: Radius.circular(EmberRadius.bubbleTail),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          streaming
+              ? _StreamingMarkdown(
+                  key: _assistantMarkdownKey(row),
+                  text: text,
+                  streaming: true,
+                )
+              : ZflowMarkdown(text, fontSize: 13),
+          if (showFeedback)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (streaming) ...[
+                  const Padding(
+                    padding: EdgeInsets.only(top: 6),
+                    child: SizedBox(
+                      width: 12,
+                      height: 12,
+                      child: CircularProgressIndicator(strokeWidth: 1.5),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  // 本条消息的发送时间(用户裁定):流式期间也显示。
+                  Text(
+                    _messageTimeLabel(rowTs),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: EmberColors.of(context).textFaint,
+                    ),
+                  ),
+                ] else ...[
+                  _FeedbackButton(
+                    icon: Icons.copy_outlined,
+                    active: false,
+                    onTap: () => Clipboard.setData(ClipboardData(text: text)),
+                  ),
+                  // 分叉(桌面端同款:消息操作行内,以此消息为断点创建
+                  // 新会话,成功后跳转)。
+                  _FeedbackButton(
+                    icon: Icons.fork_right,
+                    active: false,
+                    onTap: () => _fork(context),
+                  ),
+                  // 回合时间戳(桌面端约定:行尾小字,今天只给时刻)。
+                  Text(
+                    _messageTimeLabel(rowTs),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: EmberColors.of(context).textFaint,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 行级时间戳:协议 ts 优先(历史行带真实时间),回落视图层到达戳。
+int? _rowTsOf(Map<String, dynamic> row) {
+  final ts = (row['ts'] as num?)?.toInt() ?? 0;
+  if (ts > 0) return ts;
+  return (row['_zflowTs'] as num?)?.toInt();
+}
+
+/// 消息时间标签(对照桌面 chat.message.time):今天 HH:mm,昨天带
+/// "昨天"前缀,同年 M月d日,跨年带年份。
+String _messageTimeLabel(int? millis) =>
+    messageTimeLabel(AppLocale.current, millis);
+
+class _FeedbackButton extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _FeedbackButton({
+    required this.icon,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(
+        icon,
+        size: 15,
+        color: active
+            ? EmberColors.of(context).primary
+            : EmberColors.of(context).textFaint,
+      ),
+      onPressed: onTap,
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+/// Assistant thinking block. Ember look: tile one step darker than card
+/// (the bg↔card midpoint, per theme), 10pt radius, 3px state rail (run
+/// while streaming, faint when done). The label is a standalone faint
+/// caption row (▸/▾ prefix) toggling the body, replacing the old
+/// ExpansionTile header text.
+class _ReasoningTile extends StatefulWidget {
+  final String text;
+  final bool streaming;
+
+  /// 行时间戳(协议 ts / 视图层到达戳),尾部时间显示用;历史行可空。
+  final int? rowTs;
+
+  const _ReasoningTile({
+    required this.text,
+    this.streaming = false,
+    this.rowTs,
+  });
+
+  @override
+  State<_ReasoningTile> createState() => _ReasoningTileState();
+}
+
+class _ReasoningTileState extends State<_ReasoningTile> {
+  /// 默认展开（用户裁定）；折叠时显示一行预览。
+  bool _open = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = EmberColors.of(context);
+    final arrow = _open ? '▾ ' : '▸ ';
+    final preview = widget.text
+        .split('\n')
+        .firstWhere((l) => l.trim().isNotEmpty, orElse: () => '');
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: Color.lerp(e.bg, e.card, 0.5),
+        borderRadius: BorderRadius.circular(EmberRadius.control),
+        // Status accent rail: run while thinking, neutral when done. Drawn
+        // as a border rather than a stretched sibling Row child — Row
+        // + CrossAxisAlignment.stretch hands infinite height to its children
+        // inside the unbounded message list (crashes layout in debug and
+        // corrupts it in release).
+        border: Border(
+          left: BorderSide(
+            width: 3,
+            color: widget.streaming ? e.run : e.textFaint,
+          ),
+        ),
+      ),
+      // Compensate the border's painted width so content lines up exactly
+      // where the old rail child sat.
+      child: Padding(
+        padding: const EdgeInsets.only(left: 3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _open = !_open),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '$arrow${widget.streaming ? tr(context, 'chat.content.thinking') : tr(context, 'chat.content.thought')}',
+                      style: TextStyle(
+                        // 标签加大(用户裁定:可读性优先),预览仍
+                        // 保持小字弱化。
+                        fontSize: EmberType.body,
+                        fontWeight: FontWeight.w600,
+                        color: e.textSoft,
+                      ),
+                    ),
+                    if (!_open && preview.isNotEmpty) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          preview,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: EmberType.caption,
+                            color: e.textFaint.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (_open)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: ZflowMarkdown(widget.text, fontSize: 12),
+              ),
+            // 尾部时间戳(用户裁定,与工具块/助手消息一致):流式中附
+            // 转圈;行无戳且非流式则整行隐藏。
+            if (widget.streaming || (widget.rowTs ?? 0) > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.streaming) ...[
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 1.5),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      _messageTimeLabel(widget.rowTs),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: EmberColors.of(context).textFaint,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 工具族的强调色(用户裁定:不同工具输出块分色),全部取自 Ember 色板:
+/// todo/计划类主色、执行类(bash)琥珀、写文件类绿色、读/检索类蓝色、
+/// 其余回落主色。err 保留给错误状态,不参与分色。
+Color _toolAccent(String toolName, EmberColors e) {
+  final n = toolName.toLowerCase();
+  if (n.contains('todo') || n.contains('plan')) return e.primary;
+  if (n == 'bash' || n.contains('shell') || n.contains('terminal')) {
+    return e.warn;
+  }
+  if (n.contains('edit') || n.contains('write')) return e.ok;
+  if (n.contains('read') ||
+      n.contains('grep') ||
+      n.contains('glob') ||
+      n.contains('search') ||
+      n.contains('find')) {
+    return e.run;
+  }
+  return e.primary;
+}
+
+/// todo/计划工具输出解析(纯函数,公开给测试):逐个尝试
+/// input/inputText/content/output(含 output.text),全部失败返回 null
+/// (回落原始文本)。复用洞察面板的容错解析器。
+List<PlanStep>? todoStepsOf(Map<String, dynamic> row) {
+  for (final cand in _planPayloadCandidates(row)) {
+    final steps = _planStepsFromValue(cand);
+    if (steps != null) return steps;
+  }
+  return null;
+}
+
+/// 步骤列表块(工具块内的 todo 展示):状态图标 + 标题,完成项划线。
+Widget _todoStepsBlock(BuildContext context, List<PlanStep> steps) {
+  final e = EmberColors.of(context);
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final s in steps)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                Icon(
+                  s.completed
+                      ? Icons.check_circle
+                      : s.inProgress
+                      ? Icons.play_circle_outline
+                      : Icons.radio_button_unchecked,
+                  size: 13,
+                  color: s.completed
+                      ? e.ok
+                      : s.inProgress
+                      ? e.run
+                      : e.textFaint,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    s.title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: e.textSoft,
+                      decoration: s.completed
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+/// 工具输入里的目标文件路径(read/edit/write 等):优先 row.input,
+/// 回退解析 inputText JSON;路径键与 DiffView 同款。无则 null。
+String? toolTargetPathOf(Map<String, dynamic> row, String inputText) {
+  Map<String, dynamic>? input;
+  final raw = row['input'];
+  if (raw is Map) input = raw.cast<String, dynamic>();
+  if (input == null && inputText.trim().isNotEmpty) {
+    try {
+      final decoded = jsonDecode(inputText);
+      if (decoded is Map) input = decoded.cast<String, dynamic>();
+    } catch (_) {}
+  }
+  if (input == null) return null;
+  for (final k in const ['filePath', 'file_path', 'path', 'file']) {
+    final v = input[k];
+    if (v is String && v.trim().isNotEmpty) return v.trim();
+  }
+  return null;
+}
+
+/// 从工具行收集图片字节(用户裁定:图片也要能看):递归扫描
+/// display/output 下的 base64/data 字段,并提取文本中的 data URI;
+/// 解码失败的候选跳过。去重后返回。
+List<Uint8List> collectToolImages(Map<String, dynamic> row, String outputText) {
+  final out = <Uint8List>[];
+  final seen = <String>{};
+  void addEncoded(String s) {
+    var v = s.trim();
+    const prefix = 'data:image/';
+    if (v.startsWith(prefix)) {
+      final i = v.indexOf('base64,');
+      if (i != -1) v = v.substring(i + 'base64,'.length);
+    }
+    final bytes = decodeInlineToolImage(v);
+    if (bytes == null) return;
+    final key =
+        '${bytes.length}:${bytes.length > 8 ? bytes[0] : 0}'
+        ':${bytes.length > 16 ? bytes[8] : 0}';
+    if (!seen.add(key)) return;
+    out.add(bytes);
+  }
+
+  void walk(Object? o, int depth) {
+    if (o == null || depth > 6) return;
+    if (o is Map) {
+      for (final e in o.entries) {
+        final v = e.value;
+        if (v is String &&
+            (e.key == 'base64' || e.key == 'data' || e.key == 'dataUrl')) {
+          addEncoded(v);
+        } else {
+          walk(v, depth + 1);
+        }
+      }
+    } else if (o is List) {
+      for (final v in o) {
+        walk(v, depth + 1);
+      }
+    } else if (o is String) {
+      if (o.startsWith('data:image/') && o.contains('base64,')) {
+        addEncoded(o);
+      }
+    }
+  }
+
+  walk(row['display'], 0);
+  walk(row['output'], 0);
+  final dataUri = RegExp(
+    r'data:image/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+',
+    caseSensitive: false,
+  );
+  for (final m in dataUri.allMatches(outputText)) {
+    addEncoded(m.group(0)!);
+  }
+  return out;
+}
+
+/// WebSearch 输出的解析摘要(用户裁定:有解析过的摘要即可)。
+class WebSearchSummary {
+  final String? query;
+
+  /// 每条:{title, url, snippet}(均可空字符串)。
+  final List<Map<String, String>> items;
+
+  /// 无结构化条目时的答案/正文文本(如 {answer: "..."} 形状)。
+  final String? answerText;
+
+  const WebSearchSummary({this.query, required this.items, this.answerText});
+}
+
+/// 容错解析 WebSearch 工具输出:兼容 JSON(bare 数组 / results|data|
+/// items 包裹;条目取 title/url/snippet|content|description)与纯文本
+/// (含 URL 的行视作一条结果)。解析不出结构返回 null(回落原文)。
+@visibleForTesting
+WebSearchSummary? parseWebSearchSummary(String outputText) {
+  final trimmed = outputText.trim();
+  if (trimmed.isEmpty) return null;
+  Object? decoded;
+  try {
+    decoded = jsonDecode(trimmed);
+  } catch (_) {
+    decoded = null;
+  }
+  List<dynamic>? items;
+  String? query;
+  if (decoded is List) {
+    items = decoded;
+  } else if (decoded is Map) {
+    for (final k in const ['results', 'data', 'items', 'searchResults']) {
+      final v = decoded[k];
+      if (v is List && v.isNotEmpty) {
+        items = v;
+        break;
+      }
+    }
+    for (final k in const ['query', 'searchQuery', 'q']) {
+      final v = decoded[k];
+      if (v is String && v.trim().isNotEmpty) {
+        query = v.trim();
+        break;
+      }
+    }
+    if (items == null) {
+      for (final k in const ['answer', 'content', 'summary', 'text']) {
+        final v = decoded[k];
+        if (v is String && v.trim().isNotEmpty) {
+          return WebSearchSummary(
+            query: query,
+            items: const [],
+            answerText: v.trim(),
+          );
+        }
+      }
+      return null;
+    }
+  }
+  if (items == null || items.isEmpty) {
+    // 纯文本回落:含 URL 的行各视作一条结果(标题=去 URL 后的文字)。
+    final urlRe = RegExp(r'https?://\S+');
+    final rows = <Map<String, String>>[];
+    for (final line in trimmed.split('\n')) {
+      final m = urlRe.firstMatch(line);
+      if (m == null) continue;
+      final url = m.group(0)!;
+      final text = line.replaceAll(url, '').trim();
+      rows.add({'title': text.isEmpty ? url : text, 'url': url, 'snippet': ''});
+    }
+    return rows.isEmpty ? null : WebSearchSummary(items: rows);
+  }
+  final rows = <Map<String, String>>[];
+  for (final item in items) {
+    if (item is! Map) continue;
+    String str(Object? v) => v?.toString().trim() ?? '';
+    rows.add({
+      'title': str(item['title']).isNotEmpty
+          ? str(item['title'])
+          : str(item['url']),
+      'url': str(item['url']),
+      'snippet': str(item['snippet'] ?? item['content'] ?? item['description']),
+    });
+  }
+  return rows.isEmpty ? null : WebSearchSummary(query: query, items: rows);
+}
+
+/// WebSearch 结果摘要块(解析成功时替换原始输出):查询词 + 逐条
+/// 标题/摘要/链接。
+Widget _webSearchSummaryBlock(BuildContext context, WebSearchSummary summary) {
+  final e = EmberColors.of(context);
+  final hasItems = summary.items.isNotEmpty;
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (summary.query != null && summary.query!.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              tr(
+                context,
+                'chat.content.searchQuery',
+                args: {'query': '${summary.query}'},
+              ),
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: e.textSoft,
+              ),
+            ),
+          ),
+        if (!hasItems && (summary.answerText ?? '').isNotEmpty)
+          Text(
+            summary.answerText!,
+            style: TextStyle(fontSize: 11.5, height: 1.5, color: e.textSoft),
+          ),
+        for (final item in summary.items)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 3),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item['title'] ?? '',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: e.textSolid,
+                  ),
+                ),
+                if ((item['snippet'] ?? '').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Text(
+                      item['snippet']!,
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: e.textMuted),
+                    ),
+                  ),
+                if ((item['url'] ?? '').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Text(
+                      item['url']!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontFamily: EmberFonts.term,
+                        color: e.run,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+/// MCP/Skill 工具输出的解析摘要(用户裁定:有解析过的摘要即可)。
+/// [entries] 非空 = 顶层键值摘要;[text] 非空 = MCP content 文本。
+class ToolTextSummary {
+  final List<MapEntry<String, String>>? entries;
+  final String? text;
+
+  const ToolTextSummary.entries(this.entries) : text = null;
+  const ToolTextSummary.text(this.text) : entries = null;
+}
+
+/// 解析 MCP/Skill 工具输出(容错,失败返回 null 回落原文):
+/// - MCP 结果形状 {content: [{type:'text', text:...}]} → 拼接文本;
+/// - 其他 JSON 对象 → 顶层键值摘要(值截断);JSON 数组 → 逐行拼接。
+@visibleForTesting
+ToolTextSummary? parseMcpSkillSummary(String outputText) {
+  final trimmed = outputText.trim();
+  if (trimmed.isEmpty) return null;
+  Object? decoded;
+  try {
+    decoded = jsonDecode(trimmed);
+  } catch (_) {
+    return null;
+  }
+  String compact(Object? v) {
+    if (v == null) return 'null';
+    if (v is String) return v;
+    return jsonEncode(v);
+  }
+
+  if (decoded is Map) {
+    final contentList = decoded['content'];
+    if (contentList is List) {
+      // MCP 标准结果形状:content[].type == 'text' 的 text 拼接。
+      final texts = <String>[];
+      for (final item in contentList) {
+        if (item is Map && item['type'] == 'text' && item['text'] is String) {
+          texts.add(item['text'] as String);
+        }
+      }
+      if (texts.isNotEmpty) return ToolTextSummary.text(texts.join('\n'));
+    }
+    final entries = <MapEntry<String, String>>[
+      for (final e in decoded.entries)
+        MapEntry(e.key.toString(), compact(e.value)),
+    ];
+    if (entries.isNotEmpty) return ToolTextSummary.entries(entries);
+    return null;
+  }
+  if (decoded is List) {
+    return ToolTextSummary.text(decoded.map(compact).join('\n'));
+  }
+  return null;
+}
+
+/// MCP/Skill 摘要块:键值行或文本段落。
+Widget _toolTextSummaryBlock(BuildContext context, ToolTextSummary summary) {
+  final e = EmberColors.of(context);
+  final entries = summary.entries;
+  return Padding(
+    padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (summary.text != null)
+          Text(
+            summary.text!,
+            style: TextStyle(fontSize: 11.5, height: 1.5, color: e.textSoft),
+          ),
+        for (final entry in (entries ?? const <MapEntry<String, String>>[]))
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${entry.key}: ',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: e.textSoft,
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    entry.value,
+                    style: TextStyle(fontSize: 11.5, color: e.textSoft),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+/// 工具调用块。Ember look matches [_ReasoningTile]: tile one step
+/// darker than card, 10pt radius, 3px rail colored by status (success→ok,
+/// error→err, running→run). The tool name is a standalone caption row
+/// (▸/▾ prefix, term font, 工具族强调色) toggling the input/output/error
+/// detail.
+class _ToolCallTile extends StatefulWidget {
+  final Map<String, dynamic> row;
+
+  const _ToolCallTile({required this.row});
+
+  @override
+  State<_ToolCallTile> createState() => _ToolCallTileState();
+}
+
+class _ToolCallTileState extends State<_ToolCallTile> {
+  /// 默认展开(用户裁定);read 工具例外——输出为整个文件内容,
+  /// 默认折叠(用户裁定),折叠预览优先显示目标文件路径。todoRead
+  /// 是待办清单小输出,不在此列。
+  late bool _open = !_isReadTool;
+
+  bool get _isReadTool {
+    final n = widget.row['toolName'] as String? ?? '';
+    return n.toLowerCase().contains('read') &&
+        !n.toLowerCase().contains('todo');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final row = widget.row;
+    final e = EmberColors.of(context);
+    final toolName = row['toolName'] as String? ?? 'tool';
+    final status = row['status'] as String? ?? '';
+    final inputText = row['inputText'] as String? ?? '';
+    final output = row['output'];
+    final outputText = output is Map ? output['text'] as String? ?? '' : '';
+    final error = row['error'];
+    final progress = row['progress'];
+    final display = row['display'];
+    final diff = extractDiff(row);
+
+    /// 折叠态的一行预览:目标文件路径优先(read/edit 等带路径输入,
+    /// 用户裁定:与 edit 一样可见操作对象),回落输入/输出首行。
+    final toolPath = toolTargetPathOf(row, inputText);
+    final toolPreview =
+        (toolPath ?? (inputText.isNotEmpty ? inputText : outputText))
+            .split('\n')
+            .firstWhere((l) => l.trim().isNotEmpty, orElse: () => '');
+
+    /// bash 工具保留原始输入输出;其余工具直接展示结果。
+    final isBash = toolName.toLowerCase() == 'bash';
+
+    /// 工具族强调色(分色 + 名称着色,用户裁定)。
+    final accent = _toolAccent(toolName, e);
+
+    /// todo/计划工具:输出 JSON 解析成步骤列表展示(用户裁定:不铺
+    /// 原始 JSON)。仅对 todo/计划类工具启用,解析失败回落原始文本。
+    final todoSteps = isBash || !_todoPlanToolName.hasMatch(toolName)
+        ? null
+        : todoStepsOf(row);
+
+    /// WebSearch 工具:输出解析为搜索结果摘要(用户裁定)。
+    final isWebSearch =
+        toolName.toLowerCase().contains('websearch') ||
+        toolName.toLowerCase().contains('web_search');
+    final webSearch = isWebSearch ? parseWebSearchSummary(outputText) : null;
+
+    /// MCP/Skill 工具:输出解析为摘要(用户裁定)——MCP content 文本
+    /// 或顶层键值摘要;解析失败回落原始文本。
+    final isMcpOrSkill =
+        toolName.toLowerCase().contains('mcp') ||
+        toolName.toLowerCase().contains('skill');
+    final mcpSummary =
+        (!isBash &&
+            todoSteps == null &&
+            webSearch == null &&
+            (isMcpOrSkill || outputText.contains('"content":[')))
+        ? parseMcpSkillSummary(outputText)
+        : null;
+
+    final (icon, color) = switch (status) {
+      'running' ||
+      'inputStreaming' ||
+      'pendingApproval' => (Icons.hourglass_top, e.run),
+      'success' => (Icons.check, e.ok),
+      'error' => (Icons.error_outline, e.err),
+      'cancelled' => (Icons.block, e.warn),
+      _ => (Icons.build_outlined, e.textFaint),
+    };
+
+    final images =
+        display is Map &&
+            display['kind'] == 'node_repl_images' &&
+            display['images'] is List
+        ? display['images'] as List
+        : const [];
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      decoration: BoxDecoration(
+        color: Color.lerp(e.bg, e.card, 0.5),
+        borderRadius: BorderRadius.circular(EmberRadius.control),
+        // Status rail mirrors the icon color so the state reads at a glance
+        // even while collapsed. Drawn as a border rather than a stretched
+        // sibling Row child — Row + CrossAxisAlignment.stretch hands
+        // infinite height to its children inside the unbounded message list
+        // (crashes layout in debug and corrupts it in release).
+        border: Border(left: BorderSide(width: 3, color: color)),
+      ),
+      // Compensate the border's painted width so content lines up exactly
+      // where the old rail child sat.
+      child: Padding(
+        padding: const EdgeInsets.only(left: 3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => setState(() => _open = !_open),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      _open ? '▾ ' : '▸ ',
+                      style: TextStyle(
+                        fontSize: EmberType.caption,
+                        color: e.textFaint,
+                      ),
+                    ),
+                    Icon(icon, size: 12, color: color),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        toolName,
+                        style: TextStyle(
+                          // 名称加大着色(用户裁定:可读性优先),
+                          // 与左侧状态图标、标题族色一致。
+                          fontSize: EmberType.body,
+                          fontFamily: EmberFonts.term,
+                          color: accent,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    // 执行状态文字(用户裁定):标题里直接可见,不只靠颜色。
+                    if (status == 'running' ||
+                        status == 'inputStreaming' ||
+                        status == 'pendingApproval') ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        tr(context, 'chat.content.toolRunning'),
+                        style: TextStyle(
+                          fontSize: EmberType.caption,
+                          color: e.run,
+                        ),
+                      ),
+                    ] else if (status == 'success') ...[
+                      const SizedBox(width: 6),
+                      Text(
+                        tr(context, 'chat.content.toolDone'),
+                        style: TextStyle(
+                          fontSize: EmberType.caption,
+                          color: e.textFaint,
+                        ),
+                      ),
+                    ],
+                    if (!_open) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          toolPreview,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: EmberType.caption,
+                            color: e.textFaint.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            if (_open) ...[
+              // 目标文件路径行(用户裁定:read 等与 edit 一样显示操作
+              // 对象);edit 已有 diff 路径头,不重复。
+              if (toolPath != null && diff == null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 6),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.insert_drive_file_outlined,
+                        size: 12,
+                        color: e.textFaint,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          toolPath,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontFamily: EmberFonts.term,
+                            color: e.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // 用户裁定:bash 保留原始输入输出,其余工具直接展示结果
+              // (不再铺原始输入/输出 kv);todo/计划工具解析成步骤列表。
+              if (isBash) ...[
+                if (inputText.isNotEmpty)
+                  _kv(
+                    context,
+                    tr(context, 'chat.content.input'),
+                    inputText,
+                    accent,
+                  ),
+                if (outputText.isNotEmpty)
+                  _kv(
+                    context,
+                    tr(context, 'chat.content.output'),
+                    outputText,
+                    accent,
+                  ),
+              ] else if (todoSteps != null)
+                _todoStepsBlock(context, todoSteps)
+              else if (webSearch != null)
+                _webSearchSummaryBlock(context, webSearch)
+              else if (mcpSummary != null)
+                _toolTextSummaryBlock(context, mcpSummary)
+              else if (outputText.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      // 输出块按工具族着色(用户裁定):同一强调色的
+                      // 低透明度底,随明暗主题自动适配。
+                      color: accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: SelectableText(
+                      outputText,
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        height: 1.45,
+                        color: EmberColors.of(context).textSoft,
+                      ),
+                    ),
+                  ),
+                ),
+              if (error is Map)
+                _kv(
+                  context,
+                  tr(context, 'chat.content.error'),
+                  '${error['code'] ?? ''} ${error['message'] ?? ''}',
+                ),
+            ],
+            if (progress is Map) _ProgressRow(progress: progress),
+            if (diff != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                child: DiffView(diff: diff),
+              ),
+            for (final image in images)
+              if (image is Map && image['base64'] is String)
+                Builder(
+                  builder: (context) {
+                    final bytes = decodeInlineToolImage(
+                      image['base64'] as String,
+                    );
+                    if (bytes == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(
+                          bytes,
+                          fit: BoxFit.contain,
+                          // Cap the decode at viewport width — inline tool
+                          // outputs can embed multi-megapixel renders.
+                          cacheWidth:
+                              (MediaQuery.sizeOf(context).width *
+                                      MediaQuery.devicePixelRatioOf(context))
+                                  .round(),
+                          errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            // 查看按钮(用户裁定:所有工具、所有文件类型,点开全屏
+            // 查看工具输出),位于尾部转圈/时间戳上方。
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () => _viewOutput(
+                    context,
+                    row,
+                    inputText,
+                    outputText,
+                    toolName,
+                  ),
+                  icon: const Icon(Icons.visibility_outlined, size: 14),
+                  label: Text(
+                    tr(context, 'chat.content.view'),
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: e.textMuted,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    minimumSize: const Size(0, 30),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ),
+            ),
+            // 尾部时间戳(用户裁定,与助手消息一致):运行中附转圈,
+            // 完成后仅时间;行无戳(历史)则整行隐藏。标题块的执行中/
+            // 执行完毕状态文字不受影响。
+            if (status == 'running' ||
+                status == 'inputStreaming' ||
+                status == 'pendingApproval' ||
+                _messageTimeLabel(_rowTsOf(row)).isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (status == 'running' ||
+                        status == 'inputStreaming' ||
+                        status == 'pendingApproval') ...[
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 1.5),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      _messageTimeLabel(_rowTsOf(row)),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: EmberColors.of(context).textFaint,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 查看工具输出(用户裁定):有 diff 的工具(编辑类)全屏展示变更;
+  /// 其余展示文本与图片;输出被宿主截断时提示「后续内容已省略」
+  /// (桌面端同款文案,协议不提供取回接口)。
+  void _viewOutput(
+    BuildContext context,
+    Map<String, dynamic> row,
+    String inputText,
+    String outputText,
+    String toolName,
+  ) {
+    final path = toolTargetPathOf(row, inputText);
+    final title = path == null ? toolName : '$toolName · $path';
+    final diff = extractDiff(row);
+    final truncated = row['truncated'] is Map
+        ? (row['truncated'] as Map)['totalBytes'] as num?
+        : null;
+    if (diff != null) {
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        builder: (context) => _ToolDiffSheet(title: title, diff: diff),
+      );
+      return;
+    }
+    final images = collectToolImages(row, outputText);
+    final dataUri = RegExp(
+      r'data:image/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+',
+      caseSensitive: false,
+    );
+    final text = outputText.replaceAll(dataUri, '').trim();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _ToolOutputSheet(
+        title: title,
+        content: text,
+        images: images,
+        truncatedBytes: truncated?.toInt(),
+      ),
+    );
+  }
+
+  Widget _kv(
+    BuildContext context,
+    String label,
+    String value, [
+    Color? accent,
+  ]) {
+    final e = EmberColors.of(context);
+    // Pretty-print JSON input when possible (official shows structured view)
+    final display = formatToolValue(value);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: 10.5, color: accent ?? e.textFaint),
+          ),
+          const SizedBox(height: 2),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              // 工具族分色(用户裁定):有强调色时以低透明度着底,否则
+              // 用共用代码表面。
+              color: accent != null
+                  ? accent.withValues(alpha: 0.1)
+                  : e.codeBlockBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: SelectableText(
+              display,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 11,
+                color: e.textSolid,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 工具输出全屏查看器(用户裁定:所有工具、所有文件类型,文本与
+/// 图片都能看):等宽可选中文本支持横向滚动,图片整幅随页滚动。
+/// [truncatedBytes] 非空 = 宿主截断了输出,底部提示后续已省略。
+class _ToolOutputSheet extends StatelessWidget {
+  final String title;
+  final String content;
+  final List images;
+  final int? truncatedBytes;
+
+  const _ToolOutputSheet({
+    required this.title,
+    required this.content,
+    required this.images,
+    this.truncatedBytes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = EmberColors.of(context);
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.heightOf(context) * 0.92,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: colors.textSolid,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: tr(context, 'chat.content.close'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close, size: 20, color: colors.textMuted),
+                  ),
+                ],
+              ),
+              const Divider(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (content.isNotEmpty)
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SelectableText(
+                            content,
+                            style: TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11.5,
+                              height: 1.5,
+                              color: colors.textSoft,
+                            ),
+                          ),
+                        ),
+                      for (final image in images)
+                        if (image is Map && image['base64'] is String)
+                          Builder(
+                            builder: (context) {
+                              final bytes = decodeInlineToolImage(
+                                image['base64'] as String,
+                              );
+                              if (bytes == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.memory(
+                                    bytes,
+                                    fit: BoxFit.contain,
+                                    width: double.infinity,
+                                    // Cap the decode at viewport width —
+                                    // inline renders can be huge.
+                                    cacheWidth:
+                                        (MediaQuery.sizeOf(context).width *
+                                                MediaQuery.devicePixelRatioOf(
+                                                  context,
+                                                ))
+                                            .round(),
+                                    errorBuilder: (_, _, _) =>
+                                        const SizedBox.shrink(),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                      if (content.isEmpty && images.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            tr(context, 'chat.content.viewerNoData'),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.textFaint,
+                            ),
+                          ),
+                        ),
+                      if (truncatedBytes != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            tr(
+                              context,
+                              'chat.content.truncatedBytes',
+                              args: {'bytes': truncatedBytes},
+                            ),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: colors.textFaint,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 工具变更全屏查看(编辑类工具的「查看」):目标文件路径 + 完整
+/// diff,随页滚动。
+class _ToolDiffSheet extends StatelessWidget {
+  final String title;
+  final DiffData diff;
+
+  const _ToolDiffSheet({required this.title, required this.diff});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = EmberColors.of(context);
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.heightOf(context) * 0.92,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: EmberFonts.term,
+                        color: colors.textSolid,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: tr(context, 'chat.content.close'),
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(Icons.close, size: 20, color: colors.textMuted),
+                  ),
+                ],
+              ),
+              const Divider(height: 16),
+              Expanded(
+                child: SingleChildScrollView(child: DiffView(diff: diff)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgressRow extends StatelessWidget {
+  final Map progress;
+
+  const _ProgressRow({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = (progress['bytes'] as num?)?.toInt() ?? 0;
+    final preview = progress['previewLine'] as String? ?? '';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(strokeWidth: 1.5),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              [
+                if (preview.isNotEmpty) preview,
+                '${(bytes / 1024).toStringAsFixed(1)} KB',
+              ].join(' · '),
+              style: TextStyle(
+                fontSize: 11,
+                color: EmberColors.of(context).textFaint,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TurnHeader extends StatefulWidget {
+  final Map<String, dynamic> row;
+
+  /// First error snippet of this turn's failed tool calls (failure state).
+  final String? errorSummary;
+
+  const _TurnHeader({required this.row, this.errorSummary});
+
+  @override
+  State<_TurnHeader> createState() => _TurnHeaderState();
+}
+
+class _TurnHeaderState extends State<_TurnHeader> {
+  final Stopwatch _watch = Stopwatch();
+  Timer? _ticker;
+
+  String get _state => widget.row['state'] as String? ?? '';
+
+  @override
+  void initState() {
+    super.initState();
+    _syncTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TurnHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncTimer();
+  }
+
+  /// The wire only sends activeMs on completion, so while running the
+  /// elapsed time ticks from a local stopwatch (started when the running
+  /// header first appeared — reopening an already-running turn counts from
+  /// open). If a live activeMs shows up in deltas, it wins.
+  void _syncTimer() {
+    final running = _state == 'running';
+    if (running && !_watch.isRunning) {
+      _watch.start();
+      _ticker ??= Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted && _watch.isRunning) setState(() {});
+      });
+    } else if (!running && _watch.isRunning) {
+      _watch.stop();
+      _ticker?.cancel();
+      _ticker = null;
+      if (mounted) setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  String _fmtDuration(int? ms) {
+    if (ms == null || ms <= 0) return '';
+    if (ms < 1000) return '${ms}ms';
+    final s = ms / 1000;
+    if (s < 60) return '${s.toStringAsFixed(1)}s';
+    final m = s ~/ 60;
+    return '${m}m${(s % 60).round()}s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = _state;
+    final fileChanges = widget.row['fileChanges'];
+    final activeMs = (widget.row['activeMs'] as num?)?.toInt();
+    final duration = _fmtDuration(activeMs);
+    final liveMs = (activeMs != null && activeMs > 0)
+        ? activeMs
+        : _watch.elapsedMilliseconds;
+
+    String stats = '';
+    if (fileChanges is Map) {
+      final adds = fileChanges['additions'];
+      final dels = fileChanges['deletions'];
+      final files = fileChanges['files'];
+      final parts = <String>[
+        if (adds is num && adds > 0) '+$adds',
+        if (dels is num && dels > 0) '-$dels',
+        if (files is num && files > 0)
+          tr(context, 'chat.content.filesCount', args: {'files': files}),
+      ];
+      stats = parts.join(' ');
+    }
+
+    final errSummary = widget.errorSummary?.trim();
+    final liveLabel = _fmtDuration(liveMs);
+    final label = switch (state) {
+      'running' => liveLabel.isEmpty
+          ? tr(context, 'chat.content.turnRunning')
+          : tr(
+              context,
+              'chat.content.turnRunningWithTime',
+              args: {'time': liveLabel},
+            ),
+      'completedSuccess' => [
+        tr(context, 'chat.content.turnCompleted'),
+        if (duration.isNotEmpty) duration,
+        if (stats.isNotEmpty) stats,
+      ].join(' · '),
+      'completedInterrupted' => tr(context, 'chat.content.interrupted'),
+      'failed' => [
+        tr(context, 'chat.content.turnFailed'),
+        if (errSummary != null && errSummary.isNotEmpty) errSummary,
+      ].join(' · '),
+      _ => '',
+    };
+    if (label.isEmpty) return const SizedBox.shrink();
+    final color = switch (state) {
+      'running' => EmberColors.of(context).run,
+      'failed' => EmberColors.of(context).err,
+      'completedInterrupted' => EmberColors.of(context).warn,
+      _ => EmberColors.of(context).textFaint,
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          const Expanded(child: Divider()),
+          Flexible(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                label,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: color.withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+          ),
+          const Expanded(child: Divider()),
+        ],
+      ),
+    );
+  }
+}
+
+class _TimelineMarkerWidget extends StatelessWidget {
+  final Map<String, dynamic> row;
+
+  const _TimelineMarkerWidget({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    final marker = row['marker'];
+    if (marker is! Map) return const SizedBox.shrink();
+    final type = '${marker['type'] ?? ''}';
+
+    final (icon, text, color) = switch (type) {
+      'compact' => (
+        Icons.compress,
+        '${tr(context, 'chat.content.contextCompacted', args: {'status': '${marker['status'] ?? ''}'})}'
+            '${marker['tokensBefore'] != null ? ' · ${marker['tokensBefore']}→${marker['tokensAfter'] ?? '?'} tokens' : ''}',
+        EmberColors.of(context).primary,
+      ),
+      'forkNotice' => (
+        Icons.fork_right,
+        tr(context, 'chat.content.forkedFromSession'),
+        EmberColors.of(context).textFaint,
+      ),
+      'forkCreated' => (
+        Icons.fork_right,
+        tr(context, 'chat.content.forkSessionCreated'),
+        EmberColors.of(context).textFaint,
+      ),
+      'modelChange' => (
+        Icons.swap_horiz,
+        tr(
+          context,
+          'chat.content.modelChanged',
+          args: {
+            'from': '${marker['fromModel'] ?? ''}',
+            'to': '${marker['toModel'] ?? ''}',
+          },
+        ),
+        EmberColors.of(context).warn,
+      ),
+      'goalSet' => (
+        Icons.flag_outlined,
+        tr(
+          context,
+          'chat.content.goalSet',
+          args: {'objective': '${marker['objective'] ?? ''}'},
+        ),
+        EmberColors.of(context).ok,
+      ),
+      'goalVerify' => (
+        Icons.fact_check_outlined,
+        tr(
+          context,
+          'chat.content.goalVerification',
+          args: {
+            'iteration': '${marker['iteration'] ?? '?'}',
+            'outcome': '${marker['outcome'] ?? ''}',
+          },
+        ),
+        EmberColors.of(context).ok,
+      ),
+      'retryNotice' => (
+        Icons.refresh,
+        tr(
+          context,
+          'chat.content.autoRetry',
+          args: {
+            'attempt': '${marker['attempt'] ?? '?'}',
+            'reason': '${marker['reasonCode'] ?? ''}',
+          },
+        ),
+        EmberColors.of(context).warn,
+      ),
+      'checkpointRestored' => (
+        Icons.restore,
+        tr(context, 'chat.content.checkpointRestored'),
+        EmberColors.of(context).textFaint,
+      ),
+      _ => (Icons.info_outline, type, EmberColors.of(context).textFaint),
+    };
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                text,
+                style: TextStyle(fontSize: 11, color: color),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SubagentTile extends StatelessWidget {
+  final Map<String, dynamic> row;
+
+  const _SubagentTile({required this.row});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.deepPurple.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.smart_toy_outlined,
+            size: 15,
+            color: Colors.deepPurpleAccent,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${tr(context, 'chat.content.subagent')} · ${row['subagentType'] ?? ''}',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                Text(
+                  '${row['status'] ?? ''}  ${row['summaryText'] ?? ''}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: EmberColors.of(context).textFaint,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 回合文件变更的查看器:拉取 conversationFileChangesV4 并展示。解析出
+/// 文件清单时用结构化列表(路径 + 增删行数,桌面变更条同款信息),形状
+/// 未知时回退原始 JSON。
+Future<void> showTurnFileChangesSheet(
+  BuildContext context, {
+  required ConversationTransport transport,
+  required String sessionId,
+  required Map<String, dynamic> header,
+  int Function()? beginFileChangesOperation,
+  bool Function(int generation)? isFileChangesOperationCurrent,
+  bool Function()? isSourceCurrent,
+}) async {
+  if (isSourceCurrent != null && !isSourceCurrent()) return;
+  final operationGeneration = beginFileChangesOperation?.call();
+  try {
+    final changes = await transport.fileChanges(
+      sessionId,
+      target: {'rowId': header['rowId'], 'entityId': header['entityId']},
+    );
+    if (!context.mounted ||
+        (isSourceCurrent != null && !isSourceCurrent()) ||
+        (operationGeneration != null &&
+            !(isFileChangesOperationCurrent?.call(operationGeneration) ??
+                true))) {
+      return;
+    }
+    final entries = parseFileChangeEntries(changes);
+    if (entries == null) {
+      showModalBottomSheet(
+        context: context,
+        builder: (context) => _JsonSheet(
+          title: tr(context, 'chat.content.edit'),
+          data: changes,
+        ),
+      );
+      return;
+    }
+    final adds = (header['fileChanges']?['additions'] as num?)?.toInt();
+    final dels = (header['fileChanges']?['deletions'] as num?)?.toInt();
+    showModalBottomSheet(
+      context: context,
+      builder: (context) =>
+          _FileChangesSheet(entries: entries, additions: adds, deletions: dels),
+    );
+  } catch (e) {
+    if (context.mounted &&
+        (isSourceCurrent == null || isSourceCurrent()) &&
+        (operationGeneration == null ||
+            (isFileChangesOperationCurrent?.call(operationGeneration) ??
+                true))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            tr(context, 'chat.content.fetchFailed', args: {'error': '$e'}),
+          ),
+        ),
+      );
+    }
+  }
+}
+
+/// 解析文件变更响应为条目(path/状态/增删)。形状未知返回 null(回退
+/// 原始 JSON 展示)。
+List<({String path, int? additions, int? deletions})>? parseFileChangeEntries(
+  Object? changes,
+) {
+  List? list;
+  if (changes is List) {
+    list = changes;
+  } else if (changes is Map) {
+    for (final k in const ['files', 'changes', 'entries', 'items']) {
+      final v = changes[k];
+      if (v is List && v.isNotEmpty) {
+        list = v;
+        break;
+      }
+    }
+    if (list == null && changes['path'] != null) list = [changes];
+  }
+  if (list == null) return null;
+  final entries = <({String path, int? additions, int? deletions})>[];
+  for (final item in list) {
+    if (item is! Map) return null;
+    final path = '${item['path'] ?? item['file'] ?? item['name'] ?? ''}';
+    if (path.isEmpty) return null;
+    entries.add((
+      path: path,
+      additions:
+          (item['additions'] as num?)?.toInt() ??
+          (item['added'] as num?)?.toInt(),
+      deletions:
+          (item['deletions'] as num?)?.toInt() ??
+          (item['removed'] as num?)?.toInt(),
+    ));
+  }
+  return entries.isEmpty ? null : entries;
+}
+
+/// 回合内文件变更卡(桌面 `› N 个文件已更改 +312 -2` 样式):点击拉取
+/// 明细并展示。
+class _FileChangesCard extends StatelessWidget {
+  final Map<String, dynamic> header;
+  final ConversationTransport transport;
+  final String sessionId;
+  final int Function()? beginFileChangesOperation;
+  final bool Function(int generation)? isFileChangesOperationCurrent;
+  final bool Function()? isSourceCurrent;
+
+  const _FileChangesCard({
+    required this.header,
+    required this.transport,
+    required this.sessionId,
+    this.beginFileChangesOperation,
+    this.isFileChangesOperationCurrent,
+    this.isSourceCurrent,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = EmberColors.of(context);
+    final fileChanges = header['fileChanges'] as Map? ?? const {};
+    final files = (fileChanges['files'] as num?)?.toInt() ?? 0;
+    final adds = (fileChanges['additions'] as num?)?.toInt();
+    final dels = (fileChanges['deletions'] as num?)?.toInt();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(EmberRadius.control),
+        onTap: () => showTurnFileChangesSheet(
+          context,
+          transport: transport,
+          sessionId: sessionId,
+          header: header,
+          beginFileChangesOperation: beginFileChangesOperation,
+          isFileChangesOperationCurrent: isFileChangesOperationCurrent,
+          isSourceCurrent: isSourceCurrent,
+        ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          decoration: BoxDecoration(
+            color: Color.lerp(colors.bg, colors.card, 0.5),
+            borderRadius: BorderRadius.circular(EmberRadius.control),
+            border: Border.all(color: colors.hairline),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.chevron_right, size: 14, color: colors.textFaint),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  tr(
+                    context,
+                    'chat.content.filesChanged',
+                    args: {'files': files},
+                  ),
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: colors.textSolid,
+                  ),
+                ),
+              ),
+              if (adds != null && adds > 0)
+                Text(
+                  '+$adds',
+                  style: TextStyle(fontSize: 12, color: colors.ok),
+                ),
+              if (dels != null && dels > 0) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '-$dels',
+                  style: TextStyle(fontSize: 12, color: colors.err),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 结构化文件变更明细(桌面变更面板样式):统计头 + 路径/增删行。
+class _FileChangesSheet extends StatelessWidget {
+  final List<({String path, int? additions, int? deletions})> entries;
+  final int? additions;
+  final int? deletions;
+
+  const _FileChangesSheet({
+    required this.entries,
+    this.additions,
+    this.deletions,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = EmberColors.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: EmberSpacing.page,
+              ),
+              child: Row(
+                children: [
+                  Text(
+                    tr(
+                      context,
+                      'chat.content.editCount',
+                      args: {'count': entries.length},
+                    ),
+                    style: TextStyle(
+                      fontSize: EmberType.body,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textSolid,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (additions != null && additions! > 0)
+                    Text(
+                      '+$additions',
+                      style: TextStyle(fontSize: 12.5, color: colors.ok),
+                    ),
+                  if (deletions != null && deletions! > 0) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '-$deletions',
+                      style: TextStyle(fontSize: 12.5, color: colors.err),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Divider(height: 16),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: entries.length,
+                itemBuilder: (context, i) {
+                  final e = entries[i];
+                  final name = e.path
+                      .split('/')
+                      .where((p) => p.isNotEmpty)
+                      .last;
+                  final dir = e.path.substring(0, e.path.length - name.length);
+                  return ListTile(
+                    dense: true,
+                    leading: Icon(
+                      Icons.insert_drive_file_outlined,
+                      size: 16,
+                      color: colors.textFaint,
+                    ),
+                    title: Text(
+                      name,
+                      style: TextStyle(fontSize: 12.5, color: colors.textSolid),
+                    ),
+                    subtitle: dir.isEmpty
+                        ? null
+                        : Text(
+                            dir,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              color: colors.textFaint,
+                            ),
+                          ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (e.additions != null && e.additions! > 0)
+                          Text(
+                            '+${e.additions}',
+                            style: TextStyle(fontSize: 11.5, color: colors.ok),
+                          ),
+                        if (e.deletions != null && e.deletions! > 0) ...[
+                          const SizedBox(width: 6),
+                          Text(
+                            '-${e.deletions}',
+                            style: TextStyle(fontSize: 11.5, color: colors.err),
+                          ),
+                        ],
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- bars
+
+class _ContextUsageBar extends StatelessWidget {
+  final ConversationState state;
+
+  const _ContextUsageBar({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final usage = state.usage;
+    final window = usage?['contextWindow'];
+    if (window is! Map) return const SizedBox.shrink();
+    final used = (window['usedTokens'] as num?)?.toInt();
+    final max = (window['maxTokens'] as num?)?.toInt();
+    if (used == null || max == null || max <= 0) {
+      return const SizedBox.shrink();
+    }
+    final ratio = (used / max).clamp(0.0, 1.0);
+    final color = ratio > 0.8
+        ? EmberColors.of(context).warn
+        : EmberColors.of(context).primary;
+    String fmt(int v) => v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}k' : '$v';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 4,
+                backgroundColor: EmberColors.of(context).raise,
+                valueColor: AlwaysStoppedAnimation(color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${fmt(used)}/${fmt(max)}',
+            style: TextStyle(fontSize: 10, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}

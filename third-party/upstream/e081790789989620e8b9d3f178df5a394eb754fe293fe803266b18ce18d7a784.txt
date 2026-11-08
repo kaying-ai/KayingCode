@@ -1,0 +1,29 @@
+{
+  "name": "proxy-agent-negotiate",
+  "version": "1.1.0",
+  "license": "MIT",
+  "repository": {
+    "url": "git+https://github.com/TooTallNate/proxy-agents.git",
+    "type": "git",
+    "directory": "packages/negotiate"
+  },
+  "dist": {
+    "shasum": "de7d37aede9d71e74346125d6f484fac8092b615",
+    "tarball": "https://registry.npmjs.org/proxy-agent-negotiate/-/proxy-agent-negotiate-1.1.0.tgz",
+    "fileCount": 5,
+    "integrity": "sha512-N8IBcM3UgCVzz2L2Lqv8DVntDnnC8/hiV4nEDUPkqq72TPUgYWjQc+bdZlBPZK9LzPAvOY//gAt0S0DApoOXWQ==",
+    "signatures": [
+      {
+        "sig": "MEUCIAZXJuIWPDmBLjX2GPp2P3IVQwLz6IXCGSoirTOpj8K8AiEA7AdjZQHKd+Tw+3NHgrk7RlO1GBtxZ/EYQkjdSamE5oY=",
+        "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U"
+      }
+    ],
+    "attestations": {
+      "url": "https://registry.npmjs.org/-/npm/v1/attestations/proxy-agent-negotiate@1.1.0",
+      "provenance": {
+        "predicateType": "https://slsa.dev/provenance/v1"
+      }
+    },
+    "unpackedSize": 4509
+  }
+}

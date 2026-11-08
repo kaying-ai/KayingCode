@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "image_search": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${KAYINGCODE_PLUGIN_ROOT}/scripts/image-search-server.mjs"],
+      "timeoutMs": 30000
+    }
+  }
+}

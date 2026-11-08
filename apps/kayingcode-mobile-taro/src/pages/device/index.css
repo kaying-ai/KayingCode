@@ -1,0 +1,45 @@
+.device-card {
+  margin-bottom: 12px;
+}
+.device-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.device-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--raise);
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.device-card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.device-action {
+  flex: 1;
+  margin: 0;
+  font-size: 12px;
+}
+.device-add {
+  margin-top: 4px;
+  padding: 14px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.device-add-choice {
+  border-bottom: 0;
+  padding: 8px 0;
+}

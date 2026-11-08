@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@zcode/plugin-creator-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Develop and validate KayingCode plugins through a local dev marketplace, installation, trials and updates.",
+  "license": "MIT"
+}

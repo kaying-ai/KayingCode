@@ -1,0 +1,1388 @@
+## <small>1.24.14 (2026-09-09)</small>
+
+### Bug Fixes
+
+* proxy: 恢复服务端兼容行为并隔离 Maker 专属策略 (#467) (ef17085)
+* maker: 完善本地访问限制与提交同步 (#464) (2fa1bd2)
+
+## <small>1.24.13 (2026-09-07)</small>
+
+### Bug Fixes
+
+* h5: 完善首次传包与广告方向恢复流程 (#454) (fecb6ff)
+* maker: 支持主动拉取并安装用户 Skills (#427) (22d7f5d)
+
+### Documentation
+
+* workbuddy: 记录插件市场发布包结构 (#438) (2d14cc7)
+
+## <small>1.24.12 (2026-08-27)</small>
+
+### Features
+
+* dsh: 接入 npm 插件市场发布 (4b35610)
+* maker: 添加 DeepSeek Harness（DSH）插件 (a8c5df0)
+* maker: 添加自包含 WorkBuddy 插件 (27e9c76)
+* maker: 添加自包含 Codex 插件 (15e4dd7)
+* maker: 完善多项目 MCP 稳定性并支持 DSH (#314) (2800bf6)
+* maker: 完善本地 MCP 能力路由和二维码流程 (#290) (7c63dfd)
+* maker: 上报本地 MCP 活跃事件 (#288) (0bc646d)
+* maker: expose ad config and feedback proxy tools (#275) (1ce9d70)
+* maker: 支持更多 AI 编辑器 MCP 安装 (#263) (de05cd1)
+* maker: add package update policy check (#258) (bf4ecf0)
+* maker: improve project creation and upgrade guidance (5765f21)
+* maker: add project creation and 3d proxy assets (29c24a9)
+* maker: add managed Python runtime setup (8cf65d1)
+
+### Bug Fixes
+
+* release: isolate and stabilize main native artifacts (#432) (a6e9a20)
+* h5: 避免短时缓存竞争误报应用状态 (0d5d8e8)
+* ads: 修复 H5 广告自动接入与配置隔离 (295dc51)
+* dsh: support first package publication token (#425) (8ee50d8)
+* dsh: use repository token for npm publishing (#424) (c0e4cde)
+* maker: 发布已验证的 0.0.32 正式版候选 (c1d1496)
+* maker: 插件运行时跳过 npm 更新提示 (85dd14b)
+* maker: 修复 DSH 激活并支持 beta 验证 (6bfa631)
+* maker: 修复 DSH 插件评审阻塞项 (338328f)
+* maker-plugin: 同步客户端插件发布产物 (fb7c883)
+* maker-plugin: 完成 Codex 安装事务回滚 (7e56b93)
+* maker-plugin: 对齐 Codex 安装回滚指引 (a97524a)
+* maker-plugin: 回滚失败的 Codex 安装迁移 (4491c90)
+* maker-plugin: 对齐安装前后兼容检查 (05a71a7)
+* maker-plugin: 自动禁用 Codex 旧 MCP (e83f2c4)
+* maker-plugin: 完善 WorkBuddy 插件生命周期与跨平台兼容 (d80fbd0)
+* maker: 固化 Proxy 工具定义并校验远端契约 (652dc1a)
+* maker: 同步固定音频工具路由 (#308) (a3d4b4c)
+* maker: 优化 MCP 会话与构建失败引导 (#306) (3d506ac)
+* maker: 收紧反馈意图并移除素材工具优先导向 (#303) (31afb0c)
+* maker: 复用项目级 proxy 长连接 (#300) (92a448e)
+* maker: 修复本地 MCP 启动与客户端诊断 (#297) (677f58f)
+* proxy: preserve remote build errors through retry paths (#292) (8d1126b)
+* maker: 修复项目结构检查和能力语义 (#286) (626c80b)
+* maker: 完善 MCP 连接错误诊断 (#285) (5347262)
+* maker: 完善本地音频代理全链路 (#281) (e87a1f2)
+* maker: 修复本地 3D 资产生成流程 (#280) (caae617)
+* maker: align multiplayer build defaults (#277) (a31410e)
+* maker: simplify maker project setup and build flow (#272) (4433069)
+* maker: 完善 WorkBuddy 异步构建流程 (#267) (ee0643a)
+* maker: clarify create flag usage in init guidance (af91234)
+* maker: resolve mcp project roots context (f711a31)
+* maker: expose video query proxy tool (6af0729)
+* maker: improve proxy media handling (b199c40)
+* proxy: exit standalone proxy on stdio disconnect (9a3a363)
+* maker: prevent orphan proxy processes (17f9363)
+* maker: publish beta packages as prereleases (90c445f)
+* maker: install lua lsp in private venv (a108b46)
+* maker: install lua lsp after python setup (b1bd969)
+* maker: block init on python setup failure (#247) (dd09fdd)
+* maker: pin mcp cwd for maker projects (#246) (be67d7e)
+* maker: enforce Python runtime version policy (67dbd78)
+
+### Documentation
+
+* dsh: correct stable plugin distribution guide (#339) (abaea35)
+
+### CI
+
+* maker: 分离 DSH 功能与发布基础设施 (8360bbf)
+* maker: 支持 develop 预发布与 DSH 手动发布 (aaf2e22)
+* release: 建立 Maker 插件独立发布流程 (#321) (cd26970)
+
+### Chores
+
+* maker: 同步 develop 发布基础设施 (abfa959)
+* release: 同步 main 发布基础设施到 develop (a250d92)
+* maker-plugin: 同步插件发布工作流 (6aa95ee)
+* maker-plugin: 建立独立插件版本与发布包 (deb64dc)
+
+### Other Changes
+
+* Merge pull request #423 from taptap/fix/dsh-maker-0.1.1-main (bb6ac6d)
+* Merge pull request #421 from taptap/chore/maker-plugin-0.0.3 (03320dd)
+* Merge pull request #419 from taptap/fix/maker-0.0.32-main (8fe0c6b)
+* Merge pull request #338 from taptap/chore/maker-plugin-0.0.2 (cf9c843)
+* Merge pull request #337 from taptap/chore/update-maker-version-policy-0.0.31 (0e11196)
+* Merge pull request #334 from taptap/chore/update-maker-version-policy-0.0.31-beta.2 (4f8fc1b)
+* Merge pull request #335 from taptap/develop (320cdfa)
+* Merge pull request #333 from taptap/fix/maker-plugin-update-notice (75c0a2c)
+* Merge pull request #332 from taptap/fix/maker-plugin-generated-bundles (0fbe00b)
+* Merge pull request #330 from taptap/develop (3acf380)
+* Merge pull request #331 from taptap/fix/workbuddy-managed-node (0899229)
+* Merge pull request #329 from taptap/fix/workbuddy-plugin-source-link (42ece25)
+* Merge pull request #328 from taptap/chore/update-maker-version-policy-0.0.31-beta.1 (9b48150)
+* Merge pull request #325 from taptap/fix/maker-plugin-distribution-entry (7033d72)
+* Merge pull request #327 from taptap/fix/sync-main-ci-to-develop (ea4e5e7)
+* Merge pull request #326 from taptap/fix/maker-develop-prerelease-ci (7385e53)
+* Merge pull request #324 from taptap/fix/maker-plugin-distribution-entry (62bc88b)
+* Merge pull request #323 from taptap/fix/maker-client-plugins (051e7b3)
+* Merge pull request #322 from taptap/fix/maker-client-plugins (ded0860)
+* Merge pull request #257 from taptap/fix/maker-remote-proxy-timeout (e2799e9)
+* Merge branch 'fix/maker-roots-project-context' into fix/maker-remote-proxy-timeout (3482bba)
+* Merge pull request #256 from taptap/fix/sync-beta-tested-changes (69cd9b1)
+* Merge pull request #255 from taptap/fix/maker-mcp-proxy-failures (d0c00fd)
+* Merge pull request #250 from taptap/fix/maker-lua-lsp-venv (6b7ac05)
+* Merge pull request #245 from taptap/fix/maker-python-runtime-pr (a1e93ff)
+
+## <small>1.24.11 (2026-06-10)</small>
+
+### CI
+
+* workflow: fix app token git auth recovery (5e85d57)
+* release: use app token for release prs (6b7ba02)
+
+### Other Changes
+
+* Merge pull request #243 from taptap/fix/release-git-auth-recovery (bca07dc)
+* Merge pull request #242 from taptap/fix/release-app-token-recovery (4d66aea)
+
+## <small>1.24.10 (2026-06-09)</small>
+
+### Features
+
+* proxy: pass client session id to handlers (c573b8f)
+* maker: add cli login and dev-kit update checks (932780d)
+* maker: materialize proxy tool assets (97d0332)
+* maker: expose video and music proxy tools (25814c7)
+* maker: expose image proxy tools (97e56ae)
+* maker: add install shortcut alias (d898367)
+
+### Bug Fixes
+
+* maker: wake server before remote build (234a7e9)
+* proxy: use custom fields for session id (81cb1bc)
+* maker: promote main Maker bug fixes (aae55ee)
+* maker: install dev kit after checkout (1012a2b)
+* maker: promote beta Maker and proxy fixes (778d05d)
+* maker: 精简 app 列表展示并兼容旧分页参数 (#191) (9cbd1ea)
+
+### CI
+
+* workflow: restore release PR required checks (f869464)
+* release: allow main release version policy tests (#228) (eb3ebbf)
+* release: simplify manual package publishing (#227) (5ac2793)
+* release: disable automatic main package publish (#226) (4e62dd0)
+* release: allow maker releases from main and beta (c348aba)
+* release: isolate maker package publishing (#222) (dd42ccb)
+* maker: switch npm publish to oidc only [skip ci] (9cfd353)
+* maker: add npm tag cleanup workflow [skip ci] (74b8f0b)
+* maker: fix npm access command [skip ci] (575d115)
+* maker: add npm access repair workflow [skip ci] (02b913b)
+
+### Chores
+
+* deps: align lockfile with ci npm [skip ci] (829a4e0)
+* deps: sync lockfile for maker publish [skip ci] (13bbd23)
+* maker: add standalone maker package publishing [skip ci] (8d6b858)
+
+### Other Changes
+
+* Merge pull request #236 from taptap/fix/session-id-custom-fields (a5ddd24)
+* Merge pull request #232 from taptap/fix/maker-shallow-clone (1e2f2ba)
+* Merge pull request #231 from taptap/fix/maker-sync-beta-proxy-tools (1fbb164)
+
+## <small>1.23.4 (2026-05-26)</small>
+
+* fix(maker): optimize Maker app list display and sync recovery ([3a98789](https://github.com/taptap/instant-games-open-mcp/commit/3a98789))
+
+
+
+## <small>1.23.3 (2026-05-25)</small>
+
+* ci(release): publish stable package with latest tag (#185) ([60ef364](https://github.com/taptap/instant-games-open-mcp/commit/60ef364)), closes [#185](https://github.com/taptap/instant-games-open-mcp/issues/185)
+* fix(maker): harden dev kit setup and app selection (#178) ([a1c5323](https://github.com/taptap/instant-games-open-mcp/commit/a1c5323)), closes [#178](https://github.com/taptap/instant-games-open-mcp/issues/178)
+* fix(maker): harden Maker local workflow recovery ([b7a4cb7](https://github.com/taptap/instant-games-open-mcp/commit/b7a4cb7))
+* fix(release): prevent accidental major publishing ([7d4eb71](https://github.com/taptap/instant-games-open-mcp/commit/7d4eb71))
+* refactor(maker)!: move onboarding to cli-first workflow ([131e542](https://github.com/taptap/instant-games-open-mcp/commit/131e542))
+
+
+### BREAKING CHANGE
+
+* Maker MCP public initialization tools were removed.
+Use the taptap-maker CLI for PAT, app listing, clone, and onboarding.
+Use maker://status, maker_status_lite, and maker_build_current_directory
+for runtime status and submit, push, and build. Removed tools:
+maker_exchange_pat, maker_list_apps, maker_status,
+maker_clone_to_current_directory, maker_submit_current_directory.
+
+
+## 1.21.0 (2026-05-08)
+
+* feat(debug-feedback): 支持按 moment_id 单查反馈并修复大整数精度丢失 (#154) ([1270ee4](https://github.com/taptap/instant-games-open-mcp/commit/1270ee4)), closes [#154](https://github.com/taptap/instant-games-open-mcp/issues/154)
+* ci(claude-review): 改用 vars.ANTHROPIC_BASE_URL 配置 ([ca80e6b](https://github.com/taptap/instant-games-open-mcp/commit/ca80e6b))
+* ci(codeql): 切换为 workflow 配置，跳过 release PR ([5d83ca4](https://github.com/taptap/instant-games-open-mcp/commit/5d83ca4))
+
+
+
+## <small>1.20.5 (2026-04-07)</small>
+
+* fix(ci): 等待 release PR 合并后再创建 tag ([7578c88](https://github.com/taptap/instant-games-open-mcp/commit/7578c88))
+
+
+
+## <small>1.20.4 (2026-04-07)</small>
+
+* fix(ci): 修复 GitHub Release 创建 + 接入 Puer Code Review ([867305d](https://github.com/taptap/instant-games-open-mcp/commit/867305d))
+
+
+
+## <small>1.20.3 (2026-04-07)</small>
+
+* fix(ci): analyze 步骤移除对 NPM_TOKEN secret 的依赖 ([d0d05e5](https://github.com/taptap/instant-games-open-mcp/commit/d0d05e5))
+* fix(ci): 为 claude-code-action 添加 review prompt ([42e67af](https://github.com/taptap/instant-games-open-mcp/commit/42e67af))
+* fix(ci): 为 claude-code-action 配置 allowedTools ([12c5a0a](https://github.com/taptap/instant-games-open-mcp/commit/12c5a0a))
+* fix(ci): 升级 macOS runner 从 macos-13 到 macos-14 ([a12c0a4](https://github.com/taptap/instant-games-open-mcp/commit/a12c0a4))
+* refactor(package): 重命名为 @taptap/instant-games-open-mcp ([383c958](https://github.com/taptap/instant-games-open-mcp/commit/383c958))
+* ci(review): 接入 Claude Code Review GitHub Action ([75f1068](https://github.com/taptap/instant-games-open-mcp/commit/75f1068))
+
+
+
+## <small>1.20.2 (2026-04-03)</small>
+
+* fix(package): 修正 repository URL 匹配实际仓库名 ([764fdcb](https://github.com/taptap/minigame-open-mcp/commit/764fdcb))
+* refactor(ci): 使用 OIDC Trusted Publishing 替代 NPM_TOKEN ([6eabc94](https://github.com/taptap/minigame-open-mcp/commit/6eabc94))
+
+
+
+## <small>1.20.1 (2026-04-03)</small>
+
+* refactor(package): add publishConfig for @taptap scope (#137) ([e52987b](https://github.com/taptap/taptap_minigame_open_mcp/commit/e52987b)), closes [#137](https://github.com/taptap/taptap_minigame_open_mcp/issues/137)
+* chore(package): 迁移 npm scope 从 @mikoto_zero 到 @taptap (#136) ([7db2640](https://github.com/taptap/taptap_minigame_open_mcp/commit/7db2640)), closes [#136](https://github.com/taptap/taptap_minigame_open_mcp/issues/136)
+
+
+
+## 1.20.0 (2026-03-27)
+
+* fix(server): hide raw tools behind opt-in flag ([eb945e2](https://github.com/taptap/taptap_minigame_open_mcp/commit/eb945e2))
+* feat(dc): add raw tools and openclaw plugin package ([3632c0b](https://github.com/taptap/taptap_minigame_open_mcp/commit/3632c0b))
+* docs(skill): sync MCP install guidance ([1c5acdc](https://github.com/taptap/taptap_minigame_open_mcp/commit/1c5acdc))
+
+
+
+## 1.19.0 (2026-03-25)
+
+* docs(skills): add Codex DC ops brief skill ([8d4e43d](https://github.com/taptap/taptap_minigame_open_mcp/commit/8d4e43d))
+* fix(app): restore level-only compatibility hints ([3b39668](https://github.com/taptap/taptap_minigame_open_mcp/commit/3b39668))
+* feat(dc-current-app): add overview tools and app aggregation ([9499f54](https://github.com/taptap/taptap_minigame_open_mcp/commit/9499f54))
+
+
+
+## 1.18.0 (2026-03-19)
+
+* fix(runtime): align minimum node version with dependency requirements ([48f93de](https://github.com/taptap/taptap_minigame_open_mcp/commit/48f93de))
+* feat(proxy): forward progress notifications for tool calls ([5453d95](https://github.com/taptap/taptap_minigame_open_mcp/commit/5453d95))
+* docs: add quick start guide and AI setup guide ([83a5c51](https://github.com/taptap/taptap_minigame_open_mcp/commit/83a5c51))
+
+
+
+## 1.17.0 (2026-03-11)
+
+* chore(ads): fix status code inconsistencies and remove deprecated code ([ca6fc9a](https://github.com/taptap/taptap_minigame_open_mcp/commit/ca6fc9a))
+* feat(ads): add complete ad manager integration with rewarded video focus ([c9f1d9d](https://github.com/taptap/taptap_minigame_open_mcp/commit/c9f1d9d))
+* feat(ads): add workflow-guided ads integration with status check ([407742c](https://github.com/taptap/taptap_minigame_open_mcp/commit/407742c))
+* feat(ads): update ad status enum and support landscape/portrait ad spaces ([a3323cc](https://github.com/taptap/taptap_minigame_open_mcp/commit/a3323cc))
+
+
+
+## <small>1.16.1 (2026-03-04)</small>
+
+* fix(h5game): adjust debug feedback fetch defaults and policy (#124) ([9a9fde3](https://github.com/taptap/taptap_minigame_open_mcp/commit/9a9fde3)), closes [#124](https://github.com/taptap/taptap_minigame_open_mcp/issues/124)
+
+
+
+## 1.16.0 (2026-03-03)
+
+* feat(h5game): add debug feedback pull workflow (#121) ([9722799](https://github.com/taptap/taptap_minigame_open_mcp/commit/9722799)), closes [#121](https://github.com/taptap/taptap_minigame_open_mcp/issues/121)
+
+
+
+## 1.15.0 (2026-02-27)
+
+* ci(release): add workflow_dispatch for manual trigger ([8f570ac](https://github.com/taptap/taptap_minigame_open_mcp/commit/8f570ac))
+* ci(release): fix false positive auth error detection ([7480b23](https://github.com/taptap/taptap_minigame_open_mcp/commit/7480b23))
+* ci(release): surface authentication errors in release analysis ([c87781e](https://github.com/taptap/taptap_minigame_open_mcp/commit/c87781e))
+* ci(release): use stricter grep for version extraction ([aa3539b](https://github.com/taptap/taptap_minigame_open_mcp/commit/aa3539b))
+* fix(proxy): address copilot review on PR #118 ([f510387](https://github.com/taptap/taptap_minigame_open_mcp/commit/f510387)), closes [#118](https://github.com/taptap/taptap_minigame_open_mcp/issues/118)
+* fix(proxy): address PR #116 copilot review suggestions ([1715c1c](https://github.com/taptap/taptap_minigame_open_mcp/commit/1715c1c)), closes [#116](https://github.com/taptap/taptap_minigame_open_mcp/issues/116)
+* feat(proxy): add custom_fields support for business metadata (#116) ([5b255dd](https://github.com/taptap/taptap_minigame_open_mcp/commit/5b255dd)), closes [#116](https://github.com/taptap/taptap_minigame_open_mcp/issues/116) [#117](https://github.com/taptap/taptap_minigame_open_mcp/issues/117)
+
+
+
+## <small>1.14.1 (2026-01-23)</small>
+
+* docs: update plan to add missing proxy config documentation ([7b29004](https://github.com/taptap/taptap_minigame_open_mcp/commit/7b29004))
+* docs(proxy): add missing configuration options documentation ([05f4f8a](https://github.com/taptap/taptap_minigame_open_mcp/commit/05f4f8a))
+* fix(proxy): inject private params on every tool call for MCP Server compatibility ([b4718c9](https://github.com/taptap/taptap_minigame_open_mcp/commit/b4718c9))
+
+
+
+## 1.14.0 (2026-01-16)
+
+* chore(release): disable BREAKING CHANGE detection in commit footer ([48ae5fb](https://github.com/taptap/taptap_minigame_open_mcp/commit/48ae5fb))
+* fix(lint): resolve all ESLint unused variable warnings ([b4f68dd](https://github.com/taptap/taptap_minigame_open_mcp/commit/b4f68dd))
+* fix(server): normalize projectPath and improve token parsing error logging ([9a0b8ea](https://github.com/taptap/taptap_minigame_open_mcp/commit/9a0b8ea))
+* docs: update documentation for session context architecture ([be062f0](https://github.com/taptap/taptap_minigame_open_mcp/commit/be062f0))
+* docs(architecture): update cache system documentation ([723e464](https://github.com/taptap/taptap_minigame_open_mcp/commit/723e464))
+* docs(copilot): add dependency management guidelines ([c7de570](https://github.com/taptap/taptap_minigame_open_mcp/commit/c7de570))
+* refactor(app): update app management handlers and tool descriptions ([d7debf4](https://github.com/taptap/taptap_minigame_open_mcp/commit/d7debf4))
+* refactor(context): remove developer_id and app_id from private params ([2197ca2](https://github.com/taptap/taptap_minigame_open_mcp/commit/2197ca2))
+* refactor(h5game): simplify upload handlers and improve error messages ([73a0d96](https://github.com/taptap/taptap_minigame_open_mcp/commit/73a0d96))
+* feat(cache): use SHA256 hash for tenant isolation key ([2f680e0](https://github.com/taptap/taptap_minigame_open_mcp/commit/2f680e0))
+* feat(logger): enhance client connection logging with session context ([37100ea](https://github.com/taptap/taptap_minigame_open_mcp/commit/37100ea))
+* feat(proxy): add session headers injection for authentication ([eef6800](https://github.com/taptap/taptap_minigame_open_mcp/commit/eef6800))
+
+
+### BREAKING CHANGE
+
+* _developer_id and _app_id private parameters are removed
+
+- Remove _developer_id and _app_id from PrivateToolParams interface
+- Remove developerId and appId from ResolvedData and ResolvedContext
+- Update resolveApp() to only read from cache (no fallback to private params)
+- Update leaderboard/api.ts and share/api.ts to use ctx.resolveApp()
+- Update error messages to guide users to use select_app tool
+
+These fields should only be obtained via select_app tool which saves
+to cache. This simplifies the architecture and makes the data flow clearer.
+
+Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>
+
+
+## 1.13.0 (2026-01-07)
+
+* fix(http): send empty JSON object for POST/PUT requests without body ([4133565](https://github.com/taptap/taptap_minigame_open_mcp/commit/4133565))
+* fix(upload): correct binary signature calculation for multipart uploads ([3f78133](https://github.com/taptap/taptap_minigame_open_mcp/commit/3f78133))
+* feat(app): add upload_image tool and sync API field extensions ([459c691](https://github.com/taptap/taptap_minigame_open_mcp/commit/459c691))
+* chore(deps): move @types/qrcode to devDependencies ([c3ec278](https://github.com/taptap/taptap_minigame_open_mcp/commit/c3ec278))
+* chore(docker): improve local dev script and remove docker-compose ([f122555](https://github.com/taptap/taptap_minigame_open_mcp/commit/f122555))
+* refactor(cache): implement TTL-based cache with version info display ([2a069a4](https://github.com/taptap/taptap_minigame_open_mcp/commit/2a069a4))
+
+
+
+## <small>1.12.1 (2026-01-04)</small>
+
+* fix: 授权流程返回二维码 ([eb3e7b1](https://github.com/taptap/taptap_minigame_open_mcp/commit/eb3e7b1))
+
+
+
+## 1.12.0 (2025-12-31)
+
+* docs(copilot): rewrite instructions in English with unified workflow ([387a19c](https://github.com/taptap/taptap_minigame_open_mcp/commit/387a19c))
+* ci: add auto-assign workflow for PR to main branch ([f546426](https://github.com/taptap/taptap_minigame_open_mcp/commit/f546426))
+* ci(release): filter noise commits from release notes and changelog ([619dda3](https://github.com/taptap/taptap_minigame_open_mcp/commit/619dda3))
+* fix(log): use local time for log cleanup date comparison ([1c22863](https://github.com/taptap/taptap_minigame_open_mcp/commit/1c22863))
+* feat(log): add file logging support for Server and Proxy ([35db772](https://github.com/taptap/taptap_minigame_open_mcp/commit/35db772))
+
+
+
+## <small>1.11.5 (2025-12-31)</small>
+
+* docs(copilot): add Chinese language preference ([f5e7aeb](https://github.com/taptap/taptap_minigame_open_mcp/commit/f5e7aeb))
+* ci(release): use annotated tag with release notes ([80d3fc3](https://github.com/taptap/taptap_minigame_open_mcp/commit/80d3fc3))
+* fix(docs): correct markdown formatting and improve commitlint regex ([56d8e2a](https://github.com/taptap/taptap_minigame_open_mcp/commit/56d8e2a))
+* chore: add copilot instructions and update commitlint config ([a0ead79](https://github.com/taptap/taptap_minigame_open_mcp/commit/a0ead79))
+
+
+
+## <small>1.11.4 (2025-12-30)</small>
+
+* refactor(proxy): improve code consistency and cookie parsing ([5884575](https://github.com/taptap/taptap_minigame_open_mcp/commit/5884575))
+* fix(proxy): add cookie sticky session support for K8s multi-replica ([7d7cc4f](https://github.com/taptap/taptap_minigame_open_mcp/commit/7d7cc4f))
+* fix(proxy): improve cookie sticky session implementation ([cf0db5d](https://github.com/taptap/taptap_minigame_open_mcp/commit/cf0db5d))
+
+
+
+## <small>1.11.3 (2025-12-29)</small>
+
+* refactor(proxy): simplify formatError based on actual error structures ([54c4ff2](https://github.com/taptap/taptap_minigame_open_mcp/commit/54c4ff2))
+* fix(proxy): add detailed error logging for connection failures ([0709c2d](https://github.com/taptap/taptap_minigame_open_mcp/commit/0709c2d))
+* fix(proxy): enhance error logging to capture HTTP status codes ([964fa17](https://github.com/taptap/taptap_minigame_open_mcp/commit/964fa17))
+
+
+
+## <small>1.11.2 (2025-12-26)</small>
+
+* fix(proxy): add session validation for multi-replica deployment ([1075a6f](https://github.com/taptap/taptap_minigame_open_mcp/commit/1075a6f))
+* docs: add user guide and update configuration docs ([cf39cd0](https://github.com/taptap/taptap_minigame_open_mcp/commit/cf39cd0))
+
+
+
+## <small>1.11.1 (2025-12-25)</small>
+
+* fix(multiplayer): fix PR review issues and embed DebugLogger code ([7b80111](https://github.com/taptap/taptap_minigame_open_mcp/commit/7b80111))
+
+
+
+## 1.11.0 (2025-12-25)
+
+* style(multiplayer): format code with prettier ([9573099](https://github.com/taptap/taptap_minigame_open_mcp/commit/9573099))
+* fix(multiplayer): fix critical double rate-limit bug and enhance template ([281c14f](https://github.com/taptap/taptap_minigame_open_mcp/commit/281c14f))
+* fix(multiplayer): fix eslint errors and remove unused imports ([ff6750c](https://github.com/taptap/taptap_minigame_open_mcp/commit/ff6750c))
+* refactor(multiplayer): consolidate documentation tools structure ([fc0e4c1](https://github.com/taptap/taptap_minigame_open_mcp/commit/fc0e4c1))
+* docs(multiplayer):  多人对战，第二版 ([bdcadaf](https://github.com/taptap/taptap_minigame_open_mcp/commit/bdcadaf))
+* feat: 多人联机mcp第一版 ([c34838e](https://github.com/taptap/taptap_minigame_open_mcp/commit/c34838e))
+
+
+
+## <small>1.10.1 (2025-12-10)</small>
+
+* chore: add docker:npm script and remove unused import ([9d2455a](https://github.com/taptap/taptap_minigame_open_mcp/commit/9d2455a))
+* chore(docker): reorganize docker files into dedicated directory ([1be0a92](https://github.com/taptap/taptap_minigame_open_mcp/commit/1be0a92))
+* fix(app): correct AppStatusResponse parsing and add enums ([158bbac](https://github.com/taptap/taptap_minigame_open_mcp/commit/158bbac))
+* docs(claude): add commit type verification reminder ([340462a](https://github.com/taptap/taptap_minigame_open_mcp/commit/340462a))
+
+
+
+## 1.10.0 (2025-12-04)
+
+* fix(ci): handle missing release assets gracefully ([8f5597e](https://github.com/taptap/taptap_minigame_open_mcp/commit/8f5597e))
+* feat(ci): implement native signer on-demand build ([3ee077a](https://github.com/taptap/taptap_minigame_open_mcp/commit/3ee077a))
+
+
+
+## <small>1.9.2 (2025-12-04)</small>
+
+* fix(ci): add explicit PATH setup for Cargo on macOS ([f67ab97](https://github.com/taptap/taptap_minigame_open_mcp/commit/f67ab97))
+* fix(ci): clean corrupted rust config before reinstalling on macos-13 ([b06dbeb](https://github.com/taptap/taptap_minigame_open_mcp/commit/b06dbeb))
+* fix(ci): reinstall Rust on macos-13 if cargo not found ([fed80d9](https://github.com/taptap/taptap_minigame_open_mcp/commit/fed80d9))
+* fix(ci): resolve macOS cargo path and Linux ARM64 cross-compilation ([5a34fdc](https://github.com/taptap/taptap_minigame_open_mcp/commit/5a34fdc))
+* fix(ci): use CARGO env var and add debug info for macOS Intel ([62f4806](https://github.com/taptap/taptap_minigame_open_mcp/commit/62f4806))
+
+
+
+## <small>1.9.1 (2025-12-04)</small>
+
+* fix(ci): add Linux ARM64 and fix macOS Intel build ([6f0d5f9](https://github.com/taptap/taptap_minigame_open_mcp/commit/6f0d5f9))
+* fix(ci): fix macOS Intel build and Linux ARM64 cross-compile ([eda6866](https://github.com/taptap/taptap_minigame_open_mcp/commit/eda6866))
+* fix(ci): temporarily disable macOS Intel build ([f7417c7](https://github.com/taptap/taptap_minigame_open_mcp/commit/f7417c7))
+* fix(ci): use CARGO_HOME/bin in PATH for macOS builds ([a0c3818](https://github.com/taptap/taptap_minigame_open_mcp/commit/a0c3818))
+* fix(path): always join projectPath with WORKSPACE_ROOT ([862413f](https://github.com/taptap/taptap_minigame_open_mcp/commit/862413f))
+
+
+
+## 1.9.0 (2025-12-04)
+
+* fix(ci): correct rust-toolchain action name ([1720188](https://github.com/taptap/taptap_minigame_open_mcp/commit/1720188))
+* fix(ci): update Rust in Docker before building native ([e3326e0](https://github.com/taptap/taptap_minigame_open_mcp/commit/e3326e0))
+* fix(ci): use correct NPM_TOKEN env var for semantic-release ([d6bcca4](https://github.com/taptap/taptap_minigame_open_mcp/commit/d6bcca4))
+* ci: add explicit permissions to workflows for security ([42bdca0](https://github.com/taptap/taptap_minigame_open_mcp/commit/42bdca0)), closes [#7](https://github.com/taptap/taptap_minigame_open_mcp/issues/7)
+* docs: add native signer documentation to CLAUDE.md ([00bec35](https://github.com/taptap/taptap_minigame_open_mcp/commit/00bec35))
+* feat: add cloud save module with API documentation ([f2ef41f](https://github.com/taptap/taptap_minigame_open_mcp/commit/f2ef41f))
+* feat: add native signer module for secure OAuth signing ([1fda862](https://github.com/taptap/taptap_minigame_open_mcp/commit/1fda862))
+* feat: integrate native signer into core modules ([4c48e5f](https://github.com/taptap/taptap_minigame_open_mcp/commit/4c48e5f))
+* feat(proxy): add configurable tool call timeout with progress reset ([6aede0a](https://github.com/taptap/taptap_minigame_open_mcp/commit/6aede0a))
+
+
+
+## 1.8.0 (2025-12-02)
+
+* feat: 增加分享参数的透传逻辑 ([f10fc32](https://github.com/taptap/taptap_minigame_open_mcp/commit/f10fc32))
+
+
+
+## 1.7.0 (2025-12-02)
+
+* feat: 增加分享模块 ([a525d56](https://github.com/taptap/taptap_minigame_open_mcp/commit/a525d56))
+* style: apply prettier formatting and prefer-const fixes ([5709172](https://github.com/taptap/taptap_minigame_open_mcp/commit/5709172))
+* ci: add lint-staged and prettier integration ([c9c0d5d](https://github.com/taptap/taptap_minigame_open_mcp/commit/c9c0d5d))
+
+
+
+## <small>1.6.1 (2025-12-01)</small>
+
+* fix(leaderboard): address code review issues from Copilot ([87af411](https://github.com/taptap/taptap_minigame_open_mcp/commit/87af411))
+* docs: update documentation and config for new features ([970eded](https://github.com/taptap/taptap_minigame_open_mcp/commit/970eded))
+* refactor(app,leaderboard): improve tool descriptions for better Agent guidance ([dbeca69](https://github.com/taptap/taptap_minigame_open_mcp/commit/dbeca69))
+* refactor(h5game): improve path resolution with structured error messages ([7b2a565](https://github.com/taptap/taptap_minigame_open_mcp/commit/7b2a565))
+* chore(ci): add husky commit-msg hook for local validation ([1c913cf](https://github.com/taptap/taptap_minigame_open_mcp/commit/1c913cf))
+* style(core): optimize imports and remove deprecated types ([dbf98dc](https://github.com/taptap/taptap_minigame_open_mcp/commit/dbf98dc))
+
+
+
+## 1.6.0 (2025-11-24)
+
+* refactor(api): migrate all API functions to accept ResolvedContext ([3a3baa7](https://github.com/taptap/taptap_minigame_open_mcp/commit/3a3baa7))
+* refactor(auth): remove global token state from ApiConfig ([4ca04c9](https://github.com/taptap/taptap_minigame_open_mcp/commit/4ca04c9))
+* refactor(context): abstract token resolution logic with single source ([731fc04](https://github.com/taptap/taptap_minigame_open_mcp/commit/731fc04))
+* refactor(core): remove old resolver modules and migrate to ResolvedContext ([8baf7d4](https://github.com/taptap/taptap_minigame_open_mcp/commit/8baf7d4))
+* refactor(handlers): migrate all handlers to use ResolvedContext API ([260505d](https://github.com/taptap/taptap_minigame_open_mcp/commit/260505d))
+* refactor(http): use ResolvedContext for token resolution ([aea2d94](https://github.com/taptap/taptap_minigame_open_mcp/commit/aea2d94))
+* refactor(server): extract common server info printing logic ([ad6e795](https://github.com/taptap/taptap_minigame_open_mcp/commit/ad6e795))
+* refactor(server): use ResolvedContext in tool call pipeline ([b7fe153](https://github.com/taptap/taptap_minigame_open_mcp/commit/b7fe153))
+* refactor(utils): unify resolver modules with functional design ([2ccf599](https://github.com/taptap/taptap_minigame_open_mcp/commit/2ccf599))
+* fix(all): correct ResolvedContext propagation across all layers ([45aecae](https://github.com/taptap/taptap_minigame_open_mcp/commit/45aecae))
+* fix(auth): simplify OAuth success message for AI agents ([aa07483](https://github.com/taptap/taptap_minigame_open_mcp/commit/aa07483))
+* feat(auth): add user-isolated token storage and resolver ([f87ef85](https://github.com/taptap/taptap_minigame_open_mcp/commit/f87ef85))
+* feat(server): extract user/project IDs from HTTP headers ([f48c841](https://github.com/taptap/taptap_minigame_open_mcp/commit/f48c841))
+* feat(types): add projectId to HandlerContext ([f12b196](https://github.com/taptap/taptap_minigame_open_mcp/commit/f12b196))
+* feat(types): create ResolvedContext class with request-scoped lifecycle ([8a5a037](https://github.com/taptap/taptap_minigame_open_mcp/commit/8a5a037))
+
+
+
+## <small>1.5.11 (2025-11-21)</small>
+
+* fix(bin): revert to ESM format and fix type errors ([f1648f0](https://github.com/taptap/taptap_minigame_open_mcp/commit/f1648f0))
+* fix(bin): 使用 CommonJS 格式提升 npx 兼容性 ([f81ce92](https://github.com/taptap/taptap_minigame_open_mcp/commit/f81ce92))
+* refactor(config): enhance configuration validation ([df6aa93](https://github.com/taptap/taptap_minigame_open_mcp/commit/df6aa93))
+* refactor(config): simplify ApiConfig to only manage runtime state ([4a5faef](https://github.com/taptap/taptap_minigame_open_mcp/commit/4a5faef))
+* refactor(errors): unify authentication error handling ([59fef25](https://github.com/taptap/taptap_minigame_open_mcp/commit/59fef25))
+* refactor(logger): use logger module for MAC token parse warnings ([aea1b83](https://github.com/taptap/taptap_minigame_open_mcp/commit/aea1b83))
+* refactor(types): improve MacToken type safety and validation ([b8fc080](https://github.com/taptap/taptap_minigame_open_mcp/commit/b8fc080))
+* perf(server): optimize tool and resource lookup with Map index ([8a86ac7](https://github.com/taptap/taptap_minigame_open_mcp/commit/8a86ac7))
+
+
+
+## <small>1.5.10 (2025-11-20)</small>
+
+* perf(build): 实现双模式构建系统 ([fea2d12](https://github.com/taptap/taptap_minigame_open_mcp/commit/fea2d12))
+
+
+
+## <small>1.5.9 (2025-11-19)</small>
+
+* revert(bundle): 暂时恢复主服务器为传统部署模式 ([abd9504](https://github.com/taptap/taptap_minigame_open_mcp/commit/abd9504))
+
+
+
+## <small>1.5.8 (2025-11-19)</small>
+
+* docs(docker): 统一 Docker 配置为 bundle 版本 ([a7614bc](https://github.com/taptap/taptap_minigame_open_mcp/commit/a7614bc))
+* perf(bundle): 单文件 bundle 优化，减少包体积 96% ([4f3a698](https://github.com/taptap/taptap_minigame_open_mcp/commit/4f3a698))
+
+
+
+## <small>1.5.7 (2025-11-19)</small>
+
+* refactor(proxy): 优化单文件版本号注入逻辑 ([4d561bc](https://github.com/taptap/taptap_minigame_open_mcp/commit/4d561bc))
+* docs: 完善 commitlint 规范说明 ([73dfc14](https://github.com/taptap/taptap_minigame_open_mcp/commit/73dfc14))
+
+
+
+## <small>1.5.6 (2025-11-19)</small>
+
+* fix(http-client): 统一修复 macToken 验证逻辑，避免无效 token 污染 context ([4d342b5](https://github.com/taptap/taptap_minigame_open_mcp/commit/4d342b5))
+* fix(logger): stdio 模式下只使用 stderr，避免重复输出 ([0e3e8ab](https://github.com/taptap/taptap_minigame_open_mcp/commit/0e3e8ab))
+* fix(logger): 恢复详细日志输出并清理临时调试代码 ([83a3151](https://github.com/taptap/taptap_minigame_open_mcp/commit/83a3151))
+* fix(proxy): 修复单文件打包时无法找到 package.json 的问题 ([5e4cc94](https://github.com/taptap/taptap_minigame_open_mcp/commit/5e4cc94))
+* refactor: 删除不必要的包装函数 ([2e59077](https://github.com/taptap/taptap_minigame_open_mcp/commit/2e59077))
+* refactor(auth): 模块化 OAuth 认证实现 ([39069c4](https://github.com/taptap/taptap_minigame_open_mcp/commit/39069c4))
+* refactor(auth): 移除冗余的 config.ts，直接使用统一环境配置 ([be12880](https://github.com/taptap/taptap_minigame_open_mcp/commit/be12880))
+* refactor(config): 优化环境配置管理，提升代码可读性 ([a4351d9](https://github.com/taptap/taptap_minigame_open_mcp/commit/a4351d9))
+* refactor(config): 统一环境配置管理，优化模块职责 ([40e1de6](https://github.com/taptap/taptap_minigame_open_mcp/commit/40e1de6))
+* refactor(http-client): 将配置状态格式化逻辑移到业务层 ([611f2f8](https://github.com/taptap/taptap_minigame_open_mcp/commit/611f2f8))
+* refactor(server): context 改为请求级别，避免跨请求污染 ([cb88dbd](https://github.com/taptap/taptap_minigame_open_mcp/commit/cb88dbd))
+* refactor(server): 简化 OAuth 工具调用流程 ([0b05d67](https://github.com/taptap/taptap_minigame_open_mcp/commit/0b05d67))
+
+
+
+## <small>1.5.5 (2025-11-19)</small>
+
+* refactor: 更新 Dockerfile 中的环境变量 ([fa07dc5](https://github.com/taptap/taptap_minigame_open_mcp/commit/fa07dc5))
+* refactor: 更新服务器和认证模块中的环境变量 ([5616860](https://github.com/taptap/taptap_minigame_open_mcp/commit/5616860))
+* refactor: 更新源代码中的环境变量 ([bf67071](https://github.com/taptap/taptap_minigame_open_mcp/commit/bf67071))
+* refactor: 更新环境变量名称为 TAPTAP_MCP_ 前缀 ([f1f61ba](https://github.com/taptap/taptap_minigame_open_mcp/commit/f1f61ba))
+* refactor(env): 引入类型安全的 EnvConfig 类 ([5b003ae](https://github.com/taptap/taptap_minigame_open_mcp/commit/5b003ae))
+* refactor(env): 重命名环境变量从 TDS_MCP_* 到 TAPTAP_MCP_* ([8871d7b](https://github.com/taptap/taptap_minigame_open_mcp/commit/8871d7b))
+* docs: 全面重写 MCP Proxy 开发指引 ([acd458f](https://github.com/taptap/taptap_minigame_open_mcp/commit/acd458f))
+* docs: 更新文档中的环境变量名称 ([4cb4c55](https://github.com/taptap/taptap_minigame_open_mcp/commit/4cb4c55))
+* docs: 重构文档结构，提升可维护性 ([e5b92eb](https://github.com/taptap/taptap_minigame_open_mcp/commit/e5b92eb))
+* fix(docs): 修复 DEPLOYMENT.md 中的错误 ([bf66748](https://github.com/taptap/taptap_minigame_open_mcp/commit/bf66748))
+* fix(docs): 修复文档中的多处错误描述 ([b047663](https://github.com/taptap/taptap_minigame_open_mcp/commit/b047663))
+
+
+
+## <small>1.5.4 (2025-11-17)</small>
+
+* fix: 添加 MCP Proxy 独立打包功能以支持无 node_modules 环境 ([665d89a](https://github.com/taptap/taptap_minigame_open_mcp/commit/665d89a))
+
+
+
+## <small>1.5.3 (2025-11-17)</small>
+
+* docs: 添加 v1.5.3 版本的 CHANGELOG 条目 ([c785771](https://github.com/taptap/taptap_minigame_open_mcp/commit/c785771))
+* fix: 修复 stdio 模式下的路径解析和 Token 覆盖问题 ([83ec37b](https://github.com/taptap/taptap_minigame_open_mcp/commit/83ec37b))
+
+
+
+
+## <small>1.5.2 (2025-11-17)</small>
+
+* refactor: 优化认证检查逻辑，提高代码可维护性 ([559fd2a](https://github.com/taptap/taptap_minigame_open_mcp/commit/559fd2a))
+* fix: proxy模式下授权检测问题 ([bfbdcc8](https://github.com/taptap/taptap_minigame_open_mcp/commit/bfbdcc8))
+
+## <small>1.5.1 (2025-11-17)</small>
+
+* fix: version in package.json ([4b9661f](https://github.com/taptap/taptap_minigame_open_mcp/commit/4b9661f))
+
+
+
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+**Note**: From version 1.5.0+, this file is automatically generated and maintained by [semantic-release](https://github.com/semantic-release/semantic-release) based on commit messages.
+
+
+## [1.4.13] - 2025-01-15
+
+### 📚 Documentation
+
+- **添加 WORKSPACE_ROOT 环境变量说明**
+  - 在 `.env.example` 中添加 `WORKSPACE_ROOT` 配置说明
+  - 说明其用于 H5 游戏路径解析
+  - 默认值为 `process.cwd()`
+
+- **统一 `.env.docker` 与 `.env.example` 配置格式**
+  - 保持完整配置项与 `.env.example` 一致
+  - 为 Docker 场景设置合理的默认值
+  - 添加清晰的说明，标注哪些配置由 `docker-compose.yml` 管理
+  - 添加完整的 Docker 部署步骤和注意事项
+
+### ✨ Improved
+
+- **启动日志显示目录配置**
+  - 显示 `WORKSPACE_ROOT`（H5 游戏路径解析）
+  - 显示 `TDS_MCP_CACHE_DIR`（应用缓存目录）
+  - 显示 `TDS_MCP_TEMP_DIR`（临时文件目录）
+  - 标注是否使用环境变量或默认值
+    - `(env)` = 从环境变量读取
+    - `(default)` = 使用默认值
+    - `(default: cwd)` = 默认为当前工作目录
+
+
+## [1.4.12] - 2025-01-15
+
+### ✨ Added
+
+- **新增 `start_oauth_authorization` 工具**
+  - 提供专门的授权工具，用户说"我要授权"时 AI 可以直接调用
+  - 明确的语义，不再需要通过调用其他需要授权的工具间接触发
+  - 检查已有授权状态，避免重复授权
+
+### 🎨 Improved
+
+- **优化授权错误信息**
+  - 简化授权链接展示格式，更加清晰易读
+  - 使用步骤式指引（1️⃣、2️⃣、3️⃣）提升用户体验
+  - 统一错误提示文案，指引用户使用 `start_oauth_authorization`
+
+- **改进 `check_environment` 工具**
+  - 未授权时直接提示使用 `start_oauth_authorization` 工具
+  - 不再是"将自动触发授权"的模糊说法
+
+- **`get_current_app_info` 中文化**
+  - 返回信息改为中文，与其他工具保持一致
+  - 提升中文用户的使用体验
+
+### 🔧 Refactor
+
+- **重构 `getCurrentAppInfo` 函数位置**
+  - 从 `leaderboard/docTools.ts` 移至 `app/handlers.ts`
+  - 作为通用应用管理功能，不应在排行榜模块中
+  - 代码组织更加合理，符合模块化架构
+
+### 🗑️ Removed
+
+- **删除废弃代码**
+  - 删除未使用的 `startDeviceFlow()` 私有方法
+  - 删除未使用的 `displayAuthorizationInfo()` 方法
+  - 减少代码冗余，提升可维护性
+
+## [1.4.11] - 2025-01-15
+
+### 🐛 Bug Fixes
+
+**修复 OAuth 完成后 MAC Token 无法正确传递的问题**
+
+#### Fixed
+
+- **OAuth Token 传递问题**
+  - 修复 `server.ts` 中 `context.macToken` 在服务器启动时固定为空对象的问题
+  - 改用动态 getter 让 `context.macToken` 始终返回最新的 `apiConfig.macToken`
+  - 确保 OAuth 完成后的请求能正确获取到授权 token
+
+- **HttpClient Token 获取**
+  - 优化 `httpClient.ts` 中的 token 获取逻辑
+  - 改为每次请求时动态调用 `ApiConfig.getInstance().macToken`
+  - 避免缓存旧的 token 引用
+
+#### Technical Details
+
+**问题根源：**
+```typescript
+// 旧代码 - 问题所在
+const TDS_MCP_MAC_TOKEN = apiConfig.macToken;  // 启动时是空对象 {}
+this.context = {
+  macToken: TDS_MCP_MAC_TOKEN  // 永远指向空对象
+};
+```
+
+**修复方案：**
+```typescript
+// 新代码 - 动态获取
+this.context = {
+  get macToken() {
+    return apiConfig.macToken;  // 每次访问都获取最新值
+  }
+};
+```
+
+#### Impact
+
+- ✅ OAuth 授权流程现在完全正常工作
+- ✅ 不影响 MCP Proxy 私有参数（`_mac_token`）传递逻辑
+- ✅ 不影响环境变量配置的 token
+
+#### Debug Enhancements
+
+新增详细调试日志（`TDS_MCP_VERBOSE=true`）：
+- `ApiConfig.setMacToken()` 调用日志
+- `HttpClient` Token 获取日志
+- MAC 签名生成过程日志
+- 请求签名生成过程日志
+
+## [1.4.10] - 2025-01-15
+
+### 🚀 Major Update - 统一路径解析系统与 Proxy 配置极简化
+
+**重大架构改进：实现统一路径解析系统，极简化 Proxy 配置，移除冗余路径拼接逻辑。**
+
+### Added
+
+- 📦 **统一路径解析器** (`src/core/utils/pathResolver.ts`)
+  - `resolveWorkPath()` - 主解析函数，智能检测绝对/相对路径
+  - `getWorkspaceRoot()` - 获取工作空间根路径
+  - `isPathInWorkspace()` - 路径安全检查
+  - `getRelativeToWorkspace()` - 转换为相对路径
+  - 公式：`WORKSPACE_ROOT + _project_path + gamePath`
+
+- 🌍 **新环境变量支持**
+  - `WORKSPACE_ROOT` - 工作空间根路径（默认：`process.cwd()`）
+  - 自动适配三种场景：Proxy、容器、本地开发
+
+- 📚 **技术文档**
+  - `docs/PATH_RESOLUTION.md` - 完整路径解析说明
+  - 三种场景详细示例
+  - 开发者集成指南
+
+### Changed
+
+- 🔧 **Proxy 配置极简化**
+  - 移除 `workspace_path` 字段（不再需要）
+  - `project_relative_path` 重命名为 `project_path`
+  - Proxy 不再做路径拼接，只传递相对路径
+  - 路径拼接逻辑统一由 MCP Server 的 `pathResolver` 处理
+
+- ⚡ **H5 Game 工具参数调整**
+  - `projectPath` → `gamePath`（相对路径）
+  - 参数说明更新为相对路径
+  - 使用 `resolveWorkPath()` 统一解析
+
+- 🗑️ **移除废弃环境变量**
+  - 移除 `TDS_MCP_PROJECT_PATH` 使用
+  - 所有路径通过 `context.projectPath` 传递
+
+### Fixed
+
+- 🐛 **修复 getCurrentAppInfo 路径问题**
+  - 从 context 获取 projectPath（而非环境变量）
+  - 传递 context 给所有需要路径的函数
+
+### Documentation
+
+- 📚 批量更新所有 Proxy 相关文档 (50+ 处更新)
+  - `docs/PROXY_CLIENT_CONFIG.md`
+  - `docs/TAPCODE_QUICK_START.md`
+  - `docs/TAPCODE_INTEGRATION.md`
+  - `docs/DOCKER_DEPLOYMENT.md`
+  - `README.md`
+  - `src/mcp-proxy/README.md`
+
+**配置对比：**
+
+旧配置（v1.4.9）：
+```json
+{
+  "tenant": {
+    "workspace_path": "/workspace",
+    "project_relative_path": "user-123/my-game",
+    "user_id": "user-123",
+    "project_id": "my-game"
+  }
+}
+```
+
+新配置（v1.4.10）：
+```json
+{
+  "tenant": {
+    "project_path": "project-123/workspace",
+    "user_id": "user-456",
+    "project_id": "project-123"
+  }
+}
+```
+
+**职责分离：**
+- ✅ TapCode 平台：生成 `project_path`
+- ✅ Proxy：直接传递 `_project_path`
+- ✅ MCP Server：统一路径解析（`pathResolver`）
+
+**优势：**
+- ✅ Proxy 配置更简单（减少一个字段）
+- ✅ 路径逻辑统一在 MCP Server
+- ✅ 支持多场景自动适配
+- ✅ 用户只需传递相对路径
+
+## [1.4.9] - 2025-01-15
+
+### 🔄 Refactor - MCP Proxy 配置结构优化
+
+**优化 tenant 配置结构，将 user_id 和 project_id 从路径构建中分离，仅用于标识和日志追踪。**
+
+### Changed
+
+- 📝 **配置结构调整**
+  - `user_id` 和 `project_id` 改为可选，仅用于日志追踪和标识
+  - 路径完全由 `project_relative_path` 决定（默认 '.'）
+  - 所有 tenant 字段都改为可选
+  - 简化路径构建逻辑
+
+- ✅ **类型定义优化** (types.ts)
+  - `workspace_path`: 可选，默认 '/workspace'
+  - `project_relative_path`: 可选，默认 '.'（用于构建路径）
+  - `user_id`: 可选，仅标识
+  - `project_id`: 可选，仅标识
+
+- 🔧 **配置验证简化** (config.ts)
+  - 移除所有 tenant 字段的必填验证
+  - `project_relative_path` 默认值设为 '.'
+
+- ⚡ **路径构建简化** (proxy.ts)
+  - 简化逻辑：直接使用 `project_relative_path`
+  - 更新启动日志：分别显示各字段（如果存在）
+
+### Documentation
+
+- 📚 更新 README.md 配置说明
+- 📚 更新 config.example.json 示例
+- 📚 明确标注字段用途和优先级
+
+**配置示例：**
+```json
+{
+  "tenant": {
+    "workspace_path": "/workspace",
+    "project_relative_path": "user-123/my-game",
+    "user_id": "user-123",
+    "project_id": "my-game"
+  }
+}
+```
+
+**优点：**
+- ✅ 职责清晰：user_id/project_id 仅标识，不影响路径
+- ✅ 灵活性强：路径完全由 project_relative_path 控制
+- ✅ 配置简单：所有字段可选，默认值合理
+
+## [1.4.8] - 2025-11-12
+
+### 🚀 Major Update - MCP Proxy 重连机制全面优化
+
+**本次更新全面优化了 MCP Proxy 的重连机制，提供无感知的自动重连和请求队列功能。**
+
+### Added
+
+- 📦 **请求队列机制**
+  - 重连期间自动缓存请求到队列
+  - 重连成功后自动处理队列中的所有请求
+  - 请求超时保护（默认 30 秒，可配置）
+  - 用户无感知，请求自动重试
+
+- 🔍 **增强网络错误检测**
+  - 优先检查错误码（ECONNREFUSED, ETIMEDOUT, ENOTFOUND 等）
+  - 备选检查错误消息关键词
+  - 覆盖所有常见网络错误场景
+  - 支持 8 种网络错误码 + 7 种关键词
+
+- 📢 **标准通知机制**
+  - 使用 MCP 标准 `notifications/message` 通知
+  - 同时发送 `notifications/tools/list_changed`（兼容支持的客户端）
+  - 重连成功时通知 Agent
+  - 提供重连事件的时间戳和详情
+
+### Fixed
+
+- 🔧 **连接资源泄漏修复**
+  - 重连前自动关闭旧连接
+  - 避免 socket 和事件监听器泄漏
+  - 多次重连不会导致内存泄漏
+
+### Removed
+
+- ❌ **移除定期监控机制**
+  - 删除 10 秒定期监控（冗余）
+  - 完全依赖即时网络错误检测
+  - 减少资源消耗
+
+### Changed
+
+- 🔄 **重连流程优化**
+  - 网络错误时立即触发重连 + 加入请求队列
+  - 重连成功后自动处理队列
+  - 超时请求自动失败（避免无限等待）
+
+- ⚙️ **配置选项调整**
+  - 移除 `monitor_interval` 配置
+  - 新增 `request_timeout` 配置（默认 30000ms）
+
+## [1.4.7] - 2025-11-12
+
+### 🎯 Major Update - MCP Proxy 私有参数协议完整修复
+
+**本次更新完整修复了 MCP Proxy 的私有参数注入机制，实现了真正的多租户支持和请求级别的认证。**
+
+### Fixed
+
+- 🔐 **私有参数注入完整修复**
+  - 修复 `ensureAuthenticated()` - 优先检查请求级别的 `context.macToken`
+  - 修复 `applyDefaults()` - 保留 `project_relative_path` 配置字段
+  - 修复所有 H5 Game handlers - 传递 `context` 到所有 API 调用
+  - 修复所有 H5 Game tools - 使用 `effectiveContext` 并传递到 handlers
+  - HttpClient 现在正确使用 Proxy 注入的 MAC Token 进行签名
+
+- 📁 **路径计算优化**
+  - 新增 `tenant.project_relative_path` 配置字段
+  - 支持灵活的项目路径映射（Docker 场景）
+  - 优先使用 `project_relative_path`，回退到 `userId/projectId`
+  - Handler 优先使用 `context.projectPath`（Docker 路径优先于 Agent 传参）
+
+- 🔄 **MCP Proxy 重连机制优化**
+  - Tool call 失败时立即检测网络错误并触发重连
+  - 不再等待定期监控（10秒）
+  - 支持 ECONNREFUSED、fetch failed、socket hang up 等错误检测
+
+- 📊 **日志增强**
+  - 客户端连接/断开事件始终显示（不受 verbose 限制）
+  - Proxy 配置加载显示 `project_relative_path`
+  - Private Params 日志显示注入的路径信息
+
+### Changed
+
+- 🐳 **Docker 部署优化**
+  - `.env` 和 `.env.docker` 默认启用 verbose 日志
+  - `docker-compose.yml` 默认 `TDS_MCP_VERBOSE=true`
+  - 新增 `Dockerfile.local` 用于本地代码构建和测试
+  - 支持 `WORKSPACE_ROOT` 环境变量配置
+
+### Documentation
+
+- 📖 **更新配置文档**
+  - `docs/PROXY_CLIENT_CONFIG.md` 添加路径配置说明
+  - 详细说明 `project_relative_path` 字段用法
+  - 添加 Docker 部署场景的最佳实践
+
+## [1.4.3] - 2025-11-12
+
+### Added
+
+- 📚 **客户端配置文档**
+  - 新增 `docs/PROXY_CLIENT_CONFIG.md` - MCP Proxy 客户端配置指南
+  - VS Code、Claude Desktop、Cursor 配置示例
+  - 配置生成器和验证方法
+
+### Fixed
+
+- 📊 **启动日志增强**
+  - 显示 workspace 挂载状态（📁 Workspace: /workspace ✅）
+  - 帮助快速诊断 Docker 挂载配置问题
+
+## [1.4.2] - 2025-11-12
+
+### Fixed
+
+- 🐛 **Docker 部署架构修复**
+  - 修复 MCP Server 容器缺少 workspace 挂载导致无法读取用户代码
+  - docker-compose.yml 添加 `${WORKSPACE_ROOT}:/workspace:ro` 挂载
+  - 新增 WORKSPACE_ROOT 环境变量配置
+
+- 📊 **日志增强**
+  - 启动日志显示缓存和临时目录路径
+  - Tool call 日志分离显示业务参数和私有参数
+  - 私有参数自动脱敏（mac_key: ***REDACTED***）
+
+## [1.4.1] - 2025-11-12
+
+### 🚀 Major Update - MCP Proxy Production Ready
+
+**This release brings production-ready MCP Proxy with critical bug fixes, architectural improvements, and TapCode platform integration.**
+
+### Added
+
+- 🎯 **MCP Proxy CLI 入口和 NPM 包支持**
+  - 新增 `bin/taptap-mcp-proxy` CLI 命令
+  - 支持全局安装：`npm install -g @mikoto_zero/minigame-open-mcp`
+  - package.json exports 支持多入口点
+  - 完整的 TapCode 集成文档（`docs/TAPCODE_INTEGRATION.md`）
+
+### Changed
+
+- 🔄 **MCP Proxy 配置重构**
+  - **Breaking**: 移除环境变量配置方式，改用 JSON 配置
+  - 新的配置结构：`{ server, tenant, auth, options }`
+  - 支持 3 种传递方式：命令行参数 / stdin / 环境变量
+  - Token 内嵌在配置中（内存管理，不落盘）
+  - 删除 `tokenStore.ts`，简化代码结构
+  - 新增 `config.ts` 和 `config.example.json`
+
+### Fixed
+
+- 🐛 **MCP Proxy Bug Fixes**
+  - Fixed reconnection state management bug that prevented retry after failed reconnect
+  - Fixed connection state not being reset when `connect()` fails
+  - Fixed resource leak by adding cleanup for monitor timers on process exit
+  - Enhanced Token validation to check `mac_algorithm` field
+
+- 🔧 **架构修复：缓存和临时文件目录分离**
+  - Fixed `_project_path` now uses absolute path instead of relative path
+  - Separated cache directory from workspace (supports read-only workspace)
+  - Separated temp files directory for H5 game uploads
+  - Improved tenant isolation with dedicated cache/temp directories
+  - Environment variables: `TDS_MCP_CACHE_DIR`, `TDS_MCP_TEMP_DIR`
+
+## [1.4.0] - 2025-11-11
+
+### 🚀 Major Release - Context Resolver & Multi-Tenant Support
+
+**This release implements ContextResolver system and enhances multi-tenant support with proper tenant isolation through projectPath.**
+
+### Added
+
+- 🎯 **ContextResolver System**
+  - New `src/core/utils/contextResolver.ts` - Centralized context resolution
+  - Replaces scattered `ensureAppInfo()` calls with unified resolver
+  - Priority-based resolution: private params > context > cache
+  - Single source of truth for all context fields
+
+- 📋 **Extended Private Parameters** (v1.3.0+)
+  - `_developer_id`: Developer ID injection
+  - `_app_id`: App ID injection
+  - `_project_path`: Project path injection (for H5 upload)
+  - `_tenant_id`: Tenant ID for multi-tenant scenarios
+  - `_trace_id`: Distributed tracing support
+  - `_request_id`: Request-level logging
+
+- 📖 **Documentation**
+  - Updated `docs/MCP_PROXY_GUIDE.md` - Added multi-tenant isolation guide
+  - Explained tenant isolation through `_project_path`
+  - Clarified cache file separation per tenant
+
+### Changed
+
+- 🏗️ **Architecture Refactor**
+  - **API Layer**: All API functions use `ContextResolver` instead of `ensureAppInfo()`
+  - **Handler Layer**: Simplified context resolution logic
+  - **Type System**: Extended `HandlerContext` with new fields (developerId, appId, userId, tenantId, etc.)
+  - **Private Parameters**: All utility functions support extended field set
+
+- 🔧 **Core Components**
+  - `HandlerContext`: Added 8 new fields for complete context support
+  - `getEffectiveContext()`: Merges all private parameter types
+  - `stripPrivateParams()`: Handles all new private parameter fields
+  - Fixed duplicate `HandlerContext` definitions (consolidated to `core/types/`)
+
+- 📊 **Code Quality**
+  - Eliminated circular dependencies between `app` and `leaderboard` modules
+  - Removed async API calls from context resolution (lazy loading from cache)
+  - Cleaner error messages with actionable guidance
+
+### Removed
+
+- ❌ **Deprecated Patterns**
+  - Direct `ensureAppInfo()` calls in leaderboard module
+  - Inline `HandlerContext` interface definitions (consolidated)
+  - Unnecessary `context.macToken` parameter passing (use `context` directly)
+
+### Technical Details
+
+**Priority Resolution Flow:**
+```
+Private Params > HandlerContext > Local Cache
+```
+
+**Multi-Tenant Isolation:**
+- ✅ Each tenant has isolated `projectPath`
+- ✅ Cache files stored in `{projectPath}/.taptap-minigame/`
+- ✅ MCP Proxy injects tenant-specific context
+- ✅ Supports RuntimeContainer architecture
+
+### Migration Guide
+
+**Before (v1.3.0):**
+```typescript
+const appInfo = await ensureAppInfo(context.projectPath, true, context);
+const developerId = appInfo.developer_id;
+```
+
+**After (v1.4.0):**
+```typescript
+const resolved = contextResolver.resolve(context);
+const developerId = resolved.developerId;
+```
+
+## [1.3.0] - 2025-11-10
+
+### 🚀 Major Release - Private Parameter Protocol for MCP Proxy
+
+**This is a major architectural enhancement enabling MCP Proxy mode with multi-account authentication support.**
+
+### Added
+
+- 🔐 **Private Parameter Protocol**
+  - Support for MCP Proxy mode multi-account authentication
+  - Completely transparent to AI Agent (private params not in tool definitions)
+  - Dual injection modes: arguments or HTTP Header
+  - Four-tier authentication priority system
+  - Complete business layer isolation
+
+- 📝 **New Documentation**
+  - `docs/PRIVATE_PROTOCOL.md` - Complete private parameter protocol specification
+  - `docs/MCP_PROXY_GUIDE.md` - Comprehensive MCP Proxy development guide
+  - Full test scripts and troubleshooting guides
+
+- 🧪 **Testing**
+  - `test-private-params.sh` - Automated testing script for both injection modes
+  - Validates parameter injection, priority, and security
+
+### Changed
+
+- 🏗️ **Architecture Optimization**
+  - Unified `HandlerContext` parameter passing (removed inconsistencies)
+  - HttpClient accepts `HandlerContext` instead of separate params
+  - Server layer centralized private parameter processing
+  - Business layer completely unaware of private parameters
+
+- ✨ **API Improvements**
+  - All API functions accept `context?: HandlerContext`
+  - Removed unused `env` field from `HandlerContext`
+  - Simplified HttpClient constructor (3 lines)
+
+- 📊 **Code Reduction**
+  - Removed RequestStorage class (-20 lines)
+  - Removed HTTP Server token storage logic (-15 lines)
+  - Removed _currentSessionKey mechanism (-10 lines)
+  - Removed PrivateToolParams from business layer (-15 declarations)
+  - Total: -70+ lines of code
+
+### Technical Details
+
+**Private Parameter Injection:**
+- Method 1: Direct parameter injection in `arguments._mac_token` (recommended)
+- Method 2: HTTP Header `X-TapTap-Mac-Token` (HTTP/SSE mode only)
+
+**Authentication Priority:**
+```
+1. arguments._mac_token (highest)
+2. HTTP Header X-TapTap-Mac-Token
+3. context.macToken (env/OAuth)
+4. global ApiConfig (lowest)
+```
+
+**Data Flow:**
+```
+Server Layer (extracts & strips private params)
+    ↓ stripPrivateParams()
+Business Layer (only sees business params)
+    ↓ context.macToken
+HttpClient → HTTP Request
+```
+
+**Security:**
+- Private parameters automatically stripped from logs
+- TypeScript type safety maintained
+- Session isolation for HTTP Header injection
+
+### Documentation
+
+- Added comprehensive MCP Proxy development guide
+- Updated architecture documentation in CLAUDE.md
+- Enhanced README.md with v1.3.0 features
+
+## [1.2.0] - 2025-11-03
+
+### 🚀 Major Release - Multi-Client Concurrency & Smart Auto-Authorization
+
+**This is a major release bringing significant improvements: multi-client concurrent connections, intelligent auto-authorization for SSE mode, three transport modes support, and complete H5 game management.**
+
+### Added
+
+- 🔌 **Multi-Client Concurrent Connections**
+  - Independent Server and Transport instances for each session
+  - Session ID-based request routing via `mcp-session-id` header
+  - Active session tracking in `/health` endpoint
+  - Support for unlimited concurrent clients
+
+- 📊 **Client Connection Logging**
+  - `logger.logClientConnection(sessionId)` - Log client connections
+  - `logger.logClientDisconnection(sessionId)` - Log client disconnections
+  - Verbose mode displays full connection events (session ID + timestamp)
+  - Dual output: stderr (local debugging) + MCP notification (client monitoring)
+
+- 🔐 **Smart Auto-Authorization (SSE Mode)**
+  - One-step authorization flow in SSE mode (vs two-step in stdio/http)
+  - Real-time progress updates every 10 seconds
+  - Progress types: auth_url, polling, success, timeout, error
+  - Clear operation instructions for AI agents
+  - Automatic polling with 2-minute timeout
+
+- 📡 **Three Transport Modes**
+  - `TDS_MCP_TRANSPORT=sse` → SSE streaming (`Content-Type: text/event-stream`)
+  - `TDS_MCP_TRANSPORT=http` → JSON responses (`Content-Type: application/json`)
+  - `TDS_MCP_TRANSPORT=stdio` → stdio mode (default, maximum compatibility)
+
+- 🎮 **H5 Game Module** (17 tools total)
+  - Complete H5 game upload and publishing workflow
+  - `upload_and_publish_h5_game` - Upload game package and publish
+  - `get_h5_game_status` - Check game publication status
+  - `update_h5_game_info` - Update game metadata
+  - `gather_h5_game_info` - Collect game information
+
+- 📦 **Modular Architecture**
+  - `features/app/` - Application management (8 tools)
+  - `features/leaderboard/` - Leaderboard (5 tools + 7 resources)
+  - `features/h5Game/` - H5 game management (4 tools)
+  - Clean separation of concerns and dependencies
+
+### Changed
+
+- 🔧 **Request Handler Refactoring**
+  - `setupHandlers()` → `setupHandlersForServer(server)` (supports multiple instances)
+  - Each session has isolated handler configuration
+  - Prevents cross-session interference
+
+- 🎯 **Authorization Strategy by Transport**
+  - SSE mode: Auto-authorization with progress streaming
+  - HTTP/stdio modes: Two-step authorization (backward compatible)
+  - Smart mode selection based on `TDS_MCP_TRANSPORT`
+
+- 📝 **Startup Logging Enhancement**
+  - Display response mode (SSE Streaming / JSON Only)
+  - Show active sessions count
+  - Clarify transport capabilities
+
+- 🏗️ **Architecture Improvements**
+  - Unified format for all tools and resources
+  - Modular design with clear boundaries
+  - Scaffolding script for rapid feature development
+
+### Fixed
+
+- ✅ **Multi-Client Initialize Support**
+  - Removed "Server already initialized" error
+  - Each client gets independent session
+  - No more 400 errors on repeated initialize
+
+- ✅ **HTTP JSON Mode Compatibility**
+  - Correctly uses two-step auth (avoids 2-min blocking without progress)
+  - Progress notifications silently fail (graceful degradation)
+  - All features work correctly without SSE streaming
+
+### Migration Guide
+
+**For SSE Mode Users** (OpenHands, Claude Code, etc.):
+```bash
+# One-step auto-authorization (new feature)
+TDS_MCP_TRANSPORT=sse TDS_MCP_PORT=3000 npm start
+# Tool call → auth URL + auto-wait → user authorizes → automatic completion
+```
+
+**For HTTP JSON Mode Users**:
+```bash
+# JSON-only responses
+TDS_MCP_TRANSPORT=http TDS_MCP_PORT=3000 npm start
+# Returns: Content-Type: application/json
+```
+
+**For Local Development** (Claude Desktop, Cursor, VSCode):
+```bash
+# Default stdio mode (unchanged)
+npx @mikoto_zero/minigame-open-mcp
+```
+
+**No Breaking Changes** - All existing configurations continue to work.
+
+## [1.1.4] - 2025-10-15
+
+### Note
+- 🔄 **Re-release of v1.1.3 fixes without Resources/Prompts**
+  - v1.1.3 was already published with Resources/Prompts
+  - v1.1.4 contains the same API fixes but removes Resources/Prompts
+  - Simplified to Tools-only architecture for production stability
+
+## [1.1.3] - 2025-10-15
+
+### Fixed
+- 🔧 **Critical API documentation fixes** - Aligned with LeaderboardManager source code
+  - Fixed method signatures: all methods use object parameters `({ param1, param2 })`
+  - Fixed parameter names: `continuationToken` → `nextPage`
+  - Fixed parameter names: unified `leaderboardId` (lowercase 'b')
+  - Added complete parameter examples including `undefined` values
+  - Prevents AI from generating incomplete or incorrect code
+
+### Removed
+- 🗑️ **Removed Resources and Prompts** - Simplified to Tools-only architecture
+  - Removed all Resources support (8 resources deleted)
+  - Removed all Prompts support (2 prompts deleted)
+  - Deleted files: resourceDefinitions.ts, promptDefinitions.ts, promptHandlers.ts
+  - Back to simple, reliable Tools-only approach
+  - Reduces complexity and potential confusion
+
+### Added
+- ⚠️ **Important usage notes in documentation**
+  - Emphasized: 'tap' is a GLOBAL object (NO imports needed)
+  - Emphasized: NO npm packages required
+  - Emphasized: All methods accept SINGLE object parameter
+  - Works in TapTap Minigame AND H5 game environments
+
+### Changed
+- 📝 **Updated description** - Now supports both Minigame and H5 games
+  - Package description: "TapTap Open API MCP Server - Documentation and Management APIs for TapTap Minigame and H5 Games"
+  - API title: "TapTap Leaderboard API (Minigame & H5)"
+- 📊 **Simplified architecture** - Tools-only (17 tools)
+  - Easier to understand and use
+  - Proven to work reliably
+  - For experimental Resources/Prompts, see v1.2.0-beta versions
+
+## [1.1.2] - 2025-10-14
+
+### Fixed
+- 🔄 **Republish v1.1.0 as stable version** - Skip the deprecated warnings from v1.1.1
+  - This version is identical to v1.1.0 in functionality
+  - Provides clean Tools, Resources, and Prompts without deprecation warnings
+  - Recommended for production use (v1.1.1 skipped)
+  - All 17 Tools remain available and fully functional
+
+### Note
+- v1.1.1 introduced deprecation warnings but has been skipped
+- v1.1.2 provides the same features as v1.1.0 without warnings
+- For experimental breaking changes, see v1.2.0-beta.1
+
+## [1.1.0] - 2025-10-14
+
+### Added
+- 🎯 **MCP Resources Support** - Added read-only documentation resources
+- 🎨 **MCP Prompts Support** - Added reusable workflow templates
+
+### Note
+- This version was superseded by v1.1.2-v1.1.4 for production use
+- Resources/Prompts are available in v1.2.0-beta versions
+
+## [1.0.16] - 2025-10-14
+
+### Improved
+- 🤖 **Smart AI Agent behavior** - Context-aware leaderboard creation
+
+(Earlier versions omitted for brevity)

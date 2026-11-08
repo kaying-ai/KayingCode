@@ -1,0 +1,64 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "tags": ["-lintignore"],
+  "workspaces": {
+    ".": {
+      "entry": [
+        ".release-it.mjs",
+        ".vscode/*.mjs",
+        "scripts/check-workspace-freshness.mjs",
+        "scripts/mise-run.mjs"
+      ]
+    },
+    "packages/desktop": {
+      "entry": [
+        "electron-builder.config.js",
+        "scripts/sign-windows-hook.cjs",
+        "src/renderer/*.html",
+        "src/renderer/cuaPermissionPanel.ts",
+        "src/renderer/src/resource-manager.tsx"
+      ]
+    },
+    "packages/server": {
+      "entry": ["src/index.ts", "src/entry-stdio.ts", "build-remote.ts"]
+    },
+    "packages/services": {
+      "entry": ["src/index.ts", "src/storage/module.ts"]
+    },
+    "packages/mobile-client-core": {
+      "entry": ["src/contract.ts", "src/module.ts", "src/contract.example.ts"]
+    },
+    "apps/kayingcode-mobile-taro": {
+      "entry": [
+        "src/app.tsx",
+        "src/app.config.ts",
+        "src/module.ts",
+        "src/pages/**/index.tsx",
+        "src/pages/**/index.config.ts",
+        "src/global.d.ts",
+        "config/index.ts"
+      ],
+      "ignoreDependencies": [
+        "@babel/runtime",
+        "@tarojs/cli",
+        "@tarojs/components",
+        "@tarojs/helper",
+        "@tarojs/plugin-framework-react",
+        "@tarojs/plugin-platform-h5",
+        "@tarojs/plugin-platform-weapp",
+        "@tarojs/react",
+        "@tarojs/runtime",
+        "@tarojs/shared",
+        "@tarojs/taro",
+        "@tarojs/webpack5-runner",
+        "@types/react-dom",
+        "babel-preset-taro",
+        "react-dom"
+      ]
+    },
+    "apps/zcode-cli/packages/browser-use-plugin": {
+      "entry": ["src/browser-client.ts"]
+    }
+  },
+  "ignore": [".agents/**", "docs/**", "packages/ui/src/components/**"]
+}

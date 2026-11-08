@@ -1,0 +1,59 @@
+packages:
+  - apps/*
+  - apps/zcode-cli
+  - apps/zcode-cli/packages/*
+  - apps/zcode-cli/tools/*
+  - packages/*
+  - tools/*
+
+supportedArchitectures:
+  os:
+    - current
+    - darwin
+    - linux
+    - win32
+  cpu:
+    - current
+    - x64
+    - arm64
+  libc:
+    - current
+    - glibc
+
+onlyBuiltDependencies:
+  - "@parcel/watcher"
+  - "@swc/core"
+  - "@tarojs/binding"
+  - "@tarojs/cli"
+  - cpu-features
+  - edgedriver
+  - electron
+  - electron-winstaller
+  - esbuild
+  - geckodriver
+  - koffi
+  - msw
+  - node-pty
+  - protobufjs
+  - ssh2
+  - unsafe-pointer
+  - "@zcode/desktop"
+
+allowBuilds:
+  "@parcel/watcher": true
+  "@swc/core": true
+  "@tarojs/binding": true
+  "@tarojs/cli": true
+  cpu-features: true
+  edgedriver: true
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  geckodriver: true
+  koffi: true
+  msw: true
+  node-pty: true
+  protobufjs: true
+  ssh2: true
+  unsafe-pointer: true
+  "@zcode/desktop": true

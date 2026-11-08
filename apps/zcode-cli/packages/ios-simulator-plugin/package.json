@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@zcode/ios-simulator-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "iOS development workflow and simulator automation guidance driven by xcrun simctl.",
+  "license": "MIT"
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12+ 启动画面（夜间模式）。与 values-v31 同理：SplashScreen API 会忽略
+      windowBackground，必须用 windowSplashScreenBackground 显式声明。
+      夜间同样用黑底：KY 品牌主图是黑底白字，黑底在两种主题下都保持图标对比度。
+      NormalTheme 刻意不在此声明，交给 values-night/styles.xml 解析。
+    -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@android:color/black</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
+</resources>

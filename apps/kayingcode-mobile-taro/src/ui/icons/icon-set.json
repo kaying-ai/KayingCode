@@ -1,0 +1,85 @@
+{
+  "note": [
+    "Taro 端使用的 Flutter Material Icons 清单（生成输入；产物 material-icons-subset.otf / icons.ts / material-icons.css 皆为生成物，勿手改）。",
+    "值是 Flutter 的 Icons.<name> 常量名，必须逐字等于 flutter/lib/src/material/icons.dart 里的定义名——生成脚本按名字从那取精确码点，不做名字猜测。",
+    "取舍规则：同一语义位置沿用 Flutter 用的同一个图标；Taro 独有的控件借用 Flutter 中语义最近的图标，并在分组说明里注明出处。",
+    "每个条目都必须在 Taro 源码里作为字符串字面量出现，否则生成脚本的 --check 会判定为冗余条目（保持子集最小）。",
+    "新增图标：加到这里 → 重跑 scripts/generate-mobile-taro-icons.py → 提交三个生成物。"
+  ],
+  "groups": {
+    "壳层底栏（Flutter root_shell.dart 的 NavigationBar）": [
+      "smart_toy",
+      "smart_toy_outlined",
+      "forum",
+      "forum_outlined",
+      "person",
+      "person_outline"
+    ],
+    "导航、返回与展开（arrow_back 见 Flutter chat/composer.dart；keyboard_arrow_* 是 Flutter 各处展开折叠的通用指示）": [
+      "arrow_back",
+      "chevron_right",
+      "keyboard_arrow_down",
+      "keyboard_arrow_up",
+      "menu",
+      "add"
+    ],
+    "Bot 列表与设备（Flutter bot_list_page.dart、device_management_page.dart）": [
+      "tune_outlined",
+      "edit_outlined",
+      "delete_outline",
+      "link_outlined",
+      "desktop_windows_outlined",
+      "devices_other",
+      "settings_outlined",
+      "settings_backup_restore",
+      "save_outlined"
+    ],
+    "引导提示图标": ["info_outline"],
+    "设置首页分组行（Flutter settings_page.dart 的 ListTile leading）": [
+      "palette_outlined",
+      "language_outlined",
+      "support_agent_outlined",
+      "copy_outlined",
+      "devices_outlined",
+      "extension_outlined",
+      "schedule_outlined",
+      "school_outlined"
+    ],
+    "会话入口与抽屉（Flutter session_drawer.dart）": ["add_comment_outlined"],
+    "消息与工具状态（Flutter msg_widgets.dart 的工具状态表：pendingApproval→hourglass_top、success→check、error→error_outline、cancelled→block、其余→build_outlined）": [
+      "check",
+      "check_circle",
+      "check_circle_outline",
+      "block",
+      "error_outline",
+      "build_outlined",
+      "hourglass_top",
+      "hourglass_bottom",
+      "motion_photos_on",
+      "radio_button_unchecked",
+      "radio_button_checked",
+      "play_circle_outline"
+    ],
+    "消息、回合与时间线（Flutter msg_widgets.dart、chat/insights.dart；fork_right/restore 见 Flutter 会话时间线的分叉与检查点标记）": [
+      "attach_file",
+      "compress",
+      "swap_horiz",
+      "flag_outlined",
+      "fact_check_outlined",
+      "refresh",
+      "fork_right",
+      "restore"
+    ],
+    "输入区与斜杠命令（Flutter chat/composer.dart 的 send 键、chat/sheets.dart 的命令图标三分支）": [
+      "arrow_upward",
+      "auto_awesome_outlined",
+      "bolt",
+      "grid_view_rounded",
+      "memory",
+      "psychology",
+      "stop",
+      "terminal",
+      "data_object_outlined"
+    ]
+  }
+}

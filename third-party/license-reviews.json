@@ -1,0 +1,651 @@
+[
+  {
+    "package": "@fig/autocomplete-helpers@1.0.7",
+    "expectedLicense": "(missing)",
+    "scope": "identifier",
+    "selectedLicense": "MIT",
+    "reason": "精确版本自带完整 MIT 原文，保留原始版权与字节哈希。",
+    "evidence": {
+      "file": "third-party/upstream/5129f8779dca579cfcb235570688a2f15822b270575e04f27ef906aabbcc0355.txt",
+      "sha256": "5129f8779dca579cfcb235570688a2f15822b270575e04f27ef906aabbcc0355",
+      "source": "https://registry.npmjs.org/@fig/autocomplete-helpers/1.0.7",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5129f8779dca579cfcb235570688a2f15822b270575e04f27ef906aabbcc0355"
+    }
+  },
+  {
+    "package": "@img/sharp-libvips-darwin-arm64@1.3.4",
+    "expectedLicense": "LGPL-3.0-or-later",
+    "scope": "development",
+    "selectedLicense": "LGPL-3.0-or-later",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/394ecfe4e823ebf6ddc9f9b7155046aad1f0492300920323ddfb84cae85dbac0.json",
+      "sha256": "394ecfe4e823ebf6ddc9f9b7155046aad1f0492300920323ddfb84cae85dbac0",
+      "source": "https://registry.npmjs.org/@img/sharp-libvips-darwin-arm64/1.3.4",
+      "kind": "publisher-metadata"
+    },
+    "installedEvidence": {
+      "member": "package.json",
+      "sha256": "394ecfe4e823ebf6ddc9f9b7155046aad1f0492300920323ddfb84cae85dbac0"
+    }
+  },
+  {
+    "package": "@img/sharp-libvips-darwin-x64@1.3.4",
+    "expectedLicense": "LGPL-3.0-or-later",
+    "scope": "development",
+    "selectedLicense": "LGPL-3.0-or-later",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/83fed0c22436ac0e5c3d1d9f73622a0428de23f19a33882604ee8dc72b9697b5.json",
+      "sha256": "83fed0c22436ac0e5c3d1d9f73622a0428de23f19a33882604ee8dc72b9697b5",
+      "source": "https://registry.npmjs.org/@img/sharp-libvips-darwin-x64/1.3.4",
+      "kind": "publisher-metadata"
+    },
+    "installedEvidence": {
+      "member": "package.json",
+      "sha256": "83fed0c22436ac0e5c3d1d9f73622a0428de23f19a33882604ee8dc72b9697b5"
+    }
+  },
+  {
+    "package": "@img/sharp-libvips-linux-arm64@1.3.4",
+    "expectedLicense": "LGPL-3.0-or-later",
+    "scope": "development",
+    "selectedLicense": "LGPL-3.0-or-later",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/a3d16b47b7c0a55ddb43afa9678a9a83b6a27edbd3cf42d41e53c7838930982b.json",
+      "sha256": "a3d16b47b7c0a55ddb43afa9678a9a83b6a27edbd3cf42d41e53c7838930982b",
+      "source": "https://registry.npmjs.org/@img/sharp-libvips-linux-arm64/1.3.4",
+      "kind": "publisher-metadata"
+    },
+    "installedEvidence": {
+      "member": "package.json",
+      "sha256": "a3d16b47b7c0a55ddb43afa9678a9a83b6a27edbd3cf42d41e53c7838930982b"
+    }
+  },
+  {
+    "package": "@img/sharp-libvips-linux-x64@1.3.4",
+    "expectedLicense": "LGPL-3.0-or-later",
+    "scope": "development",
+    "selectedLicense": "LGPL-3.0-or-later",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/2c5f6f9abf74c1492622d5dc4e4da056ab0712fd71de61e03a687c88b8cdab4e.json",
+      "sha256": "2c5f6f9abf74c1492622d5dc4e4da056ab0712fd71de61e03a687c88b8cdab4e",
+      "source": "https://registry.npmjs.org/@img/sharp-libvips-linux-x64/1.3.4",
+      "kind": "publisher-metadata"
+    },
+    "installedEvidence": {
+      "member": "package.json",
+      "sha256": "2c5f6f9abf74c1492622d5dc4e4da056ab0712fd71de61e03a687c88b8cdab4e"
+    }
+  },
+  {
+    "package": "@img/sharp-libvips-linuxmusl-arm64@1.3.4",
+    "expectedLicense": "LGPL-3.0-or-later",
+    "scope": "development",
+    "selectedLicense": "LGPL-3.0-or-later",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/becf49c2f03f2a35b342a8bada9f5da9a3938cb1a25268b889314117b95886ff.json",
+      "sha256": "becf49c2f03f2a35b342a8bada9f5da9a3938cb1a25268b889314117b95886ff",
+      "source": "https://registry.npmjs.org/@img/sharp-libvips-linuxmusl-arm64/1.3.4",
+      "kind": "publisher-metadata"
+    },
+    "installedEvidence": {
+      "member": "package.json",
+      "sha256": "becf49c2f03f2a35b342a8bada9f5da9a3938cb1a25268b889314117b95886ff"
+    }
+  },
+  {
+    "package": "@img/sharp-libvips-linuxmusl-x64@1.3.4",
+    "expectedLicense": "LGPL-3.0-or-later",
+    "scope": "development",
+    "selectedLicense": "LGPL-3.0-or-later",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/9d93c5ff1a47f5c79286f6c832e0ab9001feff6db50b9085f578b20a663b580e.json",
+      "sha256": "9d93c5ff1a47f5c79286f6c832e0ab9001feff6db50b9085f578b20a663b580e",
+      "source": "https://registry.npmjs.org/@img/sharp-libvips-linuxmusl-x64/1.3.4",
+      "kind": "publisher-metadata"
+    },
+    "installedEvidence": {
+      "member": "package.json",
+      "sha256": "9d93c5ff1a47f5c79286f6c832e0ab9001feff6db50b9085f578b20a663b580e"
+    }
+  },
+  {
+    "package": "@img/sharp-win32-arm64@0.35.5",
+    "expectedLicense": "Apache-2.0 AND LGPL-3.0-or-later",
+    "scope": "development",
+    "selectedLicense": "Apache-2.0 AND LGPL-3.0-or-later",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693.txt",
+      "sha256": "dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693",
+      "source": "https://registry.npmjs.org/@img/sharp-win32-arm64/0.35.5",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693"
+    }
+  },
+  {
+    "package": "@img/sharp-win32-x64@0.35.5",
+    "expectedLicense": "Apache-2.0 AND LGPL-3.0-or-later",
+    "scope": "development",
+    "selectedLicense": "Apache-2.0 AND LGPL-3.0-or-later",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693.txt",
+      "sha256": "dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693",
+      "source": "https://registry.npmjs.org/@img/sharp-win32-x64/0.35.5",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "dc1f5d2d43c5531dfe0acaf4e950ea5dbe3e61e1850cf0e983bda7efc10d6693"
+    }
+  },
+  {
+    "package": "@react-grab/cli@0.1.37",
+    "expectedLicense": "(missing)",
+    "scope": "development",
+    "selectedLicense": "MIT",
+    "reason": "精确版本发布者许可记录已核对，仅非生产开发链。",
+    "evidence": {
+      "file": "third-party/upstream/3cb91aec78b7a54136b60a81055a3e1e5bac3c2d47d06dc866948129e4cd4f45.txt",
+      "sha256": "3cb91aec78b7a54136b60a81055a3e1e5bac3c2d47d06dc866948129e4cd4f45",
+      "source": "https://registry.npmjs.org/@react-grab/cli/0.1.37",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "3cb91aec78b7a54136b60a81055a3e1e5bac3c2d47d06dc866948129e4cd4f45"
+    }
+  },
+  {
+    "package": "buffers@0.1.1",
+    "expectedLicense": "(missing)",
+    "scope": "development",
+    "selectedLicense": "MIT/X11",
+    "reason": "精确版本发布者许可记录已核对，仅非生产开发链。",
+    "evidence": {
+      "file": "third-party/upstream/buffers-0.1.1-package.json",
+      "sha256": "eb42a43d5b685e6de2f2f4a5e18a70255be72349def7eedf504b912dd908913e",
+      "source": "https://raw.githubusercontent.com/bitpay/node-buffers/1b745ee35d33eb166e15ef1866073a07c6d7de87/package.json"
+    },
+    "installedEvidence": {
+      "member": "index.js",
+      "sha256": "97801e296ba5f3c32242f647e1daac5917e300367fed7935ab1e62f40adb1b8a"
+    }
+  },
+  {
+    "package": "chainsaw@0.1.0",
+    "expectedLicense": "MIT/X11",
+    "scope": "development",
+    "selectedLicense": "MIT/X11",
+    "reason": "精确版本发布者许可记录已核对，仅非生产开发链。",
+    "evidence": {
+      "file": "third-party/upstream/chainsaw-0.1.0-package.json",
+      "sha256": "51910ad64abca4eb8c2c23abb2f713ba5220db89ed89c9fd198d27241a5a70ea",
+      "source": "https://registry.npmjs.org/chainsaw/0.1.0"
+    },
+    "installedEvidence": {
+      "member": "package.json",
+      "sha256": "51910ad64abca4eb8c2c23abb2f713ba5220db89ed89c9fd198d27241a5a70ea"
+    }
+  },
+  {
+    "package": "elkjs@0.12.1",
+    "expectedLicense": "EPL-2.0 OR GPL-3.0-or-later",
+    "scope": "internal-workspace",
+    "selectedLicense": "EPL-2.0",
+    "reason": "仅内部 dev-docs 使用，选择 EPL-2.0；其他生产 owner 重新阻断。",
+    "evidence": {
+      "file": "third-party/upstream/637e81f4a1b6b4079535c499fca05e238cf7605c1ff5b76d60d7da7ce96700c9.txt",
+      "sha256": "637e81f4a1b6b4079535c499fca05e238cf7605c1ff5b76d60d7da7ce96700c9",
+      "source": "https://registry.npmjs.org/elkjs/0.12.1",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE.md",
+      "sha256": "637e81f4a1b6b4079535c499fca05e238cf7605c1ff5b76d60d7da7ce96700c9"
+    },
+    "allowedOwners": ["@zcode/dev-docs"]
+  },
+  {
+    "package": "exif-parser@0.1.12",
+    "expectedLicense": "(missing)",
+    "scope": "identifier",
+    "selectedLicense": "MIT",
+    "reason": "精确版本自带完整 MIT 原文，保留原始版权与字节哈希。",
+    "evidence": {
+      "file": "third-party/upstream/3c58bdcad5b1313456b7cf639574708a84a80ee6bddf1a26f0c5fc4d7ab1830b.txt",
+      "sha256": "3c58bdcad5b1313456b7cf639574708a84a80ee6bddf1a26f0c5fc4d7ab1830b",
+      "source": "https://registry.npmjs.org/exif-parser/0.1.12",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE.md",
+      "sha256": "3c58bdcad5b1313456b7cf639574708a84a80ee6bddf1a26f0c5fc4d7ab1830b"
+    }
+  },
+  {
+    "package": "khroma@2.1.0",
+    "expectedLicense": "(missing)",
+    "scope": "identifier",
+    "selectedLicense": "MIT",
+    "reason": "精确版本自带完整 MIT 原文，保留原始版权与字节哈希。",
+    "evidence": {
+      "file": "third-party/upstream/66b333b0f66759a0b710459e03f7029abe17f4358114a128d2c972e642961b49.txt",
+      "sha256": "66b333b0f66759a0b710459e03f7029abe17f4358114a128d2c972e642961b49",
+      "source": "https://registry.npmjs.org/khroma/2.1.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "license",
+      "sha256": "66b333b0f66759a0b710459e03f7029abe17f4358114a128d2c972e642961b49"
+    }
+  },
+  {
+    "package": "lightningcss-darwin-arm64@1.32.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-darwin-arm64/1.32.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-darwin-arm64@1.33.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-darwin-arm64/1.33.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-darwin-x64@1.32.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-darwin-x64/1.32.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-darwin-x64@1.33.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-darwin-x64/1.33.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-linux-arm64-gnu@1.32.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-linux-arm64-gnu/1.32.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-linux-arm64-gnu@1.33.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-linux-arm64-gnu/1.33.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-linux-arm64-musl@1.32.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-linux-arm64-musl/1.32.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-linux-arm64-musl@1.33.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-linux-arm64-musl/1.33.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-linux-x64-gnu@1.32.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-linux-x64-gnu/1.32.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-linux-x64-gnu@1.33.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-linux-x64-gnu/1.33.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-linux-x64-musl@1.32.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-linux-x64-musl/1.32.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-linux-x64-musl@1.33.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-linux-x64-musl/1.33.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-win32-arm64-msvc@1.32.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-win32-arm64-msvc/1.32.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-win32-arm64-msvc@1.33.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-win32-arm64-msvc/1.33.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-win32-x64-msvc@1.32.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-win32-x64-msvc/1.32.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss-win32-x64-msvc@1.33.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss-win32-x64-msvc/1.33.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss@1.32.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss/1.32.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "lightningcss@1.33.0",
+    "expectedLicense": "MPL-2.0",
+    "scope": "development",
+    "selectedLicense": "MPL-2.0",
+    "reason": "仅非生产构建/本地 Wrangler 模拟链；进入生产时重新阻断，不视为二进制分发义务已完成。",
+    "evidence": {
+      "file": "third-party/upstream/5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e.txt",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e",
+      "source": "https://registry.npmjs.org/lightningcss/1.33.0",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "5eba353fe5076ac3432177f8ab1cf75e3afcd0584251e37c3bfead5f447d040e"
+    }
+  },
+  {
+    "package": "mdn-data@1.1.4",
+    "expectedLicense": "MPL-2.0",
+    "scope": "source-available",
+    "selectedLicense": "MPL-2.0",
+    "reason": "保留 MPL-2.0 原文与精确版本源码地址；发行制品及源码交付仍需核验。",
+    "evidence": {
+      "file": "third-party/upstream/1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5.txt",
+      "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5",
+      "source": "https://registry.npmjs.org/mdn-data/1.1.4",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "1f256ecad192880510e84ad60474eab7589218784b9a50bc7ceee34c2b91f1d5"
+    },
+    "sourceArchive": "https://registry.npmjs.org/mdn-data/-/mdn-data-1.1.4.tgz",
+    "releaseReviewRequired": "Release artifact inclusion, modifications and corresponding source availability must be verified before distribution."
+  },
+  {
+    "package": "oxlint-plugin-react-doctor@0.9.22",
+    "expectedLicense": "SEE LICENSE IN LICENSE",
+    "scope": "development",
+    "selectedLicense": "Modified MIT",
+    "reason": "Modified MIT，仅内部诊断；禁止训练/改进 AI 与转售托管，不随产品分发。",
+    "evidence": {
+      "file": "third-party/upstream/aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1.txt",
+      "sha256": "aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1",
+      "source": "https://registry.npmjs.org/oxlint-plugin-react-doctor/0.9.22",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1"
+    }
+  },
+  {
+    "package": "react-doctor@0.9.22",
+    "expectedLicense": "SEE LICENSE IN LICENSE",
+    "scope": "development",
+    "selectedLicense": "Modified MIT",
+    "reason": "Modified MIT，仅内部诊断；禁止训练/改进 AI 与转售托管，不随产品分发。",
+    "evidence": {
+      "file": "third-party/upstream/aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1.txt",
+      "sha256": "aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1",
+      "source": "https://registry.npmjs.org/react-doctor/0.9.22",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1"
+    }
+  },
+  {
+    "package": "semaphore@1.1.0",
+    "expectedLicense": "(missing)",
+    "scope": "identifier",
+    "selectedLicense": "MIT",
+    "reason": "发布方 README 声明 MIT；只复核标识，不代表完整版权原文已取得，原有 strict 缺口保留。",
+    "evidence": {
+      "file": "third-party/upstream/be2a8a71f8055b65f5b5d2724418aef1642c5d4ba243f3206eebd915d35ba228.txt",
+      "sha256": "be2a8a71f8055b65f5b5d2724418aef1642c5d4ba243f3206eebd915d35ba228",
+      "source": "https://registry.npmjs.org/semaphore/1.1.0",
+      "kind": "publisher-readme-license-section"
+    },
+    "installedEvidence": {
+      "member": "README.md",
+      "sha256": "be2a8a71f8055b65f5b5d2724418aef1642c5d4ba243f3206eebd915d35ba228"
+    }
+  },
+  {
+    "package": "webpack-chain@6.5.1",
+    "expectedLicense": "MPL-2.0",
+    "scope": "source-available",
+    "selectedLicense": "MPL-2.0",
+    "reason": "保留 MPL-2.0 原文与精确版本源码地址；发行制品及源码交付仍需核验。",
+    "evidence": {
+      "file": "third-party/upstream/4b89d4518bd135ab4ee154a7bce722246b57a98c3d7efc1a09409898160c2bd1.txt",
+      "sha256": "4b89d4518bd135ab4ee154a7bce722246b57a98c3d7efc1a09409898160c2bd1",
+      "source": "https://registry.npmjs.org/webpack-chain/6.5.1",
+      "kind": "publisher-notice"
+    },
+    "installedEvidence": {
+      "member": "LICENSE",
+      "sha256": "4b89d4518bd135ab4ee154a7bce722246b57a98c3d7efc1a09409898160c2bd1"
+    },
+    "sourceArchive": "https://registry.npmjs.org/webpack-chain/-/webpack-chain-6.5.1.tgz",
+    "releaseReviewRequired": "Release artifact inclusion, modifications and corresponding source availability must be verified before distribution."
+  }
+]

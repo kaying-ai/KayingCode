@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "out/types/renderer",
+    "rootDir": "src",
+    "lib": ["es2025", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "noEmit": true
+  },
+  "include": ["src/renderer", "src/shared/armsBrowserInit.ts", "src/shared/armsRumShared.ts"],
+  // renderer 直接 import 了 shared；把它补进 references，避免 renderer 单独检查时再走源码回退路径。
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/ui" },
+    { "path": "../../packages/client" }
+  ]
+}

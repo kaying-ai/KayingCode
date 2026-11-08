@@ -1,0 +1,11 @@
+{
+  "name": "ios-simulator",
+  "version": "0.1.0",
+  "description": "iOS development workflow and simulator automation guidance driven by xcrun simctl.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "skills"
+}

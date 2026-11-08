@@ -1,0 +1,44 @@
+{
+  "name": "kaying-for-taptap",
+  "version": "0.1.1",
+  "description": "TapTap Maker 游戏开发、发布、预览，以及 three.js / Canvas 网页游戏转写能力。内置运行时，无需手工配置 MCP。",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "./skills",
+  "commands": "./commands",
+  "mcpServers": {
+    "kaying_for_taptap": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${KAYINGCODE_PLUGIN_ROOT}/dist/mcp/server.js"],
+      "cwd": "${KAYINGCODE_PROJECT_DIR}",
+      "timeoutMs": 900000
+    }
+  },
+  "uiContributions": {
+    "sidePanes": [
+      {
+        "contractVersion": 1,
+        "id": "transcription-compare",
+        "kind": "browser-compare",
+        "title": "转写对比",
+        "publicationFile": ".maker/threejs-to-taptapmaker/compare-publication.v1.json",
+        "views": [
+          {
+            "id": "source",
+            "label": "原版 Web",
+            "profile": "standard-web"
+          },
+          {
+            "id": "target",
+            "label": "TapTap 预览",
+            "profile": "taptap-preview"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "skill-creator",
+  "version": "0.1.0",
+  "description": "Create, edit, and iterate local KayingCode skills.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "skills"
+}

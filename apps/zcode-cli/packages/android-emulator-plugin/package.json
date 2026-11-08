@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@zcode/android-emulator-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Android development workflow and emulator automation guidance driven by adb.",
+  "license": "MIT"
+}

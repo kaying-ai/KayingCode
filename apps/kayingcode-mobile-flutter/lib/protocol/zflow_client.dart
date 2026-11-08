@@ -1,0 +1,751 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+
+import 'channel_client.dart';
+import 'connection_params.dart';
+import 'conversation.dart';
+import 'device_info.dart';
+import 'id.dart';
+import 'relay_client.dart';
+import 'rpc_transport.dart';
+
+String _reqId(String prefix) => generateRequestId(prefix);
+
+/// High-level facade replicating the web client's `otn()` flow:
+/// relay connect -> pair -> bootstrap -> workspace bridge -> channel RPC.
+class ZflowClient {
+  final ZflowConnectionParams params;
+  final void Function(String line)? onLog;
+
+  late final RelayClient relay;
+  final _pendingMatchers = <String, bool Function(Map<String, dynamic>)>{};
+  final _pendingCompleters = <String, Completer<Map<String, dynamic>>>{};
+
+  StreamSubscription? _payloadSub;
+
+  final _workspaceListUpdatedController = StreamController<dynamic>.broadcast();
+  Stream<dynamic> get workspaceListUpdated =>
+      _workspaceListUpdatedController.stream;
+
+  ZflowClient(
+    this.params, {
+    this.onLog,
+    Future<String> Function()? getTerminalToken,
+  }) {
+    relay = RelayClient(
+      params,
+      onLog: onLog,
+      getTerminalToken: getTerminalToken,
+    );
+    _payloadSub = relay.payloads.listen(_dispatchPayload);
+    relay.stateListenable.addListener(_onRelayState);
+  }
+
+  void _log(String line) => onLog?.call(line);
+
+  Future<void> connect() => relay.start();
+
+  // ------------------------------------------------------ frame watchdog
+
+  /// 最近一次桥数据帧到达时刻。注意与 RelayClient 的断链检测分工:
+  /// 链路死(socket 断)由 RelayClient 心跳处理;这里的场景是**链路活、
+  /// 桥冻结**——pair_status_ack 每 10s 照常入站,但桌面桥的重放队列
+  /// 已超限降级,会话帧最长冻结到 45s 宽限+重建后才整体冲刷(真机实测
+  /// 模型 5s 答完、手机 27s 后才收到)。此时只有 rpc-frame 级静默可辨。
+  DateTime? _lastBridgeFrameAt;
+
+  /// 上次看门狗主动恢复时刻(限频:≥30s 一次)。
+  DateTime? _lastWatchdogRecoveryAt;
+
+  Timer? _frameWatchdogTimer;
+
+  /// 桥帧看门狗:有活动桥 + 配对在线 + rpc-frame 静默 ≥25s(正常时
+  /// 索引推送 ~10s 一跳,静默 25s 即异常)→ 主动 reconnectWorkspace
+  /// (廉价路径,重挂桥即触发积压冲刷),不等 bridge-degraded 通知
+  /// (通知本身可能被同一冻结拖延)。
+  /// 懒启动:首个桥打开才起定时器,桥全部关闭即停——空闲连接不占
+  /// 定时器(widget 测试也不留挂起 Timer)。
+  void _startFrameWatchdog() {
+    _frameWatchdogTimer ??= Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_disposed || _activeBridges.isEmpty) return;
+      if (relay.state != RelayState.paired) return;
+      final last = _lastBridgeFrameAt;
+      if (last == null) return;
+      final silent = DateTime.now().difference(last);
+      if (silent < const Duration(seconds: 25)) return;
+      final lastRecovery = _lastWatchdogRecoveryAt;
+      if (lastRecovery != null &&
+          DateTime.now().difference(lastRecovery) <
+              const Duration(seconds: 30)) {
+        return;
+      }
+      _lastWatchdogRecoveryAt = DateTime.now();
+      // 取最新打开的桥所在工作区(多桥场景下逐个重连太重,最新即当前)。
+      final bridge = _activeBridges.last.bridge;
+      final workspaceKey = '${bridge['workspaceKey'] ?? ''}';
+      if (workspaceKey.isEmpty) return;
+      _log(
+        '[watchdog] 桥帧静默 ${silent.inSeconds}s,主动重连工作区 '
+        '$workspaceKey(不等 bridge-degraded)',
+      );
+      _recoverActiveBridges();
+    });
+  }
+
+  bool _needsBridgeRecovery = false;
+
+  /// Relay reconnects happen silently (heartbeat timeout, network switch,
+  /// laptop sleep). After re-pairing, every active bridge must be
+  /// recovered — mirrors the web client's connection recovery.
+  void _onRelayState() {
+    final state = relay.state;
+    if (state == RelayState.reconnecting || state == RelayState.error) {
+      if (_activeBridges.isNotEmpty) {
+        _needsBridgeRecovery = true;
+        // Mark bridges degraded immediately so in-flight commands gate on
+        // recovery instead of timing out on the now-dead socket/bridge.
+        for (final s in _activeBridges) {
+          if (s.degraded.value == null) s.degraded.value = 'reconnecting';
+        }
+      }
+      return;
+    }
+    if (state == RelayState.paired && _needsBridgeRecovery) {
+      _needsBridgeRecovery = false;
+      _recoverActiveBridges();
+    }
+  }
+
+  Future<void> _recoverActiveBridges() async {
+    _log('[bridge] recovering ${_activeBridges.length} bridge(s)');
+    for (final session in List<BridgeSession>.from(_activeBridges)) {
+      _startBridgeRecovery(session);
+    }
+  }
+
+  final Set<BridgeSession> _recoveringBridges = {};
+
+  /// Starts at most one recovery loop per bridge. All recovery signals
+  /// (relay state, bridge-degraded, frame watchdog) enter here so a burst of
+  /// signals cannot reopen the same bridge concurrently.
+  void _startBridgeRecovery(BridgeSession session) {
+    if (session._disposed || session._recoveryFuture != null) return;
+    final generation = ++session._recoveryGeneration;
+    final future = _recoverBridgeWithRetry(session, generation);
+    session._recoveryFuture = future;
+    _recoveringBridges.add(session);
+    unawaited(
+      future.whenComplete(() {
+        _recoveringBridges.remove(session);
+        if (identical(session._recoveryFuture, future)) {
+          session._recoveryFuture = null;
+        }
+      }),
+    );
+  }
+
+  /// Retries bridge recovery until it succeeds, so a degraded bridge never
+  /// strands commands ("can't send after reconnect"). A relay re-drop during
+  /// the retries just prolongs the loop.
+  Future<void> _recoverBridgeWithRetry(
+    BridgeSession session,
+    int generation,
+  ) async {
+    for (var attempt = 1; attempt <= 15; attempt++) {
+      if (!_recoveryIsCurrent(session, generation)) return;
+      if (await _recoverBridgeOnce(session, generation)) return;
+      if (!_recoveryIsCurrent(session, generation)) return;
+      _log('[bridge] recovery attempt $attempt failed, retrying');
+      await Future.delayed(const Duration(seconds: 3));
+    }
+  }
+
+  bool _recoveryIsCurrent(BridgeSession session, int generation) =>
+      !_disposed &&
+      !session._disposed &&
+      generation == session._recoveryGeneration;
+
+  /// Returns true when the bridge is healthy again.
+  Future<bool> _recoverBridgeOnce(BridgeSession session, int generation) async {
+    if (!_recoveryIsCurrent(session, generation)) return true;
+    final workspaceKey = session.bridge['workspaceKey'] as String?;
+    if (workspaceKey == null) {
+      // Nothing to reconnect; clear the degraded flag so commands unblock.
+      session.degraded.value = null;
+      return true;
+    }
+    session.degraded.value = 'recovering';
+    // 1) cheap path: workspace-reconnect-request
+    try {
+      final res = await reconnectWorkspace(
+        workspaceKey,
+      ).timeout(const Duration(seconds: 15));
+      if (!_recoveryIsCurrent(session, generation)) return true;
+      if (res['success'] == true) {
+        _log('[bridge] reconnected $workspaceKey');
+        session.degraded.value = null;
+        session.recovered.value += 1;
+        return true;
+      }
+    } catch (e) {
+      _log('[bridge] reconnect-request failed: $e');
+    }
+    if (!_recoveryIsCurrent(session, generation)) return true;
+    // 2) full reopen: new workspace-bridge-open, swap the transport stack
+    // into the SAME BridgeSession so open pages keep working.
+    try {
+      await _reopenBridge(session, workspaceKey, generation);
+      if (!_recoveryIsCurrent(session, generation)) return true;
+      session.degraded.value = null;
+      session.recovered.value += 1;
+      return true;
+    } catch (e) {
+      _log('[bridge] reopen failed: $e');
+      if (_recoveryIsCurrent(session, generation)) {
+        session.degraded.value = 'reopen-failed: $e';
+      }
+      return false;
+    }
+  }
+
+  /// App-resume liveness action (see RelayClient.poke) — surfaced here so
+  /// the UI layer doesn't touch the relay directly.
+  void pokeRelay() => relay.poke();
+
+  /// Waits until the relay reports `matched` (paired with the desktop).
+  /// Fails fast with the relay's failure reason (credential/desktop/relay
+  /// errors) instead of waiting out the full timeout.
+  Future<void> waitPaired({Duration timeout = const Duration(seconds: 60)}) {
+    if (relay.state == RelayState.paired) return Future.value();
+    if (relay.failure != null) {
+      return Future.error(StateError(relay.failure!.reason));
+    }
+    final completer = Completer<void>();
+    Timer? timer;
+    void listener() {
+      if (relay.state == RelayState.paired && !completer.isCompleted) {
+        timer?.cancel();
+        completer.complete();
+      }
+    }
+
+    StreamSubscription? failureSub;
+    failureSub = relay.failures.listen((f) {
+      if (!completer.isCompleted) {
+        timer?.cancel();
+        completer.completeError(
+          StateError('${f.reason}${f.message == null ? '' : ': ${f.message}'}'),
+          StackTrace.current,
+        );
+      }
+    });
+    relay.stateListenable.addListener(listener);
+    timer = Timer(timeout, () {
+      if (!completer.isCompleted) {
+        completer.completeError(TimeoutException('pairing timeout'));
+      }
+    });
+    return completer.future.whenComplete(() {
+      timer?.cancel();
+      relay.stateListenable.removeListener(listener);
+      failureSub?.cancel();
+    });
+  }
+
+  void _dispatchPayload(Map<String, dynamic> payload) {
+    final type = payload['zcode_type'];
+    if (type == 'workspace-list-updated') {
+      _workspaceListUpdatedController.add(payload['result']);
+      return;
+    }
+    if (type == 'bridge-degraded') {
+      _handleBridgeDegraded(payload);
+      return;
+    }
+    if (type == 'rpc-frame' || type == 'rpc-frame-ack') {
+      // 看门狗的活性信号:桥上有真实数据帧到达(见 _startFrameWatchdog)。
+      _lastBridgeFrameAt = DateTime.now();
+      // Race: the desktop may push frames (e.g. IPC Initialize) before
+      // openBridge's await continuation attaches the transport. Buffer
+      // unknown-bridge frames and flush on registration.
+      final id = payload['bridgeSessionId'] as String?;
+      final router = id == null ? null : _frameRouters[id];
+      if (router != null) {
+        router(payload);
+      } else if (id != null) {
+        (_pendingBridgePayloads[id] ??= []).add(payload);
+      }
+      return;
+    }
+    // Mirrors the web client's `k()` helper: every pending matcher is
+    // tested against every payload; responses are NOT guaranteed to echo
+    // our requestId.
+    final done = <String>[];
+    _pendingMatchers.forEach((requestId, matcher) {
+      final completer = _pendingCompleters[requestId];
+      if (completer != null && !completer.isCompleted && matcher(payload)) {
+        done.add(requestId);
+        completer.complete(payload);
+      }
+    });
+    for (final id in done) {
+      _pendingMatchers.remove(id);
+      _pendingCompleters.remove(id);
+    }
+  }
+
+  /// Request/response over relay payloads (mirrors the `k()` helper).
+  Future<Map<String, dynamic>> request(
+    Map<String, dynamic> payload,
+    bool Function(Map<String, dynamic>) match, {
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    final requestId = payload['requestId'] as String;
+    final completer = Completer<Map<String, dynamic>>();
+    _pendingMatchers[requestId] = match;
+    _pendingCompleters[requestId] = completer;
+    relay.sendPayload(payload);
+    return completer.future.timeout(
+      timeout,
+      onTimeout: () {
+        _pendingMatchers.remove(requestId);
+        _pendingCompleters.remove(requestId);
+        relay.cancelQueuedRequest(requestId);
+        throw TimeoutException('request $requestId timed out');
+      },
+    );
+  }
+
+  /// bootstrap-request -> bootstrap-response (workspaces overview).
+  Future<Map<String, dynamic>> bootstrap() async {
+    final id = _reqId('bootstrap');
+    final res = await request({
+      'zcode_type': 'bootstrap-request',
+      'requestId': id,
+    }, (p) => p['zcode_type'] == 'bootstrap-response' && p['requestId'] == id);
+    return (res['result'] as Map?)?.cast<String, dynamic>() ?? res;
+  }
+
+  /// workspace-list-request -> workspace-list-response.
+  Future<dynamic> listWorkspaces() async {
+    final id = _reqId('workspace-list');
+    final res = await request(
+      {'zcode_type': 'workspace-list-request', 'requestId': id},
+      (p) =>
+          p['zcode_type'] == 'workspace-list-response' && p['requestId'] == id,
+    );
+    return res['result'];
+  }
+
+  int _bridgeGeneration = 0;
+  final _activeBridges = <BridgeSession>[];
+  final _frameRouters = <String, void Function(Map<String, dynamic>)>{};
+  final _pendingBridgePayloads = <String, List<Map<String, dynamic>>>{};
+
+  /// bridge-degraded (e.g. `rpc-transport-fault`): the desktop stopped the
+  /// bridge transport. Mark it degraded and kick off the retrying recovery
+  /// loop (mirrors the web client's recovery path) so it never stays stuck.
+  Future<void> _handleBridgeDegraded(Map<String, dynamic> payload) async {
+    final bridgeSessionId = payload['bridgeSessionId'] as String?;
+    final reason = payload['reason'] as String?;
+    _log('[bridge] degraded: $bridgeSessionId reason=$reason');
+    var found = false;
+    for (final session in _activeBridges) {
+      if (session.bridge['bridgeSessionId'] == bridgeSessionId) {
+        session.degraded.value = reason ?? 'unknown';
+        found = true;
+      }
+    }
+    if (found) {
+      final session = _activeBridges.firstWhere(
+        (s) => s.bridge['bridgeSessionId'] == bridgeSessionId,
+      );
+      _startBridgeRecovery(session);
+    }
+  }
+
+  /// workspace-bridge-open -> workspace-bridge-ready, then builds the
+  /// rpc-frame transport + IPC channel client for the workspace.
+  Future<BridgeSession> openBridge(
+    String workspaceKey, {
+    String? taskId,
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final bridgeSessionId = _reqId('bridge');
+    final generation = ++_bridgeGeneration;
+    final requestId = _reqId('workspace-bridge');
+    final res = await request(
+      {
+        'zcode_type': 'workspace-bridge-open',
+        'requestId': requestId,
+        'bridgeSessionId': bridgeSessionId,
+        'bridgeGeneration': generation,
+        'workspaceKey': workspaceKey,
+        'taskId': ?taskId,
+      },
+      (p) =>
+          (p['zcode_type'] == 'workspace-bridge-ready' ||
+              p['zcode_type'] == 'workspace-bridge-error') &&
+          p['bridgeSessionId'] == bridgeSessionId,
+      timeout: timeout,
+    );
+    if (res['zcode_type'] == 'workspace-bridge-error') {
+      throw StateError('workspace-bridge-error: ${res['error'] ?? res}');
+    }
+    final bridge =
+        (res['bridge'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+    bridge['backendType'] ??= params.backendType.name;
+    bridge['relayOrigin'] ??= params.source.origin;
+    _log('[bridge] ready: $bridge');
+
+    final session = BridgeSession._(
+      bridge: bridge,
+      onDispose: (s) {
+        final id = s.bridge['bridgeSessionId'] as String?;
+        _activeBridges.remove(s);
+        if (id != null && id.isNotEmpty) {
+          _frameRouters.remove(id);
+          _pendingBridgePayloads.remove(id);
+        }
+        if (_activeBridges.isEmpty) {
+          _frameWatchdogTimer?.cancel();
+          _frameWatchdogTimer = null;
+        }
+      },
+    );
+    _attachStack(session, bridgeSessionId, bridge);
+    _activeBridges.add(session);
+    _startFrameWatchdog();
+
+    await sendMobileViewState(
+      workspaceKey: (bridge['workspaceKey'] as String?) ?? workspaceKey,
+      taskId: (bridge['initialTaskId'] as String?) ?? taskId,
+    );
+    return session;
+  }
+
+  /// Builds the rpc-frame transport + IPC channel stack for a bridge and
+  /// attaches it to [session] (fresh or swapped-in after a reopen).
+  void _attachStack(
+    BridgeSession session,
+    String requestedBridgeSessionId,
+    Map<String, dynamic> bridge,
+  ) {
+    // 保存旧 ID 必须在 _swap 前完成；_swap 会立即替换 session.bridge，
+    // 否则恢复换栈后永远读到新 ID，旧路由会一直残留。
+    final oldId = session.bridge['bridgeSessionId'] as String?;
+    final oldTransport = session._transport;
+    final oldChannels = session._channels;
+    if (oldId != null && oldId.isNotEmpty) {
+      _frameRouters.remove(oldId);
+      _pendingBridgePayloads.remove(oldId);
+    }
+    oldChannels.dispose();
+    oldTransport.dispose();
+    final transport = RpcFrameTransport(
+      bridgeSessionId:
+          (bridge['bridgeSessionId'] as String?) ?? requestedBridgeSessionId,
+      bridgeGeneration: (bridge['bridgeGeneration'] as num?)?.toInt(),
+      recoveryId: bridge['recoveryId'] as String?,
+      sendPayload: relay.sendPayload,
+      onLog: onLog,
+    );
+    // Over the workspace bridge each rpc-frame message IS one ChannelClient
+    // body (value-stream) — no 13-byte IPC framing on this path.
+    final channels = ChannelClient(
+      sendBody: transport.sendMessage,
+      onLog: onLog,
+    );
+    transport.messages.listen(channels.handleMessage);
+    session._swap(bridge, transport, channels);
+
+    // Register at the single dispatch point and flush any frames that
+    // arrived before the transport existed (Initialize race).
+    final id = transport.bridgeSessionId;
+    _frameRouters[id] = transport.acceptPayload;
+    final pending = _pendingBridgePayloads.remove(id);
+    if (pending != null) {
+      for (final payload in pending) {
+        transport.acceptPayload(payload);
+      }
+    }
+  }
+
+  /// Reopens a degraded/dead bridge: new `workspace-bridge-open` (fresh
+  /// bridgeSessionId, bumped generation, carries recoveryId), then swaps
+  /// the stack into the existing [BridgeSession].
+  Future<void> _reopenBridge(
+    BridgeSession session,
+    String workspaceKey,
+    int recoveryGeneration,
+  ) async {
+    final oldBridge = session.bridge;
+    final bridgeSessionId = _reqId('bridge');
+    final generation = ++_bridgeGeneration;
+    final requestId = _reqId('workspace-bridge');
+    _log('[bridge] reopen $workspaceKey (gen $generation)');
+    final res = await request(
+      {
+        'zcode_type': 'workspace-bridge-open',
+        'requestId': requestId,
+        'bridgeSessionId': bridgeSessionId,
+        'bridgeGeneration': generation,
+        if (oldBridge['recoveryId'] != null)
+          'recoveryId': oldBridge['recoveryId'],
+        'workspaceKey': workspaceKey,
+      },
+      (p) =>
+          (p['zcode_type'] == 'workspace-bridge-ready' ||
+              p['zcode_type'] == 'workspace-bridge-error') &&
+          p['bridgeSessionId'] == bridgeSessionId,
+    );
+    if (res['zcode_type'] == 'workspace-bridge-error') {
+      throw StateError('workspace-bridge-error: ${res['error'] ?? res}');
+    }
+    if (!_recoveryIsCurrent(session, recoveryGeneration)) return;
+    final bridge =
+        (res['bridge'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
+    _attachStack(session, bridgeSessionId, bridge);
+    _log('[bridge] reopened: $bridge');
+  }
+
+  /// mobile-view-state-update (mirrors `N()` in the web client).
+  Future<void> sendMobileViewState({
+    required String workspaceKey,
+    String? taskId,
+  }) async {
+    relay.sendPayload({
+      'zcode_type': 'mobile-view-state-update',
+      'viewState': {
+        'activeWorkspaceKey': workspaceKey,
+        'activeTaskId': ?taskId,
+        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+      'deviceInfo': {
+        'platform': zflowPlatformName(),
+        'version': params.appVersion ?? 'web',
+        'name': zflowAppName,
+      },
+    });
+  }
+
+  /// workspace-reconnect-request.
+  Future<Map<String, dynamic>> reconnectWorkspace(String workspaceKey) async {
+    final id = _reqId('workspace-reconnect');
+    return request(
+      {
+        'zcode_type': 'workspace-reconnect-request',
+        'requestId': id,
+        'workspaceKey': workspaceKey,
+      },
+      (p) =>
+          p['zcode_type'] == 'workspace-reconnect-response' &&
+          p['requestId'] == id &&
+          p['workspaceKey'] == workspaceKey,
+    );
+  }
+
+  bool _disposed = false;
+
+  Future<void> dispose() async {
+    _disposed = true;
+    for (final session in List<BridgeSession>.from(_activeBridges)) {
+      session._recoveryGeneration++;
+      session._recoveryFuture = null;
+    }
+    _frameWatchdogTimer?.cancel();
+    relay.stateListenable.removeListener(_onRelayState);
+    await _payloadSub?.cancel();
+    for (final s in List<BridgeSession>.from(_activeBridges)) {
+      s.dispose();
+    }
+    await relay.dispose();
+    await _workspaceListUpdatedController.close();
+  }
+}
+
+class BridgeSession {
+  Map<String, dynamic> _bridge;
+  RpcFrameTransport _transport;
+  ChannelClient _channels;
+  final void Function(BridgeSession) _onDispose;
+  Future<void> Function() _closeAttachment;
+  void Function(BridgeSession owner)? _onAttachmentAdopted;
+  int _attachmentEpoch = 0;
+  bool _disposed = false;
+
+  /// Non-null while the bridge is degraded (rpc-transport-fault etc.).
+  final ValueNotifier<String?> degraded = ValueNotifier(null);
+
+  /// Bumped when the bridge recovers/reopens — subscriptions must
+  /// resubscribe (server-side subscription state died with the old bridge).
+  final ValueNotifier<int> recovered = ValueNotifier(0);
+
+  /// One recovery loop per bridge. All triggers reuse this future instead of
+  /// racing separate reconnect/reopen operations.
+  Future<void>? _recoveryFuture;
+  int _recoveryGeneration = 0;
+
+  /// Resolves once the bridge is healthy again (degraded cleared), or throws
+  /// [TimeoutException]. Commands gate on this so a send during a
+  /// reconnect/recovery window doesn't hang on a dead bridge.
+  Future<void> waitHealthy({Duration timeout = const Duration(seconds: 45)}) {
+    if (_disposed || degraded.value == null) return Future.value();
+    final completer = Completer<void>();
+    void check() {
+      if (degraded.value == null && !completer.isCompleted) {
+        completer.complete();
+      }
+    }
+
+    degraded.addListener(check);
+    check();
+    return completer.future
+        .timeout(
+          timeout,
+          onTimeout: () {
+            degraded.removeListener(check);
+            throw TimeoutException('bridge 恢复超时: ${degraded.value}');
+          },
+        )
+        .whenComplete(() => degraded.removeListener(check));
+  }
+
+  BridgeSession._({
+    required Map<String, dynamic> bridge,
+    required void Function(BridgeSession) onDispose,
+    ChannelClient? channels,
+    Future<void> Function()? closeAttachment,
+    void Function(BridgeSession owner)? onAttachmentAdopted,
+  }) : _bridge = bridge,
+       _transport = _placeholderTransport(bridge),
+       _channels = channels ?? ChannelClient(sendBody: (_) {}),
+       _onDispose = onDispose,
+       _closeAttachment = closeAttachment ?? (() async {}),
+       _onAttachmentAdopted = onAttachmentAdopted;
+
+  /// Standalone session with a no-op send path — test scaffold for UI code
+  /// that holds a [BridgeSession] without a live relay connection.
+  /// [channels] 可注入自建 ChannelClient(faker 测试捕获 outgoing 请求)。
+  @visibleForTesting
+  factory BridgeSession.detached(
+    Map<String, dynamic> bridge, {
+    ChannelClient? channels,
+  }) => BridgeSession._(bridge: bridge, onDispose: (_) {}, channels: channels);
+
+  /// Session backed by a platform attachment; its owner closes the socket here.
+  factory BridgeSession.fromAttachment(
+    Map<String, dynamic> bridge, {
+    required ChannelClient channels,
+    required Future<void> Function() closeAttachment,
+    void Function(BridgeSession session)? onDispose,
+    void Function(BridgeSession owner)? onAttachmentAdopted,
+  }) => BridgeSession._(
+    bridge: bridge,
+    channels: channels,
+    onDispose: onDispose ?? (_) {},
+    closeAttachment: closeAttachment,
+    onAttachmentAdopted: onAttachmentAdopted,
+  );
+
+  static RpcFrameTransport _placeholderTransport(Map<String, dynamic> bridge) =>
+      RpcFrameTransport(
+        bridgeSessionId: '${bridge['bridgeSessionId'] ?? ''}',
+        sendPayload: (_) {},
+      );
+
+  Map<String, dynamic> get bridge => _bridge;
+  RpcFrameTransport get transport => _transport;
+  ChannelClient get channels => _channels;
+  bool get isDisposed => _disposed;
+  int get attachmentEpoch => _attachmentEpoch;
+
+  void _swap(
+    Map<String, dynamic> bridge,
+    RpcFrameTransport transport,
+    ChannelClient channels,
+  ) {
+    _bridge = bridge;
+    _transport = transport;
+    _channels = channels;
+  }
+
+  /// Replace the socket-backed transport while preserving this bridge's
+  /// identity for widgets and ConversationTransport instances.
+  Future<void> adoptAttachmentFrom(BridgeSession replacement) async {
+    if (_disposed || replacement._disposed) {
+      throw StateError('Cannot replace a disposed bridge attachment');
+    }
+    if (replacement.degraded.value != null) {
+      throw StateError('Cannot adopt a degraded replacement attachment');
+    }
+    // 重启恢复只替换同一授权目标的传输；目录排序或迟到结果不能把页面接到另一工作区/Node。
+    for (final key in [
+      'workspaceKey',
+      'nodeId',
+      'serverId',
+      'backendType',
+      'relayOrigin',
+    ]) {
+      if (_bridge[key] != replacement._bridge[key]) {
+        throw StateError(
+          'Cannot replace attachment with a different target: $key',
+        );
+      }
+    }
+    final oldTransport = _transport;
+    final oldChannels = _channels;
+    final oldClose = _closeAttachment;
+    _bridge = replacement._bridge;
+    _transport = replacement._transport;
+    _channels = replacement._channels;
+    _closeAttachment = replacement._closeAttachment;
+    _attachmentEpoch++;
+    replacement._transport = _placeholderTransport(replacement._bridge);
+    replacement._channels = ChannelClient(sendBody: (_) {});
+    replacement._closeAttachment = () async {};
+    replacement._onAttachmentAdopted?.call(this);
+    replacement._onDispose(replacement);
+    replacement._disposed = true;
+    replacement.degraded.dispose();
+    replacement.recovered.dispose();
+    oldTransport.dispose();
+    oldChannels.dispose();
+    await oldClose();
+    if (!_disposed && degraded.value == null) recovered.value += 1;
+  }
+
+  String? get workspaceKey => _bridge['workspaceKey'] as String?;
+  String? get initialTaskId => _bridge['initialTaskId'] as String?;
+
+  /// The transport is keyed by the complete workspace scope so a path change
+  /// under the same identity cannot reuse a stale scope.
+  final Map<String, ConversationTransport> _conversations = {};
+
+  ConversationTransport conversation(
+    Map<String, dynamic> scope, {
+    void Function(String line)? onLog,
+  }) {
+    final key =
+        '${scope['workspacePath']}\u0000${scope['workspaceIdentity'] ?? ''}';
+    return _conversations.putIfAbsent(
+      key,
+      () => ConversationTransport(session: this, scope: scope, onLog: onLog),
+    );
+  }
+
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    for (final transport in _conversations.values) {
+      transport.dispose();
+    }
+    _conversations.clear();
+    _onDispose(this);
+    degraded.dispose();
+    recovered.dispose();
+    _transport.dispose();
+    unawaited(_closeAttachment());
+  }
+}

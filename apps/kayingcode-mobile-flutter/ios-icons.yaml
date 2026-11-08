@@ -1,0 +1,7 @@
+# 与桌面端同源的 KY 图标；主 pubspec 同时生成 Android/iOS。
+flutter_launcher_icons:
+  ios: true
+  android: false
+  image_path: assets/icon/kayingcode.png
+  remove_alpha_ios: true
+  background_color_ios: '#000000'

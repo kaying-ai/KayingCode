@@ -1,0 +1,16 @@
+{
+  "name": "@kayingcode/blender-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Blender workflows, read-only diagnostics and a pinned upstream MCP runtime.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "doctor": "node scripts/doctor.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:upstream": "node --test test/upstream.e2e.mjs",
+    "test:blender": "node --test test/blender.e2e.mjs",
+    "verify": "node scripts/verify-upstream.mjs",
+    "sync:upstream": "node scripts/sync-upstream.mjs"
+  }
+}

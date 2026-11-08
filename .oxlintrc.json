@@ -1,0 +1,118 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": null,
+  "categories": {},
+  "rules": {
+    "max-lines": ["error", { "max": 400, "skipBlankLines": true, "skipComments": true }]
+  },
+  "overrides": [
+    {
+      // 测试文件天然会堆叠大量场景与断言，继续复用生产代码的行数上限会造成误报，
+      // 因此只对 test/spec 文件关闭 max-lines，避免放宽业务代码约束。
+      "files": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "**/*.test.mjs",
+        "**/*.spec.mjs"
+      ],
+      "rules": {
+        "max-lines": "off"
+      }
+    },
+    {
+      "files": ["**/i18n/locales/*.ts"],
+      "rules": {
+        "max-lines": "off"
+      }
+    }
+  ],
+  "settings": {
+    "jsx-a11y": {
+      "polymorphicPropName": null,
+      "components": {},
+      "attributes": {}
+    },
+    "next": {
+      "rootDir": []
+    },
+    "react": {
+      "formComponents": [],
+      "linkComponents": [],
+      "version": null,
+      "componentWrapperFunctions": []
+    },
+    "jsdoc": {
+      "ignorePrivate": false,
+      "ignoreInternal": false,
+      "ignoreReplacesDocs": true,
+      "overrideReplacesDocs": true,
+      "augmentsExtendsReplacesDocs": false,
+      "implementsReplacesDocs": false,
+      "exemptDestructuredRootsFromChecks": false,
+      "tagNamePreference": {}
+    },
+    "vitest": {
+      "typecheck": false
+    }
+  },
+  "env": {
+    "builtin": true
+  },
+  "globals": {},
+  "ignorePatterns": [
+    "apps/zcode-cli/packages/contracts/src/tools/workflow-settings.ts",
+    "apps/zcode-cli/packages/contracts/src/tools/tool-search.ts",
+    "apps/zcode-cli/packages/contracts/src/tools/fill-workflow-hole.ts",
+    "apps/zcode-cli/packages/contracts/src/tools/deferred-tool-call.ts",
+    "apps/zcode-cli/packages/contracts/src/interfaces/topic-resource.port.ts",
+    "apps/zcode-cli/packages/contracts/src/interfaces/provider-endpoint-routing.port.ts",
+    "apps/zcode-cli/packages/contracts/src/interfaces/dynamic-workflow-run-workspace.port.ts",
+    "apps/zcode-cli/packages/contracts/src/interfaces/dynamic-workflow-run-retune.port.ts",
+    "apps/zcode-cli/packages/contracts/src/interfaces/dynamic-workflow-run-hole.port.ts",
+    "packages/shared/src/web-remote-control.ts",
+    "packages/shared/src/web-remote-control-rpc-transport.ts",
+    "packages/client/src/webRemoteControlRelayProtocol.ts",
+    "packages/client/src/webRemoteControlRelayPayloadSerializer.ts",
+    "packages/client/src/webRemoteControlAcknowledgedRelayProtocolTypes.ts",
+    "packages/client/src/webRemoteControlAcknowledgedRelayProtocol.ts",
+    "packages/client/src/webRemoteControlAcknowledgedRelayDeadline.ts",
+    "packages/client/src/webRemoteControlAcknowledgedRelayBatchQueue.ts",
+    "packages/client/src/logger.ts",
+    "packages/shared/src/source-server",
+    "packages/shared/src/conversation-share-content.ts",
+    "packages/shared/src/conversation-share-tool-presentation.ts",
+    "packages/shared/src/conversationSelection.ts",
+    "packages/shared/src/bots.ts",
+    "packages/shared/src/web-remote-relay",
+    "packages/shared/src/mcp-apps",
+    "apps/zcode-cli/e2e",
+    "apps/zcode-cli/packages/office-runtime",
+    "dist-release",
+    "dist-types",
+    "packages/ui/src/components/ui",
+    "packages/ui/src/components/ai-elements",
+    ".agents/skills",
+    "packages/formal-proof",
+    "apps/zcode-cli/packages/cli",
+    "apps/zcode-cli/packages/shared-types",
+    "apps/zcode-cli/packages/contracts",
+    "apps/zcode-cli/packages/core",
+    "apps/zcode-cli/packages/adapters",
+    "apps/zcode-cli/packages/bootstrap",
+    "apps/zcode-cli/packages/i18n",
+    "apps/zcode-cli/packages/telemetry",
+    "apps/zcode-cli/packages/tui",
+    "apps/zcode-cli/packages/dynamic-workflow",
+    "apps/zcode-cli/packages/dynamic-workflow-runtime",
+    "apps/zcode-cli/packages/node-repl-host",
+    "apps/zcode-cli/packages/swift-bridge",
+    "plugins",
+    "apps/zcode-cli/packages/*-plugin",
+    "apps/zcode-cli/packages/debug",
+    "apps/zcode-cli/tools/prompt-trajectory",
+    "apps/zcode-cli/tools/typescript",
+    "docs/electron"
+  ]
+}

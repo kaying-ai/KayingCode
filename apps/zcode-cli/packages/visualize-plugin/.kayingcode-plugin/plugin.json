@@ -1,0 +1,10 @@
+{
+  "name": "visualize",
+  "version": "0.1.1",
+  "description": "Create interactive explanations, charts and design previews in KayingCode conversations.",
+  "author": {
+    "name": "KayingCode"
+  },
+  "license": "Apache-2.0",
+  "skills": "skills"
+}

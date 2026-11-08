@@ -1,0 +1,35 @@
+{
+  "name": "@zcode/node-repl-host",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Shared node_repl MCP host for JavaScript execution and Browser Use. Computer Use runs in its own native plugin.",
+  "type": "module",
+  "exports": {
+    ".": "./src/server.ts",
+    "./browser-bridge": "./src/browser-bridge.ts",
+    "./result": "./src/result.ts",
+    "./tool-contract": "./src/tool-contract.ts",
+    "./runtime-bridge": "./src/runtime-bridge.ts"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test test/*.test.ts",
+    "lint": "oxlint src --no-ignore"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@modelcontextprotocol/server": "2.0.0",
+    "@zcode/contracts": "workspace:*",
+    "@zcode/core": "workspace:*",
+    "@zcode/shared": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/client": "2.0.0",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.5"
+  }
+}

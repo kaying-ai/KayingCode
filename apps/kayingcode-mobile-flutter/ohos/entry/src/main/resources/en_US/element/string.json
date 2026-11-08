@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "KayingCode mobile remote control"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "KayingCode mobile remote control"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "KayingCode"
+    },
+    {
+      "name": "camera_permission_reason",
+      "value": "Scan a QR code to pair with a desktop device"
+    }
+  ]
+}

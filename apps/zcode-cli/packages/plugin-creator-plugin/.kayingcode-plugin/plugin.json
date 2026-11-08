@@ -1,0 +1,11 @@
+{
+  "name": "plugin-creator",
+  "version": "0.1.0",
+  "description": "Develop and validate KayingCode plugins through a local dev marketplace, installation, trials and updates.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "skills"
+}

@@ -1,0 +1,6 @@
+# oxfmt 默认读取 .gitignore 与 .prettierignore（见 oxfmt --help 的 --ignore-path 说明）。
+# apps/zcode-cli/packages/cli 自带 oxfmt（更高版本）与 format/format:check 脚本；根仓的 oxfmt
+# 不应跨目录改写其文件，否则两边格式化器会互相打架。
+apps/zcode-cli/packages/cli/
+# Blender 上游按 commit 和逐文件 hash 原样分发；格式化只能作用于本地适配层。
+apps/zcode-cli/packages/blender-plugin/vendor/

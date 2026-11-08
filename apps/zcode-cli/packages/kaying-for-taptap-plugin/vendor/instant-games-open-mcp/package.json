@@ -1,0 +1,116 @@
+{
+  "name": "@taptap/instant-games-open-mcp",
+  "version": "1.24.14",
+  "type": "module",
+  "description": "TapTap Open API MCP Server - Documentation and Management APIs for TapTap Minigame and H5 Games (Leaderboard, and more features coming)",
+  "main": "dist/server.js",
+  "bin": {
+    "instant-games-open-mcp": "bin/instant-games-open-mcp",
+    "taptap-mcp-proxy": "bin/taptap-mcp-proxy"
+  },
+  "exports": {
+    ".": "./dist/server.js",
+    "./proxy": "./dist/proxy.js",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "node scripts/build-cross-platform.js",
+    "build:all": "./scripts/build.sh",
+    "build:native": "./scripts/build.sh --native-only",
+    "start": "node bin/instant-games-open-mcp",
+    "dev": "tsx watch src/server.ts",
+    "serve": "TAPTAP_MCP_TRANSPORT=sse node dist/server.js",
+    "openclaw:pack": "./scripts/release-openclaw-plugin.sh pack",
+    "openclaw:publish": "./scripts/release-openclaw-plugin.sh publish",
+    "maker:codex-plugin:prepare": "node scripts/prepare-maker-codex-plugin.js",
+    "maker:workbuddy-plugin:prepare": "node scripts/prepare-maker-workbuddy-plugin.js",
+    "maker:plugins:package": "node scripts/package-maker-client-plugins.js",
+    "maker:dsh-plugin:package": "node scripts/package-maker-dsh-plugin.js",
+    "maker:proxy-schema:check": "tsx scripts/sync-maker-proxy-tool-snapshot.ts",
+    "maker:proxy-schema:update": "tsx scripts/sync-maker-proxy-tool-snapshot.ts --write",
+    "docker:npm": "cd docker/npm && docker-compose -p taptap-mcp up -d",
+    "test": "jest",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" --end-of-line auto",
+    "prepare": "husky",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "taptap",
+    "minigame",
+    "leaderboard",
+    "ranking",
+    "open-api",
+    "game-development",
+    "documentation",
+    "ai-agent",
+    "openhands"
+  ],
+  "author": "TapTap Team",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.14.1"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.27.1",
+    "archiver": "7.0.1",
+    "crypto-js": "^4.2.0",
+    "dotenv": "17.2.3",
+    "qrcode": "1.5.4",
+    "yaml": "2.8.2",
+    "yauzl": "3.4.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^18.4.3",
+    "@commitlint/config-conventional": "^18.4.3",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^11.1.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^9.2.6",
+    "@semantic-release/npm": "^11.0.2",
+    "@semantic-release/release-notes-generator": "^12.1.0",
+    "@types/archiver": "6.0.4",
+    "@types/crypto-js": "^4.2.0",
+    "@types/jest": "^29.0.0",
+    "@types/node": "^20.0.0",
+    "@types/qrcode": "1.5.6",
+    "@types/yauzl": "3.4.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "conventional-changelog-cli": "5.0.0",
+    "conventional-changelog-conventionalcommits": "^7.0.2",
+    "esbuild": "0.27.0",
+    "eslint": "^8.0.0",
+    "husky": "9.1.7",
+    "jest": "^29.0.0",
+    "lint-staged": "16.2.7",
+    "prettier": "^3.0.0",
+    "semantic-release": "^22.0.12",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "tsx": "4.20.6",
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "dist/server.js",
+    "dist/proxy.js",
+    "dist/native/",
+    "bin/instant-games-open-mcp",
+    "bin/taptap-mcp-proxy"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taptap/instant-games-open-mcp.git"
+  },
+  "homepage": "https://github.com/taptap/instant-games-open-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/taptap/instant-games-open-mcp/issues"
+  }
+}

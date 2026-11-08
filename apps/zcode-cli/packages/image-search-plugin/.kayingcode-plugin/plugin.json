@@ -1,0 +1,10 @@
+{
+  "name": "image-search",
+  "version": "0.1.0",
+  "description": "Find open-licensed illustration and reference images via a local MCP server backed by the Openverse API.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT"
+}

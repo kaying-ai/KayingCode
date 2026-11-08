@@ -1,0 +1,28 @@
+{
+  "name": "@zcode/client",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node-websocket": "./src/nodeWebSocket.ts",
+    "./socket-like": "./src/socketLike.ts",
+    "./v4/command-factory": "./src/v4/commandFactory.ts",
+    "./v4/topic-wire-decoder": "./src/v4/topicWireDecoder.ts",
+    "./globals": "./src/globals.d.ts"
+  },
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@zcode/rpc": "workspace:*",
+    "@zcode/services": "workspace:*",
+    "@zcode/shared": "workspace:*",
+    "ws": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "typescript": "^6.0.2"
+  }
+}

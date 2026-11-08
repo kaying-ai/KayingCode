@@ -1,0 +1,64 @@
+name: kayingcode_mobile
+description: KayingCode mobile remote control client for the desktop workspace.
+publish_to: "none"
+version: 0.1.1+4
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  web_socket_channel: ^3.0.1
+  crypto: ^3.0.5
+  flutter_secure_storage: ^9.2.4
+  shared_preferences: ^2.3.2
+  mobile_scanner: ^7.4.0
+  image_picker: ^1.1.0
+  zxing2: ^0.2.4
+  image: ^4.9.2
+  file_picker: ^8.1.7
+  flutter_markdown_plus: ^1.0.12
+  markdown: ^7.3.1
+  http: ^1.6.0
+  path_provider: ^2.1.0
+  url_launcher: ^6.3.2
+  webview_flutter: 4.13.0
+  webview_flutter_android: 4.12.0
+  webview_windows: 0.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/icon/kayingcode.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/icon/kayingcode.png"
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: Sarasa UI SC
+      fonts:
+        - asset: assets/fonts/Zflow-UI-Regular.ttf
+        - asset: assets/fonts/Zflow-UI-Bold.ttf
+          weight: 700
+    - family: Sarasa Term SC
+      fonts:
+        - asset: assets/fonts/Zflow-Term-Regular.ttf
+
+  assets:
+    - assets/icon/kayingcode.png
+    - assets/images/support-contact-qr.png
+    - assets/licenses/APACHE-2.0.txt
+    - assets/licenses/ZFLOW-MIT.txt
+    - assets/fonts/OFL.txt

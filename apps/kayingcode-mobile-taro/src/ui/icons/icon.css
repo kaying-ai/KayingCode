@@ -1,0 +1,41 @@
+/* 图标字形与加载指示的排版。@font-face 在生成物 material-icons.css 里，
+ * family 名必须与 icons.ts 的 ICON_FONT_FAMILY 一致（有一条测试守这个不变量）。 */
+
+/* 刻意只接管排版属性，不碰 display / vertical-align / font-size：
+ * 每个位置原有的类（.icon-button、.tool-status、.bottom-nav-icon…）继续负责
+ * 盒子与对齐，.mi 只补字体族与字形自身的字距行高。这样替换占位字符不会
+ * 改变任何既有布局，也避免和 chat.css / shell.css 的规则抢优先级。
+ * 不设 font-size：位置在哪个容器里就继承哪个容器的字号；需要固定尺寸时
+ * 由调用方给 Icon 的 size（内联 style）。 */
+.mi {
+  font-family: KayingCodeMaterialIcons;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: none;
+  font-variant: normal;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 边框 + 旋转，对应 Flutter 的 CircularProgressIndicator。
+ * 颜色走 currentColor，跟着所在位置的文字色（Flutter 那边也是按位置传色）；
+ * 宽度、高度与线宽由 Spinner 按 size 内联给出，避免 em 与父级字号纠缠。 */
+.icon-spinner {
+  display: inline-block;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  border-style: solid;
+  border-color: currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  vertical-align: middle;
+  animation: icon-spin 0.9s linear infinite;
+}
+
+@keyframes icon-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

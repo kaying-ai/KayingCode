@@ -1,0 +1,49 @@
+.zcode-web-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+.zcode-web-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.zcode-web-toolbar .action {
+  margin: 0;
+  width: auto;
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 8px;
+}
+.zcode-web-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.zcode-web-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+/* Taro H5 的 iframe 默认 fixed 铺满页面，会盖住返回与刷新；只在容器内铺满。 */
+.zcode-web-content .taro-webview {
+  position: absolute;
+  inset: 0;
+  z-index: auto;
+  width: 100%;
+  height: 100%;
+}
+.zcode-web-loading {
+  position: absolute;
+  padding: 16px;
+  color: var(--muted);
+}
+.zcode-web-error {
+  padding-top: 32px;
+}

@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    // dom：ports 缺省实现引用浏览器全局（localStorage/navigator/crypto/fetch），
+    // H5 行为与第五~八批完全一致；weapp/native 经 ports 注入，不触碰这些全局。
+    "lib": ["es2025", "dom", "dom.iterable"],
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "references": [{ "path": "../shared" }, { "path": "../client" }, { "path": "../services" }]
+}

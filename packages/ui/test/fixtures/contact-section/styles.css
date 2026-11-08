@@ -1,0 +1,7 @@
+@import "../../../src/styles.css";
+@source "./fixture.jsx";
+
+body {
+  margin: 0;
+  background: var(--background);
+}

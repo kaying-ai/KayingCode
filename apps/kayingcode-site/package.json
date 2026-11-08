@@ -1,0 +1,13 @@
+{
+  "name": "kayingcode-product-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node dev.mjs",
+    "test": "node --test test/server.test.mjs && node test/site.e2e.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "1.59.1",
+    "ws": "^8.20.0"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "blender": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${KAYINGCODE_PLUGIN_ROOT}/scripts/launch.mjs"],
+      "timeoutMs": 240000
+    },
+    "blender_doctor": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${KAYINGCODE_PLUGIN_ROOT}/scripts/doctor-server.mjs"],
+      "timeoutMs": 30000
+    }
+  }
+}

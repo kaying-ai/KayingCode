@@ -1,0 +1,22 @@
+{
+  "name": "computer-use",
+  "version": "0.1.0",
+  "description": "Built-in desktop automation for macOS, Windows, and Linux. The native runtime ships with KayingCode; no global CLI or MCP setup is required.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "./skills",
+  "mcpServers": {
+    "computer-use": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${KAYINGCODE_PLUGIN_ROOT}/dist/mcp/server.js"
+      ],
+      "cwd": "${KAYINGCODE_PROJECT_DIR}",
+      "timeoutMs": 600000
+    }
+  }
+}

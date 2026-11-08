@@ -1,0 +1,70 @@
+{
+  "name": "@zcode/cli",
+  "version": "0.1.1",
+  "private": true,
+  "description": "Main CLI application for kayingcode",
+  "bin": {
+    "kayingcode": "./dist/kayingcode.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/kayingcode.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "build:desktop-agent": "node scripts/build.mjs --desktop-agent",
+    "build:sea": "pnpm --dir ../../../.. run build:cli-assets && pnpm run build && node scripts/build-sea.mjs --all",
+    "sea": "node scripts/build-sea.mjs",
+    "upload:sea": "node scripts/upload-sea-smb.mjs",
+    "clean": "node ../../../../scripts/clean-dist.mjs",
+    "dev": "tsx src/main.ts",
+    "test": "node --disable-warning=DEP0205 --import tsx --test tests/cli.unit.test.ts tests/argument-parsing/contract.test.ts tests/tui-console.test.ts tests/tui-login-polling.test.ts tests/tui-mode-switch.test.ts tests/tui-model-selection.test.ts tests/tui-signals.test.ts tests/tui-startup.test.ts tests/tui-subagent-observation.test.ts tests/tui-subagents.test.ts tests/clipboard-text.test.ts tests/clipboard-image.test.ts tests/cwd-option.test.ts tests/dwf-command.test.ts tests/dwf-child-command.test.ts tests/tui-session-event-relay.test.ts tests/headless-workflow.test.ts tests/workflow-mode-option.test.ts tests/headless-workflow-option.test.ts tests/output-format-stream-json.test.ts tests/skills-command.test.ts tests/hooks-trust-command.test.ts tests/internal-search.node-test.ts tests/kayingcode-cua-plugin-host-authority.node-test.ts tests/provider-runtime-env.test.ts tests/sea-runtime-tools.test.ts tests/process-errors.test.ts tests/memory-bench.test.ts tests/plugins-command.test.ts tests/plugin-host-entry.test.mjs tests/build.test.mjs tests/build-sea.test.mjs tests/upload-sea-smb.test.mjs tests/process-name.test.mjs",
+    "coverage": "c8 --reporter=text --reporter=html tsx --disable-warning=DEP0205 --test tests/cli.unit.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint --config .oxlintrc.json --no-ignore src",
+    "lint:fix": "oxlint --write src",
+    "registry:check": "node scripts/generate-bash-command-registry.mjs --check",
+    "registry:generate": "node scripts/generate-bash-command-registry.mjs",
+    "release": "node ../../../../node_modules/release-it/bin/release-it.js --config .release-it.json",
+    "release:dry": "pnpm run release --release-version",
+    "lint:count": "node scripts/count-ts-lines.mjs",
+    "prompt-trajectory:model-io": "pnpm --filter @zcode/prompt-trajectory run model-io",
+    "prompt-trajectory:prompt": "pnpm --filter @zcode/prompt-trajectory run record:prompt",
+    "build:workspace": "pnpm --dir ../../../.. run build",
+    "typecheck:workspace": "pnpm --dir ../../../.. --filter \"*\" run typecheck",
+    "lint:workspace": "pnpm --dir ../../../.. --filter \"*\" run lint",
+    "format": "oxfmt --write package.json \"src/**/*.ts\" \"scripts/**/*.mjs\"",
+    "format:check": "oxfmt --check package.json \"src/**/*.ts\" \"scripts/**/*.mjs\""
+  },
+  "dependencies": {
+    "@zcode/adapters": "workspace:*",
+    "@zcode/bootstrap": "workspace:*",
+    "@zcode/contracts": "workspace:*",
+    "@zcode/core": "workspace:*",
+    "@zcode/dynamic-workflow-runtime": "workspace:*",
+    "@zcode/i18n": "workspace:*",
+    "@zcode/provider-node": "workspace:*",
+    "@zcode/shared": "workspace:*",
+    "@zcode/shared-types": "workspace:*",
+    "@zcode/tui": "workspace:*",
+    "dotenv": "^17.4.2",
+    "playwright-core": "1.59.1",
+    "proxy-agent": "^8.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@withfig/autocomplete": "2.692.3",
+    "c8": "^11.0.0",
+    "esbuild": "^0.25.0",
+    "oxfmt": "^0.47.0",
+    "oxlint": "^1.62.0",
+    "postject": "^1.0.0-alpha.6",
+    "tsx": "^4.20.0",
+    "turbo": "^2.4.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

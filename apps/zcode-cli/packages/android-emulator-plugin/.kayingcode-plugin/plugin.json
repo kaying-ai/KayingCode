@@ -1,0 +1,11 @@
+{
+  "name": "android-emulator",
+  "version": "0.1.0",
+  "description": "Android development workflow and emulator automation guidance driven by adb.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "skills"
+}

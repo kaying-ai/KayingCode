@@ -1,0 +1,9 @@
+{
+  "repository": "https://gitcode.com/CPF-Flutter/flutter_flutter.git",
+  "tag": "3.35.8-ohos-1.0.4",
+  "commit": "8320f6ded3f0bdc5409545e26dcd2596bf054203",
+  "compatibleDeviceApi": 21,
+  "supportedCompileApis": [21, 26],
+  "flutterStorageBaseUrl": "https://storage.googleapis.com",
+  "flutterOhosStorageBaseUrl": "https://flutter-ohos.obs.cn-south-1.myhuaweicloud.com"
+}

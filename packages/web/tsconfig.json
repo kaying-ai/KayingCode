@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "lib": ["es2025", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "types": ["node"],
+    "noEmit": true,
+    "paths": {
+      "@/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [{ "path": "../../packages/shared" }]
+}

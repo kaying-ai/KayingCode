@@ -1,0 +1,20 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "KayingCode 手机远控"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "KayingCode 手机远控"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "KayingCode"
+    },
+    {
+      "name": "camera_permission_reason",
+      "value": "扫码连接桌面端设备"
+    }
+  ]
+}

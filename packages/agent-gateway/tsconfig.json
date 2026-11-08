@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src"],
+  // gateway 直接消费 shared / services / rpc 的源码导出；显式引用避免 project
+  // references 消费者沿包入口重复拉源码检查。
+  "references": [{ "path": "../shared" }, { "path": "../rpc" }, { "path": "../services" }]
+}

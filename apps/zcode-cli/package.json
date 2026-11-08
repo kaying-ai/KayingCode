@@ -1,0 +1,55 @@
+{
+  "name": "zcode-cli",
+  "version": "0.17.0",
+  "private": true,
+  "description": "A cross-platform TypeScript Node.js CLI with a small TUI and optional SEA packaging.",
+  "type": "module",
+  "scripts": {
+    "build": "turbo run build --filter=\"!zcode-cli\"",
+    "build:sea": "pnpm --filter @zcode/cli run build:sea",
+    "check": "pnpm run registry:check && turbo run typecheck && pnpm test",
+    "clean": "turbo run clean --filter=\"!zcode-cli\"",
+    "cli:build": "pnpm --filter @zcode/cli run build",
+    "cli:dev": "pnpm --filter @zcode/cli run dev",
+    "cli:upload-sea": "pnpm --filter @zcode/cli run upload:sea",
+    "coverage": "turbo run coverage --filter=\"!zcode-cli\"",
+    "dev": "pnpm --filter @zcode/cli run dev",
+    "format": "oxfmt --write package.json \"packages/**/*.json\" \"packages/**/*.ts\" \"packages/**/*.mjs\"",
+    "format:check": "oxfmt --check package.json \"packages/**/*.json\" \"packages/**/*.ts\" \"packages/**/*.mjs\"",
+    "lint": "pnpm --dir ../.. run lint",
+    "lint:count": "pnpm --filter @zcode/cli run lint:count",
+    "lint:fix": "pnpm --dir ../.. run lint:fix",
+    "prompt-trajectory:model-io": "pnpm --filter @zcode/prompt-trajectory run model-io --",
+    "prompt-trajectory:prompt": "pnpm --filter @zcode/prompt-trajectory run record:prompt --",
+    "registry:check": "pnpm --filter @zcode/cli run registry:check",
+    "registry:generate": "pnpm --filter @zcode/cli run registry:generate",
+    "release": "pnpm --dir packages/cli run release",
+    "release:dry": "pnpm --dir packages/cli run release:dry",
+    "sea": "pnpm --filter @zcode/cli run sea",
+    "pretest": "pnpm --dir ../.. --filter @zcode/model-option-map run build",
+    "test": "turbo run test --filter=\"!zcode-cli\"",
+    "test:browser-headless": "pnpm --filter @zcode/browser-use-plugin... build && pnpm --filter @zcode/browser-use-plugin exec vitest run test/headless-browser.e2e.test.ts",
+    "typecheck": "turbo run typecheck --filter=\"!zcode-cli\""
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "proxy-agent": "^8.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@vitest/coverage-v8": "^4.1.5",
+    "@withfig/autocomplete": "2.692.3",
+    "c8": "^11.0.0",
+    "esbuild": "^0.25.0",
+    "oxfmt": "^0.41.0",
+    "oxlint": "1.60.0",
+    "postject": "^1.0.0-alpha.6",
+    "tsx": "^4.20.0",
+    "turbo": "2.9.14",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

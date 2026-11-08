@@ -1,0 +1,10 @@
+{
+  "name": "blender",
+  "version": "0.1.0",
+  "description": "Control Blender with guided scene workflows and diagnose setup or connection failures.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT"
+}

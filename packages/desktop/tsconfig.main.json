@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "out/types/main",
+    "rootDir": "src",
+    // 上游 3.16.2 的 main 代码使用 @desktop/* 指向 src；保留同一别名，避免新增文件改写 import。
+    "paths": { "@desktop/*": ["./src/*"] },
+    // Browser page runtime 会序列化到 DOM 上下文执行，需同时检查其真实页面类型。
+    "lib": ["es2025", "dom", "dom.iterable"]
+  },
+  "include": ["src/main", "src/shared", "src/scheduler/schedulerProtocol.ts"],
+  // 按真实跨包边界复用上游声明；server 在自己的 Node 环境检查，避免 Main 的 DOM lib 污染其 stream 类型。
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/services" },
+    { "path": "../../packages/server" },
+    { "path": "../../packages/rpc" }
+  ]
+}

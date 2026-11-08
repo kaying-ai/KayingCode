@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kaying Computer Use(OCU)"
+  short_description: "Guide agents using Kaying Computer Use"
+  default_prompt: "Use $kaying-computer-use to operate desktop apps through Kaying Computer Use."

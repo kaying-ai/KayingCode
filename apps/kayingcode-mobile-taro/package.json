@@ -1,0 +1,54 @@
+{
+  "name": "@kayingcode/mobile",
+  "version": "0.1.1",
+  "private": true,
+  "description": "KayingCode 移动端（Taro React）：微信小程序 / H5（Capacitor 壳属 MOB-P-004）",
+  "scripts": {
+    "build:weapp": "taro build --type weapp && node scripts/check-weapp-syntax.mjs",
+    "dev:weapp": "taro build --type weapp --watch",
+    "build:h5": "taro build --type h5",
+    "dev:h5": "taro build --type h5 --watch",
+    "typecheck": "tsc -b --force",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "verify:weapp-syntax": "node scripts/check-weapp-syntax.mjs"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.28.6",
+    "@zcode/client": "workspace:*",
+    "@kayingcode/mobile-client-core": "workspace:*",
+    "@zcode/shared": "workspace:*",
+    "@tarojs/components": "4.3.0",
+    "@tarojs/helper": "4.3.0",
+    "@tarojs/plugin-framework-react": "4.3.0",
+    "@tarojs/plugin-platform-h5": "4.3.0",
+    "@tarojs/plugin-platform-weapp": "4.3.0",
+    "@tarojs/react": "4.3.0",
+    "@tarojs/runtime": "4.3.0",
+    "@tarojs/shared": "4.3.0",
+    "@tarojs/taro": "4.3.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.6",
+    "@babel/preset-react": "^7.28.5",
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.6.1",
+    "@tarojs/cli": "4.3.0",
+    "@tarojs/webpack5-runner": "^4.3.0",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "acorn": "^8.19.0",
+    "babel-preset-taro": "4.3.0",
+    "react-refresh": "^0.17.0",
+    "typescript": "^6.0.2",
+    "webpack": "5.91.0"
+  },
+  "templateInfo": {
+    "name": "default",
+    "typescript": true,
+    "css": "none"
+  }
+}

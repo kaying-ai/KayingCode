@@ -1,0 +1,283 @@
+page {
+  background: #161616;
+}
+.mobile-root {
+  --ui-font-size: 14px;
+  --bg: #161616;
+  --panel: #202020;
+  --card: #2b2b2b;
+  --raise: #363636;
+  --line: rgba(255, 255, 255, 0.1);
+  --text: #d4d4d4;
+  --soft: #b8b8b8;
+  --muted: #a3a3a3;
+  --faint: #969696;
+  --primary: #fff;
+  --on-primary: #000;
+  --ok: #46bf72;
+  --error: #ff5c5c;
+  --run: #4099ff;
+  --warn: #e0a33a;
+  /* 代码块 / diff / 行内码底色（与 Flutter 的 codeBlockBg、addedBg、removedBg 同族）。 */
+  --code-bg: #1b1b1b;
+  --code-inline: #2f2f2f;
+  --diff-add-bg: rgba(34, 197, 94, 0.12);
+  --diff-del-bg: rgba(239, 68, 68, 0.12);
+  --diff-add-text: #86efac;
+  --diff-del-text: #fca5a5;
+  box-sizing: border-box;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    "Sarasa UI SC",
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.mobile-root.theme-light {
+  --bg: #f8f8f8;
+  --panel: #fff;
+  --card: #fff;
+  --raise: #e6e6e6;
+  --line: rgba(13, 13, 13, 0.1);
+  --text: #262626;
+  --soft: #525252;
+  --muted: #666;
+  --faint: #737373;
+  --primary: #000;
+  --on-primary: #fff;
+  --ok: #1e8a3e;
+  --error: #e03131;
+  --run: #0b7fff;
+  --warn: #a05a00;
+  --code-bg: #f2f2f2;
+  --code-inline: #ececec;
+  --diff-add-bg: rgba(22, 183, 143, 0.16);
+  --diff-del-bg: rgba(252, 165, 165, 0.22);
+  --diff-add-text: #15803d;
+  --diff-del-text: #b91c1c;
+}
+.mobile-root .text-ui-xl {
+  font-size: calc(var(--ui-font-size) + 4px);
+}
+.mobile-root .text-ui-base {
+  font-size: var(--ui-font-size);
+}
+.mobile-root .text-ui-sm {
+  font-size: calc(var(--ui-font-size) - 2px);
+}
+.mobile-root .text-ui-xs {
+  font-size: calc(var(--ui-font-size) - 4px);
+}
+.screen {
+  padding: 16px;
+  box-sizing: border-box;
+}
+.screen-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.caption {
+  font-size: 12px;
+  color: var(--muted);
+}
+.muted {
+  color: var(--muted);
+}
+.empty {
+  display: block;
+  margin: 24px 16px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+.message {
+  display: block;
+  margin: 8px 0;
+  color: var(--error);
+  font-size: 12px;
+}
+.surface-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  box-sizing: border-box;
+}
+.control {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  box-sizing: border-box;
+  color: var(--text);
+}
+.action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.action::after {
+  border: 0;
+}
+/* H5 会保留 disabled="false"，操作按钮主题需压过组件的属性选择器，避免恢复可用后丢字。 */
+.mobile-root .action-primary {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.mobile-root .action-secondary {
+  background: var(--raise);
+  color: var(--text);
+}
+.action-ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+/* H5 的 Taro 组件会保留 disabled="false" 属性，不能把可用按钮也当成禁用态。 */
+.action[disabled]:not([disabled="false"]) {
+  opacity: 0.5;
+}
+/* 微信原生 disabled 规则会覆盖主按钮文字色；显式成对指定主题色，避免“添加”融入底色。 */
+.mobile-root .action-primary[disabled]:not([disabled="false"]) {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.topbar {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 16px;
+  background: var(--bg);
+  box-sizing: border-box;
+}
+.topbar-main {
+  flex: 1;
+  min-width: 0;
+}
+.topbar-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.topbar-subtitle {
+  display: block;
+  font-size: 10px;
+  color: var(--faint);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--soft);
+  font-size: 20px;
+}
+.list-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  box-sizing: border-box;
+}
+.list-main {
+  flex: 1;
+  min-width: 0;
+}
+.list-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.list-subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.status {
+  font-size: 10px;
+  color: var(--faint);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+.status-running {
+  color: var(--run);
+}
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  height: 44px;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  z-index: 10;
+}
+.bottom-nav-item {
+  flex: 1;
+  position: relative;
+  text-align: center;
+  color: var(--muted);
+  font-size: 10px;
+  padding-top: 3px;
+}
+/* 未读角标（通知域）：仅在有未读任务时显示，与 Flutter UnreadEvents 同义。 */
+.bottom-nav-badge {
+  position: absolute;
+  top: 1px;
+  left: 50%;
+  margin-left: 4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: var(--error);
+  color: #fff;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+}
+.bottom-nav-icon {
+  display: block;
+  font-size: 20px;
+  line-height: 24px;
+}
+.bottom-nav-item.active {
+  color: var(--text);
+  background: var(--raise);
+}

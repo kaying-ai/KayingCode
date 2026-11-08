@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12 (API 31) 及以上走系统 SplashScreen API。该 API **忽略**
+      android:windowBackground，所以 values/ 与 values-night/ 里的
+      @drawable/launch_background 完全不生效（实测表现为系统默认白底 + 居中图标，
+      与 iOS LaunchScreen 的黑色启动画面不一致）。
+      这里显式声明黑底与居中图标；API 30 及以下继续由 drawable/launch_background.xml 兜底。
+
+      只覆盖 LaunchTheme：NormalTheme 刻意不在此声明，让它继续按
+      values/ 与 values-night/ 的规则解析为 ?android:colorBackground，
+      避免浅色模式下「启动黑底 → 之后白底」闪烁。
+    -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@android:color/black</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
+</resources>

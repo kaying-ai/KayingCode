@@ -1,0 +1,1008 @@
+// 此文件是 chat_page.dart 的一部分(part):同库共享导入与私有类可见。
+part of '../chat_page.dart';
+
+// ---------------------------------------------------------------- sheets
+
+/// 会话设置面板的分区:模型列表 / 思考档(按所选模型实际支持的档位)。
+enum _SheetSection { model, thought }
+
+class _ModelModeSheet extends StatefulWidget {
+  final ConversationState? state;
+  final ConversationTransport transport;
+  final WorkspacePrep? prep;
+  final String? sessionId;
+  final Map<String, String>? draftConfig;
+  final bool Function() isSourceCurrent;
+
+  /// 本次面板展示的分区(模型按钮/思考按钮分别打开对应分区)。
+  final _SheetSection section;
+
+  /// 打开时的实时取数(新鲜度窗内不发请求);null 退回 [prep] 缓存。
+  final Future<WorkspacePrep?> Function()? onRefreshPrep;
+  final void Function(String key, String value)? onDraftChange;
+
+  const _ModelModeSheet({
+    required this.state,
+    required this.transport,
+    required this.isSourceCurrent,
+    required this.section,
+    this.prep,
+    this.sessionId,
+    this.draftConfig,
+    this.onRefreshPrep,
+    this.onDraftChange,
+  });
+
+  @override
+  State<_ModelModeSheet> createState() => _ModelModeSheetState();
+}
+
+/// Stateful 的原因:面板内点选必须立即反映(此前 StatelessWidget 只在
+/// 重开面板时才看到新值);草稿选择镜像在 [_draft],会话态变化经
+/// AnimatedBuilder 跟进。prep 取数也在此层:打开先用缓存,后台拉到
+/// 新数据后原地替换(模型列表增删即时可见)。
+class _ModelModeSheetState extends State<_ModelModeSheet> {
+  late final Map<String, String> _draft =
+      Map.of(widget.draftConfig ?? const {});
+
+  WorkspacePrep? _freshPrep;
+  bool _refreshing = false;
+  int _refreshGeneration = 0;
+  Future<void> _applyQueue = Future.value();
+  int _applyGeneration = 0;
+  String? _desiredProvider;
+  String? _desiredModel;
+  String? _desiredThought;
+
+  void _primeDesiredConfig(
+    String modelValue,
+    String thoughtValue,
+    Map<String, dynamic> config,
+  ) {
+    if (_desiredProvider != null &&
+        _desiredModel != null &&
+        _desiredThought != null) {
+      return;
+    }
+    final (provider, model) = modelValue.isNotEmpty
+        ? providerModelOf(_prep, modelValue)
+        : ('${config['provider'] ?? ''}', '${config['model'] ?? ''}');
+    _desiredProvider ??= provider;
+    _desiredModel ??= model;
+    _desiredThought ??= thoughtValue;
+  }
+
+  void _setDesiredModel(
+    String modelValue,
+    String thoughtValue,
+    Map<String, dynamic> config,
+  ) {
+    _primeDesiredConfig(modelValue, thoughtValue, config);
+    final (provider, model) = providerModelOf(_prep, modelValue);
+    _desiredProvider = provider;
+    _desiredModel = model;
+    _desiredThought = thoughtValue;
+  }
+
+  void _setDesiredThought(
+    String modelValue,
+    String thoughtValue,
+    Map<String, dynamic> config,
+  ) {
+    _primeDesiredConfig(modelValue, thoughtValue, config);
+    _desiredThought = thoughtValue;
+  }
+
+  Future<dynamic> _switchConfig(
+    String sid,
+    Map<String, dynamic> patch,
+  ) {
+    return widget.transport.switchModelConfig(
+      sid,
+      provider: '${patch['provider'] ?? ''}',
+      model: '${patch['model'] ?? ''}',
+      thought: '${patch['thought'] ?? ''}',
+    );
+  }
+
+  Map<String, dynamic> _desiredConfigPatch() => {
+        'provider': _desiredProvider,
+        'model': _desiredModel,
+        'thought': _desiredThought,
+      };
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ModelModeSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.transport != widget.transport ||
+        oldWidget.sessionId != widget.sessionId ||
+        oldWidget.onRefreshPrep != widget.onRefreshPrep) {
+      _applyGeneration++;
+      _refreshGeneration++;
+      _freshPrep = null;
+      _desiredProvider = null;
+      _desiredModel = null;
+      _desiredThought = null;
+      _refresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    _applyGeneration++;
+    _refreshGeneration++;
+    super.dispose();
+  }
+
+  Future<void> _refresh() async {
+    final refresh = widget.onRefreshPrep;
+    if (refresh == null) return;
+    final generation = ++_refreshGeneration;
+    if (mounted && widget.isSourceCurrent()) {
+      setState(() => _refreshing = true);
+    }
+    try {
+      final fresh = await refresh();
+      if (!mounted ||
+          generation != _refreshGeneration ||
+          !widget.isSourceCurrent()) {
+        return;
+      }
+      setState(() {
+        _refreshing = false;
+        if (fresh != null) _freshPrep = fresh;
+      });
+    } catch (_) {
+      if (mounted &&
+          generation == _refreshGeneration &&
+          widget.isSourceCurrent()) {
+        setState(() => _refreshing = false);
+      }
+    }
+  }
+
+  WorkspacePrep? get _prep => _freshPrep ?? widget.prep;
+
+  bool get _isDraft => widget.sessionId == null || widget.sessionId!.isEmpty;
+
+  void _setDraft(String key, String value) {
+    if (!widget.isSourceCurrent()) return;
+    setState(() => _draft[key] = value);
+    widget.onDraftChange?.call(key, value);
+  }
+
+  /// Config options beyond the model/mode/thought selects (e.g. max output
+  /// length, search enhancement) surfaced read-only from prepareWorkspace.
+  List<ConfigOption> get _otherOptions {
+    const known = {'model', 'mode', 'thought_level'};
+    final options = _prep?.configOptions;
+    if (options == null) return const [];
+    return options.where((o) => !known.contains(o.id)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // 会话态驱动(乐观补丁/宿主确认)时整面板跟随重建;draft 态由
+    // _setDraft 的 setState 驱动。
+    final state = widget.state;
+    if (state != null) {
+      return AnimatedBuilder(
+          animation: Listenable.merge([
+            state.configListenable,
+            state.controlListenable,
+          ]),
+          builder: (context, _) => _content(context));
+    }
+    return _content(context);
+  }
+
+  Widget _content(BuildContext context) {
+    final config = widget.state?.config ?? const {};
+    final modelOption = _prep?.option('model');
+    final thoughtOption = _prep?.option('thought_level');
+
+    // Current selection: prefer the LIVE session config (updates after a
+    // switch), fall back to prepareWorkspace's currentValue / draft.
+    final liveModelValue =
+        '${config['provider'] ?? ''}/${config['model'] ?? ''}';
+    final currentModelValue =
+        _isDraft || config['model'] == null || '${config['model']}'.isEmpty
+            ? (_draft['model'] ?? '${modelOption?.currentValue ?? ''}')
+            : liveModelValue;
+    final currentThoughtValue = _isDraft
+        ? (_draft['thought'] ?? '${thoughtOption?.currentValue ?? ''}')
+        : (widget.state?.currentThought.isNotEmpty == true
+            ? widget.state!.currentThought
+            : '${thoughtOption?.currentValue ?? ''}');
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+                widget.section == _SheetSection.thought
+                    ? tr(context, 'chat.sheets.thoughtLevelTitle')
+                    : (_isDraft
+                          ? tr(context, 'chat.sheets.draftModelTitle')
+                          : tr(context, 'chat.sheets.modelTitle')),
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            if (_refreshing)
+              const Padding(
+                padding: EdgeInsets.only(top: 6),
+                child: SizedBox(
+                  height: 2,
+                  child: LinearProgressIndicator(minHeight: 2),
+                ),
+              ),
+            const SizedBox(height: 16),
+            if (widget.section == _SheetSection.thought)
+              ..._thoughtSection(
+                  context, currentModelValue, currentThoughtValue, config)
+            else
+              ..._modelSection(context, currentModelValue, config),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 思考档可选项:按当前所选模型实际支持的档位
+  /// ([ConfigOptionValue.modelThoughtLevels])过滤;模型未声明档位时回退
+  /// 全部档位。返回 (value, 显示名) 对。
+  List<(String, String)> _thoughtChoices(String currentModelValue) {
+    final thoughtOption = _prep?.option('thought_level');
+    final all = thoughtOption?.options ?? const <ConfigOptionValue>[];
+    ConfigOptionValue? entry;
+    for (final o in _prep?.option('model')?.options ??
+        const <ConfigOptionValue>[]) {
+      if (o.value == currentModelValue) entry = o;
+    }
+    final levels = entry?.modelThoughtLevels ?? const [];
+    if (levels.isEmpty) {
+      return [for (final o in all) (o.value, o.name)];
+    }
+    final choices = <(String, String)>[];
+    for (final level in levels) {
+      (String, String)? match;
+      for (final o in all) {
+        if (o.value == level) match = (o.value, o.name);
+      }
+      if (match == null) {
+        for (final o in all) {
+          if (o.name == level) match = (o.value, o.name);
+        }
+      }
+      choices.add(match ?? (level, level));
+    }
+    return choices;
+  }
+
+  List<Widget> _thoughtSection(
+    BuildContext context,
+    String currentModelValue,
+    String currentThoughtValue,
+    Map<String, dynamic> config,
+  ) {
+    final choices = _thoughtChoices(currentModelValue);
+    final liveThought = widget.state?.currentThought;
+    return [
+      if (choices.isEmpty)
+        Text(tr(context, 'chat.sheets.noThoughtLevels'),
+            style: TextStyle(
+                fontSize: 12,
+                color: EmberColors.of(context).textMuted))
+      else
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final (value, name) in choices)
+              ChoiceChip(
+                label: Text(name),
+                selected: currentThoughtValue == value ||
+                    widget.state?.currentThought == value,
+                onSelected: (_) {
+                  if (_isDraft) {
+                    _setDraft('thought', value);
+                  } else {
+                    _setDesiredThought(currentModelValue, value, config);
+                    final configPatch = _desiredConfigPatch();
+                    _apply(
+                      context,
+                      () => _switchConfig(widget.sessionId!, configPatch),
+                      onAccepted: () => widget.state?.optimisticPatch({
+                        'config': {
+                          ...?widget.state!.config,
+                          ...configPatch,
+                        },
+                      }),
+                    );
+                  }
+                },
+              ),
+          ],
+        ),
+      if (liveThought != null && liveThought.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Text(
+              tr(context, 'chat.sheets.currentThought',
+                  args: {'value': liveThought}),
+              style: TextStyle(
+                  fontSize: 11.5, color: EmberColors.of(context).textMuted)),
+        ),
+    ];
+  }
+
+  List<Widget> _modelSection(
+    BuildContext context,
+    String currentModelValue,
+    Map<String, dynamic> config,
+  ) {
+    final modelOption = _prep?.option('model');
+    return [
+      if (modelOption != null && modelOption.options.isNotEmpty) ...[
+        Text(modelOption.name, style: const TextStyle(fontSize: 13)),
+        const SizedBox(height: 8),
+        for (final v in modelOption.options)
+          ListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(
+              currentModelValue == v.value
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_off,
+              size: 18,
+              color: currentModelValue == v.value
+                  ? EmberColors.of(context).primary
+                  : EmberColors.of(context).textFaint,
+            ),
+            title: Text(v.name, style: const TextStyle(fontSize: 13)),
+            subtitle: v.modelProviderName != null
+                ? Text(v.modelProviderName!,
+                    style: TextStyle(
+                        fontSize: 11,
+                        color: EmberColors.of(context).textFaint))
+                : null,
+            onTap: () {
+              if (_isDraft) {
+                _setDraft('model', v.value);
+              } else {
+                // thought must be valid for the target model:
+                // keep current if supported, else fall back to the
+                // thought option's currentValue (Turbo: enabled/off)
+                final currentThought = widget.state?.currentThought ?? '';
+                final thoughtOpt = _prep?.option('thought_level');
+                final thought = currentThought.isNotEmpty &&
+                        (thoughtOpt?.options
+                                .any((o) => o.value == currentThought) ??
+                            false)
+                    ? currentThought
+                    : '${thoughtOpt?.currentValue ?? (currentThought.isNotEmpty ? currentThought : 'enabled')}';
+                _setDesiredModel(v.value, thought, config);
+                final configPatch = _desiredConfigPatch();
+                _apply(
+                  context,
+                  () => _switchConfig(widget.sessionId!, configPatch),
+                  onAccepted: () => widget.state?.optimisticPatch({
+                    'config': {
+                      ...?widget.state!.config,
+                      ...configPatch,
+                    },
+                  }),
+                );
+              }
+            },
+          ),
+      ] else
+        Text(
+            tr(context, 'chat.sheets.currentModel',
+                args: {'model': widget.state?.currentModel ?? ''}),
+            style: TextStyle(
+                fontSize: 12, color: EmberColors.of(context).textMuted)),
+      if (_otherOptions.isNotEmpty) ...[
+        const SizedBox(height: 16),
+        Text(tr(context, 'chat.sheets.otherConfig'),
+            style: const TextStyle(fontSize: 13)),
+        const SizedBox(height: 8),
+        for (final o in _otherOptions)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(o.name, style: const TextStyle(fontSize: 13)),
+                ),
+                const SizedBox(width: 8),
+                Text('${o.currentValue}',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: EmberColors.of(context).textMuted)),
+              ],
+            ),
+          ),
+      ],
+    ];
+  }
+
+  Future<void> _apply(
+    BuildContext context,
+    Future<dynamic> Function() run, {
+    void Function()? onAccepted,
+  }) async {
+    final transport = widget.transport;
+    final applyGeneration = ++_applyGeneration;
+    if (!widget.isSourceCurrent()) return;
+    Future<dynamic> runIfCurrent() {
+      if (!mounted ||
+          transport != widget.transport ||
+          !widget.isSourceCurrent()) {
+        return Future<dynamic>.value(null);
+      }
+      return run();
+    }
+    final queued = _applyQueue.then<dynamic>(
+      (_) => runIfCurrent(),
+      onError: (_, _) => runIfCurrent(),
+    );
+    _applyQueue = queued.then<void>(
+      (_) {},
+      onError: (_, _) {},
+    );
+    try {
+      final res = await queued;
+      if (!mounted ||
+          applyGeneration != _applyGeneration ||
+          transport != widget.transport ||
+          !widget.isSourceCurrent() ||
+          !context.mounted) {
+        return;
+      }
+      if (isRpcRejected(res)) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr(context, 'chat.sheets.rejected',
+                args: {'reason': rpcFailureReason(res)}))));
+      } else {
+        onAccepted?.call();
+        if (context.mounted && widget.isSourceCurrent()) Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted &&
+          applyGeneration == _applyGeneration &&
+          transport == widget.transport &&
+          widget.isSourceCurrent() &&
+          context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr(context, 'chat.sheets.applyFailed',
+                args: {'error': '$e'}))));
+      }
+    }
+  }
+}
+
+/// 用量数字的三档单位显示(用户裁定:万/百万/亿,达到数量级自动切换),
+/// 小值原样。(553000 → 55.3 万,6800000 → 6.8 百万,300000000 → 3.0 亿)
+String formatTokenCount(num v) => compactCount(AppLocale.current, v);
+
+/// 平均缓存命中率(0..1 小数),口径对齐桌面 contextCacheUsageFromPayload:
+/// 优先取宿主随 snapshot 下发的 contextWindow.cache.hitRate(按请求加权);
+/// 缺省用桌面回退公式 缓存读 ÷ 输入——缓存写入不进分母。无数据返回 null。
+@visibleForTesting
+double? cacheHitFractionOf(Map<String, dynamic> usage) {
+  final contextWindow = usage['contextWindow'];
+  final cache = contextWindow is Map ? contextWindow['cache'] as Map? : null;
+  final rawServerHit = cache?['hitRate'];
+  if (rawServerHit is num) return rawServerHit.toDouble();
+  final cumulative = usage['cumulative'];
+  final cacheRead = (cumulative?['cacheReadTokens'] as num?) ?? 0;
+  final netInput = (cumulative?['inputTokens'] as num?) ?? 0;
+  return netInput > 0 ? cacheRead / netInput : null;
+}
+
+class _UsageSheet extends StatefulWidget {
+  final ConversationState state;
+  final BridgeSession session;
+  final Map<String, dynamic> scope;
+  final String sessionId;
+  final bool Function() isSourceCurrent;
+
+  const _UsageSheet({
+    required this.state,
+    required this.session,
+    required this.scope,
+    required this.sessionId,
+    required this.isSourceCurrent,
+  });
+
+  @override
+  State<_UsageSheet> createState() => _UsageSheetState();
+}
+
+class _UsageSheetState extends State<_UsageSheet> {
+  bool _querying = false;
+  int _queryGeneration = 0;
+
+  /// 剩余额度(usage-stats.getEntitlementSnapshot):打开即拉取,内联
+  /// 展示(参考官方 web 样式),不再跳二级页。
+  Map<String, dynamic>? _entitlements;
+  String? _quotaError;
+  bool _quotaLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadQuota();
+  }
+
+  Future<void> _loadQuota() async {
+    if (_quotaLoading) return;
+    _quotaLoading = true;
+    try {
+      final res = await widget.session.channels.call('usage-stats',
+          'getEntitlementSnapshot', [
+        {'includeSubscription': true},
+      ]);
+      if (!mounted) return;
+      setState(() =>
+          _entitlements = res is Map ? res.cast<String, dynamic>() : {});
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _quotaError = '$e');
+    } finally {
+      _quotaLoading = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  String _fmtQuotaReset(Object? millis) {
+    if (millis is! num) return '-';
+    final t = DateTime.fromMillisecondsSinceEpoch(millis.toInt()).toLocal();
+    var m = '${t.month}/${t.day}';
+    final now = DateTime.now();
+    if (t.year == now.year &&
+        t.month == now.month &&
+        t.day == now.day) {
+      m = tr(context, 'chat.sheets.today');
+    }
+    return '$m ${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// 剩余额度(官方 web 样式):五小时/每周双窗口格 + 工具调用/MCP 行。
+  Widget _quotaSection() {
+    final colors = EmberColors.of(context);
+    if (_quotaLoading && _entitlements == null) {
+      return const SizedBox(
+          height: 2, child: LinearProgressIndicator(minHeight: 2));
+    }
+    if (_quotaError != null) {
+      return Text(
+          tr(context, 'chat.sheets.quotaLoadFailed',
+              args: {'error': _quotaError!}),
+          style: TextStyle(fontSize: 11, color: colors.textFaint));
+    }
+    final data = _entitlements;
+    if (data == null) return const SizedBox.shrink();
+    final quota = data['quota'];
+    final limits =
+        quota is Map && quota['limits'] is List ? quota['limits'] as List : const [];
+    final windows = limits
+        .whereType<Map>()
+        .where((l) => isQuotaWindowLimit(l.cast<String, dynamic>()))
+        .toList();
+    final mcpTotal = mcpQuotaTotal(limits);
+    final remaining = data['remaining'];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(tr(context, 'chat.sheets.remainingQuota'),
+            style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colors.textSolid)),
+        const SizedBox(height: 10),
+        if (windows.isNotEmpty)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final (i, w) in windows.indexed) ...[
+                if (i > 0) const SizedBox(width: 10),
+                Expanded(
+                  child: _quotaTile(
+                    label: limitWindowLabel(w.cast<String, dynamic>()),
+                    remaining: tokensRemainingPercent(
+                        w.cast<String, dynamic>()),
+                    reset: _fmtQuotaReset(w['nextResetTime']),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        if (remaining is Map && remaining['isShow'] == true) ...[
+          const SizedBox(height: 8),
+          _quotaRow(
+            label: tr(context, 'chat.sheets.mcpToolCalls'),
+            percentText: mcpTotal == null
+                ? '${remaining['count'] ?? '-'}'
+                : '${remaining['count'] ?? '-'} / $mcpTotal',
+            barValue: ((remaining['percentage'] as num?) ?? 0).toDouble(),
+            reset: _fmtQuotaReset(remaining['nextResetTime']),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// 双窗口额度格:标签 + 剩余%(阈值色)+ 进度条 + 重置时间。
+  Widget _quotaTile({
+    required String label,
+    required int? remaining,
+    required String reset,
+  }) {
+    final colors = EmberColors.of(context);
+    final color = quotaColor(remaining, colors);
+    return Container(
+      padding: const EdgeInsets.all(EmberSpacing.cardPad),
+      decoration: BoxDecoration(
+        color: Color.lerp(colors.bg, colors.card, 0.5),
+        borderRadius: BorderRadius.circular(EmberRadius.control),
+        border: Border.all(color: colors.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: TextStyle(fontSize: 10.5, color: colors.textMuted)),
+          const SizedBox(height: 4),
+          Text(
+              remaining == null
+                  ? '-'
+                  : tr(context, 'chat.sheets.remainingPercent',
+                      args: {'percent': remaining}),
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: color)),
+          const SizedBox(height: 6),
+          if (remaining != null)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: LinearProgressIndicator(
+                value: (remaining / 100).clamp(0.0, 1.0),
+                minHeight: 4,
+                backgroundColor: colors.raise,
+                valueColor: AlwaysStoppedAnimation(color),
+              ),
+            ),
+          const SizedBox(height: 4),
+          Text(tr(context, 'chat.sheets.resetAt', args: {'time': reset}),
+              style: TextStyle(fontSize: 10, color: colors.textFaint)),
+        ],
+      ),
+    );
+  }
+
+  /// MCP/工具调用的行式额度:名称 + 计数 + 进度条 + 重置时间。
+  Widget _quotaRow({
+    required String label,
+    required String percentText,
+    required double barValue,
+    required String reset,
+  }) {
+    final colors = EmberColors.of(context);
+    return Row(
+      children: [
+        Text(label,
+            style: TextStyle(fontSize: 11.5, color: colors.textMuted)),
+        const Spacer(),
+        Text(percentText,
+            style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: colors.textSolid)),
+        const SizedBox(width: 8),
+        Text('· $reset',
+            style: TextStyle(fontSize: 10.5, color: colors.textFaint)),
+      ],
+    );
+  }
+
+  /// 上下文容量头(桌面 ○ 面板同款):用量/上限 + 百分比 + 进度条。
+  Widget _contextCapacityHeader(Map<dynamic, dynamic> contextWindow) {
+    final used = (contextWindow['usedTokens'] as num?) ?? 0;
+    final max = (contextWindow['maxTokens'] as num?) ?? 0;
+    final percent = max > 0 ? (used / max * 100) : 0.0;
+    final colors = EmberColors.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(tr(context, 'chat.sheets.contextCapacity'),
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colors.textSolid)),
+            const Spacer(),
+            Text(
+              '${formatTokenCount(used)} / ${formatTokenCount(max)}'
+              '${max > 0 ? ' (${percent.toStringAsFixed(1)}%)' : ''}',
+              style: TextStyle(fontSize: 11, color: colors.textMuted),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: SizedBox(
+            height: 6,
+            child: LinearProgressIndicator(
+              value: max > 0 ? (used / max).clamp(0.0, 1.0) : 0,
+              backgroundColor: colors.hairline,
+              color: percent >= 90 ? colors.err : colors.primary,
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _queryGeneration++;
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final usage = widget.state.usage ?? const {};
+    final cumulative = usage['cumulative'];
+    final contextWindow = usage['contextWindow'];
+    final netInput = (cumulative?['inputTokens'] as num?) ?? 0;
+    final hitFraction = cacheHitFractionOf(usage);
+    final cacheHitRate = hitFraction != null
+        ? '${(hitFraction * 100).toStringAsFixed(1)}%'
+        : null;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(tr(context, 'chat.sheets.usageStats'),
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 16),
+            if (contextWindow is Map) ...[
+              _contextCapacityHeader(contextWindow),
+            ],
+            if (cumulative is Map) ...[
+              _UsageRow(tr(context, 'chat.sheets.cumulativeInput'),
+                  '${formatTokenCount(netInput)} tokens'),
+              _UsageRow(tr(context, 'chat.sheets.cumulativeOutput'),
+                  '${formatTokenCount((cumulative['outputTokens'] as num?) ?? 0)} tokens'),
+              if (cacheHitRate != null)
+                _UsageRow(tr(context, 'chat.sheets.cacheHitRate'), cacheHitRate),
+            ],
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.query_stats, size: 16),
+                label: Text(tr(context, 'chat.sheets.queryTaskUsage')),
+                onPressed: _querying ? null : _queryTaskUsage,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _quotaSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _queryTaskUsage() async {
+    if (!mounted || _querying || !widget.isSourceCurrent()) return;
+    final generation = ++_queryGeneration;
+    setState(() => _querying = true);
+    try {
+      final res = await widget.session.channels.call(
+        Channels.zcodeTask,
+        'getTaskTokenUsage',
+        [
+          {...widget.scope, 'taskId': widget.sessionId},
+        ],
+      );
+      if (!mounted ||
+          generation != _queryGeneration ||
+          !widget.isSourceCurrent()) {
+        return;
+      }
+      showModalBottomSheet(
+        context: context,
+        builder: (context) =>
+            _JsonSheet(title: tr(context, 'chat.sheets.taskUsage'), data: res),
+      );
+    } catch (e) {
+      if (mounted &&
+          generation == _queryGeneration &&
+          widget.isSourceCurrent()) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr(context, 'chat.sheets.queryFailed',
+                args: {'error': '$e'}))));
+      }
+    } finally {
+      if (mounted &&
+          generation == _queryGeneration &&
+          widget.isSourceCurrent()) {
+        setState(() => _querying = false);
+      }
+    }
+  }
+}
+
+class _UsageRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _UsageRow(this.label, this.value);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13, color: EmberColors.of(context).textMuted)),
+          Text(value,
+              style: const TextStyle(fontSize: 13, fontFamily: 'monospace')),
+        ],
+      ),
+    );
+  }
+}
+
+class _JsonSheet extends StatelessWidget {
+  final String title;
+  final Object? data;
+
+  const _JsonSheet({required this.title, required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    const encoder = JsonEncoder.withIndent('  ');
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 12),
+            Flexible(
+              child: SingleChildScrollView(
+                child: SelectableText(
+                  data == null
+                      ? tr(context, 'chat.sheets.noData')
+                      : encoder.convert(data),
+                  style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------- input
+
+/// One entry in the slash popup: a builtin/custom command or a skill.
+class _SlashItem {
+  final String name;
+  final String description;
+  final String insert;
+  final bool isSkill;
+
+  const _SlashItem({
+    required this.name,
+    required this.description,
+    required this.insert,
+    this.isSkill = false,
+  });
+}
+
+class _SlashCommandBar extends StatelessWidget {
+  final String query;
+  final List<_SlashItem> items;
+  final void Function(_SlashItem item) onSelect;
+
+  const _SlashCommandBar({
+    required this.query,
+    required this.items,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final q = query.startsWith('/') || query.startsWith('\$')
+        ? query.substring(1)
+        : query;
+    final filtered = q.isEmpty
+        ? items
+        : items
+            .where((c) => c.name.toLowerCase().startsWith(q.toLowerCase()))
+            .toList();
+    if (filtered.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(tr(context, 'chat.sheets.noMatchingCommand'),
+            style: TextStyle(
+                fontSize: 12, color: EmberColors.of(context).textFaint)),
+      );
+    }
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+      constraints: const BoxConstraints(maxHeight: 260),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          for (final command in filtered)
+            ListTile(
+              dense: true,
+              leading: Icon(
+                command.isSkill
+                    ? Icons.auto_awesome_outlined
+                    : (command.name == 'compact' ? Icons.compress : Icons.bolt),
+                size: 16,
+                color: command.isSkill
+                    ? EmberColors.of(context).warn
+                    : EmberColors.of(context).primary,
+              ),
+              title: Text(
+                  command.isSkill ? '\$${command.name}' : '/${command.name}',
+                  style:
+                      const TextStyle(fontSize: 13, fontFamily: 'monospace')),
+              subtitle: Text(
+                command.description,
+                style: TextStyle(
+                    fontSize: 11, color: EmberColors.of(context).textFaint),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              onTap: () => onSelect(command),
+            ),
+        ],
+      ),
+    );
+  }
+}

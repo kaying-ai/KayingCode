@@ -1,0 +1,121 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "!dist/**", "!.turbo/**"],
+      "outputs": ["dist/**"],
+      "cache": true
+    },
+    "@zcode/web-share#build": {
+      "dependsOn": ["^build", "@zcode/web#build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!dist/**",
+        "!.turbo/**",
+        "$TURBO_ROOT$/packages/web/upstream-web.json",
+        "$TURBO_ROOT$/packages/web/scripts/**",
+        "$TURBO_ROOT$/packages/web/src/**",
+        "$TURBO_ROOT$/packages/web-share/src/**",
+        "$TURBO_ROOT$/packages/ui/src/assets/KayingCode-mark.png",
+        "$TURBO_ROOT$/public/logo/icons/32x32.png",
+        "$TURBO_ROOT$/packages/ui/src/components/ui/KayingCodeAboutLogo.tsx",
+        "$TURBO_ROOT$/packages/ui/src/root/RootStartupLoading.tsx",
+        "$TURBO_ROOT$/packages/ui/src/v4/ConversationDraftEmptyState.tsx",
+        "$TURBO_ROOT$/pnpm-lock.yaml"
+      ],
+      "outputs": ["dist/**"],
+      "cache": true
+    },
+    "build:desktop-agent": {
+      "dependsOn": [
+        "@zcode/shared-types#build",
+        "@zcode/contracts#build",
+        "@zcode/dynamic-workflow#build",
+        "@zcode/core#build",
+        "@zcode/adapters#build",
+        "@zcode/bootstrap#build",
+        "@zcode/i18n#build"
+      ],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/.env",
+        "$TURBO_ROOT$/packages/shared/package.json",
+        "$TURBO_ROOT$/packages/shared/src/**",
+        "!dist/**",
+        "!.turbo/**",
+        "$TURBO_ROOT$/config/provider/kayingcode-builtin.json",
+        "$TURBO_ROOT$/scripts/builtin-provider-config.mjs",
+        "$TURBO_ROOT$/scripts/load-endpoint-env.mjs",
+        "$TURBO_ROOT$/packages/provider/src/**",
+        "$TURBO_ROOT$/packages/provider-node/src/kayingcode-builtin-release.ts",
+        "$TURBO_ROOT$/packages/model-option-map/src/**",
+        "$TURBO_ROOT$/.env",
+        "$TURBO_ROOT$/.env.production",
+        "$TURBO_ROOT$/.env.development",
+        "$TURBO_ROOT$/.env.development.local",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/pnpm-lock.yaml"
+      ],
+      "outputs": ["dist/**"],
+      "cache": true,
+      "env": ["KAYINGCODE_ENV", "KAYINGCODE_BUILTIN_PROVIDER_CONFIG_FILE", "NODE_ENV"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {},
+    "lint:fix": {},
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "clean": {
+      "cache": false
+    },
+    "@zcode/cli#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!dist/**",
+        "!.turbo/**",
+        "$TURBO_ROOT$/config/provider/kayingcode-builtin.json",
+        "$TURBO_ROOT$/scripts/builtin-provider-config.mjs",
+        "$TURBO_ROOT$/scripts/load-endpoint-env.mjs",
+        "$TURBO_ROOT$/packages/provider/src/**",
+        "$TURBO_ROOT$/packages/provider-node/src/kayingcode-builtin-release.ts",
+        "$TURBO_ROOT$/packages/model-option-map/src/**",
+        "$TURBO_ROOT$/packages/shared/src/**",
+        "$TURBO_ROOT$/.env",
+        "$TURBO_ROOT$/.env.production",
+        "$TURBO_ROOT$/.env.development",
+        "$TURBO_ROOT$/.env.development.local",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/pnpm-lock.yaml"
+      ],
+      "outputs": ["dist/**"],
+      "cache": true,
+      "env": ["KAYINGCODE_ENV", "KAYINGCODE_BUILTIN_PROVIDER_CONFIG_FILE", "NODE_ENV"]
+    },
+    "@zcode/contracts#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!dist/**",
+        "!.turbo/**",
+        "$TURBO_ROOT$/config/official-plugins.json",
+        "$TURBO_ROOT$/scripts/official-plugin-catalog.mjs",
+        "$TURBO_ROOT$/scripts/generate-official-plugin-catalog.mjs",
+        "$TURBO_ROOT$/apps/zcode-cli/packages/*-plugin/package.json",
+        "$TURBO_ROOT$/apps/zcode-cli/packages/*-plugin/.kayingcode-plugin/plugin.json",
+        "$TURBO_ROOT$/apps/zcode-cli/packages/node-repl-host/package.json",
+        "$TURBO_ROOT$/apps/zcode-cli/packages/node-repl-host/.kayingcode-plugin/plugin.json",
+        "$TURBO_ROOT$/.oxfmtrc.json",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/pnpm-lock.yaml"
+      ],
+      "outputs": ["dist/**"]
+    }
+  }
+}

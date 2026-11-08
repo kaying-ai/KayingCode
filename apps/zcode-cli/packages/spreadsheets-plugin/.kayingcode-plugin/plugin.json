@@ -1,0 +1,12 @@
+{
+  "name": "spreadsheets",
+  "version": "0.1.0",
+  "description": "Spreadsheet skills for XLSX: create, edit, analyze, chart, and convert workbooks, with a visual acceptance reviewer agent.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "skills",
+  "agents": "agents"
+}

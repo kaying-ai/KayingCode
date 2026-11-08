@@ -1,0 +1,650 @@
+/* 壳层与共享组件样式，对齐 Flutter RootShell 及其子页面。
+ *
+ * 放在 ui/ 下而不是 pages/home/index.css：Bot 列表、设备管理、设置二级、
+ * 聊天详情都会用到同一批 className（bot-card / swipe-row / dialog…），
+ * 由 app 入口引一次，避免各页重复定义与漂移。基础 token 与通用原子类在 app.css。 */
+
+/* ---------- 通用补充 ---------- */
+.action-danger {
+  background: transparent;
+  color: var(--error);
+  border: 1px solid var(--error);
+}
+.link-action {
+  display: inline-block;
+  padding: 8px 0;
+  color: var(--run);
+  font-size: 14px;
+}
+.full-action {
+  display: flex;
+  width: 100%;
+  margin: 8px 0 0;
+}
+.section-label {
+  display: block;
+  margin: 16px 0 8px;
+}
+
+/* ---------- 壳布局 ---------- */
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+.shell-body {
+  flex: 1;
+  min-height: 0;
+  padding-bottom: calc(44px + env(safe-area-inset-bottom));
+}
+
+/* ---------- Bot 列表 ---------- */
+.bot-list {
+  padding-bottom: 24px;
+}
+.bot-list-topbar {
+  padding-left: 0;
+  padding-right: 0;
+}
+.bot-list-add-title {
+  display: block;
+  margin: 20px 0 8px;
+}
+.bot-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* 行间距由 .swipe-row 持有，卡片自己不留外边距：卡片在左滑行内部，任何
+   * 下外边距都会从 .swipe-content 塌出、被 .swipe-row 计入高度，从而在行底
+   * 露出 88px 的红色删除底衬（见 .swipe-content 注释）。 */
+  margin-bottom: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-sizing: border-box;
+}
+.bot-card-current {
+  border-color: var(--primary);
+}
+/* 卡片左侧的后端图标（Flutter bot_list_page.dart 用 size 26）。 */
+.bot-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  line-height: 1;
+  color: var(--text);
+}
+.bot-card-icon-ok {
+  color: var(--ok);
+}
+/* 当前 Bot 的 check_circle，以及它用的同一套颜色。 */
+.bot-card-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  color: var(--primary);
+}
+.bot-card-actions {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.bot-card-edit {
+  flex-shrink: 0;
+}
+.bot-card-main {
+  flex: 1;
+  min-width: 0;
+}
+.bot-card-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+.bot-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.bot-badge {
+  font-size: 10px;
+  color: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+.bot-status {
+  font-size: 10px;
+  color: var(--faint);
+}
+.bot-status-ok {
+  color: var(--ok);
+}
+.bot-status-error {
+  color: var(--error);
+}
+.bot-card-remote {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.bot-card-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--faint);
+}
+.bot-card-error {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--error);
+}
+
+/* ---------- 左滑行 ---------- */
+.swipe-row {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  /* 行间距属于行：放在这里才不会被行内内容的外边距影响行的实际高度。 */
+  margin-bottom: 12px;
+}
+.swipe-action {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  background: var(--error);
+  color: #fff;
+}
+.swipe-action-label {
+  color: #fff;
+  font-size: 14px;
+}
+.swipe-content {
+  position: relative;
+  /* 必须自成 BFC：`.swipe-row` 因 overflow:hidden 是 BFC 且高度包含子元素外边距，
+   * 而本元素不是 BFC，内容的下外边距会**塌出本元素**被行计入高度；行因此比内容
+   * 高一截，absolute(top:0;bottom:0) 的红色底衬就在这截里外露成一条红条。
+   * 这里再兜一层 BFC，任何行内内容的外边距都跑不出可见区。 */
+  overflow: hidden;
+  background: var(--bg);
+  transition: transform 0.18s ease-out;
+}
+
+/* ---------- 首启与添加入口 ---------- */
+.first-run {
+  padding-bottom: 24px;
+}
+.first-run-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+.first-run-brand {
+  flex: 1;
+  min-width: 0;
+}
+.first-run-copy {
+  display: block;
+  margin: 4px 0 16px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.first-run-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.first-run-choice-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--raise);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.first-run-choice-note {
+  display: block;
+  margin-top: 4px;
+}
+.first-run-notice {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- 我的（设置首页） ---------- */
+.settings-home {
+  padding-bottom: 24px;
+}
+.product-card {
+  padding: 16px;
+}
+.product-card-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.product-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+}
+.product-name {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+}
+.product-row {
+  border-bottom: 0;
+  padding: 10px 0;
+}
+.product-qr-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+}
+.product-qr-full {
+  width: 200px;
+  height: 200px;
+  margin: 12px auto;
+}
+.qr-hint {
+  display: block;
+  text-align: center;
+}
+.settings-group {
+  margin-top: 12px;
+  padding: 0 12px;
+}
+.settings-row-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  color: var(--soft);
+  flex-shrink: 0;
+}
+
+/* ---------- 会话 Tab ---------- */
+.session-tab {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 44px);
+  box-sizing: border-box;
+}
+.session-topbar {
+  gap: 8px;
+  padding-left: 0;
+  padding-right: 0;
+}
+.session-search {
+  margin-bottom: 12px;
+}
+.session-list {
+  flex: 1;
+  min-height: 0;
+}
+.list-card {
+  background: var(--card);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.session-node-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 45%;
+  height: 36px;
+  margin: 0;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--text);
+  font-size: inherit;
+}
+.session-node-trigger::after,
+.session-refresh::after,
+.session-empty-create::after,
+.session-workspace-action::after,
+.session-create::after,
+.session-show-all::after {
+  border: 0;
+}
+.session-node-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.session-node-dot {
+  flex-shrink: 0;
+}
+.session-node-menu {
+  margin-bottom: 8px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--card);
+}
+.session-node-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+.session-node-selected {
+  background: var(--raise);
+}
+.session-node-option-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.online {
+  color: var(--ok);
+}
+.offline {
+  color: var(--muted);
+}
+.session-workspace {
+  margin-bottom: 16px;
+}
+.session-workspace-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 4px 0 8px;
+  box-sizing: border-box;
+}
+.session-workspace-toggle {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 8px;
+  min-height: 44px;
+}
+.session-workspace-title {
+  flex: 1;
+  min-width: 0;
+}
+.session-workspace-title .workspace-name,
+.session-workspace-title .workspace-access {
+  display: block;
+}
+.session-workspace-title .workspace-name {
+  font-weight: 500;
+}
+.session-create {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--soft);
+  line-height: 1.5;
+}
+.session-refresh {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  line-height: 1;
+}
+.session-create[disabled],
+.session-refresh[disabled],
+.session-empty-create[disabled] {
+  opacity: 0.5;
+}
+.session-empty-create {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 76px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-sizing: border-box;
+  background: var(--card);
+  color: var(--text);
+  text-align: left;
+  line-height: 1.5;
+}
+.session-empty-create-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.session-empty-create-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.session-empty-create-title {
+  font-weight: 500;
+}
+.session-empty-create-copy {
+  color: var(--muted);
+}
+.session-workspace-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: auto;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--raise);
+  color: var(--text);
+  font-size: inherit;
+  line-height: 1.5;
+}
+.session-workspace-content {
+  padding: 0;
+}
+.session-workspace-hint {
+  display: block;
+  padding: 20px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.session-workspace-content .session-search {
+  width: 100%;
+  margin: 0 0 8px;
+  background: var(--panel);
+}
+.session-rows {
+  padding: 0 12px;
+  border-radius: 12px;
+  background: var(--card);
+}
+.session-item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 68px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.session-item:active {
+  opacity: 0.7;
+}
+.session-item-heading,
+.session-item-detail {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.session-item-title,
+.session-item-preview {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.session-item-title {
+  font-weight: 500;
+}
+.session-item-preview {
+  color: var(--muted);
+}
+.session-item-time,
+.session-item-status {
+  flex-shrink: 0;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.session-item-status {
+  color: var(--soft);
+}
+.session-item:last-child {
+  border-bottom: 0;
+}
+.session-show-all {
+  margin: 0;
+  padding: 6px 0;
+  background: transparent;
+  color: var(--run);
+  font-size: inherit;
+  text-align: left;
+}
+.workspace {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  box-sizing: border-box;
+}
+.workspace-name {
+  font-size: 14px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.workspace-access {
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+/* ---------- 内联弹层 ---------- */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+}
+.dialog-card {
+  width: 100%;
+  max-width: 320px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--card);
+  box-sizing: border-box;
+}
+.dialog-title {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+}
+.dialog-message {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.dialog-input {
+  width: 100%;
+  margin-top: 12px;
+}
+.dialog-input-multiline {
+  min-height: 96px;
+}
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.dialog-actions .action {
+  margin: 0;
+}

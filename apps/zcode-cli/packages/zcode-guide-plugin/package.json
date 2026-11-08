@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@kayingcode/kayingcode-guide-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "KayingCode usage and self-diagnosis guide: configuration for MCP servers, commands, skills, hooks, and plugins, dynamic workflow authoring, and how to locate and fix configuration problems for each.",
+  "license": "MIT"
+}

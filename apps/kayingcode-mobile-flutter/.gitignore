@@ -1,0 +1,62 @@
+# 本工程自 zflow 迁移而来，构建产物与本地配置一律不入库。
+# 注意：`android/.gitignore`（随 Android 壳工程提供）单独覆盖 local.properties、
+# key.properties、keystore 等签名/本机路径文件；这里只管 Dart/Flutter 层产物。
+
+# Flutter/Dart 构建与包管理产物
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/build/
+/coverage/
+
+# iOS 本机构建产物；壳工程和 Podfile.lock 入库
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Runner/GeneratedPluginRegistrant.h
+ios/Runner/GeneratedPluginRegistrant.m
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/.last_build_id
+
+# 符号化 / 混淆映射（发布流水线产物）
+app.*.symbols
+app.*.map.json
+
+# IDE
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+
+# 杂项
+*.class
+*.log
+analyze_out.txt
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# 凭据与本机配置：配对码/远程控制 URL 等同密码，绝不入库。
+.env
+*.remote.*
+.remote_url
+remote_url.txt
+
+# 本地截图与临时产物
+/screenshots/
+/scratch/
+/.local/
+
+# FVM Version Cache
+.fvm/

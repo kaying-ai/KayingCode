@@ -1,0 +1,12 @@
+{
+  "name": "kayingcode-guide",
+  "version": "0.1.0",
+  "description": "KayingCode usage and self-diagnosis guide: configuration for MCP servers, commands, skills, hooks, and plugins, dynamic workflow authoring, and how to locate and fix configuration problems for each.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "skills",
+  "commands": "commands"
+}

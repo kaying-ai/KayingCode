@@ -1,0 +1,35 @@
+dist/
+node_modules/
+.DS_Store
+*.log
+coverage/
+.env.turbo/
+.turbo
+.tmp/
+
+# SwiftPM 构建缓存（kayingcode-cua-plugin vendor 的 darwin 上游构建 scratch，~92MB，可再生）。
+.build/
+
+# 原生 runtime 一律「源码入库、产物不入库、打包时构建」：
+# - TapTap core/t3m：Rust 源在 native/core、native/threejs-to-taptapmaker（含 Cargo.lock），
+#   同平台打包由 scripts/build-runtime.mjs 用 cargo 现构建；跨平台打包按
+#   build-native.mjs 的既有约定使用 CI 产物（缺失时明确报错）。
+# - Computer Use：darwin/linux 由 scripts/build-native-runtime.mjs 构建并本地签名；
+#   native/win32-x64/ 例外保持跟踪——Go 构建确定性高、mac 构建从不重写它，
+#   且 build-native-runtime 的复用守卫让无 Go 的打包机也能直接使用该制品。
+packages/kaying-for-taptap-plugin/bin/
+packages/kayingcode-cua-plugin/native/darwin-arm64/
+packages/kayingcode-cua-plugin/native/linux-x64/
+
+# Compiled TypeScript output in src directories
+src/**/*.js
+src/**/*.d.ts
+src/**/*.js.map
+src/**/*.d.ts.map
+
+# Compiled TypeScript output in test directories
+packages/**/tests/**/*.js
+packages/**/tests/**/*.d.ts
+packages/**/tests/**/*.js.map
+packages/**/tests/**/*.d.ts.map
+.VSCodeCounter

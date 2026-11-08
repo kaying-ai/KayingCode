@@ -1,0 +1,17 @@
+{
+  "miniprogramRoot": "dist/weapp/",
+  "projectname": "kayingcode-mobile",
+  "description": "KayingCode 移动端（微信小程序）",
+  "appid": "wx7c84fe95e306bc3c",
+  "compileType": "miniprogram",
+  "libVersion": "3.8.12",
+  "setting": {
+    "urlCheck": true,
+    "es6": false,
+    "enhance": false,
+    "postcss": false,
+    "minified": false,
+    "ignoreDevUnusedFiles": false,
+    "ignoreUploadUnusedFiles": false
+  }
+}

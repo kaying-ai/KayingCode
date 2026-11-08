@@ -1,0 +1,14 @@
+@import "../../../src/styles.css";
+@source "./fixture.jsx";
+html,
+body,
+#root {
+  background: var(--color-background) !important;
+  height: auto;
+  min-height: 100%;
+}
+body {
+  margin: 0;
+  overflow: auto;
+  color: var(--color-foreground);
+}

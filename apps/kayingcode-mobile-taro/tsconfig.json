@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // tsc -b 的声明产物落在 dist-types，避免与 Taro 构建产物 dist/ 冲突。
+    "outDir": "dist-types",
+    "rootDir": ".",
+    // dom：H5 target 与 @tarojs/components 的 DOM 投影类型；weapp 运行时不触 DOM API
+    //（平台差异全部收口在 src/ports 的 Taro 实现与 core 的 RelayPlatformPorts）。
+    "lib": ["es2025", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "types": ["node"],
+    // Taro 是打包器工程：bundle 解析对 @tarojs/* 的 exports/条件导出最稳。
+    "module": "esnext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["src", "config"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/client" },
+    { "path": "../../packages/mobile-client-core" }
+  ]
+}

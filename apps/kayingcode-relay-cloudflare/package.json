@@ -1,0 +1,23 @@
+{
+  "name": "@kayingcode/relay-cloudflare",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm run build:web && wrangler dev",
+    "dev:reset": "node scripts/reset-local-state.mjs",
+    "deploy": "pnpm run build:web && wrangler deploy --keep-vars",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test:integration": "pnpm run build:web && node scripts/test-integration.mjs",
+    "build:web": "pnpm --filter @zcode/web run build:upstream && node scripts/copy-web.mjs"
+  },
+  "dependencies": {
+    "@zcode/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261013.1",
+    "@types/ws": "^8.18.1",
+    "wrangler": "^4.0.0",
+    "ws": "^8.20.0"
+  }
+}

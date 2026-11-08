@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@zcode/image-search-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Find open-licensed illustration and reference images via a local MCP server backed by the Openverse API.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./scripts/image-search-server.mjs"
+}

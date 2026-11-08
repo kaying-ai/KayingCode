@@ -1,0 +1,16 @@
+{
+  "name": "@kayingcode/kaying-game-playtest-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Evidence-driven Android and H5 game playtesting with local sessions, media and offline reports.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/build.mjs && node --test tests/*.test.mjs",
+    "lint": "oxlint runtime scripts tests --no-ignore"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
+}

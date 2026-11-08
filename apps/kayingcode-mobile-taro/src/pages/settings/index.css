@@ -1,0 +1,48 @@
+.settings-screen {
+  padding-bottom: 24px;
+}
+.settings-topbar {
+  padding: 0;
+}
+.settings-group-title {
+  display: block;
+  margin: 20px 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.settings-row {
+  border-bottom: 0;
+  padding: 0;
+}
+.settings-note {
+  display: block;
+  margin-top: 10px;
+}
+.settings-unavailable {
+  margin-top: 12px;
+}
+.settings-unavailable .list-title {
+  margin-bottom: 2px;
+}
+.theme-options {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.theme-choice {
+  flex: 1;
+  padding: 8px 4px;
+  border-radius: 8px;
+  background: var(--raise);
+  text-align: center;
+  font-size: 12px;
+}
+.theme-choice.chosen {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.settings-action {
+  display: flex;
+  margin: 12px 0 0;
+  width: 100%;
+}

@@ -1,0 +1,3 @@
+# Current V2 service needs no bootstrap admin secret or legacy Relay variables.
+# Bindings and migration history are defined in wrangler.jsonc.
+# Set KAYINGCODE_REMOTE_ORIGIN in the build shell for a custom public origin.

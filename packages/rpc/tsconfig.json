@@ -1,0 +1,26 @@
+{
+  // 这里改成 composite project，是因为之前 consumers 会顺着 package export 直接把 rpc 源码拖进来重复检查。
+  // 改成可被 project references 消费的独立工程后，typecheck 会优先复用 rpc 自己生成的声明产物，避免同一批错误被放大打印。
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "bundler",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    // 修复原因：rrweb 传递依赖的旧 @types/css-font-loading-module 会和新版 TypeScript 内置 DOM 声明重复。
+    // rpc 没继承根 tsconfig，之前没有跳过第三方声明检查，导致 bootstrap 在依赖类型冲突上失败。
+    "skipLibCheck": true,
+    // 修复原因：pnpm 使用 hoisted linker 时，@types/glob 传递依赖的空 stub @types/minimatch 会被提升到根
+    // node_modules/@types；本包未限定 types 时会把它当作隐式类型库，TypeScript 5.9 报 TS2688。
+    // rpc 本身是平台中立代码，不需要任何全局类型库。
+    "types": [],
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src/**/*.ts"]
+}

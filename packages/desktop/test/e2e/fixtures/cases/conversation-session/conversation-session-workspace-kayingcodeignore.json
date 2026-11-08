@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "caseName": "conversation-session-workspace-kayingcodeignore",
+  "spec": "./test/e2e/conversation-session/conversation-session-workspace-kayingcodeignore.test.ts",
+  "providerFixtures": [
+    "./test/e2e/fixtures/upstream/common.json",
+    "./test/e2e/fixtures/upstream/conversation-session/conversation-session-workspace-kayingcodeignore.json"
+  ],
+  "providerRequestPolicy": "none",
+  "fileFixtures": [],
+  "requests": []
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@kayingcode/mobile-client-core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/contract.ts"
+  },
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@zcode/client": "workspace:*",
+    "@zcode/services": "workspace:*",
+    "@zcode/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "typescript": "^6.0.2"
+  }
+}

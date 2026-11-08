@@ -1,0 +1,151 @@
+.recent-projects {
+  padding-top: 20px;
+}
+
+.recent-projects-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recent-projects-title,
+.recent-projects-caption {
+  display: block;
+}
+
+.recent-projects-title {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.recent-projects-caption {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.recent-projects-count {
+  flex: none;
+  margin-top: 2px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--soft);
+}
+
+.recent-projects-group,
+.recent-projects-status {
+  margin-top: 20px;
+}
+
+.recent-projects-group-heading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 2px 8px;
+  color: var(--muted);
+}
+
+.recent-projects-device {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.recent-projects-list,
+.recent-projects-status {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.recent-projects-list .recent-project {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.recent-projects-list .recent-project + .recent-project {
+  border-top: 1px solid var(--line);
+}
+
+.recent-project::after {
+  border: 0;
+}
+
+.recent-projects-list .recent-project-pressed,
+.recent-projects-list .recent-project:active {
+  background: var(--raise);
+}
+
+.recent-project:focus-visible {
+  outline: 2px solid var(--muted);
+  outline-offset: -2px;
+}
+
+.recent-projects-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--raise);
+  color: var(--soft);
+}
+
+.recent-project-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-project-name,
+.recent-project-path {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.recent-project-name {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.recent-project-path {
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.recent-project-arrow {
+  flex: none;
+  color: var(--muted);
+}
+
+.recent-projects-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.recent-projects-status-title {
+  display: block;
+  margin-top: 10px;
+  color: var(--text);
+  font-weight: 600;
+}

@@ -1,0 +1,10 @@
+{
+  "name": "node-repl-host",
+  "version": "0.1.1",
+  "description": "Hidden node_repl host for JavaScript execution and Browser Use. Browser Use enables it and provides skills and docs; Computer Use runs through its separate native MCP plugin.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT"
+}

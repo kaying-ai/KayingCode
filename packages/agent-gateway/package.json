@@ -1,0 +1,29 @@
+{
+  "name": "@kayingcode/agent-gateway",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@hono/node-ws": "^1.3.0",
+    "@zcode/rpc": "workspace:*",
+    "@zcode/services": "workspace:*",
+    "@zcode/shared": "workspace:*",
+    "hono": "^4.12.9",
+    "ws": "^8.20.0",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^6.0.2",
+    "ws": "^8.20.0"
+  }
+}

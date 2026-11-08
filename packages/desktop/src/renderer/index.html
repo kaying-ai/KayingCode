@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KayingCode</title>
+    <style>
+      html,
+      body,
+      #root {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      #root {
+        opacity: 0;
+        transition: opacity 0.16s ease;
+      }
+
+      body.kayingcode-startup-ready #root {
+        opacity: 1;
+      }
+
+      #loading {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.16s ease;
+      }
+
+      body.kayingcode-startup-ready #loading {
+        pointer-events: none;
+        opacity: 0;
+      }
+
+      .startup-logo-shell {
+        position: relative;
+        display: flex;
+        width: 96px;
+        height: 96px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 24px;
+        background: linear-gradient(180deg, #000000 0%, #151718 100%);
+        box-shadow:
+          0 20px 25px -5px rgb(0 0 0 / 0.2),
+          0 8px 10px -6px rgb(0 0 0 / 0.2);
+        transform: scale(0.72);
+        opacity: 0;
+        animation: startup-logo-pop 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        transform-origin: center;
+      }
+
+      .startup-logo-shell::before {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        content: "";
+        /* 修复原因：启动 logo 壳是固定深色底，边框不能跟随浅色主题 token，否则首屏边框过重。 */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: inherit;
+      }
+
+      /* 修复原因：启动壳原先只有呼吸，边框炫光需独立于 React 和启动完成门禁。 */
+      @property --startup-beam-angle {
+        syntax: "<angle>";
+        inherits: false;
+        initial-value: 0deg;
+      }
+
+      @keyframes startup-border-beam {
+        to {
+          --startup-beam-angle: 360deg;
+        }
+      }
+
+      .startup-logo-shell::after {
+        content: "";
+        position: absolute;
+        inset: -1px;
+        box-sizing: border-box;
+        border-radius: inherit;
+        padding: 2px;
+        pointer-events: none;
+        background: conic-gradient(
+          from var(--startup-beam-angle),
+          transparent 270deg,
+          rgb(255 255 255 / 0.2) 300deg,
+          rgb(255 255 255 / 0.95) 345deg,
+          transparent 360deg
+        );
+        mask:
+          linear-gradient(#fff 0 0) content-box,
+          linear-gradient(#fff 0 0);
+        mask-composite: exclude;
+        animation: startup-border-beam 2.2s linear infinite;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .startup-logo-shell::after {
+          animation: none;
+          background: none;
+        }
+      }
+
+      .startup-logo {
+        width: 73px;
+        height: auto;
+        object-fit: contain;
+        animation: startup-logo-breathe 2.2s ease-in-out infinite;
+      }
+
+      @keyframes startup-logo-breathe {
+        0%,
+        100% {
+          opacity: 0.74;
+          transform: scale(0.965);
+          filter: drop-shadow(0 0 0 rgb(255 255 255 / 0));
+        }
+
+        50% {
+          opacity: 1;
+          transform: scale(1.035);
+          filter: drop-shadow(0 0 12px rgb(255 255 255 / 0.16));
+        }
+      }
+
+      @keyframes startup-logo-pop {
+        0% {
+          opacity: 0;
+          transform: scale(0.72);
+        }
+
+        38% {
+          opacity: 1;
+          transform: scale(1.045);
+        }
+
+        58% {
+          transform: scale(0.985);
+        }
+
+        76% {
+          transform: scale(1.008);
+        }
+
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .startup-logo-shell {
+          opacity: 1;
+          transform: scale(1);
+          animation: none;
+        }
+
+        .startup-logo {
+          opacity: 1;
+          transform: none;
+          filter: none;
+          animation: none;
+        }
+      }
+    </style>
+    <script>
+      var _hmt = _hmt || [];
+      if (new URLSearchParams(window.location.search).get("windowKind") !== "update-status") {
+        (function () {
+          var hm = document.createElement("script");
+          hm.src = "https://hm.baidu.com/hm.js?bbfa9a5147f2d8c3991fd670b65ea595";
+          var s = document.getElementsByTagName("script")[0];
+          s.parentNode.insertBefore(hm, s);
+        })();
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div
+      id="loading"
+      class="[app-region:drag]"
+      role="status"
+      aria-busy="true"
+      aria-label="Loading..."
+    >
+      <div class="startup-logo-shell">
+        <img
+          src="data:image/png;base64,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"
+          alt=""
+          aria-hidden="true"
+          class="startup-logo"
+        />
+      </div>
+    </div>
+    <script type="module">
+      const startupLogoShell = document.querySelector(".startup-logo-shell");
+      const startupLoading = document.getElementById("loading");
+      const isUpdateStatusWindow =
+        new URLSearchParams(window.location.search).get("windowKind") === "update-status";
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      let finished = false;
+      let animationDone = false;
+      let reactReady = false;
+
+      // 修复原因：主入口不能依赖动画结束后的动态 import；一旦导入路径在 Electron/Vite 下失败，
+      // 页面会永久停在 HTML loading。这里让主入口静态加载，只把启动壳作为动画遮罩延迟移除。
+      const tryFinishStartupAnimation = () => {
+        if (finished || !animationDone || !reactReady) return;
+        finished = true;
+        document.body.classList.add("kayingcode-startup-ready");
+        window.setTimeout(() => startupLoading?.remove(), 500);
+      };
+
+      const markAnimationDone = () => {
+        animationDone = true;
+        tryFinishStartupAnimation();
+      };
+
+      const markReactReady = () => {
+        reactReady = true;
+        tryFinishStartupAnimation();
+      };
+
+      if (isUpdateStatusWindow) {
+        // Bugfix: 更新状态窗口本身就是一个轻量弹窗，复用主入口 HTML 时不应再显示启动壳。
+        // 否则透明独立窗口里的启动 logo 会短暂或持续盖在更新按钮上，看起来像弹窗 UI 异常。
+        finished = true;
+        document.body.classList.add("kayingcode-startup-ready");
+        startupLoading?.remove();
+      } else {
+        window.addEventListener("kayingcode-react-startup-ready", markReactReady, { once: true });
+      }
+
+      if (isUpdateStatusWindow || reduceMotion || !startupLogoShell) {
+        markAnimationDone();
+      } else {
+        startupLogoShell.addEventListener("animationend", (event) => {
+          // 炫光是独立循环动画，不能替代外框弹入的完成信号。
+          if (event.target === startupLogoShell && event.animationName === "startup-logo-pop") {
+            markAnimationDone();
+          }
+        });
+        window.setTimeout(markAnimationDone, 1000);
+      }
+
+      if (!isUpdateStatusWindow) {
+        window.setTimeout(markReactReady, 3000);
+      }
+    </script>
+    <script type="module" src="./src/main.tsx"></script>
+  </body>
+</html>

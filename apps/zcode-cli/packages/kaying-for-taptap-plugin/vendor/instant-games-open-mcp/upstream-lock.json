@@ -1,0 +1,31 @@
+{
+	"version": 1,
+	"packages": [
+		{
+			"packageName": "@taptap/maker",
+			"version": "0.0.38",
+			"tarball": "https://registry.npmmirror.com/@taptap/maker/-/maker-0.0.38.tgz",
+			"integrity": "sha512-H7uoEZcqnD5fJEd0JvMzy0lWHggEWbMQD71DSywMcjWkRPOkw7HAP12Fjk6TE3nZy0BQJuYS8Zh+gaK5B2R2iQ==",
+			"distFiles": [
+				"maker.js"
+			],
+			"distSha512": {
+				"maker.js": "19e44737c3e06e80dec59df765c073570555a5900f9ec110ef5b0fe24f41c3f2f5ce76e922e7a3aba70a93b5e32d63854dfed4296458444add2bbd0ed7090839"
+			}
+		},
+		{
+			"packageName": "@taptap/instant-games-open-mcp",
+			"version": "1.24.14",
+			"tarball": "https://registry.npmmirror.com/@taptap/instant-games-open-mcp/-/instant-games-open-mcp-1.24.14.tgz",
+			"integrity": "sha512-fZJGmSRd+AxRuv298ZAXgm0I+r7BIqy/aa3ClpjznPQkrLQb+ztdq1QwM6Ifgi1UpngBtxPvTwmXDgyKV3GUpA==",
+			"distFiles": [
+				"server.js",
+				"proxy.js"
+			],
+			"distSha512": {
+				"server.js": "7d686671ba949579d48ece4479db198be56a6f894a6e5a190c560a0143848cc510bdd5d16df3acb7f60685457dd8e7a399d73a5d8e672438f15b6ffa8279a6e1",
+				"proxy.js": "3cd9e11963e3b8c9ffa6a212cd97bad66eef5561645eaaece27b6506951bb705ff3b7c7c2d145be841828548d5f590220461875cd5f6230e289a47d81f249d94"
+			}
+		}
+	]
+}
