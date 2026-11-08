@@ -272,31 +272,14 @@ See [NOTICE.md](NOTICE.md) for feature and promotion scope, maintenance policy, 
 
 ## Branch workflow
 
-- `main`: a pure ZCode upstream mirror, fast-forwarded from `upstream/main`; product commits belong on development branches.
-- `kaying-code-dev`: the default development and integration branch.
-- `kaying-code-release`: release preparation and stable fixes; its initial development snapshot is pending acceptance, not a published release.
-- `kaying-code-feature-*`: short-lived work from dev, merged back into dev and then removed.
-- `kaying-code-hotfix-*`: urgent fixes from release, integrated into both release and dev.
+- `main` is the default KayingCode product branch. Submit feature, fix, and release preparation PRs here. Use a short topic branch name such as `project-drag` or `fix/session-reconnect`, and delete it after merging.
+- `zcode-main` mirrors the official ZCode `main`. It preserves the upstream source and docs and advances by fast-forward only.
+- Prepare releases on a short-lived `release/<version>` branch. After release acceptance, tag the verified commit from GitHub `main` with `kaying-code-v<version>`.
 
-Use `origin` for this product repository, `upstream` for the official [zai-org/ZCode](https://github.com/zai-org/ZCode), and `legacy` for the former product remote. Run `node scripts/check-workspace-freshness.mjs` before starting; it compares product work against `origin/kaying-code-dev`, never the upstream mirror. Adopt upstream changes through `kaying-code-feature-upstream-*`; update `UPSTREAM_BASE.json` only after adoption. Product releases use `kaying-code-v*` tags created on release. Archive merged historical branches under `archive/branches/2026-11-04/*` before removing them. See [AGENTS.md](AGENTS.md) for contribution rules.
+[GitHub](https://github.com/kaying-ai/KayingCode) hosts product development, pull requests, and releases. Gitee mirrors product source for backup and faster clones. Run `node scripts/check-workspace-freshness.mjs` before starting work. See the [repository operations guide](docs/deploy/github-gitee-repository.md) for migration, mirrors, and release steps.
 
 ### Connecting and syncing upstream
 
-Remote configuration is local to each clone. If `upstream` already exists, correct its URL with `git remote set-url upstream https://github.com/zai-org/ZCode.git`; otherwise use `git remote add upstream https://github.com/zai-org/ZCode.git`. Keep `origin` pointed at the product repository. A derived repository such as `kayingai/ZCode` is not the official update source.
+View the original source and docs on [zcode-main](https://github.com/kaying-ai/KayingCode/tree/zcode-main). To fetch the official ZCode source, run `git remote add -t main upstream https://github.com/zai-org/ZCode.git` followed by `git fetch --no-tags upstream`.
 
-From a branch other than main, fetch and inspect updates, fast-forward the mirror, then explicitly push it to the product remote:
-
-```bash
-git fetch --no-tags upstream
-git log --oneline main..upstream/main
-git rev-list --left-right --count main...upstream/main
-# The left count must be zero; the right count is the number of new upstream commits.
-git fetch --no-tags upstream main:main
-git push origin main
-```
-
-The refspec has no force prefix. If main is checked out in another worktree, run `git merge --ff-only upstream/main` there instead. Investigate divergent or rewritten history; do not bypass it with force pushes or resets. Fetch upstream tags separately when needed and never push product commits or tags to upstream.
-
-Mirror updates do not update the product. Save current work, sync dev with `origin/kaying-code-dev`, and create `kaying-code-feature-upstream-<version>` (for example, `kaying-code-feature-upstream-3-17-2`). Compare `UPSTREAM_BASE.json.commit` against `upstream/main`, update each affected module's spec first, and adapt changes with tests while preserving product boundaries. Record adopted changes, intentionally retained differences, and unfinished work. Run relevant validation, root typecheck and lint before merging into dev; release acceptance remains a separate step.
-
-Only advance `UPSTREAM_BASE.json` after all changes in the target baseline have been reviewed, adopted or explicitly excluded, and validated. Partial adoption keeps the previous baseline with progress recorded. Fetching or advancing main alone never advances this file. Changing a remote URL does not rewrite historical provenance. KayingCode's product version remains independent of the upstream version. See the [Chinese walkthrough](README.md#上游连接与更新) for the full command sequence.
+Start an adoption branch from the synced product `main`, such as `upstream/zcode-3-17-2`. Review `UPSTREAM_BASE.json.commit` against `upstream/main`, adapt and test changes by module, and open a product PR. Advance the recorded base after all target changes have been reviewed, adopted or explicitly excluded, and validated. The product version is managed independently.

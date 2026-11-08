@@ -6,12 +6,13 @@ import {
 
 export default {
   git: {
-    requireBranch: "kaying-code-release",
+    requireBranch: "release/*",
+    requireUpstream: false,
     tagMatch: "kaying-code-v*",
     commitMessage: "chore: release kaying-code-v${version}",
     tagName: "kaying-code-v${version}",
-    tagAnnotation: "Release v${version}",
-    push: true,
+    tag: false,
+    push: false,
   },
   github: {
     release: false,

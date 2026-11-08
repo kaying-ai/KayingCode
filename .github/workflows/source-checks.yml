@@ -2,9 +2,10 @@ name: Source checks
 
 on:
   pull_request:
-    branches: [kaying-code-dev, kaying-code-release]
+    branches: [main]
   push:
-    branches: [kaying-code-dev, kaying-code-release]
+    branches: [main]
+    tags: ["kaying-code-v*"]
   workflow_dispatch:
 
 permissions:
@@ -25,6 +26,10 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+          fetch-depth: ${{ github.ref_type == 'tag' && '0' || '1' }}
+      - name: Verify product tag ancestry
+        if: github.ref_type == 'tag'
+        run: git merge-base --is-ancestor HEAD refs/remotes/origin/main
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24.14.0"
@@ -37,7 +42,7 @@ jobs:
         run: |
           pnpm run public:snapshot:check
           pnpm run source:check
-          node --test scripts/check-public-snapshot.test.mjs
+          node --test scripts/check-public-snapshot.test.mjs scripts/check-workspace-freshness.test.mjs scripts/branch-policy.test.mjs
       - name: Check types, lint and architecture
         run: |
           pnpm run typecheck
