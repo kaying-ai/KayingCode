@@ -2,22 +2,23 @@
 
 [GitHub](https://github.com/kaying-ai/KayingCode) 管理产品 PR、CI、发布和正式标签。`main` 是产品默认分支，`zcode-main` 镜像 [官方 ZCode](https://github.com/zai-org/ZCode)。Gitee 单向同步产品 `main` 和选定的正式标签，供备份和克隆加速。
 
-## 切换默认分支
+## 本地工作区切换
 
-1. 维护者在 GitHub 把旧默认分支 `kaying-code-dev` 重命名为 `main`，确认 SHA 和打开的 PR 目标，再用分支治理 PR 验证新 CI 触发条件。
-2. 在 GitHub 核对 `Source checks (Windows)`，将其设为 `main` 的必需检查。要求 PR，限制强推和删除。限制 `zcode-main` 的写入主体与产品标签的创建权限。
-3. 按公开范围和许可审核流程复核两条分支的内容。原 Gitee 开发库保留为历史档案，另建空仓库作为备份。
-
-只有从 GitHub 产品历史克隆、且本地没有 `main` 时，才使用下列重命名命令。执行前保留当前工作并检查 `git branch -avv`。
+GitHub 的默认分支已切换到 `main`。已有 GitHub clone 可以刷新远端引用，并将本地产品分支设为跟踪 `origin/main`。先保存当前工作，确认本地 `main` 属于 GitHub 产品历史。
 
 ```bash
-git branch -m kaying-code-dev main &&
-  git fetch origin --prune &&
-  git branch --set-upstream-to=origin/main main &&
-  git remote set-head origin -a
+git fetch origin --prune &&
+  git remote set-head origin -a &&
+  git switch main &&
+  git merge --ff-only origin/main &&
+  git branch --set-upstream-to=origin/main main
 ```
 
-原 Gitee 工作区的本地 `main` 可能属于 ZCode。此类工作区推荐重新克隆 GitHub，从产品 `main` 建短期分支，逐项迁移已审查的本地改动。旧 Gitee refs 和归档标签保留在旧库。
+如果 clone 只跟踪旧分支，可先用 `git remote set-branches origin '*'` 恢复获取 GitHub 分支。首次建立本地产品分支可用 `git switch --track origin/main`，首次检出上游镜像可用 `git switch --track origin/zcode-main`。
+
+原 Gitee 工作区的本地 `main` 可能属于 ZCode。可重新克隆 GitHub，从产品 `main` 建短期分支，逐项迁移已审查的本地改动。旧 Gitee refs 和归档标签留在旧库。
+
+维护者在 GitHub 核对 `Source checks (Windows)` 后，可将它设为 `main` 的必需检查。要求 PR，限制强推和删除，并限制 `zcode-main` 的写入主体与产品标签的创建权限。
 
 ## 同步 zcode-main
 

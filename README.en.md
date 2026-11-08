@@ -272,14 +272,34 @@ See [NOTICE.md](NOTICE.md) for feature and promotion scope, maintenance policy, 
 
 ## Branch workflow
 
-- `main` is the default KayingCode product branch. Submit feature, fix, and release preparation PRs here. Use a short topic branch name such as `project-drag` or `fix/session-reconnect`, and delete it after merging.
-- `zcode-main` mirrors the official ZCode `main`. It preserves the upstream source and docs and advances by fast-forward only.
-- Prepare releases on a short-lived `release/<version>` branch. After release acceptance, tag the verified commit from GitHub `main` with `kaying-code-v<version>`.
+| Branch | Purpose |
+| --- | --- |
+| `main` | The default KayingCode branch. Feature, fix, and release preparation PRs target this branch. |
+| `zcode-main` | A read-only mirror of the official ZCode `main` that maintainers update by fast-forward. |
+| Topic branches | Short branches from product `main`, such as `project-drag` or `fix/session-reconnect`. Delete them after merging. |
 
-[GitHub](https://github.com/kaying-ai/KayingCode) hosts product development, pull requests, and releases. Gitee mirrors product source for backup and faster clones. Run `node scripts/check-workspace-freshness.mjs` before starting work. See the [repository operations guide](docs/deploy/github-gitee-repository.md) for migration, mirrors, and release steps.
+Clone the product from GitHub. New clones check out `main`.
+
+```bash
+git clone https://github.com/kaying-ai/KayingCode.git
+cd KayingCode
+```
+
+Start a change from the latest product branch.
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c fix/session-reconnect
+node scripts/check-workspace-freshness.mjs
+```
+
+Open your PR against GitHub `main`. Maintainers prepare releases on a short-lived `release/<version>` branch and tag the verified commit on `main` with `kaying-code-v<version>` after release acceptance.
+
+In maintainer clones, `origin` points to GitHub and `upstream` points to official ZCode. The former Gitee development repository can be kept as `legacy`. Once a dedicated Gitee backup is available, configure it as `gitee` and mirror the product branch and selected release tags from GitHub. [Migration, mirror, and release guide](docs/deploy/github-gitee-repository.md)
 
 ### Connecting and syncing upstream
 
-View the original source and docs on [zcode-main](https://github.com/kaying-ai/KayingCode/tree/zcode-main). To fetch the official ZCode source, run `git remote add -t main upstream https://github.com/zai-org/ZCode.git` followed by `git fetch --no-tags upstream`.
+The `zcode-main` mirror contains the original ZCode source and docs. To review upstream changes, add the official remote once with `git remote add --no-tags -t main upstream https://github.com/zai-org/ZCode.git` and run `git fetch --no-tags upstream`. [Original ZCode docs](https://github.com/kaying-ai/KayingCode/tree/zcode-main/docs)
 
-Start an adoption branch from the synced product `main`, such as `upstream/zcode-3-17-2`. Review `UPSTREAM_BASE.json.commit` against `upstream/main`, adapt and test changes by module, and open a product PR. Advance the recorded base after all target changes have been reviewed, adopted or explicitly excluded, and validated. The product version is managed independently.
+Start an adoption branch from the synced product `main`, such as `adopt-zcode-3-17-2`. Compare `UPSTREAM_BASE.json.commit` with `upstream/main`, adapt and test changes by module, and open a PR against product `main`. Advance the recorded base after all target changes have been reviewed and validated. KayingCode manages its product version independently.
