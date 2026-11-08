@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 10
     outputs:
       version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -30,12 +31,10 @@ jobs:
         run: |
           node --test scripts/first-public-release.test.mjs
           version=$(node -p 'require("./package.json").version')
-          if [[ "$GITHUB_REF" != "refs/tags/kaying-code-v$version" ]]; then
-            echo "::error::Run this workflow on the kaying-code-v$version release tag"
-            exit 1
-          fi
+          channel=$(node --input-type=module -e 'import { resolveLinuxReleaseTag } from "./scripts/linux-release-tag.mjs"; console.log(resolveLinuxReleaseTag(...process.argv.slice(1)));' "$version" "$(git rev-parse HEAD)" "$GITHUB_REF")
           git merge-base --is-ancestor HEAD refs/remotes/origin/main
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
 
   linux:
     name: Build and sign Linux (${{ matrix.arch }})
@@ -83,7 +82,7 @@ jobs:
         run: bash scripts/sign-linux-release.sh packages/desktop/dist "$RELEASE_VERSION" "$TARGET_ARCH" packages/desktop/build/linux-signing/release-public-key.asc
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: KayingCode-${{ needs.validate.outputs.version }}-linux-${{ matrix.arch }}-signed
+          name: KayingCode-${{ needs.validate.outputs.version }}-linux-${{ matrix.arch }}-${{ needs.validate.outputs.channel }}-signed
           if-no-files-found: error
           compression-level: 0
           path: |
