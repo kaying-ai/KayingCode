@@ -9,35 +9,19 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { runCommand } from "./spawn-command.mjs";
 
-// Bugfix: Windows GNU tar（Git Bash）会把绝对路径里的盘符冒号（C:）当成远程主机名，
-// 反斜杠路径也会被 MSYS 参数转换破坏。tar 参数统一转正斜杠，归档路径优先改用
-// 相对 cwd 的形式避开盘符冒号；对 bsdtar 与 Linux/macOS CI 无影响。
+// Windows 的 GNU tar（Git Bash）会把 `-f` 参数里的盘符冒号（如 `D:/x.tgz`）当成
+// 远程主机名，反斜杠路径也会被 MSYS 参数转换破坏，因此 tar 参数统一转正斜杠。
 function toTarPosixPath(pathValue) {
   return pathValue.replaceAll("\\", "/");
 }
 
-function resolveTarArchiveArg(archivePath, cwd) {
-  if (process.platform === "win32") {
-    try {
-      const relativeArchivePath = relative(cwd, archivePath);
-      if (relativeArchivePath && !relativeArchivePath.startsWith("..")) {
-        return toTarPosixPath(relativeArchivePath);
-      }
-    } catch {
-      // 跨盘符时 relative 会抛错，退回正斜杠绝对路径（bsdtar 可用）。
-    }
-  }
-
-  return toTarPosixPath(archivePath);
-}
-
 export function extractPrebuiltArchive({ archivePath, archiveExt, extractDir, cwd }) {
-  mkdirSync(extractDir, { recursive: true });
   if (archiveExt === "zip") {
+    mkdirSync(extractDir, { recursive: true });
     if (process.platform === "win32") {
       runCommand("powershell.exe", [
         "-NoProfile",
@@ -54,12 +38,18 @@ export function extractPrebuiltArchive({ archivePath, archiveExt, extractDir, cw
     return;
   }
 
-  const tarCwd = cwd ?? process.cwd();
-  runCommand(
-    "tar",
-    ["-xzf", resolveTarArchiveArg(archivePath, tarCwd), "-C", toTarPosixPath(extractDir)],
-    { cwd: tarCwd },
-  );
+  // 修复依据：预验收 run 42490448126 的 Windows 任务中，pnpm 缓存（D:\）与系统
+  // 临时目录（C:\）跨盘符，relative() 无法生成同盘相对路径，回退成 `D:/...`
+  // 绝对路径后被 GNU tar 当作 remote host 而以退出码 2 失败。改为把 tar 的 cwd
+  // 设为归档所在目录、`-f` 只传 `./<basename>`，任何盘符组合都不会出现盘符
+  // 冒号；对 bsdtar 与 Linux/macOS CI 无影响。
+  const baseDir = cwd ?? process.cwd();
+  const archive = resolve(baseDir, archivePath);
+  const destination = resolve(baseDir, extractDir);
+  mkdirSync(destination, { recursive: true });
+  runCommand("tar", ["-xzf", `./${basename(archive)}`, "-C", toTarPosixPath(destination)], {
+    cwd: dirname(archive),
+  });
 }
 
 export function findPrebuiltBinary(rootDir, binaryName) {
