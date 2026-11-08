@@ -78,7 +78,21 @@ jobs:
           $files = @(Get-ChildItem 'packages/desktop/dist/KayingCode-*-win-x64.exe')
           if ($files.Count -ne 1) { throw 'Expected exactly one Windows installer' }
           $signature = Get-AuthenticodeSignature $files[0].FullName
-          if ($signature.Status -ne 'Valid') { throw "Invalid Authenticode signature: $($signature.Status)" }
+          if ($signature.Status -ne 'Valid') {
+            # 验收要求 Valid；失败时输出完整诊断，区分吊销服务不可达、证书链不完整、
+            # 时间戳失败等根因，避免只能看到 UnknownError 无法定位。
+            Write-Host "::error::Authenticode $($signature.Status): $($signature.StatusMessage)"
+            Write-Host ($signature.SignerCertificate | Format-List Subject, Issuer, NotBefore, NotAfter, Thumbprint, SerialNumber | Out-String)
+            $chain = [System.Security.Cryptography.X509Certificates.X509Chain]::new()
+            $chain.ChainPolicy.RevocationMode = 'Online'
+            [void]$chain.Build($signature.SignerCertificate)
+            foreach ($element in $chain.ChainElements) {
+              $issues = ($element.ChainElementStatus | ForEach-Object { "$($_.Status): $($_.StatusInformation.Trim())" }) -join ' | '
+              Write-Host "chain: $($element.Certificate.Subject) [$issues]"
+            }
+            Write-Host ("chain status: " + ($chain.ChainStatus -join ' | '))
+            throw "Invalid Authenticode signature: $($signature.Status) - $($signature.StatusMessage)"
+          }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: KayingCode-${{ needs.validate.outputs.version }}-windows-x64-${{ needs.validate.outputs.channel }}-signed
