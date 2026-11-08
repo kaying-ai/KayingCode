@@ -21,8 +21,16 @@ public_fingerprint=$(gpg --batch --with-colons --import-options show-only --impo
 gpg --batch --yes --dearmor --output "$signing_home/public.gpg" "$public_key"
 cd "$artifact_dir"
 files=()
+# electron-builder 对 RPM / pacman 使用发行版架构名；按实际产物命名签名。
+package_arch=x86_64
+[[ "$arch" == arm64 ]] && package_arch=aarch64
 for ext in AppImage deb rpm pkg.tar.zst; do
-  file="KayingCode-$version-linux-$arch.$ext"
+  file_arch=$arch
+  # x64 的 AppImage / deb 也使用各格式对应的架构命名。
+  if [[ "$arch" == x64 && "$ext" == AppImage ]]; then file_arch=x86_64; fi
+  if [[ "$arch" == x64 && "$ext" == deb ]]; then file_arch=amd64; fi
+  if [[ "$ext" == rpm || "$ext" == pkg.tar.zst ]]; then file_arch=$package_arch; fi
+  file="KayingCode-$version-linux-$file_arch.$ext"
   [[ -f "$file" ]] || { echo "Missing artifact: $file" >&2; exit 1; }
   files+=("$file")
 done
