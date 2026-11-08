@@ -41,61 +41,46 @@
 
 ## 分支与协作
 
-| 分支                    | 用途与规则                                                                |
-| ----------------------- | ------------------------------------------------------------------------- |
-| `main`                  | ZCode 纯上游镜像，只从 `upstream/main` 快进同步，不提交 KayingCode 改动。 |
-| `kaying-code-dev`       | 默认分支与开发集成主线，功能与修复合入这里。                              |
-| `kaying-code-release`   | 发布准备与稳定线，只接收经过验收的开发提交；分支存在不代表已经发布。      |
-| `kaying-code-feature-*` | 从 dev 创建的短期功能、修复或上游适配分支，合入后删除。                   |
-| `kaying-code-hotfix-*`  | 从 release 创建的紧急修复，完成后同时回合 release 与 dev。                |
-
-日常开发：
+| 分支 | 用途 |
+| --- | --- |
+| `main` | KayingCode 的 GitHub 默认分支。功能、修复和版本准备经 PR 与 CI 合入。 |
+| `zcode-main` | 官方 ZCode `main` 的镜像，保留上游源码与文档，只快进。 |
+| 短期主题分支 | 从 `main` 创建，例如 `project-drag`、`fix/session-reconnect`，合入后清理。 |
 
 ```bash
 git fetch origin --prune
-git switch kaying-code-dev
-git merge --ff-only origin/kaying-code-dev
-git switch -c kaying-code-feature-project-drag
+git switch main
+git merge --ff-only origin/main
+git switch -c project-drag
 node scripts/check-workspace-freshness.mjs
 ```
 
-GitHub 的 [kaying-ai/KayingCode](https://github.com/kaying-ai/KayingCode) 承载产品 PR、开发和发布。Gitee 提供源码备份和克隆加速。维护者 clone 用 `origin` 指向 GitHub 产品主库，`upstream` 指向官方 ZCode，`gitee` 指向独立备份镜像，旧历史按需通过 `legacy` 查阅。[仓库同步和迁移指南](docs/deploy/github-gitee-repository.md)
-
-```text
-ZCode upstream/main → 模块适配 PR ─┐
-日常 feature PR ──────────────────┴→ GitHub dev → 发布验收 → GitHub release → 产品标签
-                                           └──── GitHub refs 单向同步到 Gitee ────┘
-```
-
-产品标签形如 `kaying-code-v0.1.1`，须可从 GitHub 的 `kaying-code-release` 到达。根 `pnpm run release` 只在 release 分支执行。
+GitHub 管理产品协作与发布，Gitee 提供产品源码备份和克隆加速。维护者从 `release/<版本>` 分支提交版本准备 PR，再对通过发布验收的 `main` 提交打 `kaying-code-v<版本>` 标签。[仓库同步和发布指南](docs/deploy/github-gitee-repository.md)
 
 ### 上游连接与更新
 
-官方上游是 [zai-org/ZCode](https://github.com/zai-org/ZCode)。在自己的 clone 中配置官方远端并获取上游对象。已有 `upstream` 时用 `git remote set-url upstream` 修正地址。
+原始源码与文档可在 GitHub 的 [zcode-main](https://github.com/kaying-ai/KayingCode/tree/zcode-main) 查看。维护者在 clone 中配置官方上游 [zai-org/ZCode](https://github.com/zai-org/ZCode)，已有 `upstream` 时用 `git remote set-url upstream` 修正地址。
 
 ```bash
 git remote add -t main upstream https://github.com/zai-org/ZCode.git
 git fetch --no-tags upstream
 ```
 
-需要核对原始设计时，可查看 [ZCode 3.17.2 的 docs](https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9/docs)。`upstream/main` 可直接用于差异审查。已有本地 `main` 镜像时，将它快进至 `upstream/main`。
-
-采纳上游更新时，先保存当前工作，再从同步后的 dev 建适配分支。以下以 `3.17.2` 为分支命名示例，版本应以实际目标为准：
+同步镜像与采纳改动分别执行。镜像按[仓库同步指南](docs/deploy/github-gitee-repository.md#同步-zcode-main)更新。采纳前先保存当前工作，再从同步后的产品 `main` 建适配分支，比较已验收基线与官方最新提交。
 
 ```bash
 git fetch origin --prune
-git switch kaying-code-dev
-git merge --ff-only origin/kaying-code-dev
-git switch -c kaying-code-feature-upstream-3-17-2
+git fetch --no-tags upstream
+git switch main
+git merge --ff-only origin/main
+git switch -c upstream/zcode-3-17-2
 node scripts/check-workspace-freshness.mjs
 upstream_base=$(node -p "require('./UPSTREAM_BASE.json').commit")
 git log --oneline "$upstream_base"..upstream/main
 git diff --stat "$upstream_base" upstream/main
 ```
 
-按模块审阅差异，先更新所属应用或包的 spec，再适配实现和测试，保留 KayingCode 的品牌、配置与平台边界。记录本轮采纳项、主动保留的差异和未完成项，执行相关验证及根类型检查、Lint，验收后合入 dev，再按发布流程进入 release。
-
-`UPSTREAM_BASE.json` 记录已审阅并验收的采纳基线，不能仅因 fetch 或 main 已更新就推进。部分采纳时保留旧基线并记录进度；该轮差异全部审阅、采纳或明确排除并验收后，再更新 repo、commit、version 与 syncedAt。历史 repo/commit 不因 remote 地址调整而改写。上游版本与 KayingCode 自身的产品版本相互独立。
+按模块更新 spec、适配实现和测试，记录采纳项、保留的差异和未完成项，验证后提交 PR。只有目标差异全部审阅、采纳或明确排除并验收后，才更新 `UPSTREAM_BASE.json`。KayingCode 自身版本独立管理。
 
 ## 初始化
 

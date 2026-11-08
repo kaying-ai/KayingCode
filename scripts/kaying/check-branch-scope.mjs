@@ -3,10 +3,10 @@
  * 集成前检查 workstream 分支的范围与卫生。
  *
  * 用法：
- *   node scripts/kaying/check-branch-scope.mjs kaying-code-feature-project-sidebar --allow packages/ui --allow packages/ui/spec
+ *   node scripts/kaying/check-branch-scope.mjs project-sidebar --allow packages/ui --allow packages/ui/spec
  *
  * 检查项：
- * - 与 kaying-code-dev 的 merge-base 之后的改动文件
+ * - 与 origin/main 的 merge-base 之后的改动文件
  * - 禁止 pnpm-lock.yaml、dist/out/node_modules、日志等产物
  * - 可选 --allow 前缀，报告越界路径
  * - 冲突标记（<<<<<<< / ||||||| / >>>>>>>）
@@ -22,7 +22,7 @@ if (!branch) {
 }
 
 const allow = [];
-let base = process.env.INTEGRATION_REF || "kaying-code-dev";
+let base = process.env.INTEGRATION_REF || "origin/main";
 for (let index = 0; index < rest.length; index += 1) {
   const value = rest[index];
   if (value === "--allow") {

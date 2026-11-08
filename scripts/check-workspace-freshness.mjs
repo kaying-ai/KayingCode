@@ -1,10 +1,10 @@
 #!/usr/bin/env node
-// 开工前只检查产品开发基线与当前 tracking ref。main 是纯上游镜像，不能当产品集成线。
+// 开工前检查 GitHub 产品主线和当前分支的跟踪 ref。
 import { execFile as execFileCallback } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFile = promisify(execFileCallback);
-let devRef = "origin/kaying-code-dev";
+let devRef = "origin/main";
 let maxBehindDev = 50;
 let doFetch = true;
 const args = process.argv.slice(2);
@@ -64,8 +64,8 @@ if (upstream) {
       `${branch} 落后 ${upstream} ${behind} 个提交：先 git merge --ff-only ${upstream}`,
     );
 }
-let report = "上游镜像/发布线不按开发分支落后量判过期";
-if (branch !== "main" && branch !== "kaying-code-release") {
+let report = "ZCode 镜像只检查跟踪 ref";
+if (branch !== "zcode-main") {
   let exists = true;
   try {
     await git("rev-parse", "--verify", `${devRef}^{commit}`);
@@ -74,7 +74,7 @@ if (branch !== "main" && branch !== "kaying-code-release") {
   }
   if (!exists)
     failures.push(
-      `找不到开发基线 ${devRef}，请先 fetch 或通过 --dev-ref 指定；禁止回退上游 main。`,
+      `找不到开发基线 ${devRef}，请先 fetch 或通过 --dev-ref 指定；请核对 origin 是否指向 GitHub 产品库。`,
     );
   else if (!(await hasCommonHistory(devRef))) {
     // GitHub 的审查快照与旧 Gitee 历史分开，提交数阈值无法识别迁移前的分支。

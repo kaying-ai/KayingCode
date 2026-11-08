@@ -272,18 +272,14 @@ See [NOTICE.md](NOTICE.md) for feature and promotion scope, maintenance policy, 
 
 ## Branch workflow
 
-- `main`: a pure ZCode upstream mirror, fast-forwarded from `upstream/main`; product commits belong on development branches.
-- `kaying-code-dev`: the default development and integration branch.
-- `kaying-code-release`: release preparation and stable fixes; its initial development snapshot is pending acceptance, not a published release.
-- `kaying-code-feature-*`: short-lived work from dev, merged back into dev and then removed.
-- `kaying-code-hotfix-*`: urgent fixes from release, integrated into both release and dev.
+- `main` is the default KayingCode product branch. Submit feature, fix, and release preparation PRs here. Use a short topic branch name such as `project-drag` or `fix/session-reconnect`, and delete it after merging.
+- `zcode-main` mirrors the official ZCode `main`. It preserves the upstream source and docs and advances by fast-forward only.
+- Prepare releases on a short-lived `release/<version>` branch. After release acceptance, tag the verified commit from GitHub `main` with `kaying-code-v<version>`.
 
-[GitHub](https://github.com/kaying-ai/KayingCode) hosts product development, pull requests, and releases. Gitee provides a one-way source mirror for backup and faster clones. In maintainer clones, `origin` points to GitHub, `gitee` to the dedicated mirror, `upstream` to ZCode, and `legacy` is available for old product history. Run `node scripts/check-workspace-freshness.mjs` before starting work. Product tags use `kaying-code-v*` and must be reachable from the GitHub release branch. See the [repository operations guide](docs/deploy/github-gitee-repository.md).
+[GitHub](https://github.com/kaying-ai/KayingCode) hosts product development, pull requests, and releases. Gitee mirrors product source for backup and faster clones. Run `node scripts/check-workspace-freshness.mjs` before starting work. See the [repository operations guide](docs/deploy/github-gitee-repository.md) for migration, mirrors, and release steps.
 
 ### Connecting and syncing upstream
 
-Configure the official remote with `git remote add -t main upstream https://github.com/zai-org/ZCode.git`, or update an existing remote with `git remote set-url upstream`. Run `git fetch --no-tags upstream` before reviewing differences. An existing local `main` mirror can be fast-forwarded to `upstream/main`. The original [ZCode 3.17.2 documentation](https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9/docs) remains in the upstream project.
+View the original source and docs on [zcode-main](https://github.com/kaying-ai/KayingCode/tree/zcode-main). To fetch the official ZCode source, run `git remote add -t main upstream https://github.com/zai-org/ZCode.git` followed by `git fetch --no-tags upstream`.
 
-Mirror updates do not update the product. Save current work, sync dev with `origin/kaying-code-dev`, and create `kaying-code-feature-upstream-<version>` (for example, `kaying-code-feature-upstream-3-17-2`). Compare `UPSTREAM_BASE.json.commit` against `upstream/main`, update each affected module's spec first, and adapt changes with tests while preserving product boundaries. Record adopted changes, intentionally retained differences, and unfinished work. Run relevant validation, root typecheck and lint before merging into dev; release acceptance remains a separate step.
-
-Only advance `UPSTREAM_BASE.json` after all changes in the target baseline have been reviewed, adopted or explicitly excluded, and validated. Partial adoption keeps the previous baseline with progress recorded. Fetching or advancing main alone never advances this file. Changing a remote URL does not rewrite historical provenance. KayingCode's product version remains independent of the upstream version. See the [Chinese walkthrough](README.md#上游连接与更新) for the full command sequence.
+Start an adoption branch from the synced product `main`, such as `upstream/zcode-3-17-2`. Review `UPSTREAM_BASE.json.commit` against `upstream/main`, adapt and test changes by module, and open a product PR. Advance the recorded base after all target changes have been reviewed, adopted or explicitly excluded, and validated. The product version is managed independently.

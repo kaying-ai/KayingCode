@@ -76,10 +76,12 @@ node dist/kayingcode/debug/kayingcode/bin/kayingcode.mjs --web --workspace "$PWD
 ### 3.1 版本发布（release-it）
 
 ```sh
-pnpm run release           # 根 release-it
+pnpm run release           # 在 release/<版本> 分支生成产品版本准备提交
 pnpm run release:cli       # 应用级 release-it（apps/zcode-cli/packages/cli/.release-it.json）
 pnpm run release:cli:dry   # 干跑
 ```
+
+根命令生成版本准备 PR 的本地提交。正式标签和 GitHub Release 按[产品发布步骤](github-gitee-repository.md#发布产品)操作。
 
 ---
 
