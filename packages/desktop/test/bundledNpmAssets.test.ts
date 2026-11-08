@@ -42,7 +42,7 @@ async function createFakeNpmTarball(root: string, options: { withNpx?: boolean }
   await writeFile(join(packageRoot, "man", "man1", "npm.1"), "man");
   await writeFile(join(packageRoot, "node_modules", "dep", "index.js"), "// dep");
   const tarballPath = join(root, "npm.tgz");
-  execFileSync("tar", ["-czf", tarballPath, "-C", sourceRoot, "package"]);
+  execFileSync("tar", ["-czf", "npm.tgz", "-C", "source", "package"], { cwd: root });
   const integrity = `sha512-${createHash("sha512")
     .update(await readFile(tarballPath))
     .digest("base64")}`;

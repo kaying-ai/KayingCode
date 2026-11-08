@@ -50,5 +50,5 @@ jobs:
           pnpm run architecture:check
       - name: Check versions and run Taro tests
         run: |
-          node --test scripts/first-public-release.test.mjs
+          node --test scripts/first-public-release.test.mjs apps/kayingcode-mobile-flutter/scripts/flutter-target.test.mjs
           pnpm --dir apps/kayingcode-mobile-taro run test

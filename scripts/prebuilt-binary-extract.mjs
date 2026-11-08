@@ -9,35 +9,17 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import process from "node:process";
 import { runCommand } from "./spawn-command.mjs";
 
-// Bugfix: Windows GNU tar（Git Bash）会把绝对路径里的盘符冒号（C:）当成远程主机名，
-// 反斜杠路径也会被 MSYS 参数转换破坏。tar 参数统一转正斜杠，归档路径优先改用
-// 相对 cwd 的形式避开盘符冒号；对 bsdtar 与 Linux/macOS CI 无影响。
 function toTarPosixPath(pathValue) {
   return pathValue.replaceAll("\\", "/");
 }
 
-function resolveTarArchiveArg(archivePath, cwd) {
-  if (process.platform === "win32") {
-    try {
-      const relativeArchivePath = relative(cwd, archivePath);
-      if (relativeArchivePath && !relativeArchivePath.startsWith("..")) {
-        return toTarPosixPath(relativeArchivePath);
-      }
-    } catch {
-      // 跨盘符时 relative 会抛错，退回正斜杠绝对路径（bsdtar 可用）。
-    }
-  }
-
-  return toTarPosixPath(archivePath);
-}
-
 export function extractPrebuiltArchive({ archivePath, archiveExt, extractDir, cwd }) {
-  mkdirSync(extractDir, { recursive: true });
   if (archiveExt === "zip") {
+    mkdirSync(extractDir, { recursive: true });
     if (process.platform === "win32") {
       runCommand("powershell.exe", [
         "-NoProfile",
@@ -54,12 +36,15 @@ export function extractPrebuiltArchive({ archivePath, archiveExt, extractDir, cw
     return;
   }
 
-  const tarCwd = cwd ?? process.cwd();
-  runCommand(
-    "tar",
-    ["-xzf", resolveTarArchiveArg(archivePath, tarCwd), "-C", toTarPosixPath(extractDir)],
-    { cwd: tarCwd },
-  );
+  // Windows Git Bash 的 GNU tar 会把 -f 参数中的盘符冒号当成远端主机。
+  // 从归档所在目录读取相对文件名，即使缓存与解包目录在不同盘符也能解包。
+  const baseDir = cwd ?? process.cwd();
+  const archive = resolve(baseDir, archivePath);
+  const destination = resolve(baseDir, extractDir);
+  mkdirSync(destination, { recursive: true });
+  runCommand("tar", ["-xzf", `./${basename(archive)}`, "-C", toTarPosixPath(destination)], {
+    cwd: dirname(archive),
+  });
 }
 
 export function findPrebuiltBinary(rootDir, binaryName) {

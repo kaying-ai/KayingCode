@@ -69,7 +69,6 @@ git tag "$tag" "$commit" && git push origin "refs/tags/$tag"
 | macOS Intel 和 Apple Silicon | Preview DMG 和 ZIP                      |
 | Linux x64 和 ARM64           | Preview AppImage、DEB、RPM 和 Pacman 包 |
 | Android                      | Flutter 通用调试 APK                    |
-| iOS                          | Flutter 模拟器 `Runner.app` 的 ZIP      |
 
 在对应运行详情的 **Artifacts** 下载制品。工作流无需签名 Secrets，产物用于验收。正式签名、公证和分发仍走对应平台的发布流程。鸿蒙使用独立的 CPF-Flutter 和 DevEco SDK。参见 [桌面部署](kayingcode-desktop.md) 和 [Flutter 多端构建](kayingcode-mobile-flutter.md)。
 

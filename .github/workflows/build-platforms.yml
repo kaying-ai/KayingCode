@@ -84,6 +84,13 @@ jobs:
       - uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2.1.2
         with:
           bun-version: "1.3.14"
+      - name: Select Xcode 26.2
+        if: matrix.os == 'mac'
+        run: |
+          # 随包 Computer Use 插件使用 Swift 6.2，macOS 15 runner 的默认 Xcode 版本较旧。
+          sudo xcode-select --switch /Applications/Xcode_26.2.app/Contents/Developer
+          xcodebuild -version
+          swift --version
       - name: Install Linux packaging tools
         if: matrix.os == 'linux'
         run: |
@@ -123,26 +130,14 @@ jobs:
             packages/desktop/dist/*.pkg.tar.zst
 
   mobile:
-    name: Flutter (${{ matrix.target }})
+    name: Flutter (android)
     needs: validate
     if: github.event_name == 'push' || inputs.target == 'all' || inputs.target == 'mobile'
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-24.04
-            target: android
-            artifact: build/app/outputs/flutter-apk/KayingCode-*-android-universal-debug.apk
-          - runner: macos-15
-            target: ios
-            artifact: build/KayingCode-ios-simulator.zip
     defaults:
       run:
         working-directory: apps/kayingcode-mobile-flutter
-    env:
-      FLUTTER_TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -152,7 +147,6 @@ jobs:
           node-version: "24.14.0"
           package-manager-cache: false
       - uses: actions/setup-java@ad2b38190b15e4d6bdf0c97fb4fca8412226d287 # v5.3.0
-        if: matrix.target == 'android'
         with:
           distribution: temurin
           java-version: "17"
@@ -161,17 +155,14 @@ jobs:
           version=$(node -p 'JSON.parse(require("node:fs").readFileSync(".fvmrc", "utf8")).flutter')
           mkdir -p .fvm
           git clone --depth 1 --branch "$version" https://github.com/flutter/flutter.git .fvm/flutter_sdk
-      - name: Build Flutter test artifact
+      - name: Build Android debug APK
         run: |
-          node scripts/flutter-target.mjs "$FLUTTER_TARGET" check
-          node scripts/flutter-target.mjs "$FLUTTER_TARGET" pub-get
-          node scripts/flutter-target.mjs "$FLUTTER_TARGET" debug
-      - name: Archive iOS simulator app
-        if: matrix.target == 'ios'
-        run: ditto -c -k --keepParent build/ios/iphonesimulator/Runner.app build/KayingCode-ios-simulator.zip
+          node scripts/flutter-target.mjs android check
+          node scripts/flutter-target.mjs android pub-get
+          node scripts/flutter-target.mjs android debug
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: KayingCode-${{ needs.validate.outputs.version }}-flutter-${{ matrix.target }}
+          name: KayingCode-${{ needs.validate.outputs.version }}-flutter-android
           if-no-files-found: error
           compression-level: 0
-          path: apps/kayingcode-mobile-flutter/${{ matrix.artifact }}
+          path: apps/kayingcode-mobile-flutter/build/app/outputs/flutter-apk/KayingCode-*-android-universal-debug.apk

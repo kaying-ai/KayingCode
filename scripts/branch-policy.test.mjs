@@ -36,7 +36,9 @@ test("product builds run for tags or manual requests with read-only repository a
     const job = workflow.jobs[name];
     assert.equal(job.needs, "validate");
     assert.equal(job.permissions, undefined);
-    assert.equal(job.strategy["fail-fast"], false);
     assert.equal(job.steps.at(-1).with["if-no-files-found"], "error");
   }
+  assert.equal(workflow.jobs.desktop.strategy["fail-fast"], false);
+  assert.equal(workflow.jobs.mobile.name, "Flutter (android)");
+  assert.equal(workflow.jobs.mobile.strategy, undefined);
 });

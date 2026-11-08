@@ -7,6 +7,7 @@
 - Debug APK 使用相同名称并追加 `-debug`，避免与可发行的 Release APK 混淆。
 - APK 命名由 Flutter 应用内的 Android 构建脚本负责。Flutter 仍负责构建 APK、Gradle 仍负责签名；脚本只在成功构建后将标准输出文件重命名到版本化名称。
 - `universal` 表示默认未使用 `--split-per-abi` 的 APK。若未来改为 ABI 分包，应在 spec 中定义每个 ABI 的名称后再改构建行为。
+- `flutter-target.mjs` 在构建前检查 SDK 版本。全新 SDK 首次启动时，下载进度和工具初始化日志可以出现在版本 JSON 之前。入口从末尾的 JSON 对象读取版本，输出缺失或 SDK 版本不匹配时退出失败。
 
 ## 所有者与边界
 
@@ -22,3 +23,4 @@
 2. 执行 Android Debug 构建脚本后，产物命名为 `KayingCode-<version>-android-universal-debug.apk`。
 3. Flutter 构建失败时脚本返回失败，且不把旧 APK 误报为本次产物。
 4. `pubspec.yaml` 版本含 build number 时，文件名只使用 `+` 前的版本。
+5. 使用首次启动会输出初始化日志的 SDK 时，`android check` 仍能核对固定版本。版本不匹配时，检查失败。
