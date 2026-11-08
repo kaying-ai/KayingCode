@@ -42,7 +42,9 @@ async function createFakeNpmTarball(root: string, options: { withNpx?: boolean }
   await writeFile(join(packageRoot, "man", "man1", "npm.1"), "man");
   await writeFile(join(packageRoot, "node_modules", "dep", "index.js"), "// dep");
   const tarballPath = join(root, "npm.tgz");
-  execFileSync("tar", ["-czf", tarballPath, "-C", sourceRoot, "package"]);
+  // Windows Git Bash 的 GNU tar 会把绝对路径里的盘符冒号当作 remote host；
+  // 在 root 内以相对路径打包，与 scripts/prebuilt-binary-extract.mjs 的规避方式一致。
+  execFileSync("tar", ["-czf", "npm.tgz", "-C", "source", "package"], { cwd: root });
   const integrity = `sha512-${createHash("sha512")
     .update(await readFile(tarballPath))
     .digest("base64")}`;
