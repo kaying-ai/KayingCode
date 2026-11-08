@@ -23,3 +23,14 @@ test("product CI checks main and product tags", async () => {
   );
   assert.equal(checks.env.NODE_OPTIONS, "--max-old-space-size=4096");
 });
+
+test("macOS signing uses the protected release environment after tag validation", async () => {
+  const workflow = parse(
+    await readFile(new URL("../.github/workflows/release-macos.yml", import.meta.url), "utf8"),
+  );
+  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.deepEqual(workflow.permissions, { contents: "read" });
+  assert.equal(workflow.jobs.validate.environment, undefined);
+  assert.equal(workflow.jobs.sign.needs, "validate");
+  assert.equal(workflow.jobs.sign.environment, "macos-release");
+});

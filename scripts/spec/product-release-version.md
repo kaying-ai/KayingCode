@@ -13,3 +13,12 @@
 - 工作流只上传 Actions 制品；正式发布人员核验后将其上传到对应 Release。该流程不修改 GitHub Release 或创建标签。
 
 - 在创建正式标签前，以同一 main 提交执行预验收并检查两种架构的构建、签名及安装包；仅对该次预验收的精确标签临时放行 `linux-release` 环境，结束后移除该规则。正式发布仍使用同一提交的正式标签。
+## macOS 正式签名构建
+
+- 维护者从正式 `kaying-code-v<版本>` 标签手动运行 `Build signed macOS release`。校验任务先确认标签版本与根清单一致，且提交属于 `origin/main` 的历史。通过后，Intel 与 Apple Silicon 两个构建任务各自使用 `macos-release` 环境。
+- GitHub Environment 保管证书和公证凭据。构建任务将 Developer ID Application 导入临时钥匙串，再调用现有 `bundle:desktop`。这样随包 Computer Use 插件、桌面应用和 DMG 都能使用发行身份。公证继续由现有 DMG hook 完成。
+- 只有通过 DMG 签名校验和公证票据校验的制品才上传到本次 Actions 运行。Release 由维护者在完成安装验收后发布。
+
+```text
+正式标签 → 版本与 main 祖先校验 → macos-release 环境 → 签名与公证 → 验签 → Actions DMG
+```

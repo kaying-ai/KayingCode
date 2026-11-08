@@ -50,6 +50,22 @@ git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main &&
   git push --no-follow-tags origin "refs/tags/kaying-code-v$RELEASE_VERSION"
 ```
 
+## 构建已签名的 macOS 安装包
+
+在 Mac 上申请 Developer ID Application 证书，并从钥匙串导出含私钥的 `.p12`。在 App Store Connect 创建团队 API 密钥用于公证，保存 `.p8`、Key ID 和 Issuer ID。参考 [Apple 证书指南](https://developer.apple.com/help/account/certificates/create-developer-id-certificates/) 和 [Apple 公证指南](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)。
+
+在 GitHub **Settings → Environments** 创建 `macos-release`，将可部署标签限制为 `kaying-code-v*`。在仓库套餐支持时可设置发布审批。将以下值保存为该环境的 Secrets。
+
+| Secret                 | 内容                                                |
+| ---------------------- | --------------------------------------------------- |
+| `MAC_CSC_LINK`         | Developer ID Application `.p12` 的单行 Base64       |
+| `MAC_CSC_KEY_PASSWORD` | `.p12` 导出密码                                     |
+| `APPLE_API_KEY_BASE64` | App Store Connect 团队 API 密钥 `.p8` 的单行 Base64 |
+| `APPLE_API_KEY_ID`     | 该密钥的 Key ID                                     |
+| `APPLE_API_ISSUER`     | App Store Connect 的 Issuer ID                      |
+
+工作流合入 `main` 后，按产品发布流程创建正式标签，再在 Actions 手动运行 **Build signed macOS release**。也可以用 GitHub CLI 选择标签，例如 `gh workflow run release-macos.yml --ref kaying-code-v0.1.1`。成功任务会上传已签名并附有 Apple 公证票据的 Intel 或 Apple Silicon DMG。下载后完成安装验收，再上传到对应的 GitHub Release。
+
 ## 同步到 Gitee
 
 确认新空库的可见性与已授权源码范围一致，将 `GITEE_MIRROR_URL` 设为其地址，并在维护者的 GitHub clone 执行 `git remote add gitee "$GITEE_MIRROR_URL"`。
