@@ -83,3 +83,20 @@ git fetch --no-tags origin &&
 ```
 
 外部贡献者可直接从 GitHub fork 向产品 `main` 提交 PR。参见 [分支治理规范](../../scripts/spec/branch-policy.md)。
+
+## 构建和验证 Linux 桌面发行包
+
+`linux-release` 环境仅允许正式标签 `kaying-code-v*`，配置环境 Secrets `LINUX_GPG_PRIVATE_KEY`（ASCII 格式私钥）与 `LINUX_GPG_PASSPHRASE`（私钥口令）。公钥位于 `packages/desktop/build/linux-signing/release-public-key.asc`；应通过可信渠道核对其完整指纹后使用。私钥与口令的本机备份存放在仓库外，禁止提交。
+
+签名工作流合入 `main` 并创建经过验收的正式标签后，在 Actions 手动运行 **Build signed Linux release**，选择该标签。x64 和 arm64 制品分别包含安装包、`SHA256SUMS-linux-<架构>`、其 `.asc` 分离签名和公钥。工作流只上传 Actions 制品，不自动创建 Release。
+
+下载同一架构的文件并独立核对公钥指纹后，可用以下命令验证签名和文件完整性（以 x64 为例）：
+
+```sh
+gpg --show-keys --fingerprint KayingCode-linux-release-public-key.asc
+gpg --dearmor < KayingCode-linux-release-public-key.asc > release-public-key.gpg
+gpgv --keyring ./release-public-key.gpg SHA256SUMS-linux-x64.asc SHA256SUMS-linux-x64
+sha256sum --check SHA256SUMS-linux-x64
+```
+
+只有在公钥指纹来自可信渠道且签名及所有校验值均通过时，才能确认文件与签名清单一致。此流程签署发行校验清单，不提供 APT 或 RPM 仓库原生签名。
