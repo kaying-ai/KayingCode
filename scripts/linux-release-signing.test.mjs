@@ -34,23 +34,36 @@ test("Linux release checksum signature verifies and detects modified artifacts",
   const pub = run(["--armor", "--export"]);
   const pubPath = join(dir, "public.asc");
   await writeFile(pubPath, pub.stdout);
-  for (const ext of ["AppImage", "deb", "rpm", "pkg.tar.zst"])
-    await writeFile(join(dir, `KayingCode-1.2.3-linux-x64.${ext}`), ext);
-  result = spawnSync("bash", ["scripts/sign-linux-release.sh", dir, "1.2.3", "x64", pubPath], {
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      LINUX_GPG_PRIVATE_KEY: secret.stdout,
-      LINUX_GPG_PASSPHRASE: "test-pass",
-      TMPDIR: "/tmp",
-    },
-  });
-  assert.equal(result.status, 0, result.stderr);
-  assert.match(
-    await readFile(join(dir, "SHA256SUMS-linux-x64"), "utf8"),
-    /KayingCode-1.2.3-linux-x64\.deb/,
-  );
-  await writeFile(join(dir, "KayingCode-1.2.3-linux-x64.deb"), "modified");
+  for (const arch of ["x64", "arm64"]) {
+    const native = arch === "x64" ? "x86_64" : "aarch64";
+    const appArch = arch === "x64" ? "x86_64" : "arm64";
+    const debArch = arch === "x64" ? "amd64" : "arm64";
+    await writeFile(join(dir, `KayingCode-1.2.3-linux-${appArch}.AppImage`), "AppImage");
+    await writeFile(join(dir, `KayingCode-1.2.3-linux-${debArch}.deb`), "deb");
+    for (const ext of ["rpm", "pkg.tar.zst"])
+      await writeFile(join(dir, `KayingCode-1.2.3-linux-${native}.${ext}`), ext);
+  }
+  for (const arch of ["x64", "arm64"]) {
+    result = spawnSync("bash", ["scripts/sign-linux-release.sh", dir, "1.2.3", arch, pubPath], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        LINUX_GPG_PRIVATE_KEY: secret.stdout,
+        LINUX_GPG_PASSPHRASE: "test-pass",
+        TMPDIR: "/tmp",
+      },
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(
+      await readFile(join(dir, `SHA256SUMS-linux-${arch}`), "utf8"),
+      new RegExp(`KayingCode-1.2.3-linux-${arch === "x64" ? "amd64" : "arm64"}\\.deb`),
+    );
+    assert.match(
+      await readFile(join(dir, `SHA256SUMS-linux-${arch}`), "utf8"),
+      new RegExp(`linux-${arch === "x64" ? "x86_64" : "aarch64"}\\.rpm`),
+    );
+  }
+  await writeFile(join(dir, "KayingCode-1.2.3-linux-amd64.deb"), "modified");
   const check = spawnSync("shasum", ["-a", "256", "-c", "SHA256SUMS-linux-x64"], {
     cwd: dir,
     encoding: "utf8",
