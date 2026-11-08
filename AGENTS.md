@@ -21,15 +21,15 @@ KayingCode 以 ZCode harness 为载体，全面接入游戏开发场景，面向
 - `kaying-code-dev` 是默认开发与集成主线；新任务从同步后的 dev 创建 `kaying-code-feature-<主题>`（主题使用小写英文与连字符），不再新增 `m3/*`、`migration/*` 或 `codex/*` 开发分支。
 - `kaying-code-release` 是发布准备与稳定线；经过验收的提交才进入正常发布流程。首次初始化的快照仍待验收，分支名不等于发布证明。
 - 紧急修复从 release 创建 `kaying-code-hotfix-<主题>`，修复后回合 release 与 dev，避免后续发布丢失修复。
-- 上游更新先快进 main，再从 dev 建 `kaying-code-feature-upstream-<版本>` 分模块采纳；保留本地产品边界，验收后才更新 `UPSTREAM_BASE.json`。
-- `origin` 为当前产品仓库，`upstream` 为 ZCode，`legacy` 为旧产品仓库。开工先运行新鲜度检查，开发基线为 `origin/kaying-code-dev`；不要再按 `origin/main` 判断产品开发是否过期。main/release 不追赶 dev。
-- 合并后清理 feature；清理历史过程分支前，核对无独有提交并先推送归档 tag。禁止删除仍被其他 worktree 使用或含未合并提交的分支；不批量清理其他 remote 所属仓库。
-- 产品版本标签用 `kaying-code-v<版本>`，根 `pnpm run release` 仅在 release 执行；CI edge 监听 dev，产品标签验证 release 祖先关系。
+- 上游更新先 fetch 官方远端，再从 dev 建 `kaying-code-feature-upstream-<版本>` 分模块采纳；保留本地产品边界，验收后才更新 `UPSTREAM_BASE.json`。
+- 维护者 clone 的 `origin` 指 GitHub 产品主库，`upstream` 指官方 ZCode，`gitee` 指由 GitHub 单向更新的备份库，`legacy` 用于查阅旧产品历史。开工先运行新鲜度检查，开发基线为 `origin/kaying-code-dev`。镜像范围及迁移步骤见 [仓库同步指南](docs/deploy/github-gitee-repository.md)。
+- 合并后清理 feature。清理历史过程分支前，核对无独有提交并先将归档 tag 推送到所属归档库。禁止删除仍被其他 worktree 使用或含未合并提交的分支。
+- 产品版本标签用 `kaying-code-v<版本>`，根 `pnpm run release` 仅在 release 执行。先确认 release 跟踪 GitHub 产品主库，并核对产品标签的 release 祖先关系。
 
 ### 官方上游与更新
 
 - 官方更新源为 [zai-org/ZCode](https://github.com/zai-org/ZCode)，`upstream` 应配置为 `https://github.com/zai-org/ZCode.git`；`kayingai/ZCode` 等派生仓库不作为官方更新源。远端配置只存在于本地 clone，具体设置与同步命令见 [README 的上游同步说明](README.md#上游连接与更新)。
-- 镜像更新与产品采纳分开执行：先 fetch 官方更新，检查提交关系，只快进 main 并显式推送 `origin/main`；不能快进时先调查，不使用强推、reset 或无关历史合并绕过检查。不得向 upstream 推送产品提交或发布标签。
+- 从 `upstream/main` 比较官方差异。已有本地 `main` 镜像时只做快进，发现分叉先调查原因。产品采纳通过 GitHub feature PR 进入 dev。
 - 从同步后的 dev 创建 `kaying-code-feature-upstream-<版本>`，比较 `UPSTREAM_BASE.json.commit` 到 `upstream/main` 的变化，先更新所属模块 spec，再按模块适配，记录采纳、保留的产品差异与未完成项，运行对应验证后合入 dev。避免未经评估整体合并上游或覆盖品牌、配置和平台边界。
 - `UPSTREAM_BASE.json` 表示已审阅并验收的采纳基线；仅 fetch 或更新 main 不改它。部分采纳保留旧基线并记录进度；本轮差异全部完成审阅、采纳或明确排除并验收后，再将 repo、commit、version 与 syncedAt 更新为对应官方基线。历史记录不因修改 remote 地址而改写；KayingCode 产品版本仍独立管理。
 

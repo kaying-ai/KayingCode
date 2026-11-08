@@ -27,6 +27,15 @@ if (!Number.isInteger(maxBehindDev) || maxBehindDev < 0) {
 async function git(...gitArgs) {
   return (await execFile("git", gitArgs, { encoding: "utf8" })).stdout.trim();
 }
+async function hasCommonHistory(baseRef) {
+  try {
+    await git("merge-base", "HEAD", baseRef);
+    return true;
+  } catch (error) {
+    if (error.code === 1) return false;
+    throw error;
+  }
+}
 const branch = await git("rev-parse", "--abbrev-ref", "HEAD");
 if (doFetch) {
   let trackingRemote;
@@ -67,7 +76,12 @@ if (branch !== "main" && branch !== "kaying-code-release") {
     failures.push(
       `找不到开发基线 ${devRef}，请先 fetch 或通过 --dev-ref 指定；禁止回退上游 main。`,
     );
-  else {
+  else if (!(await hasCommonHistory(devRef))) {
+    // GitHub 的审查快照与旧 Gitee 历史分开，提交数阈值无法识别迁移前的分支。
+    failures.push(
+      `${branch} 与开发基线 ${devRef} 没有共同祖先。浅克隆请先补齐历史，旧工作区请从 GitHub 重建开发分支。`,
+    );
+  } else {
     const ahead = Number(await git("rev-list", "--count", `${devRef}..HEAD`));
     const behind = Number(await git("rev-list", "--count", `HEAD..${devRef}`));
     report = `相对 ${devRef}：ahead ${ahead} / behind ${behind}（阈值 ${maxBehindDev}）`;

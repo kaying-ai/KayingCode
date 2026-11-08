@@ -278,24 +278,11 @@ See [NOTICE.md](NOTICE.md) for feature and promotion scope, maintenance policy, 
 - `kaying-code-feature-*`: short-lived work from dev, merged back into dev and then removed.
 - `kaying-code-hotfix-*`: urgent fixes from release, integrated into both release and dev.
 
-Use `origin` for this product repository, `upstream` for the official [zai-org/ZCode](https://github.com/zai-org/ZCode), and `legacy` for the former product remote. Run `node scripts/check-workspace-freshness.mjs` before starting; it compares product work against `origin/kaying-code-dev`, never the upstream mirror. Adopt upstream changes through `kaying-code-feature-upstream-*`; update `UPSTREAM_BASE.json` only after adoption. Product releases use `kaying-code-v*` tags created on release. Archive merged historical branches under `archive/branches/2026-11-04/*` before removing them. See [AGENTS.md](AGENTS.md) for contribution rules.
+[GitHub](https://github.com/kaying-ai/KayingCode) hosts product development, pull requests, and releases. Gitee provides a one-way source mirror for backup and faster clones. In maintainer clones, `origin` points to GitHub, `gitee` to the dedicated mirror, `upstream` to ZCode, and `legacy` is available for old product history. Run `node scripts/check-workspace-freshness.mjs` before starting work. Product tags use `kaying-code-v*` and must be reachable from the GitHub release branch. See the [repository operations guide](docs/deploy/github-gitee-repository.md).
 
 ### Connecting and syncing upstream
 
-Remote configuration is local to each clone. If `upstream` already exists, correct its URL with `git remote set-url upstream https://github.com/zai-org/ZCode.git`; otherwise use `git remote add upstream https://github.com/zai-org/ZCode.git`. Keep `origin` pointed at the product repository. A derived repository such as `kayingai/ZCode` is not the official update source.
-
-From a branch other than main, fetch and inspect updates, fast-forward the mirror, then explicitly push it to the product remote:
-
-```bash
-git fetch --no-tags upstream
-git log --oneline main..upstream/main
-git rev-list --left-right --count main...upstream/main
-# The left count must be zero; the right count is the number of new upstream commits.
-git fetch --no-tags upstream main:main
-git push origin main
-```
-
-The refspec has no force prefix. If main is checked out in another worktree, run `git merge --ff-only upstream/main` there instead. Investigate divergent or rewritten history; do not bypass it with force pushes or resets. Fetch upstream tags separately when needed and never push product commits or tags to upstream.
+Configure the official remote with `git remote add -t main upstream https://github.com/zai-org/ZCode.git`, or update an existing remote with `git remote set-url upstream`. Run `git fetch --no-tags upstream` before reviewing differences. An existing local `main` mirror can be fast-forwarded to `upstream/main`. The original [ZCode 3.17.2 documentation](https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9/docs) remains in the upstream project.
 
 Mirror updates do not update the product. Save current work, sync dev with `origin/kaying-code-dev`, and create `kaying-code-feature-upstream-<version>` (for example, `kaying-code-feature-upstream-3-17-2`). Compare `UPSTREAM_BASE.json.commit` against `upstream/main`, update each affected module's spec first, and adapt changes with tests while preserving product boundaries. Record adopted changes, intentionally retained differences, and unfinished work. Run relevant validation, root typecheck and lint before merging into dev; release acceptance remains a separate step.
 

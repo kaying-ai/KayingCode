@@ -56,6 +56,15 @@ test("stale feature fails and diverged feature warns", async (t) => {
   assert.equal(result.code, 0);
   assert.match(result.text, /警告/);
 });
+test("a feature from an unrelated archive history cannot use the product dev ref", async (t) => {
+  const { git, check, base } = await fixture(t);
+  await git("switch", "-c", "kaying-code-feature-test");
+  const snapshot = await git("commit-tree", `${base}^{tree}`, "-m", "independent GitHub snapshot");
+  await git("update-ref", "refs/remotes/origin/kaying-code-dev", snapshot);
+  const result = await check();
+  assert.equal(result.code, 1);
+  assert.match(result.text, /与开发基线 origin\/kaying-code-dev 没有共同祖先/u);
+});
 test("missing dev ref fails without falling back to main", async (t) => {
   const { git, check, base } = await fixture(t);
   await git("update-ref", "-d", "refs/remotes/origin/kaying-code-dev");
