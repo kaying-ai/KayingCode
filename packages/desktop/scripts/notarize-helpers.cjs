@@ -276,6 +276,34 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// 修复依据：Intel macOS runner 到 api.apple-cloudkit.com（stapler validate 的在线
+// 票据复核）连接不稳定，预验收曾连续多轮以 Error 68 失败，而票据在 staple 步骤
+// 已成功附加。提供有界重试以吸收瞬时网络抖动；重试耗尽仍失败则原样抛出，
+// 不放宽“票据校验必须通过”的验收标准。
+async function runCommandWithRetry(
+  runCommandImpl,
+  command,
+  args,
+  label,
+  { attempts = 3, delayMs = 20000 } = {},
+) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return runCommandImpl(command, args, label);
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        console.warn(
+          `[notarize] ${label} 第 ${attempt}/${attempts} 次失败，${Math.round(delayMs / 1000)}s 后重试: ${error.message}`,
+        );
+        await sleep(delayMs);
+      }
+    }
+  }
+  throw lastError;
+}
+
 module.exports = {
   resolveAuthorizationArgs,
   submitForNotarization,
@@ -283,6 +311,7 @@ module.exports = {
   fetchNotarizationLog,
   runNotarytool,
   runCommand,
+  runCommandWithRetry,
   requireAll,
   requireString,
   readBoundedNumber,
