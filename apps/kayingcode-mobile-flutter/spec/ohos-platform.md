@@ -55,3 +55,5 @@ sequenceDiagram
 3. 鸿蒙真机前台完成粘贴/扫码配对、冷启动凭据恢复、工作区和会话切换、发送消息、附件选择；权限拒绝时仍能使用手动配对。
 4. 鸿蒙 attachment 断开后沿现有 `web-remote-replayable` snapshot/gap repair 恢复；切换目标后旧结果不能覆盖新会话。
 5. Android/iOS 原有构建和主要交互保持可用；鸿蒙后台连接、通知和签名发布须另行验证后才能声明支持。
+
+- 上游 Flutter SDK 首次运行可能先输出初始化日志；`check` 读取其后版本 JSON，仍必须严格确认版本及拒绝 OHOS SDK。

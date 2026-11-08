@@ -13,3 +13,19 @@
 - 工作流只上传 Actions 制品；正式发布人员核验后将其上传到对应 Release。该流程不修改 GitHub Release 或创建标签。
 
 - 在创建正式标签前，以同一 main 提交执行预验收并检查两种架构的构建、签名及安装包；仅对该次预验收的精确标签临时放行 `linux-release` 环境，结束后移除该规则。正式发布仍使用同一提交的正式标签。
+
+## macOS 正式签名构建
+
+- 维护者从正式 `kaying-code-v<版本>` 标签或提交绑定的预验收标签手动运行 `Build signed macOS release`；预验收环境仅临时允许具体标签，制品名区分预验收和正式。校验任务先确认标签版本与根清单一致，且提交属于 `origin/main` 的历史。通过后，Intel 与 Apple Silicon 两个构建任务各自使用 `macos-release` 环境。
+- GitHub Environment 保管证书和公证凭据。构建任务将 Developer ID Application 导入临时钥匙串，再调用现有 `bundle:desktop`。这样随包 Computer Use 插件、桌面应用和 DMG 都能使用发行身份。公证继续由现有 DMG hook 完成。
+- 只有通过 DMG 签名校验和公证票据校验的制品才上传到本次 Actions 运行。Release 由维护者在完成安装验收后发布。
+
+```text
+正式标签 → 版本与 main 祖先校验 → macos-release 环境 → 签名与公证 → 验签 → Actions DMG
+```
+
+## Windows 与 Android 正式签名构建
+
+- 使用与 Linux 相同的提交绑定标签校验，Windows、Android 分别由对应受保护环境提供发行凭据。预验收仅临时放行精确标签并区分制品名称。
+- Windows 使用既有 Electron 打包入口及 WIN_CSC 环境证书，验证安装器的 Authenticode 签名有效才上传。Android 通过 Flutter 目标入口检查固定 SDK 后构建 release APK，以 apksigner 验证签名成功后上传；缺失凭据或校验失败不得退化为未签名或 debug 包。
+- 预验收与正式构建均只上传 Actions 制品，不创建 Release 或标签；所有目标验收通过后正式标签指向同一 main 提交。

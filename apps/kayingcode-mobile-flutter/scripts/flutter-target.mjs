@@ -68,7 +68,10 @@ async function upstreamFlutter() {
   const sdk = await realpath(join(appRoot, ".fvm", "flutter_sdk"));
   const flutter = join(sdk, "bin", process.platform === "win32" ? "flutter.bat" : "flutter");
   await stat(flutter);
-  const details = JSON.parse(await run(flutter, ["--version", "--machine"], { capture: true }));
+  const versionOutput = await run(flutter, ["--version", "--machine"], { capture: true });
+  // 新 SDK 首次启动会在 stdout 输出下载进度和工具初始化日志，版本 JSON 在最后。
+  const output = versionOutput.trim();
+  const details = JSON.parse(output.slice(output.lastIndexOf("\n{") + 1));
   if (details.frameworkVersion !== fvmrc.flutter || details.frameworkVersion.includes("ohos")) {
     throw new Error(
       `当前 .fvm/flutter_sdk 是 ${details.frameworkVersion}，需要上游 Flutter ${fvmrc.flutter}。请重新执行 fvm use ${fvmrc.flutter}。`,
