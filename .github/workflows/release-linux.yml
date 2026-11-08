@@ -51,14 +51,17 @@ jobs:
               arch: x64,
               appimage_arch: x86_64,
               deb_arch: amd64,
-              package_arch: x86_64,
+              rpm_arch: x86_64,
+              # electron-builder 对 x64 的 pacman 产物使用默认架构名 x64，而非 x86_64。
+              pacman_arch: x64,
             }
           - {
               runner: ubuntu-24.04-arm,
               arch: arm64,
               appimage_arch: arm64,
               deb_arch: arm64,
-              package_arch: aarch64,
+              rpm_arch: aarch64,
+              pacman_arch: aarch64,
             }
     env:
       HUSKY: "0"
@@ -100,7 +103,7 @@ jobs:
           path: |
             packages/desktop/dist/KayingCode-${{ needs.validate.outputs.version }}-linux-${{ matrix.appimage_arch }}.AppImage
             packages/desktop/dist/KayingCode-${{ needs.validate.outputs.version }}-linux-${{ matrix.deb_arch }}.deb
-            packages/desktop/dist/KayingCode-${{ needs.validate.outputs.version }}-linux-${{ matrix.package_arch }}.rpm
-            packages/desktop/dist/KayingCode-${{ needs.validate.outputs.version }}-linux-${{ matrix.package_arch }}.pkg.tar.zst
+            packages/desktop/dist/KayingCode-${{ needs.validate.outputs.version }}-linux-${{ matrix.rpm_arch }}.rpm
+            packages/desktop/dist/KayingCode-${{ needs.validate.outputs.version }}-linux-${{ matrix.pacman_arch }}.pkg.tar.zst
             packages/desktop/dist/SHA256SUMS-linux-${{ matrix.arch }}*
             packages/desktop/dist/KayingCode-linux-release-public-key.asc

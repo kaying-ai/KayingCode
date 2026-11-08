@@ -35,13 +35,17 @@ test("Linux release checksum signature verifies and detects modified artifacts",
   const pubPath = join(dir, "public.asc");
   await writeFile(pubPath, pub.stdout);
   for (const arch of ["x64", "arm64"]) {
-    const native = arch === "x64" ? "x86_64" : "aarch64";
+    // 夹具使用 electron-builder getArtifactArchName 的真实输出：
+    // x64 为 AppImage/rpm=x86_64、deb=amd64、pacman=x64；arm64 为 AppImage/deb=arm64、
+    // rpm/pacman=aarch64。曾因夹具与脚本同样假设 x64 pacman 为 x86_64 而漏测该缺陷。
     const appArch = arch === "x64" ? "x86_64" : "arm64";
     const debArch = arch === "x64" ? "amd64" : "arm64";
+    const rpmArch = arch === "x64" ? "x86_64" : "aarch64";
+    const pacmanArch = arch === "x64" ? "x64" : "aarch64";
     await writeFile(join(dir, `KayingCode-1.2.3-linux-${appArch}.AppImage`), "AppImage");
     await writeFile(join(dir, `KayingCode-1.2.3-linux-${debArch}.deb`), "deb");
-    for (const ext of ["rpm", "pkg.tar.zst"])
-      await writeFile(join(dir, `KayingCode-1.2.3-linux-${native}.${ext}`), ext);
+    await writeFile(join(dir, `KayingCode-1.2.3-linux-${rpmArch}.rpm`), "rpm");
+    await writeFile(join(dir, `KayingCode-1.2.3-linux-${pacmanArch}.pkg.tar.zst`), "pkg.tar.zst");
   }
   for (const arch of ["x64", "arm64"]) {
     result = spawnSync("bash", ["scripts/sign-linux-release.sh", dir, "1.2.3", arch, pubPath], {
@@ -61,6 +65,10 @@ test("Linux release checksum signature verifies and detects modified artifacts",
     assert.match(
       await readFile(join(dir, `SHA256SUMS-linux-${arch}`), "utf8"),
       new RegExp(`linux-${arch === "x64" ? "x86_64" : "aarch64"}\\.rpm`),
+    );
+    assert.match(
+      await readFile(join(dir, `SHA256SUMS-linux-${arch}`), "utf8"),
+      new RegExp(`linux-${arch === "x64" ? "x64" : "aarch64"}\\.pkg\\.tar\\.zst`),
     );
   }
   await writeFile(join(dir, "KayingCode-1.2.3-linux-amd64.deb"), "modified");
