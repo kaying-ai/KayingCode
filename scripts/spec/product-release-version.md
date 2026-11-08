@@ -11,7 +11,7 @@
 - 在合并前，可从主题分支推送 `kaying-code-test-v<版本>-<提交 SHA 前 12 位>` 标签触发同一验收矩阵。测试标签校验版本和所指提交的 SHA，不要求提交已进入 `main`。正式标签继续执行 `main` 祖先检查。
 - 桌面使用原生 runner，复用 `pnpm run bundle:desktop`。矩阵为 Windows x64、macOS x64/arm64 和 Linux x64/arm64。Windows 从固定上游发行取得源码快照中未收录的 ripgrep 归档，由现有准备脚本核对摘要及架构。打包使用 Preview 安装身份，跳过独立的远端资源 staging。
 - Windows 上预编译归档解包由 `prebuilt-binary-extract.mjs` 负责。tar 从归档所在目录读取相对文件名，允许归档缓存和解包目录分属不同盘符。两个 macOS runner 在准备资源前选用 Xcode 26.2，满足随包 Computer Use 插件的 Swift 6.2 要求。
-- GitHub 构建的 Flutter 制品为 Android 调试 APK。任务使用 `flutter-target.mjs`，按项目固定的上游 SDK 依次检查版本、按锁文件解析依赖和构建。iOS 和鸿蒙构建由对应平台发布流程负责。
+- GitHub 构建的 Flutter 制品为 Android 调试 APK。runner 从 Android 应用的 Gradle 配置读取 NDK 版本，通过 `sdkmanager` 在构建前接受该包的许可并安装对应版本。任务使用 `flutter-target.mjs`，按项目固定的上游 SDK 依次检查版本、按锁文件解析依赖和构建。iOS 和鸿蒙构建由对应平台发布流程负责。
 - 构建使用只读仓库权限，各目标独立运行。每个成功任务将对应制品上传到本次 Actions 运行。失败保留在对应目标的状态，缺少预期制品视为失败。签名、公证、实机验收和正式发布由对应平台流程负责。
 
 ```text

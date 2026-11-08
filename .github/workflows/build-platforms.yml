@@ -150,6 +150,17 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Install pinned Android NDK
+        run: |
+          ndk_version=$(sed -nE 's/^[[:space:]]*ndkVersion[[:space:]]*=[[:space:]]*"([0-9]+(\.[0-9]+)+)"[[:space:]]*$/\1/p' android/app/build.gradle.kts)
+          if [[ -z "$ndk_version" ]]; then
+            echo '::error::No pinned ndkVersion found in android/app/build.gradle.kts'
+            exit 1
+          fi
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          # Runner 缺少此 NDK 的许可，安装时应答。sdkmanager 退出后 yes 的 SIGPIPE 不应掩盖安装结果。
+          { yes || true; } | "$sdkmanager" --sdk_root="$ANDROID_HOME" --install "ndk;$ndk_version"
+          test -f "$ANDROID_HOME/ndk/$ndk_version/source.properties"
       - name: Install pinned Flutter SDK
         run: |
           version=$(node -p 'JSON.parse(require("node:fs").readFileSync(".fvmrc", "utf8")).flutter')
