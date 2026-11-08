@@ -67,6 +67,12 @@ KayingCode 把这些能力做进工作台本身：内置浏览器与游戏预览
 
 本项目按首次发布形态提供说明；安装包与平台支持以实际构建和验收为准。本地模式使用自配 Provider、内置或本地插件；模型调用会向配置端点发送所需上下文，TapTap 等平台工具有各自的登录、授权及发布确认。远控扫码授权是设备连接机制，不是订阅或额度账号。数据与网络行为见 [NOTICE.md](NOTICE.md)。
 
+## 联系与交流
+
+使用微信扫描下方二维码，联系项目团队或加入交流群。也可以发邮件到 [service@kayingai.com](mailto:service@kayingai.com)。
+
+![联系 KayingCode 团队及加入交流群的微信二维码](assets/contact/conntact-1.png)
+
 ## 分支与协作
 
 | 分支 | 用途 |

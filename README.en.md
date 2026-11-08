@@ -67,6 +67,12 @@ Clients manage device identity and browser credentials automatically; users do n
 
 The documentation describes an initial release. Installer and platform availability depend on actual builds and acceptance. Local mode uses configured Providers and built-in or locally installed plugins. Model calls send context to the selected endpoint; TapTap and other platform tools have their own sign-in, authorization and publishing confirmation. Remote scanning authorizes a device connection rather than a subscription or quota account. See [NOTICE.md](NOTICE.md) for data and network behavior.
 
+## Contact and community
+
+Scan the QR code in WeChat to contact the KayingCode team or join the discussion group. You can also reach us at [service@kayingai.com](mailto:service@kayingai.com).
+
+![WeChat QR code for the KayingCode team and discussion group](assets/contact/conntact-1.png)
+
 ## Setup
 
 Install Git, Node.js **24.14.0**, and pnpm **10.31.0**. [mise.toml](mise.toml) is the source of truth for tool versions. Run all development and packaging commands below from the repository root.
