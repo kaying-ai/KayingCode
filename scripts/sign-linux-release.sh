@@ -21,15 +21,27 @@ public_fingerprint=$(gpg --batch --with-colons --import-options show-only --impo
 gpg --batch --yes --dearmor --output "$signing_home/public.gpg" "$public_key"
 cd "$artifact_dir"
 files=()
-# electron-builder 对 RPM / pacman 使用发行版架构名；按实际产物命名签名。
-package_arch=x86_64
-[[ "$arch" == arm64 ]] && package_arch=aarch64
+# electron-builder 按目标格式使用不同的架构名；按实际产物命名签名。
+# 修复依据：electron-builder 的 getArtifactArchName 只把 x64 的 AppImage/rpm/flatpak 映射为
+# x86_64、deb/snap 映射为 amd64，x64 的 pacman 保持默认 x64；arm64 才把 rpm/pacman 映射为
+# aarch64。预验收曾因把 x64 的 pacman 预期成 x86_64 而在签名步骤报 Missing artifact。
+appimage_arch=x86_64
+deb_arch=amd64
+rpm_arch=x86_64
+pacman_arch=x64
+if [[ "$arch" == arm64 ]]; then
+  appimage_arch=arm64
+  deb_arch=arm64
+  rpm_arch=aarch64
+  pacman_arch=aarch64
+fi
 for ext in AppImage deb rpm pkg.tar.zst; do
-  file_arch=$arch
-  # x64 的 AppImage / deb 也使用各格式对应的架构命名。
-  if [[ "$arch" == x64 && "$ext" == AppImage ]]; then file_arch=x86_64; fi
-  if [[ "$arch" == x64 && "$ext" == deb ]]; then file_arch=amd64; fi
-  if [[ "$ext" == rpm || "$ext" == pkg.tar.zst ]]; then file_arch=$package_arch; fi
+  case "$ext" in
+    AppImage) file_arch=$appimage_arch ;;
+    deb) file_arch=$deb_arch ;;
+    rpm) file_arch=$rpm_arch ;;
+    *) file_arch=$pacman_arch ;;
+  esac
   file="KayingCode-$version-linux-$file_arch.$ext"
   [[ -f "$file" ]] || { echo "Missing artifact: $file" >&2; exit 1; }
   files+=("$file")

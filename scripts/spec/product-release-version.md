@@ -9,7 +9,7 @@
 
 - Linux 正式包工作流以 `kaying-code-v<根版本>` 标签且该提交属于 `origin/main` 为前提，分别在 x64 与 arm64 Linux runner 构建生产身份的桌面发行物。预验收仅允许 `kaying-code-preflight-v<根版本>-<目标提交前12位SHA>` 标签，并要求目标为 main 的祖先；正式和预验收使用同一签名流程，但 Actions 制品名称包含 `release` 或 `preflight`，避免混淆。一般测试构建不获得发行私钥。
 - `linux-release` 环境拥有 GPG 私钥与口令；工作流仅在构建完成后读取，隔离钥匙目录中导入，校验私钥指纹与仓库公开公钥一致。签名或校验失败不得上传发行文件。
-- 每种架构的 `.AppImage`、`.deb`、`.rpm` 和 `.pkg.tar.zst` 必须齐全；文件名使用 electron-builder 的架构名：x64 对应 AppImage/rpm/pacman 的 x86_64 与 deb 的 amd64，arm64 对应 AppImage/deb 的 arm64 与 rpm/pacman 的 aarch64，不重命名原始包；以稳定的文件名顺序生成 SHA-256 清单，对清单生成 ASCII GPG 分离签名并用公开公钥验证。上传安装包、清单、签名及公开公钥供下载验签；该签名不等于包管理器的原生仓库签名。
+- 每种架构的 `.AppImage`、`.deb`、`.rpm` 和 `.pkg.tar.zst` 必须齐全；文件名使用 electron-builder `getArtifactArchName` 的实际架构名：x64 对应 AppImage/rpm 的 x86_64、deb 的 amd64 与 pacman 的 x64，arm64 对应 AppImage/deb 的 arm64 与 rpm/pacman 的 aarch64，不重命名原始包；以稳定的文件名顺序生成 SHA-256 清单，对清单生成 ASCII GPG 分离签名并用公开公钥验证。上传安装包、清单、签名及公开公钥供下载验签；该签名不等于包管理器的原生仓库签名。
 - 工作流只上传 Actions 制品；正式发布人员核验后将其上传到对应 Release。该流程不修改 GitHub Release 或创建标签。
 
 - 在创建正式标签前，以同一 main 提交执行预验收并检查两种架构的构建、签名及安装包；仅对该次预验收的精确标签临时放行 `linux-release` 环境，结束后移除该规则。正式发布仍使用同一提交的正式标签。
