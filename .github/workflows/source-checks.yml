@@ -44,6 +44,9 @@ jobs:
           pnpm run source:check
           node --test scripts/check-public-snapshot.test.mjs scripts/check-workspace-freshness.test.mjs scripts/branch-policy.test.mjs
       - name: Check types, lint and architecture
+        env:
+          # 修复依据：Windows CI 类型检查在默认约 2 GiB 堆上限触发 OOM，完整工作区需要更大堆。
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           pnpm run typecheck
           pnpm run lint

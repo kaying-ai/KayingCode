@@ -18,4 +18,8 @@ test("product CI checks main and product tags", async () => {
   assert.deepEqual(workflow.on.pull_request.branches, ["main"]);
   assert.deepEqual(workflow.on.push.branches, ["main"]);
   assert.deepEqual(workflow.on.push.tags, ["kaying-code-v*"]);
+  const checks = workflow.jobs.source.steps.find(
+    (step) => step.name === "Check types, lint and architecture",
+  );
+  assert.equal(checks.env.NODE_OPTIONS, "--max-old-space-size=4096");
 });
