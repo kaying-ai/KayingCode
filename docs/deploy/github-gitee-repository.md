@@ -41,7 +41,7 @@ git push --no-follow-tags origin refs/remotes/upstream/main:refs/heads/zcode-mai
 
 1. 从同步后的 `main` 创建 `release/<版本>`，获取 GitHub 的已有产品标签，在分支上运行根 `pnpm run release` 生成本地版本和变更日志提交。核对版本文件并提交 PR。紧急修复同样从 `main` 开短期分支，经 PR 验收后合入。
 2. 在 GitHub `main` 上确定通过发布验收的提交。用完整的 `RELEASE_SHA` 和对应 `RELEASE_VERSION` 执行下面的命令。分支或标签存在均不能代替发布验收。
-3. 等待标签的源码检查通过，再在 GitHub 创建 Release 并上传已验收制品。
+3. 等待标签的源码检查和各目标构建完成。正式签名及平台验收完成后，在 GitHub 创建 Release 并上传已验收制品。
 
 ```bash
 git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main &&
@@ -49,6 +49,29 @@ git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main &&
   git tag -a "kaying-code-v${RELEASE_VERSION:?}" "$RELEASE_SHA" -m "KayingCode $RELEASE_VERSION" &&
   git push --no-follow-tags origin "refs/tags/kaying-code-v$RELEASE_VERSION"
 ```
+
+## 在 GitHub 构建验收包
+
+工作流合入 `main` 后，推送 `kaying-code-v<版本>` 标签会构建全部目标。标签版本须与根 `package.json` 一致。也可以在 **Actions → Build platform artifacts → Run workflow** 中选择分支及 `all`、`desktop` 或 `mobile`。
+
+合并前测试主题分支时，从待测提交运行以下 Git Bash 命令。测试标签用当前产品版本和提交 SHA 命名。
+
+```bash
+version=$(node -p 'require("./package.json").version')
+commit=$(git rev-parse HEAD)
+tag="kaying-code-test-v$version-${commit:0:12}"
+git tag "$tag" "$commit" && git push origin "refs/tags/$tag"
+```
+
+| 平台                         | Actions 制品                            |
+| ---------------------------- | --------------------------------------- |
+| Windows x64                  | Preview NSIS 安装包                     |
+| macOS Intel 和 Apple Silicon | Preview DMG 和 ZIP                      |
+| Linux x64 和 ARM64           | Preview AppImage、DEB、RPM 和 Pacman 包 |
+| Android                      | Flutter 通用调试 APK                    |
+| iOS                          | Flutter 模拟器 `Runner.app` 的 ZIP      |
+
+在对应运行详情的 **Artifacts** 下载制品。工作流无需签名 Secrets，产物用于验收。正式签名、公证和分发仍走对应平台的发布流程。鸿蒙使用独立的 CPF-Flutter 和 DevEco SDK。参见 [桌面部署](kayingcode-desktop.md) 和 [Flutter 多端构建](kayingcode-mobile-flutter.md)。
 
 ## 同步到 Gitee
 

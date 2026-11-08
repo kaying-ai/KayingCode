@@ -19,3 +19,24 @@ test("product CI checks main and product tags", async () => {
   assert.deepEqual(workflow.on.push.branches, ["main"]);
   assert.deepEqual(workflow.on.push.tags, ["kaying-code-v*"]);
 });
+
+test("product builds run for tags or manual requests with read-only repository access", async () => {
+  const workflow = parse(
+    await readFile(new URL("../.github/workflows/build-platforms.yml", import.meta.url), "utf8"),
+  );
+  assert.deepEqual(workflow.on.push, { tags: [release.git.tagMatch, "kaying-code-test-v*"] });
+  assert.deepEqual(workflow.on.workflow_dispatch.inputs.target.options, [
+    "all",
+    "desktop",
+    "mobile",
+  ]);
+  assert.equal(workflow.on.workflow_dispatch.inputs.target.default, "all");
+  assert.deepEqual(workflow.permissions, { contents: "read" });
+  for (const name of ["desktop", "mobile"]) {
+    const job = workflow.jobs[name];
+    assert.equal(job.needs, "validate");
+    assert.equal(job.permissions, undefined);
+    assert.equal(job.strategy["fail-fast"], false);
+    assert.equal(job.steps.at(-1).with["if-no-files-found"], "error");
+  }
+});
