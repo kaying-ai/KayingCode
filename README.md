@@ -11,19 +11,47 @@
 
 我们尽可能保留 ZCode 的通用编程能力、交互和运行逻辑，将核心改造集中在游戏开发工作流、引擎接入与多平台验证。多引擎、多平台是持续扩展方向；当前能力与已验收范围见各应用文档。项目基于 [官方 ZCode](https://github.com/zai-org/ZCode)，遵循 Apache-2.0，为非官方衍生项目。
 
+## 为什么需要 KayingCode
+
+ZCode、WorkBuddy 等通用 Agent harness 已能很好地完成编码与文档任务，但自带的右侧面板主要承担结果展示，对外开放的能力有限。游戏开发需要的是在 harness 内部完成深度融合：Agent 直接操作内置浏览器里的游戏与平台页面、生成并处理素材、把项目发布到游戏平台，再依据真实截图把画面一轮轮修正到位。这些闭环很难靠一个展示型面板或若干外部链接拼接起来。
+
+KayingCode 把这些能力做进工作台本身：内置浏览器与游戏预览共处同一界面，平台项目、构建与发布由工具直接调用，素材生成随插件提供，双预览与像素差异构成有预算、可停止的视觉修正循环。通用编程能力照常保留，游戏开发的关键步骤也不再把用户带出 harness。
+
 ## 游戏开发工作流
 
-- **项目与引擎工具**：游戏中心连接项目列表、本地工作区与开发参考；当前内置 TapTap Maker 插件提供项目、诊断、构建及发布准备工具。
+**开箱即用，把时间留给创意。** 版本内置游戏开发常用插件并随发行版本完成联调：TapTap Maker 游戏开发、Browser Use 浏览器操作、Blender 建模与素材、游戏试玩助理等，安装后即可直接使用。初学者不必先花时间查找插件、安装依赖、配置 MCP 和调试环境，描述自己的想法就能开始第一个项目；需要更多能力时再按需扩展。
+
+![游戏开发插件专区：TapTap Maker 游戏开发、KayingForBlender、小咖游戏试玩助理](assets/screenshots/game-plugins.png)
+
+*游戏开发插件专区*
+
+**首期以 TapTap 平台为一站式主线。** 用 TapTap 账号扫码登录后，项目创建、玩法开发、预览调试到构建发布可在同一个工作台连续完成（平台侧的登录、授权与发布确认仍由用户完成）。工具链、预览与平台账号预先打通，不必在编辑器、浏览器和平台后台之间反复切换，上手成本平缓。
+
+![游戏中心：我的 TapMaker 游戏与 TapTap 登录授权](assets/screenshots/game-center.png)
+
+*游戏中心 · 我的 TapMaker 游戏*
+
+完整工作流由以下环节组成：
+
+- **项目与引擎工具**：游戏中心连接项目列表、本地工作区与开发参考；当前内置 TapTap Maker 插件提供项目、诊断、构建及发布工具。
 - **实现与运行预览**：Agent 在现有 harness 中执行开发任务，本地 Desktop 提供游戏预览、界面截图和功能验证入口。
 - **视觉对照与迭代**：双预览与像素差异用于对照结果；视觉修复有预算与停止条件，完成情况以真实运行、玩法和视觉验收为准。
 - **原型与转写**：可用 three.js 网页 Demo 验证原型，再按模块适配到 TapTap Maker，并通过实际预览核对玩法与视觉结果。
 - **引擎扩展与平台接入**：通过插件、MCP、Skills 和现有接口接入引擎及工具，保留通用编程能力；具体支持范围以当前插件和应用文档为准。
 
+![在工作台内选择模型与管理 Provider](assets/screenshots/provider-setting.png)
+
+*模型与 Provider 配置*
+
 ## 使用与连接
 
-本地使用 Desktop 或 CLI，无需注册 KayingCode 账号。手机接入时，在桌面左下角打开远控入口并扫码，浏览器即可连接同一 Host 与会话。设备身份和浏览器凭据由客户端自动管理，用户无需注册、设置密码或填写 token；授权到期、注销或清除浏览器存储后重新扫码即可。
+按使用场景选择入口，全程无需注册 KayingCode 账号：
 
-自托管时，将 Web 与 Relay 部署到同一 HTTPS 地址，按 [Relay 部署教程](apps/kayingcode-relay-cloudflare/DEPLOYMENT.md) 连接 Desktop。移动入口包括 [Taro（H5/微信小程序）](apps/kayingcode-mobile-taro/README.md) 和 [Flutter](apps/kayingcode-mobile-flutter/README.md)，各渠道的接入方式及已验收平台见应用文档。Desktop 面向 Windows、macOS、Linux，支持 SSH/WSL/Docker 开发环境。
+- **桌面下载即用**：日常在 PC 上开发的用户，直接下载安装 Desktop 即可获得完整工作台，Agent、游戏预览、界面截图与功能验证都在本机运行；也可使用 CLI。
+- **手机按需接入**：需要移动连接的用户，可通过 [Flutter 客户端](apps/kayingcode-mobile-flutter/README.md)、[H5 与微信小程序](apps/kayingcode-mobile-taro/README.md) 连接桌面已有的 Host 与会话。在桌面左下角打开远控入口并扫码，浏览器或手机即可接入，任务仍留在桌面执行。
+- **远控可选自托管，免费且简单**：跨网络远控时，可以部署自己的 Relay 服务，Cloudflare 免费层级即可承载；将 Web 与 Relay 部署到同一 HTTPS 地址，按 [Relay 部署教程](apps/kayingcode-relay-cloudflare/DEPLOYMENT.md) 连接 Desktop。只在本机开发则无需任何部署。
+
+设备身份和浏览器凭据由客户端自动管理，用户无需注册、设置密码或填写 token；授权到期、注销或清除浏览器存储后重新扫码即可。各移动渠道的接入方式及已验收平台见应用文档。Desktop 面向 Windows、macOS、Linux，支持 SSH/WSL/Docker 开发环境。
 
 | 入口                      | 用途                                             | 开发命令                         |
 | ------------------------- | ------------------------------------------------ | -------------------------------- |
@@ -44,43 +72,54 @@
 | 分支 | 用途 |
 | --- | --- |
 | `main` | KayingCode 的 GitHub 默认分支。功能、修复和版本准备经 PR 与 CI 合入。 |
-| `zcode-main` | 官方 ZCode `main` 的镜像，保留上游源码与文档，只快进。 |
-| 短期主题分支 | 从 `main` 创建，例如 `project-drag`、`fix/session-reconnect`，合入后清理。 |
+| `zcode-main` | 官方 ZCode `main` 的只读镜像，维护者从上游快进同步。 |
+| 短期主题分支 | 从产品 `main` 创建，例如 `project-drag` 或 `fix/session-reconnect`，合入后清理。 |
+
+首次克隆从 GitHub 取产品源码，默认检出 `main`。
 
 ```bash
-git fetch origin --prune
+git clone https://github.com/kaying-ai/KayingCode.git
+cd KayingCode
+```
+
+在已有 GitHub clone 中，从最新的产品主线开始一项改动。
+
+```bash
 git switch main
-git merge --ff-only origin/main
-git switch -c project-drag
+git pull --ff-only origin main
+git switch -c fix/session-reconnect
 node scripts/check-workspace-freshness.mjs
 ```
 
-GitHub 管理产品协作与发布，Gitee 提供产品源码备份和克隆加速。维护者从 `release/<版本>` 分支提交版本准备 PR，再对通过发布验收的 `main` 提交打 `kaying-code-v<版本>` 标签。[仓库同步和发布指南](docs/deploy/github-gitee-repository.md)
+向 GitHub 的 `main` 提交 PR。维护者从短期 `release/<版本>` 分支提交版本准备 PR，再为通过发布验收的 `main` 提交创建 `kaying-code-v<版本>` 标签。
+
+维护者的 `origin` 指 GitHub，`upstream` 指官方 ZCode。旧 Gitee 开发库作为历史档案，可在本地命名为 `legacy`。新建 Gitee 备份库后，将它配置为 `gitee`，从 GitHub 单向同步产品主线和正式标签。 [工作区迁移、镜像与发布指南](docs/deploy/github-gitee-repository.md)
 
 ### 上游连接与更新
 
-原始源码与文档可在 GitHub 的 [zcode-main](https://github.com/kaying-ai/KayingCode/tree/zcode-main) 查看。维护者在 clone 中配置官方上游 [zai-org/ZCode](https://github.com/zai-org/ZCode)，已有 `upstream` 时用 `git remote set-url upstream` 修正地址。
+在 GitHub 的 `zcode-main` 查看 ZCode 原始源码和文档。 [ZCode 原始文档](https://github.com/kaying-ai/KayingCode/tree/zcode-main/docs)
+
+需要比较官方变更时，首次添加 `upstream` 后获取官方 `main`。已有该远端的 clone 可直接 fetch。
 
 ```bash
-git remote add -t main upstream https://github.com/zai-org/ZCode.git
+git remote add --no-tags -t main upstream https://github.com/zai-org/ZCode.git
 git fetch --no-tags upstream
 ```
 
-同步镜像与采纳改动分别执行。镜像按[仓库同步指南](docs/deploy/github-gitee-repository.md#同步-zcode-main)更新。采纳前先保存当前工作，再从同步后的产品 `main` 建适配分支，比较已验收基线与官方最新提交。
+维护者按指南将 `upstream/main` 快进同步至 GitHub 的 `zcode-main`。采纳某项上游改动时，从同步后的产品 `main` 新建短期适配分支，比较已验收基线与官方提交。 [同步 zcode-main](docs/deploy/github-gitee-repository.md#同步-zcode-main)
 
 ```bash
-git fetch origin --prune
 git fetch --no-tags upstream
 git switch main
-git merge --ff-only origin/main
-git switch -c upstream/zcode-3-17-2
+git pull --ff-only origin main
+git switch -c adopt-zcode-3-17-2
 node scripts/check-workspace-freshness.mjs
 upstream_base=$(node -p "require('./UPSTREAM_BASE.json').commit")
 git log --oneline "$upstream_base"..upstream/main
 git diff --stat "$upstream_base" upstream/main
 ```
 
-按模块更新 spec、适配实现和测试，记录采纳项、保留的差异和未完成项，验证后提交 PR。只有目标差异全部审阅、采纳或明确排除并验收后，才更新 `UPSTREAM_BASE.json`。KayingCode 自身版本独立管理。
+按模块更新 spec、适配实现和测试，记录采纳项、保留的差异和未完成项，验证后向产品 `main` 提交 PR。目标差异全部审阅并验收后，再更新 `UPSTREAM_BASE.json`。KayingCode 自身版本独立管理。
 
 ## 初始化
 

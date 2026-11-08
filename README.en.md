@@ -11,19 +11,47 @@
 
 We retain and reuse ZCode's general coding capabilities, interactions and runtime logic wherever possible, focusing KayingCode's changes on game workflows, engine integration and platform validation. Multiple engines and platforms are an ongoing direction; application guides distinguish implemented capabilities and validated targets. This is an unofficial Apache-2.0 derivative of [official ZCode](https://github.com/zai-org/ZCode).
 
+## Why KayingCode
+
+General-purpose agent harnesses such as ZCode and WorkBuddy already handle coding and documentation tasks well, but their built-in right-hand panels mainly present results and expose limited extension points. Game development needs deep integration inside the harness: agents operating games and platform pages in the built-in browser, generating and processing assets, publishing projects to a game platform, then refining visuals against real screenshots. These loops are hard to assemble from a display-only panel plus a few external links.
+
+KayingCode builds those capabilities into the workbench itself: the embedded browser and game preview share one interface, platform projects, builds and releases are called through tools, asset generation ships with plugins, and dual previews with pixel differences form a budgeted, stoppable visual repair loop. General coding capabilities stay intact, and the critical game development steps no longer take users out of the harness.
+
 ## Game development workflow
 
-- **Projects and engine tools:** Game Center connects project lists, local workspaces and development references. The current TapTap Maker plugin provides project, diagnostics, build and release-preparation tools.
+**Ready out of the box, so your time goes into ideas.** This release ships the game development plugins developers commonly need, integrated and tested with the build: TapTap Maker game development, Browser Use, Blender modelling and assets, and the game playtest assistant, all usable right after installation. Beginners do not have to spend time finding plugins, installing dependencies, configuring MCP and debugging environments; describe an idea and start a first project. Add more capabilities when needed.
+
+![Game development plugin gallery: TapTap Maker, KayingForBlender and the game playtest assistant](assets/screenshots/game-plugins.png)
+
+*Game development plugin gallery*
+
+**The first release focuses on a one-stop TapTap workflow.** After scanning a QR code to sign in with a TapTap account, project creation, gameplay development, preview and debugging, and build and release can all happen in one workbench (platform sign-in, authorization and publishing confirmation remain under user control). Toolchains, previews and the platform account are connected up front, with no switching between an editor, a browser and a platform console. The learning curve stays gentle.
+
+![Game Center: My TapMaker games and TapTap sign-in authorization](assets/screenshots/game-center.png)
+
+*Game Center · My TapMaker games*
+
+The full workflow consists of these stages:
+
+- **Projects and engine tools:** Game Center connects project lists, local workspaces and development references. The current TapTap Maker plugin provides project, diagnostics, build and release tools.
 - **Implementation and running previews:** Agents execute development tasks in the existing harness. Local Desktop provides game previews, screenshots and functional validation entry points.
 - **Visual comparison and iteration:** Dual previews and pixel differences support comparison. Visual repair has budgets and stopping conditions; acceptance relies on actual runtime, gameplay and visual results.
 - **Prototyping and porting:** Validate a three.js Web demo, adapt it to TapTap Maker module by module, and compare gameplay and visuals in actual previews.
 - **Engine and platform integration:** Extend through plugins, MCP, Skills and existing interfaces while preserving general coding capabilities. Current support is documented per application and plugin.
 
+![Choosing a model and managing Providers in the workbench](assets/screenshots/provider-setting.png)
+
+*Model and Provider settings*
+
 ## Usage and connections
 
-Use Desktop or CLI locally without registering a KayingCode account. To connect a phone, open remote control at the lower left of Desktop and scan the code. The browser joins the existing Host and sessions. Clients manage device identity and browser credentials automatically; users do not register, set passwords or enter tokens. Scan again after authorization expires, logout or browser-storage clearing.
+Choose an entry point based on how you work; no KayingCode account is needed:
 
-For self-hosting, serve Web and Relay on one HTTPS origin and follow the [Relay deployment guide](apps/kayingcode-relay-cloudflare/DEPLOYMENT.en.md). Mobile entry points include [Taro (H5/WeChat)](apps/kayingcode-mobile-taro/README.md) and [Flutter](apps/kayingcode-mobile-flutter/README.md); application guides describe access methods and validated platforms. Desktop targets Windows, macOS and Linux, including SSH/WSL/Docker development environments.
+- **Download and run on desktop:** For everyday PC development, install Desktop for the complete local workbench — Agent, game preview, screenshots and functional validation all run on the machine; CLI is also available.
+- **Connect from a phone when needed:** Use the [Flutter client](apps/kayingcode-mobile-flutter/README.md) or [H5 and WeChat Mini Program](apps/kayingcode-mobile-taro/README.md) to join the Host and sessions already running on Desktop. Open remote control at the lower left of Desktop and scan the code; the browser or phone joins while tasks stay on Desktop.
+- **Optional self-hosting for remote access, free and simple:** For access across networks, deploy your own Relay service — the Cloudflare free tier is sufficient. Serve Web and Relay on one HTTPS origin and follow the [Relay deployment guide](apps/kayingcode-relay-cloudflare/DEPLOYMENT.en.md). Local-only development needs no deployment at all.
+
+Clients manage device identity and browser credentials automatically; users do not register, set passwords or enter tokens. Scan again after authorization expires, logout or browser-storage clearing. Application guides describe access methods and validated platforms for each mobile channel. Desktop targets Windows, macOS and Linux, including SSH/WSL/Docker development environments.
 
 | Interface                         | Purpose                                                                 | Development command              |
 | --------------------------------- | ----------------------------------------------------------------------- | -------------------------------- |
@@ -272,14 +300,34 @@ See [NOTICE.md](NOTICE.md) for feature and promotion scope, maintenance policy, 
 
 ## Branch workflow
 
-- `main` is the default KayingCode product branch. Submit feature, fix, and release preparation PRs here. Use a short topic branch name such as `project-drag` or `fix/session-reconnect`, and delete it after merging.
-- `zcode-main` mirrors the official ZCode `main`. It preserves the upstream source and docs and advances by fast-forward only.
-- Prepare releases on a short-lived `release/<version>` branch. After release acceptance, tag the verified commit from GitHub `main` with `kaying-code-v<version>`.
+| Branch | Purpose |
+| --- | --- |
+| `main` | The default KayingCode branch. Feature, fix, and release preparation PRs target this branch. |
+| `zcode-main` | A read-only mirror of the official ZCode `main` that maintainers update by fast-forward. |
+| Topic branches | Short branches from product `main`, such as `project-drag` or `fix/session-reconnect`. Delete them after merging. |
 
-[GitHub](https://github.com/kaying-ai/KayingCode) hosts product development, pull requests, and releases. Gitee mirrors product source for backup and faster clones. Run `node scripts/check-workspace-freshness.mjs` before starting work. See the [repository operations guide](docs/deploy/github-gitee-repository.md) for migration, mirrors, and release steps.
+Clone the product from GitHub. New clones check out `main`.
+
+```bash
+git clone https://github.com/kaying-ai/KayingCode.git
+cd KayingCode
+```
+
+Start a change from the latest product branch.
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c fix/session-reconnect
+node scripts/check-workspace-freshness.mjs
+```
+
+Open your PR against GitHub `main`. Maintainers prepare releases on a short-lived `release/<version>` branch and tag the verified commit on `main` with `kaying-code-v<version>` after release acceptance.
+
+In maintainer clones, `origin` points to GitHub and `upstream` points to official ZCode. The former Gitee development repository can be kept as `legacy`. Once a dedicated Gitee backup is available, configure it as `gitee` and mirror the product branch and selected release tags from GitHub. [Migration, mirror, and release guide](docs/deploy/github-gitee-repository.md)
 
 ### Connecting and syncing upstream
 
-View the original source and docs on [zcode-main](https://github.com/kaying-ai/KayingCode/tree/zcode-main). To fetch the official ZCode source, run `git remote add -t main upstream https://github.com/zai-org/ZCode.git` followed by `git fetch --no-tags upstream`.
+The `zcode-main` mirror contains the original ZCode source and docs. To review upstream changes, add the official remote once with `git remote add --no-tags -t main upstream https://github.com/zai-org/ZCode.git` and run `git fetch --no-tags upstream`. [Original ZCode docs](https://github.com/kaying-ai/KayingCode/tree/zcode-main/docs)
 
-Start an adoption branch from the synced product `main`, such as `upstream/zcode-3-17-2`. Review `UPSTREAM_BASE.json.commit` against `upstream/main`, adapt and test changes by module, and open a product PR. Advance the recorded base after all target changes have been reviewed, adopted or explicitly excluded, and validated. The product version is managed independently.
+Start an adoption branch from the synced product `main`, such as `adopt-zcode-3-17-2`. Compare `UPSTREAM_BASE.json.commit` with `upstream/main`, adapt and test changes by module, and open a PR against product `main`. Advance the recorded base after all target changes have been reviewed and validated. KayingCode manages its product version independently.
