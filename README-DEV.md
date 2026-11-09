@@ -170,6 +170,63 @@ suite and a local Host attachment.
 - 修改许可、声明或第三方材料前，先阅读 [third-party/SPEC.md](third-party/SPEC.md) 和 [scripts/spec/license-inventory.md](scripts/spec/license-inventory.md)。
 - 安全漏洞通过 [SECURITY.md](SECURITY.md) 指定的私密渠道报告，不要公开 Issue 中附密钥或用户数据。
 
+## 9. 上游 ZCode 同步
+
+KayingCode 以官方 [ZCode](https://github.com/zai-org/ZCode) 为上游。`main` 是产品分支，`zcode-main` 是官方 `main` 的只读镜像；两者历史独立，不能互相合并。
+
+### 9.1 当前基线
+
+- `UPSTREAM_BASE.json` 记录已审阅并验收的官方提交，是产品采纳的比较基线。
+- 官方更新以 `upstream/main` 为准；功能分支不作为默认采纳来源。
+- 只 fetch 或只更新镜像不会改变采纳基线。
+
+### 9.2 同步镜像 zcode-main（维护者）
+
+```bash
+git fetch --no-tags upstream
+
+# 预演，确认是快进
+git push --dry-run --no-follow-tags origin \
+  refs/remotes/upstream/main:refs/heads/zcode-main
+
+# 正式快进推送
+git push --no-follow-tags origin \
+  refs/remotes/upstream/main:refs/heads/zcode-main
+
+# 两端 SHA 必须一致
+git ls-remote upstream refs/heads/main
+git ls-remote origin refs/heads/zcode-main
+```
+
+- 只允许快进；出现分叉先停止排查，不强推或合并无关历史。
+- 不向 `upstream` 推送产品提交或标签。
+- 镜像前确认上游新增的 Actions 工作流在产品仓可安全运行。
+
+### 9.3 采纳上游变更（产品）
+
+从产品 `main` 创建短期适配分支，按模块审阅和适配：
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c adopt-zcode-<版本>
+node scripts/check-workspace-freshness.mjs
+
+upstream_base=$(node -p "require('./UPSTREAM_BASE.json').commit")
+git log --oneline "$upstream_base"..upstream/main
+git diff --stat "$upstream_base" upstream/main
+```
+
+执行顺序：
+
+1. 先更新受影响模块的 `spec/`，明确产品规则、状态所有者、接口和验收场景。
+2. 按模块适配实现与测试，保留 KayingCode 品牌、配置、Host/Relay、移动端和插件边界。
+3. 在 `scripts/spec/upstream-sync-<版本>.md` 记录采纳项、明确排除项和未完成项。
+4. 运行对应验证并提交 PR。
+5. 全部目标差异审阅并验收后，才更新 `UPSTREAM_BASE.json` 的 `repo`、`commit`、`version`、`syncedAt`。
+
+部分采纳时保留旧基线并记录进度；KayingCode 产品版本独立管理，不跟随上游版本号。详细操作见 [README 的上游连接与更新](README.md#上游连接与更新) 和 [仓库同步指南](docs/deploy/github-gitee-repository.md#同步-zcode-main)。
+
 ---
 
 # Development and contribution guide (English)
@@ -236,6 +293,41 @@ Run the target package's tests as defined in its `package.json`. Add tests for b
 4. After merge, tag the validated `main` commit with `kaying-code-v<version>` and push the tag.
 5. Trigger the Linux, macOS, and Windows+Android signed builds. When all succeed, the `Publish GitHub release` workflow downloads their artifacts, generates `SHA256SUMS-<version>.txt`, and creates or updates the GitHub Release.
 6. Automatic publishing does not replace installation acceptance; verify the installers on each target platform before announcing the release.
+
+## Syncing upstream ZCode
+
+KayingCode tracks official [ZCode](https://github.com/zai-org/ZCode). `main` is the product branch; `zcode-main` is a read-only mirror of official `main`. The two histories are independent and must not be merged into each other.
+
+- `UPSTREAM_BASE.json` records the reviewed and accepted upstream commit. Fetching or mirroring alone does not change it.
+- Use `upstream/main` as the adoption source; feature branches are not adopted by default.
+
+Mirror update (maintainers, fast-forward only):
+
+```bash
+git fetch --no-tags upstream
+git push --dry-run --no-follow-tags origin \
+  refs/remotes/upstream/main:refs/heads/zcode-main
+git push --no-follow-tags origin \
+  refs/remotes/upstream/main:refs/heads/zcode-main
+git ls-remote upstream refs/heads/main
+git ls-remote origin refs/heads/zcode-main
+```
+
+Stop and investigate if the update is not a fast-forward. Never push product commits or tags to `upstream`, and confirm new upstream Actions workflows are safe for the product repository before mirroring.
+
+Product adoption:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c adopt-zcode-<version>
+node scripts/check-workspace-freshness.mjs
+upstream_base=$(node -p "require('./UPSTREAM_BASE.json').commit")
+git log --oneline "$upstream_base"..upstream/main
+git diff --stat "$upstream_base" upstream/main
+```
+
+Update the affected module `spec/` files first, adapt implementation and tests by module, keep KayingCode branding, configuration, Host/Relay, mobile and plugin boundaries, and record adopted items, explicit exclusions and remaining work in `scripts/spec/upstream-sync-<version>.md`. After all target changes are reviewed and accepted, update `UPSTREAM_BASE.json`. For partial adoption, keep the old baseline and record progress. The KayingCode product version is managed independently.
 
 ## License and security
 
