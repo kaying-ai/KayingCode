@@ -51,11 +51,13 @@ test("Windows and Android release jobs require protected credentials and signatu
     workflow.jobs.validate.steps.find((step) => step.id === "version").run,
     /resolveLinuxReleaseTag/,
   );
-  assert.match(
-    workflow.jobs.windows.steps.find((step) => step.name === "Verify Windows installer signature")
-      .run,
-    /Get-AuthenticodeSignature/,
-  );
+  const verifyWindows = workflow.jobs.windows.steps.find(
+    (step) => step.name === "Verify Windows installer signature",
+  ).run;
+  assert.match(verifyWindows, /Get-AuthenticodeSignature/);
+  // 发布规则允许自签或未受信任根证书，但仍要求安装器带签名并保留诊断输出。
+  assert.match(verifyWindows, /SignerCertificate/);
+  assert.doesNotMatch(verifyWindows, /Status -ne 'Valid'/);
   assert.match(
     workflow.jobs.android.steps.find((step) => step.name === "Build and verify Android release APK")
       .run,
