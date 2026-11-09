@@ -6,6 +6,8 @@
 
 先部署 [Cloudflare V2 与固定上游 Web](kayingcode-relay-cloudflare.md)。添加桌面生成的完整 HTTPS V2 授权链接后，在 WebView 打开；Web 处理授权、工作区、会话和恢复，执行复用已有 Desktop Host。失效邀请需在桌面重新生成。旧配对码、审批、hash/t 与自有 native KayingCode adapter 已退役，没有原生旧协议回退开关。上游 ZCode 默认使用 Web，受支持入口保留原生 V2 OAuth/ws2。
 
+应用商店审核需要跨多天、多人使用时，按[审核环境部署](kayingcode-review-environment.md)使用独立审核 Relay 和 Ubuntu Desktop Host；邀请有效期、领取次数和终端凭据有效期在 Relay 端配置，客户端不需要改动。
+
 外壳拥有本地档案与 WebView 生命周期，旧档案不自动擦除；导出不携带原生 OAuth 凭据。不要将授权链接或凭据放入构建配置、日志或截图。
 
 ## 固定 SDK 与构建

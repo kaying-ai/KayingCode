@@ -1,7 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { RemoteAccounts } from "./remoteAccounts.js";
-function setup() {
+import {
+  RemoteAccounts,
+  resolveRemoteInvitePolicy,
+  type RemoteInvitePolicy,
+} from "./remoteAccounts.js";
+function setup(policy?: RemoteInvitePolicy) {
   const values = new Map<string, unknown>();
   let now = 1000;
   const storage = {
@@ -15,7 +19,7 @@ function setup() {
       return values.delete(key);
     },
   };
-  const accounts = new RemoteAccounts(storage, () => now);
+  const accounts = new RemoteAccounts(storage, () => now, policy);
   return {
     accounts,
     advance: (ms: number) => {
@@ -61,4 +65,88 @@ test("expiry and unknown credentials fail closed", async () => {
   advance(30 * 86400000 + 1);
   assert.equal(await accounts.authenticate(terminal.token), null);
   assert.equal(await accounts.authenticate("invalid"), null);
+});
+test("controlled deployment can extend invitation and terminal lifetimes", async () => {
+  const day = 86400000;
+  const { accounts, advance } = setup({
+    inviteTtlMs: 30 * day,
+    inviteMaxClaims: 1,
+    terminalTtlMs: 60 * day,
+  });
+  await accounts.register(secret);
+  const owner = (await accounts.authenticate(secret))!;
+  const invitation = await accounts.invite(owner);
+  advance(6 * 60 * 1000);
+  const terminal = await accounts.claim(invitation.invitation);
+  advance(59 * day);
+  assert.equal((await accounts.authenticate(terminal.token))?.role, "terminal");
+  advance(2 * day);
+  assert.equal(await accounts.authenticate(terminal.token), null);
+});
+test("invitation can be configured for multiple reviewers", async () => {
+  const { accounts } = setup({
+    inviteTtlMs: 30 * 86400000,
+    inviteMaxClaims: 2,
+    terminalTtlMs: 30 * 86400000,
+  });
+  await accounts.register(secret);
+  const owner = (await accounts.authenticate(secret))!;
+  const invitation = await accounts.invite(owner);
+  const first = await accounts.claim(invitation.invitation);
+  const second = await accounts.claim(invitation.invitation);
+  assert.notEqual(first.token, second.token);
+  await assert.rejects(accounts.claim(invitation.invitation));
+});
+test("legacy invitation records without remainingClaims stay one-time", async () => {
+  const { accounts, values } = setup();
+  await accounts.register(secret);
+  const owner = (await accounts.authenticate(secret))!;
+  const invitation = await accounts.invite(owner);
+  const key = [...values.keys()].find((candidate) => candidate.startsWith("invitation:"))!;
+  const stored = values.get(key) as { userId: string; expiresAt: number };
+  values.set(key, { userId: stored.userId, expiresAt: stored.expiresAt });
+  await accounts.claim(invitation.invitation);
+  await assert.rejects(accounts.claim(invitation.invitation));
+});
+test("invite policy resolver keeps defaults for invalid or out-of-range values", () => {
+  assert.deepEqual(resolveRemoteInvitePolicy({}), {
+    inviteTtlMs: 300000,
+    inviteMaxClaims: 1,
+    terminalTtlMs: 30 * 86400000,
+  });
+  assert.deepEqual(
+    resolveRemoteInvitePolicy({
+      KAYINGCODE_REMOTE_INVITE_TTL_DAYS: " 30 ",
+      KAYINGCODE_REMOTE_INVITE_MAX_CLAIMS: "10",
+      KAYINGCODE_REMOTE_TERMINAL_TTL_DAYS: "90",
+    }),
+    {
+      inviteTtlMs: 30 * 86400000,
+      inviteMaxClaims: 10,
+      terminalTtlMs: 90 * 86400000,
+    },
+  );
+  assert.deepEqual(
+    resolveRemoteInvitePolicy({
+      KAYINGCODE_REMOTE_INVITE_TTL_DAYS: "0.5",
+      KAYINGCODE_REMOTE_TERMINAL_TTL_DAYS: "1.5",
+    }),
+    {
+      inviteTtlMs: 12 * 3600000,
+      inviteMaxClaims: 1,
+      terminalTtlMs: 36 * 3600000,
+    },
+  );
+  assert.deepEqual(
+    resolveRemoteInvitePolicy({
+      KAYINGCODE_REMOTE_INVITE_TTL_DAYS: "0",
+      KAYINGCODE_REMOTE_INVITE_MAX_CLAIMS: "1.5",
+      KAYINGCODE_REMOTE_TERMINAL_TTL_DAYS: "not-a-number",
+    }),
+    {
+      inviteTtlMs: 300000,
+      inviteMaxClaims: 1,
+      terminalTtlMs: 30 * 86400000,
+    },
+  );
 });

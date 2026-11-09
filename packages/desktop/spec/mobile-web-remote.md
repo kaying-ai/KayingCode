@@ -2,7 +2,7 @@
 
 左下角入口使用现有 WebRemoteControlManager 与 V2 设备/连接协议；自有 NodeRelayConnector、手机配对 IPC、Host v1 ingress 与对应死代码已移除。手机复用已有 window-scoped Host attachment、owner/lease、workspaceIdentity 和 remoteSessionId，不创建第二个 Host 或独立会话队列。
 
-部署原 Relay origin 保持不变。Main 的 desktopRemoteAccount 经安全凭据服务保存本机 owner secret；首次注册幂等，先保存 secret 再请求服务。每次开启/刷新签发五分钟一次性邀请，URL 使用官方 /remote/v4 参数，秘密只放 authorize fragment；owner 凭据绝不进入 QR。面板本地 busy 时隐藏旧 QR、禁用复制，避免刷新拿到上一张已消费链接。关闭/换代后迟到结果不能写 UI。
+部署原 Relay origin 保持不变。自托管时 `KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN` 优先从进程环境读取，其次本地 `.env` 快照，最后才回退默认生产 origin；打包版从终端/systemd 启动也必须生效。Main 的 desktopRemoteAccount 经安全凭据服务保存本机 owner secret；首次注册幂等，先保存 secret 再请求服务。每次开启/刷新签发邀请，默认五分钟一次性；受控部署可在 Relay 端配置邀请有效期、领取次数和 terminal 凭据有效期。URL 使用官方 /remote/v4 参数，秘密只放 authorize fragment；owner 凭据绝不进入 QR。面板本地 busy 时隐藏旧 QR、禁用复制，避免刷新拿到上一张已消费链接。关闭/换代后迟到结果不能写 UI。
 
 唯一状态 owner 与事件顺序图见 packages/web/spec/mobile-web-workbench.md，账号/V2 服务契约见 Cloudflare spec/upstream-v2.md。Web 页面、设备选择、连接及恢复均由官方源码构建；Main 和 Host 只补缺失接口。
 

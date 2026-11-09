@@ -5940,7 +5940,7 @@ const zhCN: Record<string, string> = {
   "scheduledPreview.toast.view": "查看",
   "scheduledPreview.addSchedule": "添加计划",
   "desktopMobile.v2Description":
-    "扫码授权后使用上游 Web 工作台。授权链接五分钟内有效，且只能使用一次。",
+    "扫码授权后使用上游 Web 工作台。授权链接只在有效期内可用；过期或用完后请在桌面刷新二维码。",
   "desktopMobile.v2Start": "开启远控",
   "desktopMobile.v2Status.active": "手机已连接",
   "desktopMobile.v2Status.waiting": "等待手机连接",

@@ -21,12 +21,12 @@ sequenceDiagram
   D->>R: owner Bearer 注册 device_mid
   R-->>D: 新 device_sid
   D->>R: owner Bearer 创建邀请
-  R-->>D: 五分钟单次 invitation
+  R-->>D: 邀请（默认五分钟单次，可配置）
   D-->>W: /remote/v4?sid=…#authorize=… 完整链接
   W->>W: 先清除 URL fragment，保留 sid
   W->>R: POST account/claim(invitation)
-  R->>R: 消费邀请，存 terminal 凭据摘要
-  R-->>W: 独立 terminal token，30 天有效
+  R->>R: 扣减邀请领取次数，存 terminal 凭据摘要
+  R-->>W: 独立 terminal token，默认 30 天有效
   W->>W: 保存浏览器会话；再加载工作台
 ```
 

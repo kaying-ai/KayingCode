@@ -26,7 +26,7 @@ Web 制品直接构建官方 ZCode 固定提交的 packages/web、packages/ui �
 
 采用上游 /api/v1/remote/device、device/delete、token、ws2 V2 契约；桌面复用已有 WebRemoteControlManager 与 window-scoped Host attachment。Relay 只保存账号授权、设备登记、短期 token、presence 和 socket 配对，不存任务、快照或队列。CommandInbox 是 accepted 输入唯一 owner；桌面 continuous 与手机 replayable 保持现有语义。
 
-没有官方账号服务，因此 Cloudflare 增加轻量授权服务：桌面在本机持久化私有 owner 凭据，生成一次性、五分钟有效的终端邀请；邀请秘密只进入 URL fragment。浏览器先消费并清除 fragment，经同源账号端口兑换独立终端凭据，再把 Bearer 端口交给原封不动的上游 Entry。owner 凭据不可交给手机；过期、重复领取、跨账号 SID 和被撤销凭据必须拒绝。未授权访问提示重新从桌面扫码，不能跳官方 OAuth 或伪造 JWT。
+没有官方账号服务，因此 Cloudflare 增加轻量授权服务：桌面在本机持久化私有 owner 凭据，默认生成一次性、五分钟有效的终端邀请；受控审核/演示部署可在 Relay 端延长邀请有效期和领取次数，默认产品语义不变。邀请秘密只进入 URL fragment。浏览器先消费并清除 fragment，经同源账号端口兑换独立终端凭据，再把 Bearer 端口交给原封不动的上游 Entry。浏览器保存已领取邀请的摘要；同一浏览器重开同一链接时保留现有会话，不再 claim，避免多领取配置被重复打开耗尽。只有新邀请或凭据失效才重新兑换。owner 凭据不可交给手机；过期、超出领取次数、跨账号 SID 和被撤销凭据必须拒绝。未授权访问提示重新从桌面扫码，不能跳官方 OAuth 或伪造 JWT。
 
 ```mermaid
 sequenceDiagram

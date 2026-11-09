@@ -233,7 +233,7 @@ import { createDesktopHelpConfigReader } from "./desktopHelpConfig.js";
 import { registerPlatformIpcHandlers } from "./desktopMainIpcPlatform.js";
 import {
   createDesktopRemoteAccount,
-  DEFAULT_DESKTOP_REMOTE_ORIGIN,
+  resolveDesktopRemoteOrigin,
 } from "./desktopRemoteAccount.js";
 import {
   loadCliMcpFromUserDirectory,
@@ -953,9 +953,10 @@ function getMobileLogSink(): MobileLogSink {
   return mobileLogSink;
 }
 
-const mobileRelayOrigin = new URL(
-  hostProcessLocalEnv.KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN || DEFAULT_DESKTOP_REMOTE_ORIGIN,
-).origin;
+const mobileRelayOrigin = resolveDesktopRemoteOrigin({
+  processEnv: process.env,
+  localEnv: hostProcessLocalEnv,
+});
 const desktopRemoteAccount = createDesktopRemoteAccount({
   origin: mobileRelayOrigin,
   credentials: webRemoteControlCredentialService,

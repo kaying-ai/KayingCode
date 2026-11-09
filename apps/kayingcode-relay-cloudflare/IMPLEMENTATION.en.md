@@ -40,11 +40,13 @@ owner/terminal are account authorities; device/terminal are WS roles. Owners obt
 
 | Key / attachment       | Value                                                           | Current lifetime                                              |
 | ---------------------- | --------------------------------------------------------------- | ------------------------------------------------------------- |
-| `credential:<SHA-256>` | userId, owner/terminal, expiresAt                               | Far-future owner expiry; terminal 30 days                     |
-| `invitation:<SHA-256>` | userId, expiresAt                                               | Five minutes; deleted on successful claim                     |
+| `credential:<SHA-256>` | userId, owner/terminal, expiresAt                               | Far-future owner expiry; terminal 30 days by default          |
+| `invitation:<SHA-256>` | userId, expiresAt, remainingClaims                              | Five minutes by default; decremented or deleted on claim      |
 | `device:<device_sid>`  | SID, MID, userId, created_at, meta                              | Until owner deletion                                          |
 | `token:<SHA-256>`      | Authority, WS role, credentialDigest, expiresAt                 | 60 seconds; consumed before upgrade, even if validation fails |
 | Socket attachment      | Ticket fields plus lease, SID, terminalSid, initialized and mid | One pairing-eligible connection per SID/role                  |
+
+Invitation lifetime, claim count and terminal-credential lifetime are controlled by `KAYINGCODE_REMOTE_INVITE_TTL_DAYS`, `KAYINGCODE_REMOTE_INVITE_MAX_CLAIMS` and `KAYINGCODE_REMOTE_TERMINAL_TTL_DAYS`. Durations use days and accept fractions; defaults and ranges are in the [protocol spec](spec/upstream-v2.md#邀请与凭据有效期配置). Legacy invitations without `remainingClaims` remain one-time.
 
 Account credentials and invitations are 32 random bytes encoded as unpadded Base64URL, 43 characters. Connection tickets use 16 bytes, 22 characters. Storage does not retain raw bearer credentials, invitations or tickets. Reads check expiry; an approximately one-minute alarm scans expired records and closes expired or initialization-timed-out sockets. The alarm is not a business heartbeat or replay mechanism.
 

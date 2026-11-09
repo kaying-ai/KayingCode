@@ -12,6 +12,7 @@ import {
   RemoteAccounts,
   randomRemoteSecret,
   remoteSecretDigest,
+  resolveRemoteInvitePolicy,
   type RemoteAuthority,
 } from "./remoteAccounts.js";
 interface Device extends WebRemoteControlRelayV2Device {
@@ -38,7 +39,11 @@ const failure = (status: number, msg: string) => json({ code: status, msg, data:
 
 /** V2 服务只拥有授权、presence 和 socket lease；data 内容不进入业务状态或持久化。 */
 export class WebRemoteRelayObject extends DurableObject<RelayCloudflareEnv> {
-  private readonly accounts = new RemoteAccounts(this.ctx.storage);
+  private readonly accounts: RemoteAccounts;
+  constructor(ctx: DurableObjectState, env: RelayCloudflareEnv) {
+    super(ctx, env);
+    this.accounts = new RemoteAccounts(ctx.storage, Date.now, resolveRemoteInvitePolicy(env));
+  }
   fetch(request: Request): Promise<Response> {
     return this.ctx.blockConcurrencyWhile(() => this.handle(request));
   }

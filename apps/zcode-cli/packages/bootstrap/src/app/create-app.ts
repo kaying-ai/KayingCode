@@ -90,7 +90,11 @@ import {
 import { getWorkflowConcurrencyGovernor } from "./workflow-concurrency-governor.js";
 import { createDynamicWorkflowSnippetService } from "./dynamic-workflow-snippet-service.js";
 import { createModelCatalogPort } from "./model-catalog-port.js";
-import { createReviewModelBudgetAdmission } from "./review-budget.js";
+import {
+  combineModelRequestAdmissions,
+  createReviewModelBudgetAdmission,
+  resolveReviewTokenBudgetConfig,
+} from "./review-budget.js";
 import { createDynamicWorkflowRunProgressSink } from "./dynamic-workflow-run-progress-sink.js";
 import { createScriptWorkflowAgentRuntime } from "./script-workflow-child-runtime.js";
 import { workflowActorModelPolicy } from "./workflow-actor-model.js";
@@ -870,6 +874,23 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       registry: options.providerRegistry,
       currentSelection: () => getRuntime().getSessionModelSelection(),
     });
+    // 部署级审核预算与只读代码审核模式各自拥有不同绑定来源，不能同时启用。
+    const reviewTokenBudget = resolveReviewTokenBudgetConfig({ sessionId });
+    if (process.env.KAYINGCODE_REVIEW_WORKSPACE_ROOT && reviewTokenBudget) {
+      throw new Error(
+        "KAYINGCODE_REVIEW_WORKSPACE_ROOT and KAYINGCODE_REVIEW_TOKEN_BUDGET cannot be combined",
+      );
+    }
+    const reviewModelAdmission = reviewTokenBudget
+      ? combineModelRequestAdmissions(
+          createReviewModelBudgetAdmission(
+            reviewTokenBudget.root,
+            sessionId,
+            reviewTokenBudget.options,
+          ),
+          workflowConcurrencyGovernor.observer(),
+        )
+      : undefined;
     runtime = new AgentRuntime(sessionId, runtimeConfig, {
       ...(options.readSubagentRuntimeConfig
         ? {
@@ -913,10 +934,20 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
             process.env.KAYINGCODE_REVIEW_BUDGET_DIR || "",
             sessionId,
           )
-        : workflowConcurrencyGovernor.observer(),
+        : (reviewModelAdmission ?? workflowConcurrencyGovernor.observer()),
       // 主代理的 subagent 不是 observer：和 workflow run 一样排队、看冷却，同一父会话共用一条队列。
+      // 审核预算同时包住 subagent，避免主代理被拦住后子代理继续消耗额度。
       subagentModelRequestAdmission: (parentSessionId) =>
-        workflowConcurrencyGovernor.sessionSubagents(parentSessionId),
+        reviewTokenBudget
+          ? combineModelRequestAdmissions(
+              createReviewModelBudgetAdmission(
+                reviewTokenBudget.root,
+                parentSessionId,
+                reviewTokenBudget.options,
+              ),
+              workflowConcurrencyGovernor.sessionSubagents(parentSessionId),
+            )
+          : workflowConcurrencyGovernor.sessionSubagents(parentSessionId),
       eventStore: options.eventStore ?? createInMemorySessionEventStore(),
       sessionStore,
       sessionMailboxPort,

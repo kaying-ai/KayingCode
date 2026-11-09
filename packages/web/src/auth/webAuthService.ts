@@ -4,6 +4,8 @@ interface Session {
   token: string;
   userId: string;
   expiresAt: number;
+  /** 已领取邀请的摘要；同一浏览器重开同一链接时不再重复 claim。 */
+  inviteDigest?: string;
 }
 let session: Session | null = null;
 export let accountError = "";
@@ -19,12 +21,27 @@ function valid(value: unknown): value is Session {
     item.expiresAt > Date.now()
   );
 }
+async function invitationDigest(invite: string): Promise<string | null> {
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(invite));
+    return [...new Uint8Array(digest)]
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
+  } catch {
+    // 非安全上下文没有 subtle；此时退化为正常 claim，不阻断授权。
+    return null;
+  }
+}
 export async function initializeAccount() {
   session = null;
   accountError = "";
+  let saved: Session | null = null;
   try {
-    const saved: unknown = JSON.parse(localStorage.getItem(key) ?? "null");
-    if (valid(saved)) session = saved;
+    const value: unknown = JSON.parse(localStorage.getItem(key) ?? "null");
+    if (valid(value)) {
+      saved = value;
+      session = value;
+    }
   } catch {
     /* 禁用存储仍允许本次页面使用授权。 */
   }
@@ -33,6 +50,11 @@ export async function initializeAccount() {
   if (!invite) return;
   // 邀请先从历史中清理；重复打开旧链接不能丢掉浏览器已经持有的独立凭据。
   history.replaceState(history.state, "", url.pathname + url.search);
+  // 多领取邀请下，同一浏览器重开同一链接不能继续消耗领取次数；只有新邀请才重新 claim。
+  if (saved) {
+    const digest = await invitationDigest(invite);
+    if (digest && saved.inviteDigest === digest) return;
+  }
   try {
     const response = await fetch("/api/v1/account/claim", {
       method: "POST",
@@ -48,7 +70,8 @@ export async function initializeAccount() {
     }
     const value: unknown = await response.json();
     if (!valid(value)) throw new Error("invalid_session");
-    session = value;
+    const digest = await invitationDigest(invite);
+    session = { ...value, ...(digest ? { inviteDigest: digest } : {}) };
     try {
       localStorage.setItem(key, JSON.stringify(session));
     } catch {

@@ -12,7 +12,7 @@ KayingCode's mobile remote-access service hosts the Web workbench, device author
 
 **Users do not register accounts, set passwords or enter tokens.** Clients create the Desktop identity, issue an invitation and save browser credentials automatically. Scanning is the user's device-authorization action. Internal accounts isolate devices and credentials rather than provide an account-management product. Scan again after credential expiry, logout or browser-storage clearing.
 
-Invitations last five minutes and are claimed once; authorized browser credentials last 30 days. Clients manage long-lived credentials and fresh per-connection tickets.
+Invitations last five minutes and are claimed once by default; authorized browser credentials last 30 days. Clients manage long-lived credentials and fresh per-connection tickets. Controlled review or demo deployments can adjust invitation lifetime, claim count and terminal-credential lifetime with Worker variables; see the [protocol spec](spec/upstream-v2.md#邀请与凭据有效期配置).
 
 ## Documentation
 

@@ -75,6 +75,38 @@ mise exec -- pnpm --dir apps/kayingcode-relay-cloudflare exec wrangler deploy --
 
 The actual sequence is build:web → clear/copy public → wrangler deploy --keep-vars. keep-vars preserves existing remote ordinary variables; it does not set the build-time origin. Dashboard runtime variables cannot repair an address already compiled into JavaScript. The origin is public configuration, not a secret. Changing it requires rebuilding, deploying and aligning Desktop.
 
+### 4.1 Review or controlled-deployment lifetimes
+
+Normal deployments keep the defaults: a five-minute, single-claim invitation and a 30-day terminal credential. For app-store review or internal demos that need two to four weeks and several reviewers, deploy a **separate review Worker and origin** instead of relaxing production limits.
+
+Set these as ordinary variables on that Worker (Cloudflare dashboard → the Worker → Settings → Variables and Secrets; they are not secrets):
+
+| Variable                              | Review example | Purpose                                   |
+| ------------------------------------- | -------------- | ----------------------------------------- |
+| `KAYINGCODE_REMOTE_INVITE_TTL_DAYS`   | `30`           | Invitation valid for 30 days              |
+| `KAYINGCODE_REMOTE_INVITE_MAX_CLAIMS` | `5`            | Allow up to five claims from one link     |
+| `KAYINGCODE_REMOTE_TERMINAL_TTL_DAYS` | `30`           | Each claimed credential valid for 30 days |
+
+Durations use days and accept fractions (`0.5` means 12 hours). Variables affect newly issued invitations only. Existing invitations keep the `expiresAt` and `remainingClaims` recorded when issued, so lowering the configuration does not shorten existing links. Invalid or out-of-range values fall back to defaults without blocking the service.
+
+Build and deploy an isolated review Worker (replace `review.example.com`):
+
+```sh
+KAYINGCODE_REMOTE_ORIGIN=https://review.example.com mise exec -- pnpm --dir apps/kayingcode-relay-cloudflare run build:web
+mise exec -- pnpm --dir apps/kayingcode-relay-cloudflare exec wrangler deploy --name kayingcode-relay-review --keep-vars
+```
+
+`--name` overrides the Worker name in wrangler.jsonc; the review Worker gets its own Durable Object namespace. Bind the review domain to that Worker in the Cloudflare dashboard, then add the variables above. Delete the review Worker/domain after review; at minimum delete devices, stop remote control and remove the variables.
+
+Point the review Desktop at the review origin and use an isolated data directory so the production owner identity is not reused:
+
+```sh
+export KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN=https://review.example.com
+export KAYINGCODE_DATA_BASE_DIR=/srv/kayingcode-review
+```
+
+`build:web` writes the review origin into `packages/web/dist` and `public/`. Rebuild with the production origin before any production deployment.
+
 Generate public through build:web and deploy it as a build artifact. packages/web/upstream-web.json pins the official source. Missing Git objects are fetched without moving the product branch. The manifest contains source, relayOrigin and audit hashes. Both third-party notices ship with assets. Material verification is explicit rather than a requirement to clear the entire backlog before packaging; see [license policy](../../third-party/SPEC.md).
 
 ## 5. Desktop and mobile onboarding
@@ -85,7 +117,7 @@ For self-hosting, set the following origin before launching Desktop:
 $env:KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN = "https://relay.example.com"
 ```
 
-On POSIX: `export KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN=https://relay.example.com`. Launch the actual Desktop application from that environment. System-icon/background launches must inherit it too; no installation path is assumed here.
+On POSIX: `export KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN=https://relay.example.com`. Launch the actual Desktop application from that environment. System-icon/background launches must inherit it too; no installation path is assumed here. Packaged Desktop reads the process environment first, then the desktop package's `.env` snapshot, and only then falls back to the default production origin.
 
 If KAYINGCODE_WEB_REMOTE_CONTROL_URL or KAYINGCODE_WEB_REMOTE_CONTROL_RELAY_WS_URL overrides are configured, align them with the same deployment. Usually the origin setting is sufficient.
 

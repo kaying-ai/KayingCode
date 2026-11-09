@@ -6195,7 +6195,7 @@ const enUS: Record<string, string> = {
   "scheduledPreview.toast.view": "View",
   "scheduledPreview.addSchedule": "Add schedule",
   "desktopMobile.v2Description":
-    "Scan to authorize the upstream Web workbench. The link expires in five minutes and can be used once.",
+    "Scan to authorize the upstream Web workbench. The link is valid only for its configured lifetime; refresh the QR code on desktop if it expires or has been used.",
   "desktopMobile.v2Start": "Start remote control",
   "desktopMobile.v2Status.active": "Phone connected",
   "desktopMobile.v2Status.waiting": "Waiting for phone",
