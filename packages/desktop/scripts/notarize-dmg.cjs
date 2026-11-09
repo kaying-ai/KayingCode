@@ -113,7 +113,14 @@ module.exports = async function notarizeDmg(context) {
 
     await waitForAccepted(submissionId, authorization, "notarize-dmg");
 
-    runCommand("xcrun", ["stapler", "staple", dmgPath], "staple ticket to DMG");
+    // staple 与 validate 都要访问 api.apple-cloudkit.com（staple 下载票据、validate
+    // 在线复核），Intel runner 对该服务偶发 Error 68 网络中断，因此两步都做有界重试。
+    await runCommandWithRetry(
+      runCommand,
+      "xcrun",
+      ["stapler", "staple", dmgPath],
+      "staple ticket to DMG",
+    );
     await runCommandWithRetry(
       runCommand,
       "xcrun",
