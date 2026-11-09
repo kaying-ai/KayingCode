@@ -34,6 +34,7 @@ const {
   submitForNotarization,
   waitForAccepted,
   runCommand,
+  runCommandWithRetry,
 } = require("./notarize-helpers.cjs");
 
 // ============================================================
@@ -113,7 +114,12 @@ module.exports = async function notarizeDmg(context) {
     await waitForAccepted(submissionId, authorization, "notarize-dmg");
 
     runCommand("xcrun", ["stapler", "staple", dmgPath], "staple ticket to DMG");
-    runCommand("xcrun", ["stapler", "validate", dmgPath], "validate stapled ticket");
+    await runCommandWithRetry(
+      runCommand,
+      "xcrun",
+      ["stapler", "validate", dmgPath],
+      "validate stapled ticket",
+    );
     console.log(`[notarize-dmg] Notarization ticket stapled to ${label}`);
 
     deleteStaleBlockmap(dmgPath);

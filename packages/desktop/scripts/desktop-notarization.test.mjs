@@ -10,6 +10,9 @@ import {
   verifyLatestMacYmlDmgEntry,
   verifyNotarizedMacDistribution,
 } from "./desktop-notarization.mjs";
+import notarizeHelpers from "./notarize-helpers.cjs";
+
+const { runCommandWithRetry } = notarizeHelpers;
 
 test("notarization accepts a complete App Store Connect API key triple", () => {
   const resolved = resolveMacNotarizationEnvironment({
@@ -282,4 +285,44 @@ test("verifyLatestMacYmlDmgEntry rejects a missing DMG entry", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("stapler validate retries transient failures before succeeding", async () => {
+  const calls = [];
+  const stub = (command, args, label) => {
+    calls.push({ command, args, label });
+    if (calls.length === 1) throw new Error("[notarize] Failed to validate (exit 68): network lost");
+    if (calls.length === 2) throw new Error("CloudKit's response is inconsistent with expections: (null)");
+    return { stdout: "The validate action worked!", stderr: "" };
+  };
+
+  const result = await runCommandWithRetry(
+    stub,
+    "xcrun",
+    ["stapler", "validate", "/tmp/KayingCode.dmg"],
+    "validate stapled ticket",
+    { delayMs: 1 },
+  );
+
+  assert.equal(calls.length, 3);
+  assert.deepEqual(calls[0].args, ["stapler", "validate", "/tmp/KayingCode.dmg"]);
+  assert.equal(result.stdout, "The validate action worked!");
+});
+
+test("stapler validate throws after exhausting retries", async () => {
+  const calls = [];
+  const stub = () => {
+    calls.push(1);
+    throw new Error("[notarize] Failed to validate (exit 68): network lost");
+  };
+
+  await assert.rejects(
+    () =>
+      runCommandWithRetry(stub, "xcrun", ["stapler", "validate", "/tmp/KayingCode.dmg"], "validate stapled ticket", {
+        attempts: 3,
+        delayMs: 1,
+      }),
+    /exit 68/u,
+  );
+  assert.equal(calls.length, 3);
 });
