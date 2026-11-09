@@ -11,6 +11,21 @@
 
 我们尽可能保留 ZCode 的通用编程能力、交互和运行逻辑，将核心改造集中在游戏开发工作流、引擎接入与多平台验证。多引擎、多平台是持续扩展方向；当前能力与已验收范围见各应用文档。项目基于 [官方 ZCode](https://github.com/zai-org/ZCode)，上游 ZCode 部分遵循 Apache-2.0；KayingCode 项目整体以 AGPL-3.0 发布，为非官方衍生项目。
 
+## 下载
+
+最新版本：**0.1.2**（[全部版本与校验值](https://github.com/kaying-ai/KayingCode/releases)）
+
+| 平台              | 下载                                                                                                                                                                                                                                                                                                                                    |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Windows x64       | [安装包](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-win-x64.exe)                                                                                                                                                                                                                     |
+| macOS Apple Silicon | [DMG](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-mac-arm64.dmg)                                                                                                                                                                                                                     |
+| macOS Intel       | [DMG](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-mac-x64.dmg)                                                                                                                                                                                                                       |
+| Linux x64         | [AppImage](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-linux-x86_64.AppImage) · [deb](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-linux-amd64.deb) · [rpm](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-linux-x86_64.rpm) · [pacman](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-linux-x64.pkg.tar.zst) |
+| Linux arm64       | [AppImage](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-linux-arm64.AppImage) · [deb](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-linux-arm64.deb) · [rpm](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-linux-aarch64.rpm) · [pacman](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-linux-aarch64.pkg.tar.zst) |
+| Android           | [APK](https://github.com/kaying-ai/KayingCode/releases/download/kaying-code-v0.1.2/KayingCode-0.1.2-android-universal.apk)                                                                                                                                                                                                             |
+
+Windows 当前使用自签证书，安装时可能提示“未知发布者”。各平台系统要求与安装说明见对应应用文档。
+
 ## 为什么需要 KayingCode
 
 ZCode、WorkBuddy 等通用 Agent harness 已能很好地完成编码与文档任务，但自带的右侧面板主要承担结果展示，对外开放的能力有限。游戏开发需要的是在 harness 内部完成深度融合：Agent 直接操作内置浏览器里的游戏与平台页面、生成并处理素材、把项目发布到游戏平台，再依据真实截图把画面一轮轮修正到位。这些闭环很难靠一个展示型面板或若干外部链接拼接起来。
