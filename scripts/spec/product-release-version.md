@@ -18,7 +18,7 @@
 
 - 维护者从正式 `kaying-code-v<版本>` 标签或提交绑定的预验收标签手动运行 `Build signed macOS release`；预验收环境仅临时允许具体标签，制品名区分预验收和正式。校验任务先确认标签版本与根清单一致，且提交属于 `origin/main` 的历史。通过后，Intel 与 Apple Silicon 两个构建任务各自使用 `macos-release` 环境。
 - GitHub Environment 保管证书和公证凭据。构建任务将 Developer ID Application 导入临时钥匙串，再调用现有 `bundle:desktop`。这样随包 Computer Use 插件、桌面应用和 DMG 都能使用发行身份。公证继续由现有 DMG hook 完成。
-- 只有通过 DMG 签名校验和公证票据校验的制品才上传到本次 Actions 运行。`stapler validate` 的在线票据复核依赖 Apple 服务，Intel runner 偶发 Error 68 网络抖动；构建脚本对该复核做有界重试（默认 3 次），重试耗尽仍失败则构建失败，不放宽验收标准。Release 由维护者在完成安装验收后发布。
+- 只有通过 DMG 签名校验和公证票据校验的制品才上传到本次 Actions 运行。`stapler validate` 的在线票据复核依赖 Apple 服务，Intel runner 偶发 Error 68 网络抖动；构建脚本对该复核做有界重试（默认 3 次），重试耗尽仍失败则构建失败，不放宽验收标准。GitHub Release 由 `Publish GitHub release` 工作流在全部平台构建成功后创建；维护者仍应在对外分发前完成安装验收。
 
 ```text
 正式标签 → 版本与 main 祖先校验 → macos-release 环境 → 签名与公证 → 验签 → Actions DMG
@@ -28,4 +28,12 @@
 
 - 使用与 Linux 相同的提交绑定标签校验，Windows、Android 分别由对应受保护环境提供发行凭据。预验收仅临时放行精确标签并区分制品名称。
 - Windows 使用既有 Electron 打包入口及 WIN_CSC 环境证书；安装器必须带签名，允许自签或未受信任根证书（当前发行使用自签证书，安装时可能显示未知发布者），验签状态、签名者和证书链写入构建日志后上传。Android 通过 Flutter 目标入口检查固定 SDK 后构建 release APK，以 apksigner 验证签名成功后上传；缺失凭据或校验失败不得退化为未签名或 debug 包。
-- 预验收与正式构建均只上传 Actions 制品，不创建 Release 或标签；所有目标验收通过后正式标签指向同一 main 提交。
+- 预验收只上传 Actions 制品，不创建 Release 或标签；正式构建完成后由 `Publish GitHub release` 汇总制品并创建或更新 GitHub Release。所有目标验收通过后正式标签指向同一 main 提交。
+
+## GitHub Release 发布
+
+- `Publish GitHub release` 由三套正式构建的 `workflow_run` 完成事件触发，也支持手动 `workflow_dispatch` 并传入产品标签。只处理匹配 `kaying-code-v<版本>` 的标签。
+- 发布任务读取该标签下三套构建工作流的最新运行；任一运行未完成时退出，等待最后完成的构建再次触发；任一运行失败时拒绝发布。全部成功后下载三套 Actions 制品，按文件名去重。
+- 发布任务生成 `SHA256SUMS-<版本>.txt`，用 `scripts/release-notes.mjs` 从 `CHANGELOG.md` 提取当前版本说明，并创建或更新 GitHub Release。已存在且含校验值资产的 Release 视为完成，重复触发不重复上传。
+- 工作流使用 `contents: write` 创建 Release，`actions: read` 下载制品；构建工作流本身保持只读。发布失败时保留 Actions 制品，可手动运行同一工作流重试，不重新构建。
+- 自动发布不替代安装验收：维护者在对外宣布或推广前，仍应按目标平台完成安装与启动验证。

@@ -1,0 +1,150 @@
+name: Publish GitHub release
+
+on:
+  workflow_run:
+    workflows:
+      - Build signed Linux release
+      - Build signed macOS release
+      - Build signed Windows and Android releases
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Product tag to publish, for example kaying-code-v0.1.2
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: publish-release-${{ github.event.workflow_run.head_branch || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       startsWith(github.event.workflow_run.head_branch, 'kaying-code-v'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: main
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Resolve tag
+        id: tag
+        env:
+          REF: ${{ github.event.workflow_run.head_branch || inputs.tag }}
+        run: |
+          if [[ ! "$REF" =~ ^kaying-code-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Unsupported release tag: $REF"
+            exit 1
+          fi
+          echo "tag=$REF" >> "$GITHUB_OUTPUT"
+          echo "version=${REF#kaying-code-v}" >> "$GITHUB_OUTPUT"
+      - name: Collect successful build runs
+        id: runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          workflows=(
+            "Build signed Linux release"
+            "Build signed macOS release"
+            "Build signed Windows and Android releases"
+          )
+          for attempt in 1 2 3; do
+            ids=()
+            pending=0
+            failed=0
+            for name in "${workflows[@]}"; do
+              # 取该标签下最新的 workflow_dispatch 运行；rerun 后状态为最新一次尝试。
+              line=$(gh api --paginate \
+                "repos/$GITHUB_REPOSITORY/actions/runs?event=workflow_dispatch&per_page=100" \
+                --jq ".workflow_runs[] | select(.head_branch == \"$TAG\" and .name == \"$name\") | [.id, .status, .conclusion] | @tsv" \
+                | sort -n | tail -1)
+              if [[ -z "$line" ]]; then
+                echo "waiting for $name"
+                pending=1
+                continue
+              fi
+              id=${line%%$'\t'*}
+              rest=${line#*$'\t'}
+              status=${rest%%$'\t'*}
+              conclusion=${rest#*$'\t'}
+              if [[ "$status" != "completed" ]]; then
+                echo "waiting for $name ($status)"
+                pending=1
+                continue
+              fi
+              if [[ "$conclusion" != "success" ]]; then
+                echo "::error::$name finished with $conclusion"
+                failed=1
+                continue
+              fi
+              ids+=("$id")
+            done
+            if [[ $failed -eq 1 ]]; then
+              exit 1
+            fi
+            if [[ $pending -eq 0 ]]; then
+              printf 'ids=%s\n' "$(IFS=,; echo "${ids[*]}")" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 20
+          done
+          # 其他构建尚未结束时先退出；最后完成的构建会再次触发本工作流。
+          echo "Not all release builds have completed yet; waiting for another run."
+      - name: Download artifacts
+        if: steps.runs.outputs.ids != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist release
+          IFS=',' read -ra ids <<< "${{ steps.runs.outputs.ids }}"
+          for id in "${ids[@]}"; do
+            gh run download "$id" --repo "$GITHUB_REPOSITORY" -D "dist/$id"
+          done
+          declare -A seen
+          while IFS= read -r file; do
+            base=$(basename "$file")
+            [[ -n "${seen[$base]:-}" ]] && continue
+            seen[$base]=1
+            cp "$file" "release/$base"
+          done < <(find dist -type f | sort)
+      - name: Generate checksums
+        if: steps.runs.outputs.ids != ''
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd release
+          find . -maxdepth 1 -type f ! -name "SHA256SUMS-$VERSION.txt" -printf '%f\n' \
+            | sort | xargs sha256sum > "SHA256SUMS-$VERSION.txt"
+      - name: Create or update release
+        if: steps.runs.outputs.ids != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets \
+            --jq '.assets[].name' 2>/dev/null | grep -qx "SHA256SUMS-$VERSION.txt"; then
+            echo "Release $TAG already has its checksum asset; nothing to do."
+            exit 0
+          fi
+          node scripts/release-notes.mjs "$TAG" > notes.md
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" \
+              --title "KayingCode $VERSION" --notes-file notes.md --verify-tag
+          fi
