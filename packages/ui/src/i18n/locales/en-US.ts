@@ -4021,6 +4021,7 @@ const enUS: Record<string, string> = {
   "chat.message.toolSnapshot.retry": "Load failed, retry",
   "chat.message.time.yesterday": "Yesterday {time}",
   "chat.message.retry": "Retry",
+  "chat.loading.working": "Working",
   "chat.history.workingFor": "Working for {duration}",
   "chat.history.workedFor": "Worked for {duration}",
   "chat.history.worked": "Worked",

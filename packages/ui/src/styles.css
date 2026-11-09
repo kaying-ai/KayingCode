@@ -987,6 +987,58 @@ body {
   will-change: opacity;
 }
 
+/* 轮尾「工作中」加载：3×3 像素点按轨道错峰点亮，文案做低对比 shimmer。
+   两者都是装饰，计时文本仍由组件以 tabular-nums 渲染。 */
+@keyframes kayingcode-loading-pixel-on {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: scale(1);
+  }
+
+  35% {
+    opacity: var(--loading-pixel-peak, 0.75);
+    transform: scale(1.08);
+  }
+}
+
+.dark .kayingcode-loading-pixel,
+.theme-zai-dark .kayingcode-loading-pixel {
+  --loading-pixel-peak: 1;
+}
+
+.kayingcode-loading-pixel {
+  animation: kayingcode-loading-pixel-on 650ms ease-in-out infinite;
+}
+
+@keyframes kayingcode-loading-shimmer {
+  from {
+    background-position: 200% 0;
+  }
+
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.kayingcode-loading-label {
+  display: inline-block;
+  font-weight: 500;
+  background-image: linear-gradient(
+    90deg,
+    var(--color-foreground-subtle) 35%,
+    var(--color-foreground) 50%,
+    var(--color-foreground-subtle) 65%
+  );
+  background-position: 200% 0;
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: kayingcode-loading-shimmer 1.4s linear infinite;
+}
+
 /*  Radix Collapsible 在测量 closed 高度时会写入 inline animation-name:none。
    assistant 历史区自动结束收起需要在延迟卸载期间继续播放高度动画，
    所以这里用 !important 覆盖 Radix 的 inline style，只作用于显式标记的收起窗口。 */
@@ -1023,6 +1075,8 @@ body {
   [data-kayingcode-stream-marker-animate="true"]::marker,
   [data-kayingcode-tool-stream-animate="true"],
   [data-kayingcode-chat-loading-animate="true"],
+  .kayingcode-loading-pixel,
+  .kayingcode-loading-label,
   [data-kayingcode-collapsible-animate-close="true"][data-state="closed"],
   [data-kayingcode-collapsible-animate-close="true"][data-state="closed"] > * {
     animation: none;

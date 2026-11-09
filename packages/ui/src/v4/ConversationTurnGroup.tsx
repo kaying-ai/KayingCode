@@ -755,7 +755,11 @@ function ConversationTurnFlow({
           stageTailIsRunning={unit.isRunning}
           assistantCodeCommentProjectionEnabled={assistantCodeCommentProjectionEnabled}
         />
-        <TurnChatLoadingSlot apiRetry={apiRetry} eligible={showLoading} />
+        <TurnChatLoadingSlot
+          apiRetry={apiRetry}
+          eligible={showLoading}
+          initialElapsedMs={unit.workStatus?.durationMs ?? 0}
+        />
       </div>
     );
   }
@@ -818,7 +822,11 @@ function ConversationTurnFlow({
           canRetryLatestAssistant={canRetryLatestAssistant}
         />
       ))}
-      <TurnChatLoadingSlot apiRetry={apiRetry} eligible={showLoading} />
+      <TurnChatLoadingSlot
+        apiRetry={apiRetry}
+        eligible={showLoading}
+        initialElapsedMs={unit.workStatus?.durationMs ?? 0}
+      />
     </div>
   );
 }
@@ -1020,7 +1028,11 @@ function ConversationBackgroundResultWork({
           assistantCodeCommentProjectionEnabled={assistantCodeCommentProjectionEnabled}
         />
       ) : null}
-      <TurnChatLoadingSlot apiRetry={apiRetry} eligible={showLoading} />
+      <TurnChatLoadingSlot
+        apiRetry={apiRetry}
+        eligible={showLoading}
+        initialElapsedMs={unit.workStatus?.durationMs ?? 0}
+      />
     </div>
   );
 }
