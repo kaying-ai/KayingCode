@@ -43,7 +43,7 @@
 | `blender`              | `blender-plugin/`              | `@kayingcode/blender-plugin`              | 0.1.0 | script   | 否       | MIT / MIT                  | **无**（仅 vendor 上游 LICENSE） |
 | `kaying-game-playtest` | `kaying-game-playtest-plugin/` | `@kayingcode/kaying-game-playtest-plugin` | 0.1.0 | build    | 是       | Apache-2.0 / Apache-2.0    | 有                               |
 
-根 `LICENSE` 为 Apache-2.0（`Z.AI Co., Ltd` / `KayingCode contributors`），与插件各自声明的 MIT / Apache-2.0 分属不同层次，不构成冲突；但插件随制品分发时仍需各自附许可文本（见 4.3）。
+根 `LICENSE` 为 AGPL-3.0-only（`KayingCode contributors`）；上游 ZCode 派生部分继续适用 Apache-2.0。插件各自声明的 MIT / Apache-2.0 与根许可分属不同层次，不构成冲突；但插件随制品分发时仍需各自附许可文本（见 4.3）。
 
 ## 3. 来源与上游情况
 
@@ -84,12 +84,12 @@
 
 四个待修缺口：
 
-| 插件                | 现象                                                                                                                       | 影响                                                                                                 | 建议                                                                       |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `browser-use`       | `package.json` = Apache-2.0，`.kayingcode-plugin/plugin.json` = MIT；无 LICENSE / NOTICE；`requiredSeedPaths` 不含许可文件 | 若代码派生自 Apache-2.0 上游，MIT 声明与缺少许可副本、NOTICE 均不符合 §4；对外展示的许可信息也不一致 | 先确认真实派生来源，统一两个 manifest，补 LICENSE（必要时补 NOTICE）       |
-| `node-repl-host`    | `package.json` 无 `license` 字段，`plugin.json` = MIT，无 LICENSE 文件                                                     | MIT 要求随副本附版权与许可声明，当前未附                                                             | 补 `license` 字段与 LICENSE 文件；若属纯内部宿主包，明确其许可归属         |
-| `kaying-for-taptap` | 声明 MIT，插件根目录无 LICENSE，只有 `vendor/instant-games-open-mcp/LICENSE`                                               | 上游 npm 包义务已闭合，插件自身代码的 MIT 文本未随插件分发                                           | 补插件级 LICENSE，或明确由根 Apache-2.0 LICENSE 覆盖并在制品中附根 LICENSE |
-| `blender`           | 同上，只有 `vendor/mcp-for-blender/LICENSE`                                                                                | 同上                                                                                                 | 同上                                                                       |
+| 插件                | 现象                                                                                                                       | 影响                                                                                                 | 建议                                                                     |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `browser-use`       | `package.json` = Apache-2.0，`.kayingcode-plugin/plugin.json` = MIT；无 LICENSE / NOTICE；`requiredSeedPaths` 不含许可文件 | 若代码派生自 Apache-2.0 上游，MIT 声明与缺少许可副本、NOTICE 均不符合 §4；对外展示的许可信息也不一致 | 先确认真实派生来源，统一两个 manifest，补 LICENSE（必要时补 NOTICE）     |
+| `node-repl-host`    | `package.json` 无 `license` 字段，`plugin.json` = MIT，无 LICENSE 文件                                                     | MIT 要求随副本附版权与许可声明，当前未附                                                             | 补 `license` 字段与 LICENSE 文件；若属纯内部宿主包，明确其许可归属       |
+| `kaying-for-taptap` | 声明 MIT，插件根目录无 LICENSE，只有 `vendor/instant-games-open-mcp/LICENSE`                                               | 上游 npm 包义务已闭合，插件自身代码的 MIT 文本未随插件分发                                           | 补插件级 LICENSE，或明确由根 AGPL-3.0 LICENSE 覆盖并在制品中附根 LICENSE |
+| `blender`           | 同上，只有 `vendor/mcp-for-blender/LICENSE`                                                                                | 同上                                                                                                 | 同上                                                                     |
 
 ### 4.3 发行制品中的许可文本覆盖
 

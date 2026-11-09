@@ -75,7 +75,7 @@ export const copy = {
     readChinese: "中文使用说明",
     readEnglish: "English README",
     startNote:
-      "KayingCode 是基于 ZCode 的非官方衍生项目，遵循 Apache-2.0。源码启动不代表拥有 TapTap 平台授权。",
+      "KayingCode 是基于 ZCode 的非官方衍生项目，项目整体以 AGPL-3.0 发布，上游 ZCode 部分遵循 Apache-2.0。源码启动不代表拥有 TapTap 平台授权。",
     faqKicker: "常见问题",
     faqTitle: "你可能还想知道",
     faq1Q: "项目数据和模型请求在哪里？",
@@ -86,7 +86,7 @@ export const copy = {
       "原生游戏预览、双预览视觉对比和本机控制以本地 Desktop 为主。Web 与 CLI 提供各自的工作入口。",
     faq3Q: "能自动发布到 TapTap 吗？",
     faq3A: "工具可辅助项目、诊断、构建与发布准备。平台登录、授权、结果验证和最终发布确认由你完成。",
-    footerOrigin: "基于 ZCode · Apache-2.0 · 非官方项目",
+    footerOrigin: "基于 ZCode（Apache-2.0）· 本项目 AGPL-3.0 · 非官方项目",
     backTop: "返回顶部",
     copied: "命令已复制。",
     copyFailed: "无法访问剪贴板，请手动复制上方命令。",
@@ -188,7 +188,7 @@ export const copy = {
     readChinese: "中文使用说明",
     readEnglish: "English README",
     startNote:
-      "KayingCode is an unofficial derivative of ZCode under Apache-2.0. Running from source does not grant TapTap platform authorization.",
+      "KayingCode is an unofficial derivative of ZCode. KayingCode as a whole is released under AGPL-3.0; upstream ZCode portions remain under Apache-2.0. Running from source does not grant TapTap platform authorization.",
     faqKicker: "COMMON QUESTIONS",
     faqTitle: "A few things to know",
     faq1Q: "Where are project data and model requests?",
@@ -200,7 +200,7 @@ export const copy = {
     faq3Q: "Does it publish to TapTap automatically?",
     faq3A:
       "Tools assist with projects, diagnostics, builds, and release preparation. You handle platform sign-in, authorization, result verification, and final release confirmation.",
-    footerOrigin: "Built on ZCode · Apache-2.0 · Unofficial project",
+    footerOrigin: "Built on ZCode (Apache-2.0) · This project AGPL-3.0 · Unofficial",
     backTop: "Back to top",
     copied: "Command copied.",
     copyFailed: "Clipboard unavailable. Copy the command above manually.",
