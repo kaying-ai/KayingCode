@@ -9,7 +9,7 @@
 
 **KayingCode uses the ZCode harness as its foundation, bringing game development workflows into a harness designed for multiple game engines and platforms.** It connects agents, engine tools, running previews and tests to iterate from gameplay goals through implementation to verified results.
 
-We retain and reuse ZCode's general coding capabilities, interactions and runtime logic wherever possible, focusing KayingCode's changes on game workflows, engine integration and platform validation. Multiple engines and platforms are an ongoing direction; application guides distinguish implemented capabilities and validated targets. This is an unofficial Apache-2.0 derivative of [official ZCode](https://github.com/zai-org/ZCode).
+We retain and reuse ZCode's general coding capabilities, interactions and runtime logic wherever possible, focusing KayingCode's changes on game workflows, engine integration and platform validation. Multiple engines and platforms are an ongoing direction; application guides distinguish implemented capabilities and validated targets. The upstream ZCode portions remain under Apache-2.0, while KayingCode as a whole is released under AGPL-3.0. This is an unofficial derivative of [official ZCode](https://github.com/zai-org/ZCode).
 
 ## Why KayingCode
 
@@ -300,9 +300,17 @@ Open `http://127.0.0.1:3030` to validate the complete flow, with one backend ser
 
 See the [repository rules](AGENTS.md), [app directory guide](apps/README.md), and [generated package map](SOURCE_PACKAGES.md) for placement rules, public entry points, and distribution paths. After changing packages or plugin metadata, run `pnpm run source:plugins`, `pnpm run source:map`, and `pnpm run source:check`.
 
+## License and commercial use
+
+The KayingCode community edition is released under the [GNU Affero General Public License v3.0](LICENSE) (SPDX: `AGPL-3.0-only`). You may use, modify and distribute it, including for commercial purposes, provided you comply with all AGPL-3.0 terms.
+
+AGPL-3.0 requires that if you modify the project and make it available to users over a network, you offer those users the corresponding complete source code. For a commercial license that exempts you from the AGPL-3.0 requirements, contact [service@kayingai.com](mailto:service@kayingai.com).
+
+KayingCode is based on ZCode (Apache-2.0); upstream code and notices remain under Apache-2.0, and built-in plugins and third-party components retain their own licenses. See [PRIVACY.en.md](PRIVACY.en.md) for privacy and data handling.
+
 ## Project Notice
 
-See [NOTICE.md](NOTICE.md) for feature and promotion scope, maintenance policy, execution and data risks, licensing, and third-party copyright information.
+See [NOTICE.md](NOTICE.md) for feature and promotion scope, maintenance policy, execution and data risks, licensing, and third-party copyright information. See [PRIVACY.en.md](PRIVACY.en.md) for privacy and data handling.
 
 ## Branch workflow
 

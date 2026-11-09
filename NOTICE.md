@@ -1,6 +1,6 @@
 # KayingCode 相关功能说明与第三方组件声明
 
-> **衍生声明**：本项目（KayingCode）衍生自开源项目 **ZCode**（Apache-2.0，Copyright 2026 Z.AI Co., Ltd），为非官方衍生作品，与 Z.AI / 智谱无隶属或官方合作关系。修改文件已按 Apache-2.0 要求保留原版权与第三方声明。
+> **衍生声明**：本项目（KayingCode）衍生自开源项目 **ZCode**（Apache-2.0，Copyright 2026 Z.AI Co., Ltd），为非官方衍生作品，与 Z.AI / 智谱无隶属或官方合作关系。修改文件已按 Apache-2.0 要求保留原版权与第三方声明。KayingCode 项目整体以 AGPL-3.0 发布（见 [LICENSE](LICENSE)）；上游 ZCode 代码与声明继续适用 Apache-2.0，各内置插件与第三方组件保留其各自声明的许可。隐私与数据处理见 [PRIVACY.md](PRIVACY.md)。
 >
 > **产品形态（KayingCode.localrun）**：本地使用无需平台注册；手机远控由客户端自动管理设备身份和扫码授权凭据，不要求用户注册或设置密码；不提供官方订阅/支付/额度；不默认访问 KayingCode 官方 CDN、插件市场在线列表、会话分享发布、反馈工单或遥测上报。插件仅支持**内置**与**本地安装**。模型请求仍会发往用户自行配置的模型端点。
 
@@ -84,6 +84,6 @@ AI 生成的代码、命令、解释、文件和建议可能存在错误、遗�
 
 ## 四、第三方许可与版权声明
 
-本仓库第一方代码依照根 [LICENSE](LICENSE) 采用 Apache-2.0；该许可不替其他权利人新增授权，也不覆盖第三方软件、复制代码、原生二进制、字体、图标、网页素材及其他资源的独立条款。具体依赖包详见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。Apache-2.0 不授予商标权，本衍生作品不使用 KayingCode / Z.AI 商标暗示官方身份。受第三方版权、许可及再分发条件等约束，不承诺提供官方产品的全部功能及活动政策，具体以实际发布的源码和构建产物为准。
+本仓库第一方代码依照根 [LICENSE](LICENSE) 采用 AGPL-3.0-only；上游 ZCode 派生部分继续适用 Apache-2.0。该许可不替其他权利人新增授权，也不覆盖第三方软件、复制代码、原生二进制、字体、图标、网页素材及其他资源的独立条款。具体依赖包详见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。AGPL-3.0 与 Apache-2.0 均不授予商标权，本衍生作品不使用 KayingCode / Z.AI 商标暗示官方身份。受第三方版权、许可及再分发条件等约束，不承诺提供官方产品的全部功能及活动政策，具体以实际发布的源码和构建产物为准。
 
 Flutter 移动端 `apps/kayingcode-mobile-flutter` 迁入了 [Zflow](https://github.com/g0spel/zflow) 的代码（MIT，Copyright (c) 2026 Zemote contributors）；原始许可全文随移动端源码及安装包保存在 `assets/licenses/ZFLOW-MIT.txt`。随包的 Sarasa Gothic SC 字体遵循 SIL OFL 1.1，许可全文在 `assets/fonts/OFL.txt`。移动端 KY 图标直接取自本仓库桌面端 `packages/desktop/build/icons/1024x1024.png`，不再使用 Zflow 原图标。App「关于 → 开源许可」可查看许可文本。

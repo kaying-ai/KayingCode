@@ -9,7 +9,7 @@
 
 **KayingCode 以 ZCode harness 为载体，全面接入游戏开发场景，打造面向多游戏引擎、多平台的游戏开发 harness。** 它将 Agent、引擎工具、运行预览与测试验证连接起来，支持从玩法目标、实现到结果验证的持续迭代。
 
-我们尽可能保留 ZCode 的通用编程能力、交互和运行逻辑，将核心改造集中在游戏开发工作流、引擎接入与多平台验证。多引擎、多平台是持续扩展方向；当前能力与已验收范围见各应用文档。项目基于 [官方 ZCode](https://github.com/zai-org/ZCode)，遵循 Apache-2.0，为非官方衍生项目。
+我们尽可能保留 ZCode 的通用编程能力、交互和运行逻辑，将核心改造集中在游戏开发工作流、引擎接入与多平台验证。多引擎、多平台是持续扩展方向；当前能力与已验收范围见各应用文档。项目基于 [官方 ZCode](https://github.com/zai-org/ZCode)，上游 ZCode 部分遵循 Apache-2.0；KayingCode 项目整体以 AGPL-3.0 发布，为非官方衍生项目。
 
 ## 为什么需要 KayingCode
 
@@ -365,6 +365,14 @@ node dist/kayingcode/debug/kayingcode/bin/kayingcode.mjs --web \
 
 新增文件的落点见 [仓库工作规则](AGENTS.md) 和 [应用目录说明](apps/README.md)，完整包信息见 [生成包地图](SOURCE_PACKAGES.md)。包或插件变更后运行 `pnpm run source:plugins`、`pnpm run source:map` 和 `pnpm run source:check`。
 
+## 许可与商用
+
+KayingCode 社区版采用 [GNU Affero General Public License v3.0](LICENSE)（SPDX：`AGPL-3.0-only`）发布。你可以在遵守 AGPL-3.0 全部条款的前提下使用、修改和分发本项目，包括商业用途。
+
+AGPL-3.0 要求：当你修改本项目并通过网络向用户提供服务时，需要向这些用户提供对应的完整源码。若你需要不受 AGPL-3.0 约束的商业授权，请联系 [service@kayingai.com](mailto:service@kayingai.com)。
+
+本项目基于 ZCode（Apache-2.0）；上游代码与声明继续适用 Apache-2.0，各内置插件和第三方组件保留其各自声明的许可。隐私与数据处理说明见 [PRIVACY.md](PRIVACY.md)。
+
 ## 项目声明
 
-功能与优惠范围、维护规则、执行与数据风险，以及许可和第三方版权说明，详见 [NOTICE.md](NOTICE.md)。
+功能与优惠范围、维护规则、执行与数据风险，以及许可和第三方版权说明，详见 [NOTICE.md](NOTICE.md)；隐私与数据处理见 [PRIVACY.md](PRIVACY.md)。
