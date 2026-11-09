@@ -71,7 +71,7 @@ KayingCode 把这些能力做进工作台本身：内置浏览器与游戏预览
 
 使用微信扫描下方二维码，联系项目团队或加入交流群。也可以发邮件到 [service@kayingai.com](mailto:service@kayingai.com)。
 
-![联系 KayingCode 团队及加入交流群的微信二维码](assets/contact/conntact-1.png)
+![联系 KayingCode 团队及加入交流群的微信二维码](assets/contact/contact-1.png)
 
 ## 分支与协作
 
