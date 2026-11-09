@@ -335,6 +335,8 @@ See [NOTICE.md](NOTICE.md) for feature and promotion scope, maintenance policy, 
 | `zcode-main` | A read-only mirror of the official ZCode `main` that maintainers update by fast-forward. |
 | Topic branches | Short branches from product `main`, such as `project-drag` or `fix/session-reconnect`. Delete them after merging. |
 
+See [README-DEV.md](README-DEV.md) for setup, commit conventions, the PR flow, and release steps.
+
 Clone the product from GitHub. New clones check out `main`.
 
 ```bash
