@@ -64,3 +64,21 @@ test("Windows and Android release jobs require protected credentials and signatu
     /apksigner.*verify/,
   );
 });
+
+test("release publishing waits for all signed builds and writes the GitHub release", async () => {
+  const workflow = parse(
+    await readFile(new URL("../.github/workflows/publish-release.yml", import.meta.url), "utf8"),
+  );
+  assert.deepEqual(workflow.on.workflow_run.workflows, [
+    "Build signed Linux release",
+    "Build signed macOS release",
+    "Build signed Windows and Android releases",
+  ]);
+  assert.deepEqual(workflow.permissions, { contents: "write", actions: "read" });
+  const steps = workflow.jobs.publish.steps;
+  assert.match(steps.find((step) => step.id === "runs").run, /workflow_dispatch/);
+  assert.match(
+    steps.find((step) => step.name === "Create or update release").run,
+    /gh release create/,
+  );
+});
