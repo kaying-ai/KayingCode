@@ -71,7 +71,7 @@ The documentation describes an initial release. Installer and platform availabil
 
 Scan the QR code in WeChat to contact the KayingCode team or join the discussion group. You can also reach us at [service@kayingai.com](mailto:service@kayingai.com).
 
-![WeChat QR code for the KayingCode team and discussion group](assets/contact/conntact-1.png)
+![WeChat QR code for the KayingCode team and discussion group](assets/contact/contact-1.png)
 
 ## Setup
 
