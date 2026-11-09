@@ -7,9 +7,12 @@ import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 export function ConversationTurnLoading({
   apiRetry,
   eligible,
+  initialElapsedMs = 0,
 }: {
   apiRetry: ApiRetryState | null;
   eligible: boolean;
+  /** 本轮已运行时长（毫秒），作为「工作中」计时的挂载起点。 */
+  initialElapsedMs?: number;
 }) {
   const { intl, locale } = useKayingCodeIntl();
   if (!apiRetry && !eligible) return null;
@@ -32,7 +35,7 @@ export function ConversationTurnLoading({
           locale={locale}
         />
       ) : (
-        <ChatLoading loading data-testid={TID_CHAT_LOADING} size="sm" />
+        <ChatLoading loading data-testid={TID_CHAT_LOADING} initialElapsedMs={initialElapsedMs} />
       )}
     </div>
   );

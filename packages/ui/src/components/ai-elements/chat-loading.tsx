@@ -1,39 +1,83 @@
 "use client";
 
-import type { ComponentPropsWithoutRef } from "react";
-import { LoaderIcon } from "lucide-react";
+import { useEffect, useState, type ComponentPropsWithoutRef } from "react";
 import { cn } from "@/components/lib/utils.js";
+import { formatRunningWorkDuration } from "@/lib/workDuration.js";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 
 export interface ChatLoadingProps extends ComponentPropsWithoutRef<"div"> {
   loading: boolean;
+  /** 本轮已运行时长（毫秒）；挂载后在此基础上自刷新。 */
+  initialElapsedMs?: number;
   size?: "default" | "sm";
-  className?: string;
 }
 
-export function ChatLoading({ loading, size = "default", className, ...props }: ChatLoadingProps) {
-  const { intl } = useKayingCodeIntl();
+// 3×3 像素点按轨道顺序点亮：中心点常暗，其余八点错峰。
+const ORBIT_ORDER = [0, 1, 2, 5, 8, 7, 6, 3];
 
-  if (!loading) {
-    return null;
-  }
+export function ChatLoadingPixels() {
+  return (
+    <span
+      aria-hidden="true"
+      className="grid shrink-0 size-[13px] grid-cols-3 grid-rows-3 gap-[1.3px] text-foreground"
+    >
+      {Array.from({ length: 9 }, (_, index) => (
+        <span
+          key={index}
+          className="kayingcode-loading-pixel size-full rounded-[1px] bg-current"
+          style={{
+            opacity: index === 4 ? 0.07 : 0.15,
+            animationName: index === 4 ? "none" : undefined,
+            animationDuration: "950ms",
+            animationDelay: `${Math.max(0, ORBIT_ORDER.indexOf(index)) * 110}ms`,
+          }}
+        />
+      ))}
+    </span>
+  );
+}
 
-  const sizeClasses = size === "sm" ? "size-4 text-ui-base" : "size-6";
-
+export function ChatLoading({
+  loading,
+  initialElapsedMs = 0,
+  className,
+  size: _size,
+  ...props
+}: ChatLoadingProps) {
+  const { intl, locale } = useKayingCodeIntl();
+  const [elapsedMs, setElapsedMs] = useState(initialElapsedMs);
+  useEffect(() => {
+    if (!loading) return;
+    // 本轮已有耗时作为起点；独立刷新小组件，避免整个对话每 100ms 重渲染。
+    const started = performance.now();
+    const timer = window.setInterval(() => {
+      setElapsedMs(initialElapsedMs + performance.now() - started);
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [loading, initialElapsedMs]);
+  if (!loading) return null;
   return (
     <div
-      aria-label={intl.formatMessage({ id: "common.loading" })}
-      {...props}
-      data-kayingcode-chat-loading-animate="true"
       role="status"
-      className={cn("flex items-center", className)}
+      aria-label={intl.formatMessage({ id: "common.loading" })}
+      data-kayingcode-chat-loading-animate="true"
+      {...props}
+      className={cn("inline-flex w-fit items-center gap-2.5", className)}
     >
-      <div className="flex size-4 items-center justify-center">
-        <LoaderIcon
-          aria-hidden="true"
-          className={cn("animate-spin text-foreground-subtle", sizeClasses)}
-        />
-      </div>
+      <ChatLoadingPixels />
+      <span className="kayingcode-loading-label text-ui-base font-medium">
+        {intl.formatMessage({ id: "chat.loading.working" })}
+      </span>
+      <span
+        aria-hidden="true"
+        className="font-mono text-ui-caption tabular-nums text-foreground-subtle"
+      >
+        {formatRunningWorkDuration(
+          elapsedMs,
+          (descriptor) => intl.formatMessage(descriptor),
+          locale,
+        )}
+      </span>
     </div>
   );
 }

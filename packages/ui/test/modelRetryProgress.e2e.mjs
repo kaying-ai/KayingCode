@@ -31,6 +31,9 @@ try {
     await page.clock.pauseAt(new Date("2026-10-21T10:00:01Z"));
     await page.goto(server.resolvedUrls.local[0]);
     const area = page.getByTestId("loading-area");
+    // 普通 loading 与重试共用同一插槽：首屏中文显示「工作中」和十分之一秒计时。
+    await area.getByText("工作中", { exact: true }).waitFor();
+    await area.getByText("0.0 秒", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Retry 60", exact: true }).click();
     await area.getByText("模型请求重试 · 60 秒后继续 · 1/10", { exact: true }).waitFor();
     await page.clock.runFor(2000);
@@ -60,12 +63,27 @@ try {
     await page.getByRole("button", { name: "Recovered", exact: true }).click();
     await page.getByTestId("chat-loading").waitFor();
     assert.doesNotMatch(await area.innerText(), /retry|重试/i);
+    // 重试恢复后回到普通 loading：英文文案 + 组件本地 100ms 时钟持续推进。
+    await area.getByText("Working", { exact: true }).waitFor();
+    await area.getByText("0.0s", { exact: true }).waitFor();
+    await page.clock.runFor(2500);
+    await area.getByText("2.5s", { exact: true }).waitFor();
+    await page.screenshot({ path: resolve(tmpdir(), `kayingcode-loading-${width}.png`) });
+    await page.getByRole("button", { name: "End", exact: true }).click();
+    assert.equal(await area.locator('[data-kayingcode-chat-loading-slot="true"]').count(), 0);
+    // 切回运行中的历史轮：计时以本轮已运行时长起步，并从该起点继续递增。
+    await page.getByRole("button", { name: "Resume 12.5", exact: true }).click();
+    await area.getByText("12.5s", { exact: true }).waitFor();
+    await page.clock.runFor(1000);
+    await area.getByText("13.5s", { exact: true }).waitFor();
     await page.getByRole("button", { name: "End", exact: true }).click();
     assert.equal(await area.locator('[data-kayingcode-chat-loading-slot="true"]').count(), 0);
     assert.deepEqual(errors, []);
     await page.close();
   }
-  console.log("model retry progress e2e ok: first retry, countdown, replay, recovery, phone/en/zh");
+  console.log(
+    "model retry progress e2e ok: retry countdown, replay, recovery, loading timer, phone/en/zh",
+  );
 } finally {
   await browser?.close();
   await server.close();

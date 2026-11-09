@@ -3790,6 +3790,7 @@ const zhCN: Record<string, string> = {
   "chat.message.toolSnapshot.retry": "加载失败，重试",
   "chat.message.time.yesterday": "昨天 {time}",
   "chat.message.retry": "重试",
+  "chat.loading.working": "工作中",
   "chat.history.workingFor": "工作中 {duration}",
   "chat.history.workedFor": "已工作 {duration}",
   "chat.history.worked": "已处理",
