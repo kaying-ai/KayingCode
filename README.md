@@ -96,6 +96,8 @@ KayingCode 把这些能力做进工作台本身：内置浏览器与游戏预览
 | `zcode-main` | 官方 ZCode `main` 的只读镜像，维护者从上游快进同步。 |
 | 短期主题分支 | 从产品 `main` 创建，例如 `project-drag` 或 `fix/session-reconnect`，合入后清理。 |
 
+开发环境、提交信息格式、PR 流程与发布步骤见 [README-DEV.md](README-DEV.md)。
+
 首次克隆从 GitHub 取产品源码，默认检出 `main`。
 
 ```bash
