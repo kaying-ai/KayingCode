@@ -27,5 +27,5 @@
 ## Windows 与 Android 正式签名构建
 
 - 使用与 Linux 相同的提交绑定标签校验，Windows、Android 分别由对应受保护环境提供发行凭据。预验收仅临时放行精确标签并区分制品名称。
-- Windows 使用既有 Electron 打包入口及 WIN_CSC 环境证书，验证安装器的 Authenticode 签名有效才上传。Android 通过 Flutter 目标入口检查固定 SDK 后构建 release APK，以 apksigner 验证签名成功后上传；缺失凭据或校验失败不得退化为未签名或 debug 包。
+- Windows 使用既有 Electron 打包入口及 WIN_CSC 环境证书；安装器必须带签名，允许自签或未受信任根证书（当前发行使用自签证书，安装时可能显示未知发布者），验签状态、签名者和证书链写入构建日志后上传。Android 通过 Flutter 目标入口检查固定 SDK 后构建 release APK，以 apksigner 验证签名成功后上传；缺失凭据或校验失败不得退化为未签名或 debug 包。
 - 预验收与正式构建均只上传 Actions 制品，不创建 Release 或标签；所有目标验收通过后正式标签指向同一 main 提交。
