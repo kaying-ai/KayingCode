@@ -6,7 +6,7 @@
 
 | 项目             | 当前值                                      | 规则                                                                                      |
 | ---------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Flutter 工程版本 | 见 `pubspec.yaml`                            | `+` 前是商店版本，`+` 后是 Apple build number                                              |
+| Flutter 工程版本 | 见 `pubspec.yaml`                           | `+` 前是商店版本，`+` 后是 Apple build number                                             |
 | Bundle ID        | `com.lingdian.kayingai.agent.code`          | 必须与 App ID 和 App Store Connect app record 完全一致                                    |
 | App 展示名称     | `KayingCode`                                | 来自 `ios/Runner/Info.plist` 的 `CFBundleDisplayName`                                     |
 | 最低 iOS         | 13.0                                        | 当前 `IPHONEOS_DEPLOYMENT_TARGET`                                                         |
@@ -72,7 +72,7 @@ App Store profile 不需要登记测试设备 UDID；Ad Hoc profile 面向设备
 3. 上传 build 之前必须创建 app record；Bundle ID 必须与 Xcode target 一致。
 4. 补齐商品页元数据、支持 URL、隐私政策 URL、年龄评级、版权、价格和可用地区。
 5. 在 **App Privacy** 申报 app 与第三方 SDK 收集/使用的数据。以当前代码、Relay/Node 数据流、网络服务和所有 SDK 行为为依据；隐私政策 URL 对 iOS app 必填。
-6. 在审核备注中写清用途、测试设备/系统、配对和连接步骤、外部服务依赖、演示环境和进入核心功能的方法。
+6. 在审核备注中写清用途、测试设备/系统、配对和连接步骤、外部服务依赖、演示环境和进入核心功能的方法。当前审核域名、链接规则和备注模板见[应用审核方案](../../../../docs/deploy/kayingcode-app-review.md)。
 
 ## 更新版本并构建
 

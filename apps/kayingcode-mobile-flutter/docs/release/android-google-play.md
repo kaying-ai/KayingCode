@@ -165,6 +165,8 @@ Play 首发推荐上传 AAB，由 Play 为设备生成优化 APK。需要线下�
 6. 如果审核员需要配对才能进入主功能，在 **App access** 提供可用演示环境、有效配对说明/测试凭据及逐步操作步骤；不要提供真实用户生产凭据。自托管 V2 链接默认 5 分钟、单次领取；审核周期较长时使用独立审核 Relay 配置长有效期/多领取，并为每位审核员提供单独链接或明确说明可重复领取，注明 Desktop 需保持在线。
 7. 首次启用 Play App Signing 时，按控制台提示确认 Google 托管 app signing key，并登记本地 upload certificate。
 
+当前审核域名、链接规则和备注模板见[应用审核方案](../../../../docs/deploy/kayingcode-app-review.md)。
+
 ## 先发测试轨道
 
 1. 进入 **Test and release > Testing > Internal testing** 创建内部测试，上传 AAB，添加测试人员并发布测试版本。

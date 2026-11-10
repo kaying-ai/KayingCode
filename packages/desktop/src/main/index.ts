@@ -231,10 +231,7 @@ import {
 import { createWebRemoteControlSharedHostAttachments } from "./webRemoteControlSharedHostAttachments.js";
 import { createDesktopHelpConfigReader } from "./desktopHelpConfig.js";
 import { registerPlatformIpcHandlers } from "./desktopMainIpcPlatform.js";
-import {
-  createDesktopRemoteAccount,
-  resolveDesktopRemoteOrigin,
-} from "./desktopRemoteAccount.js";
+import { createDesktopRemoteAccount, resolveDesktopRemoteOrigin } from "./desktopRemoteAccount.js";
 import {
   loadCliMcpFromUserDirectory,
   migrateLegacyCommonMcp,
@@ -978,6 +975,8 @@ const webRemoteControlManager = createWebRemoteControlManager({
   deviceMid,
   deviceName: hostname(),
   appVersion: webRemoteControlAppVersion,
+  // 审核提审备注有 200 字限制；显式开启时省略仅用于展示的 name，其余参数不变。
+  compactLink: process.env["KAYINGCODE_REVIEW_COMPACT_LINK"]?.trim() === "1",
   getLogin: () => desktopRemoteAccount.getLogin(),
   createMobileAuthorization: (signal) => desktopRemoteAccount.createMobileAuthorization(signal),
   deviceStorage: createWebRemoteControlDeviceStorage({
