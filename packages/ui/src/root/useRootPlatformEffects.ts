@@ -37,7 +37,6 @@ export function useRootPlatformEffects({
   activeWorkspaceIdentity,
   reconnectingRemoteWorkspaceKeys = [],
   remoteWorkspaceErrorByWorkspaceKey = {},
-  totalUnreadTaskCount,
   hasCompletedFullTabRestore = true,
   intl,
 }: {
@@ -69,7 +68,6 @@ export function useRootPlatformEffects({
   activeWorkspaceIdentity?: string | null;
   reconnectingRemoteWorkspaceKeys?: string[];
   remoteWorkspaceErrorByWorkspaceKey?: Record<string, string>;
-  totalUnreadTaskCount: number;
   hasCompletedFullTabRestore?: boolean;
   intl: ReturnType<typeof import("@/i18n/IntlProvider.js").useKayingCodeIntl>["intl"];
   isRestoringOAuthSession: boolean;
@@ -321,10 +319,4 @@ export function useRootPlatformEffects({
       disposed = true;
     };
   }, [isDesktop, locale, platform]);
-
-  useEffect(() => {
-    // Dock badge 一期只统计“后台完成后还没点开”的 task 数。
-    // 失败态红点和 permission tag 仍留在各自 UI 语义里，避免把平台徽标混成泛化告警数。
-    platform.syncWindowUnreadCount(totalUnreadTaskCount);
-  }, [platform, totalUnreadTaskCount]);
 }

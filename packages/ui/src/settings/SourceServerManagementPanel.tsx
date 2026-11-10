@@ -11,7 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog.js";
 import { useOptionalPlatform } from "@/hooks/usePlatform.js";
-import { DesktopCommandIds } from "@zcode/shared";
+import { DesktopCommandIds, normalizeMobileRelayOrigin } from "@zcode/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUpRight,
@@ -44,6 +44,7 @@ import { getPathLeaf } from "@/lib/path.js";
 import { toast } from "@/components/ui/toast.js";
 import { getSourceServerManagementErrorMessage } from "@/lib/sourceServerManagementError.js";
 import { Button } from "@/components/ui/button.js";
+import { Input } from "@/components/ui/input.js";
 import { Switch } from "@/components/ui/switch.js";
 import { cn } from "@/components/lib/utils.js";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog.js";
@@ -178,7 +179,9 @@ export function SourceServerManagementPanel({
   workspaceTabs?: WorkspaceTabState[];
   settings?: Pick<
     AppSettings,
-    "remoteStartupAutoReconnectEnabled" | "remoteConversationWorkspaceBySourceServerId"
+    | "remoteStartupAutoReconnectEnabled"
+    | "remoteConversationWorkspaceBySourceServerId"
+    | "mobileRelayOrigin"
   > | null;
   onUpdateSettings?: (patch: Partial<AppSettings>) => Promise<unknown> | void;
 }) {
@@ -192,6 +195,12 @@ export function SourceServerManagementPanel({
   useEffect(() => {
     setStartupAutoReconnect(settings?.remoteStartupAutoReconnectEnabled ?? true);
   }, [settings?.remoteStartupAutoReconnectEnabled]);
+  const [mobileRelayOrigin, setMobileRelayOrigin] = useState(settings?.mobileRelayOrigin ?? "");
+  const [mobileRelayOriginError, setMobileRelayOriginError] = useState<string | null>(null);
+  useEffect(() => {
+    setMobileRelayOrigin(settings?.mobileRelayOrigin ?? "");
+    setMobileRelayOriginError(null);
+  }, [settings?.mobileRelayOrigin]);
   const [editingConnection, setEditingConnection] = useState<{
     profile: ConnectionProfile;
     server?: SourceServerRecord;
@@ -318,6 +327,44 @@ export function SourceServerManagementPanel({
     },
     [applySnapshot, refreshSnapshot, intl, hasBusyScope],
   );
+
+  const normalizedMobileRelayOrigin = mobileRelayOrigin.trim();
+  const mobileRelayOriginDirty =
+    normalizedMobileRelayOrigin !== (settings?.mobileRelayOrigin ?? "");
+  const savingMobileRelayOrigin = busyOperations.has("mobile-relay-origin");
+  const saveMobileRelayOrigin = useCallback(() => {
+    if (!onUpdateSettings || !mobileRelayOriginDirty || savingMobileRelayOrigin) {
+      return;
+    }
+
+    let nextOrigin = normalizedMobileRelayOrigin;
+    if (nextOrigin) {
+      try {
+        nextOrigin = normalizeMobileRelayOrigin(nextOrigin);
+      } catch {
+        setMobileRelayOriginError(
+          intl.formatMessage({ id: "settings.source.mobileRelayOriginInvalid" }),
+        );
+        return;
+      }
+    }
+
+    setMobileRelayOriginError(null);
+    void run("mobile-relay-origin", async () => {
+      await onUpdateSettings({ mobileRelayOrigin: nextOrigin });
+      if (mountedRef.current) setMobileRelayOrigin(nextOrigin);
+      toast(intl.formatMessage({ id: "settings.source.mobileRelayOriginSaved" }), {
+        variant: "success",
+      });
+    });
+  }, [
+    intl,
+    mobileRelayOriginDirty,
+    normalizedMobileRelayOrigin,
+    onUpdateSettings,
+    run,
+    savingMobileRelayOrigin,
+  ]);
 
   const removeProfile = useCallback(
     async (profile: ConnectionProfile) => {
@@ -1670,6 +1717,60 @@ export function SourceServerManagementPanel({
                   id: "settings.source.startupAutoReconnect",
                 })}
               />
+            </div>
+            <div className="space-y-2">
+              <div>
+                <p className="text-ui-sm text-foreground">
+                  {intl.formatMessage({
+                    id: "settings.source.mobileRelayOrigin",
+                  })}
+                </p>
+                <p className="text-ui-xs text-remote-foreground-muted">
+                  {intl.formatMessage({
+                    id: "settings.source.mobileRelayOriginDescription",
+                  })}
+                </p>
+              </div>
+              <div className="flex max-w-xl items-center gap-2">
+                <Input
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={mobileRelayOrigin}
+                  placeholder="https://relay.example.com"
+                  aria-label={intl.formatMessage({
+                    id: "settings.source.mobileRelayOrigin",
+                  })}
+                  aria-invalid={Boolean(mobileRelayOriginError)}
+                  disabled={savingMobileRelayOrigin || !onUpdateSettings}
+                  onChange={(event) => {
+                    setMobileRelayOrigin(event.target.value);
+                    if (mobileRelayOriginError) setMobileRelayOriginError(null);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      saveMobileRelayOrigin();
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!onUpdateSettings || !mobileRelayOriginDirty || savingMobileRelayOrigin}
+                  aria-busy={savingMobileRelayOrigin}
+                  onClick={saveMobileRelayOrigin}
+                >
+                  {savingMobileRelayOrigin ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                  {intl.formatMessage({ id: "settings.source.mobileRelayOriginSave" })}
+                </Button>
+              </div>
+              {mobileRelayOriginError ? (
+                <p role="alert" className="text-ui-xs text-destructive">
+                  {mobileRelayOriginError}
+                </p>
+              ) : null}
             </div>
           </div>
         </section>

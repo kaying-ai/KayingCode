@@ -8,6 +8,7 @@ import { wslUserSchema } from "./wslUserValidation.js";
 import { KAYINGCODE_ENABLED_AGENT_PROVIDERS } from "./kayingcode-agent-policy.js";
 import { DYNAMIC_WORKFLOW_MODES } from "./dynamic-workflow-feature.js";
 import { normalizeKayingCodeEndpointOrigin } from "./kayingcodeEndpoint.js";
+import { normalizeMobileRelayOrigin } from "./mobileRelayOrigin.js";
 import {
   DEFAULT_EMBEDDED_BROWSER_VIEWPORT_PREFERENCE,
   embeddedBrowserViewportPreferenceSchema,
@@ -188,6 +189,23 @@ const kayingcodeEndpointOriginSchema = z.preprocess((value) => {
   }
   try {
     return normalizeKayingCodeEndpointOrigin(trimmed);
+  } catch {
+    return undefined;
+  }
+}, z.string().optional());
+
+// 手机远控 Relay 地址只接受 https origin；空串表示恢复部署默认。
+// 坏值在设置读取时丢弃，避免旧配置或手工编辑阻断整个设置快照。
+const mobileRelayOriginSchema = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+  try {
+    return normalizeMobileRelayOrigin(trimmed);
   } catch {
     return undefined;
   }
@@ -579,6 +597,7 @@ const appSettingsObjectSchema = z.object({
   // Bug 原因：该开关过去只声明在 patch schema，SettingService 合并后再走完整 schema 时会把
   // 显式 false 剥离，导致重启后恢复为默认开启。完整 schema 必须拥有这项持久化事实。
   remoteStartupAutoReconnectEnabled: z.boolean().optional(),
+  mobileRelayOrigin: mobileRelayOriginSchema.optional(),
   sourceServerDirectoryMigrationVersion: z.literal(1).optional(),
   remoteBoundaryOnboardingVersion: z.literal(2).optional(),
   remoteBoundaryIntroAcknowledgedVersion: z.literal(1).optional(),
@@ -688,6 +707,7 @@ export const appSettingsPatchSchema = z.object({
   connectionProfiles: z.array(connectionProfileSchema).optional(),
   sourceServerWorkspaceHistory: z.array(sourceServerWorkspaceHistoryEntrySchema).optional(),
   remoteStartupAutoReconnectEnabled: z.boolean().optional(),
+  mobileRelayOrigin: mobileRelayOriginSchema.optional(),
   sourceServerDirectoryMigrationVersion: z.literal(1).optional(),
   remoteBoundaryOnboardingVersion: z.literal(2).optional(),
   remoteBoundaryIntroAcknowledgedVersion: z.literal(1).optional(),

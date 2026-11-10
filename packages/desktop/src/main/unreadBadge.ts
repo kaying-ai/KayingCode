@@ -20,7 +20,16 @@ export function maxWindowUnreadCounts(windowUnreadCountMap: ReadonlyMap<number, 
   return maxUnreadCount;
 }
 
-// 应用级 badge：macOS Dock / Linux LauncherEntry。spec 见 docs/desktop/windows-taskbar-unread-badge.md
+// 窗口关闭后必须移除它的计数：renderer 不会再上报 0，残留值会让 Dock/任务栏角标永久保留。
+export function removeWindowUnreadCount(
+  windowUnreadCountMap: Map<number, number>,
+  windowId: number,
+): number {
+  windowUnreadCountMap.delete(windowId);
+  return maxWindowUnreadCounts(windowUnreadCountMap);
+}
+
+// 应用级 badge：macOS Dock / Linux LauncherEntry。spec 见 packages/desktop/spec/task-unread-badge.md
 export function supportsAppUnreadBadge(platform: NodeJS.Platform): boolean {
   return platform === "darwin" || platform === "linux";
 }

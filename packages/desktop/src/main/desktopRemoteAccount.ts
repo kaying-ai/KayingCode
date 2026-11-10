@@ -4,16 +4,19 @@ import type { ICredentialService } from "@zcode/services";
 import type { WebRemoteControlLogin } from "./web-remote-relay/contract.js";
 
 /**
- * 自托管部署必须能通过进程环境指向审核/私有 Relay。
- * 之前只读本地 .env 快照，打包版从终端启动时 export 的 origin 会被静默忽略。
+ * 手机远控 Relay origin 的解析顺序：
+ * 用户设置 > 进程环境 > 本地 .env 快照 > 默认生产 origin。
+ * 用户设置只来自已校验的 AppSettings；非法环境变量仍按原有语义抛错。
  */
 export function resolveDesktopRemoteOrigin(
   options: {
+    overrideOrigin?: string;
     processEnv?: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN?: string };
     localEnv?: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN?: string };
   } = {},
 ): string {
   const configured =
+    options.overrideOrigin?.trim() ||
     options.processEnv?.KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN?.trim() ||
     options.localEnv?.KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN?.trim();
   return configured ? new URL(configured).origin : DEFAULT_DESKTOP_REMOTE_ORIGIN;

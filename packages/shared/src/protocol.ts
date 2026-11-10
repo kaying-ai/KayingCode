@@ -415,6 +415,11 @@ export interface AppSettings {
   sourceServerWorkspaceHistory?: import("./source-server/contracts.js").SourceServerWorkspaceHistoryEntry[];
   /** 桌面端启动时是否执行 Source Server 静默重连；缺失按 true 兼容旧设置。 */
   remoteStartupAutoReconnectEnabled?: boolean;
+  /**
+   * 用户自定义的手机远控 Relay origin；留空时使用部署默认值。
+   * 只保存规范化后的 http(s) origin，实际链接与连接解析由 Main 负责。
+   */
+  mobileRelayOrigin?: string;
   sourceServerDirectoryMigrationVersion?: 1;
   /** 旧客户端只接受 2；保留回滚兼容，新介绍不使用该字段判断已读。 */
   remoteBoundaryOnboardingVersion?: 2;

@@ -1,5 +1,6 @@
 const TASK_NOTIFICATION_ENABLED_STORAGE_KEY = "kayingcode-notification-enabled";
 const TASK_NOTIFICATION_SOUND_ENABLED_STORAGE_KEY = "kayingcode-notification-sound-enabled";
+const TASK_UNREAD_BADGE_ENABLED_STORAGE_KEY = "kayingcode-task-unread-badge-enabled";
 
 function readStoredBoolean(key: string, defaultValue: boolean): boolean {
   try {
@@ -28,6 +29,15 @@ export function isTaskNotificationEnabled(): boolean {
 
 export function isTaskNotificationSoundPreferenceEnabled(): boolean {
   return readStoredBoolean(TASK_NOTIFICATION_SOUND_ENABLED_STORAGE_KEY, true);
+}
+
+// 角标是通知的可选子能力，默认不打扰；老用户没有该键时按关闭处理。
+export function isTaskUnreadBadgeEnabled(): boolean {
+  return readStoredBoolean(TASK_UNREAD_BADGE_ENABLED_STORAGE_KEY, false);
+}
+
+export function persistTaskUnreadBadgeEnabled(enabled: boolean): void {
+  persistStoredBoolean(TASK_UNREAD_BADGE_ENABLED_STORAGE_KEY, enabled);
 }
 
 export function isTaskNotificationSoundEnabled(): boolean {

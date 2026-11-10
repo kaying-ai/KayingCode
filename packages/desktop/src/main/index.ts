@@ -950,17 +950,34 @@ function getMobileLogSink(): MobileLogSink {
   return mobileLogSink;
 }
 
-const mobileRelayOrigin = resolveDesktopRemoteOrigin({
-  processEnv: process.env,
-  localEnv: hostProcessLocalEnv,
-});
-const desktopRemoteAccount = createDesktopRemoteAccount({
-  origin: mobileRelayOrigin,
-  credentials: webRemoteControlCredentialService,
-});
+const desktopRemoteAccounts = new Map<string, ReturnType<typeof createDesktopRemoteAccount>>();
+
+async function resolveCurrentMobileRelayOrigin(): Promise<string> {
+  const settings = await mainSettingService.get();
+  return resolveDesktopRemoteOrigin({
+    overrideOrigin: settings.mobileRelayOrigin,
+    processEnv: process.env,
+    localEnv: hostProcessLocalEnv,
+  });
+}
+
+// owner secret 按 origin 隔离；切换设置后新会话走新 origin，旧凭据保留在本机不跨域发送。
+function getDesktopRemoteAccount(origin: string): ReturnType<typeof createDesktopRemoteAccount> {
+  let account = desktopRemoteAccounts.get(origin);
+  if (!account) {
+    account = createDesktopRemoteAccount({
+      origin,
+      credentials: webRemoteControlCredentialService,
+    });
+    desktopRemoteAccounts.set(origin, account);
+  }
+  return account;
+}
+
 const webRemoteControlManager = createWebRemoteControlManager({
   mobileLogSink: { append: (target, events) => getMobileLogSink().append(target, events) },
   getEndpointUrls: async () => {
+    const mobileRelayOrigin = await resolveCurrentMobileRelayOrigin();
     const derived = buildKayingCodeEndpointUrls(mobileRelayOrigin, {
       appVersion: webRemoteControlAppVersion,
     });
@@ -977,8 +994,11 @@ const webRemoteControlManager = createWebRemoteControlManager({
   appVersion: webRemoteControlAppVersion,
   // 审核提审备注有 200 字限制；显式开启时省略仅用于展示的 name，其余参数不变。
   compactLink: process.env["KAYINGCODE_REVIEW_COMPACT_LINK"]?.trim() === "1",
-  getLogin: () => desktopRemoteAccount.getLogin(),
-  createMobileAuthorization: (signal) => desktopRemoteAccount.createMobileAuthorization(signal),
+  getLogin: async () => getDesktopRemoteAccount(await resolveCurrentMobileRelayOrigin()).getLogin(),
+  createMobileAuthorization: async (signal) =>
+    getDesktopRemoteAccount(await resolveCurrentMobileRelayOrigin()).createMobileAuthorization(
+      signal,
+    ),
   deviceStorage: createWebRemoteControlDeviceStorage({
     loadSettings: () => mainSettingService.get(),
     patchSettings: (patch) => mainSettingService.update(patch),
@@ -1193,6 +1213,13 @@ function syncImmediateAppSettings(patch: ReturnType<typeof appSettingsPatchSchem
         win.webContents.send(PlatformChannels.SettingsChanged);
       }
     }
+  }
+
+  if ("mobileRelayOrigin" in patch) {
+    // Relay origin 已落盘；旧窗口的二维码和 WS 仍指向旧地址，必须按 endpoint 变更挂起。
+    void suspendWebRemoteControlForEndpointChange().catch((error: unknown) => {
+      logger.warn("[settings] suspend web remote control after relay origin change failed", error);
+    });
   }
 }
 
@@ -1623,11 +1650,15 @@ async function resolveKayingCodeEndpointSelection(): Promise<"production" | "tes
   return "custom";
 }
 
-async function handleKayingCodeEndpointChanged() {
-  rebuildMenu();
+async function suspendWebRemoteControlForEndpointChange() {
   for (const win of getApplicationWindows()) {
     await webRemoteControlManagerRef.current?.suspend(win.id, "endpoint-changed");
   }
+}
+
+async function handleKayingCodeEndpointChanged() {
+  rebuildMenu();
+  await suspendWebRemoteControlForEndpointChange();
 }
 
 /** 快捷键设置页录制态（renderer 经 SetShortcutRecordingActive 同步）；true 时菜单摘除可配置 accelerator。 */
@@ -1941,6 +1972,7 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
         hideWindow: () => win.hide(),
       }),
     windowHostProcessMap,
+    windowUnreadCountMap,
     awaitFirstHostSpawnDecision,
     spawnHostProcess: (win, label, initMessage) =>
       spawnHostProcess(

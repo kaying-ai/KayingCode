@@ -276,6 +276,10 @@ export function SettingsPage({
   const setNotificationSoundEnabled = useKayingCodeStore(
     (state) => state.setNotificationSoundEnabled,
   );
+  const taskUnreadBadgeEnabled = useKayingCodeStore((state) => state.taskUnreadBadgeEnabled);
+  const setTaskUnreadBadgeEnabled = useKayingCodeStore(
+    (state) => state.setTaskUnreadBadgeEnabled,
+  );
   const usageProviderSettingsRead = useProviderSettingsView();
   const usageProviderSettingsView =
     usageProviderSettingsRead.state.status === "ready"
@@ -1395,6 +1399,7 @@ export function SettingsPage({
                             platform={platform}
                             notificationEnabled={notificationEnabled}
                             notificationSoundEnabled={notificationSoundEnabled}
+                            taskUnreadBadgeEnabled={taskUnreadBadgeEnabled}
                             closeToTrayOnWindows={closeToTrayOnWindows}
                             keepAwakeWhileRunning={sharedSettings?.keepAwakeWhileRunning ?? false}
                             desktopChromiumHardwareAccelerationEnabled={
@@ -1437,6 +1442,21 @@ export function SettingsPage({
                                   trigger: "switch",
                                 },
                                 operation: () => setNotificationSoundEnabled(enabled),
+                                completed: {
+                                  resultSource: "local_commit",
+                                  stateAfter: enabled ? "enabled" : "disabled",
+                                },
+                                failureStage: "local_commit",
+                              })
+                            }
+                            setTaskUnreadBadgeEnabled={(enabled) =>
+                              runUserAction({
+                                input: {
+                                  featureId: "settings.notification",
+                                  action: "toggle_task_unread_badge",
+                                  trigger: "switch",
+                                },
+                                operation: () => setTaskUnreadBadgeEnabled(enabled),
                                 completed: {
                                   resultSource: "local_commit",
                                   stateAfter: enabled ? "enabled" : "disabled",

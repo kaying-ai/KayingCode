@@ -331,6 +331,7 @@ export * from "./tool-identity.js";
 export * from "./streaming-tool-input-preview.js";
 export * from "./tool-plan-adapter.js";
 export * from "./permission-request-preview.js";
+export * from "./mobileRelayOrigin.js";
 export * from "./web-remote-control.js";
 export * from "#src/web-remote-relay/index.js";
 

@@ -23,6 +23,22 @@ it("resolves a self-hosted relay origin from the process environment first", () 
     }),
   ).toThrow();
 });
+
+it("user relay setting overrides deployment defaults", () => {
+  expect(
+    resolveDesktopRemoteOrigin({
+      overrideOrigin: " https://mine.example/path ",
+      processEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: "https://review.example" },
+      localEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: "https://local.example" },
+    }),
+  ).toBe("https://mine.example");
+  expect(
+    resolveDesktopRemoteOrigin({
+      overrideOrigin: "",
+      processEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: "https://review.example" },
+    }),
+  ).toBe("https://review.example");
+});
 it("persists the owner before registration and shares concurrent initialization", async () => {
   let stored: string | null = null;
   const calls: string[] = [];

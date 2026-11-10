@@ -2169,6 +2169,9 @@ const enUS: Record<string, string> = {
   "settings.notificationSound": "Notification sound",
   "settings.notificationSoundDescription":
     "When notifications are enabled, you can mute the task notification sound separately.",
+  "settings.taskUnreadBadge": "Show unread badge",
+  "settings.taskUnreadBadgeDescription":
+    "Show the unread task count on the Dock or taskbar. The sidebar dot is unaffected when disabled.",
   "notification.taskWithTitle": "Task: {title}",
   "notification.taskWaiting": "Task waiting for your confirmation",
   "notification.completed": "Task completed",
@@ -6388,6 +6391,14 @@ const enUS: Record<string, string> = {
   "settings.source.startupAutoReconnect": "Reconnect automatically at startup",
   "settings.source.startupAutoReconnectDescription":
     "Reconnects devices seen online in the last 7 days at startup. Changes take effect on the next startup.",
+  "settings.source.mobileRelayOrigin": "Mobile control relay address",
+  "settings.source.mobileRelayOriginDescription":
+    "Enter the origin of an https relay service you trust, for example https://relay.example.com. Leave empty to use the default relay; regenerate the QR code after changing it.",
+  "settings.source.mobileRelayOriginSave": "Save",
+  "settings.source.mobileRelayOriginSaved":
+    "Relay address saved. Regenerate the QR code to use it.",
+  "settings.source.mobileRelayOriginInvalid":
+    "Enter a valid https address, for example https://relay.example.com.",
   "settings.source.identityChangeTitle": "Connection target identity has changed",
   "settings.source.identityChangeDescription":
     "Confirm to create a new device record and independent connection record. Existing task history stays with the previous device.",
