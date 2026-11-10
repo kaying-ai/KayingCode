@@ -28,7 +28,8 @@ test("macOS signing uses the protected release environment after tag validation"
   const workflow = parse(
     await readFile(new URL("../.github/workflows/release-macos.yml", import.meta.url), "utf8"),
   );
-  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.deepEqual(Object.keys(workflow.on), ["push", "workflow_dispatch"]);
+  assert.deepEqual(workflow.on.push.tags, ["kaying-code-v*", "kaying-code-preflight-v*"]);
   assert.deepEqual(workflow.permissions, { contents: "read" });
   assert.equal(workflow.jobs.validate.environment, undefined);
   assert.equal(workflow.jobs.sign.needs, "validate");
@@ -42,7 +43,8 @@ test("Windows and Android release jobs require protected credentials and signatu
       "utf8",
     ),
   );
-  assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+  assert.deepEqual(Object.keys(workflow.on), ["push", "workflow_dispatch"]);
+  assert.deepEqual(workflow.on.push.tags, ["kaying-code-v*", "kaying-code-preflight-v*"]);
   assert.equal(workflow.jobs.windows.needs, "validate");
   assert.equal(workflow.jobs.windows.environment, "windows-release");
   assert.equal(workflow.jobs.android.needs, "validate");
@@ -76,9 +78,26 @@ test("release publishing waits for all signed builds and writes the GitHub relea
   ]);
   assert.deepEqual(workflow.permissions, { contents: "write", actions: "read" });
   const steps = workflow.jobs.publish.steps;
-  assert.match(steps.find((step) => step.id === "runs").run, /workflow_dispatch/);
+  const runs = steps.find((step) => step.id === "runs").run;
+  assert.match(runs, /workflow_dispatch/);
+  assert.match(runs, /\\"push\\"/);
+  assert.doesNotMatch(runs, /event=workflow_dispatch/);
   assert.match(
     steps.find((step) => step.name === "Create or update release").run,
     /gh release create/,
+  );
+});
+
+test("Linux release builds run on release tag pushes", async () => {
+  const workflow = parse(
+    await readFile(new URL("../.github/workflows/release-linux.yml", import.meta.url), "utf8"),
+  );
+  assert.deepEqual(Object.keys(workflow.on), ["push", "workflow_dispatch"]);
+  assert.deepEqual(workflow.on.push.tags, ["kaying-code-v*", "kaying-code-preflight-v*"]);
+  assert.equal(workflow.jobs.linux.needs, "validate");
+  assert.equal(workflow.jobs.linux.environment, "linux-release");
+  assert.match(
+    workflow.jobs.validate.steps.find((step) => step.id === "version").run,
+    /resolveLinuxReleaseTag/,
   );
 });
