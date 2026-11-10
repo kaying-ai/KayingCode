@@ -1,6 +1,10 @@
 name: Build signed Linux release
 
 on:
+  push:
+    tags:
+      - "kaying-code-v*"
+      - "kaying-code-preflight-v*"
   workflow_dispatch:
 
 permissions:

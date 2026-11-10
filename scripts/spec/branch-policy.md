@@ -7,7 +7,7 @@
 ## 发布
 
 - `release/<版本>` 是从产品 `main` 创建的短期分支。根 `pnpm run release` 只在该分支生成版本和变更日志提交，供 PR 审查。命令本身不打标签、不推送。紧急修复同样通过短期分支和 PR 进入 `main`。
-- 维护者从已通过发布验收的 GitHub `main` 提交创建 `kaying-code-v<版本>` 标签。标签源码检查验证目标是 GitHub `main` 的祖先，通过后再发布制品。产品签名、制品上传与部署由独立发布流程负责。
+- 维护者从已通过发布验收的 GitHub `main` 提交创建 `kaying-code-v<版本>` 标签。推送标签会自动触发三套签名构建；预验收标签同样自动触发，但推送前必须先临时放行对应环境。标签源码检查验证目标是 GitHub `main` 的祖先，通过后再发布制品。产品签名、制品上传与部署由独立发布流程负责。
 - GitHub Actions 对发往 `main` 的 PR、`main` 推送和正式标签推送执行产品源码检查。工作流使用固定 Node/pnpm、冻结锁文件和只读权限。Windows runner 的类型检查步骤设置 4 GiB Node 堆上限，以容纳完整 TypeScript 工作区；类型检查、Lint 或架构检查失败仍阻止通过。维护者将 `Source checks (Windows)` 配置为 `main` 的合并检查。
 
 ## 开工检查

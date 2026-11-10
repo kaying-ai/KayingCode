@@ -64,10 +64,10 @@ jobs:
             pending=0
             failed=0
             for name in "${workflows[@]}"; do
-              # 取该标签下最新的 workflow_dispatch 运行；rerun 后状态为最新一次尝试。
+              # 取该标签下最新的构建运行（标签推送或手动 dispatch）；rerun 后状态为最新一次尝试。
               line=$(gh api --paginate \
-                "repos/$GITHUB_REPOSITORY/actions/runs?event=workflow_dispatch&per_page=100" \
-                --jq ".workflow_runs[] | select(.head_branch == \"$TAG\" and .name == \"$name\") | [.id, .status, .conclusion] | @tsv" \
+                "repos/$GITHUB_REPOSITORY/actions/runs?per_page=100" \
+                --jq ".workflow_runs[] | select(.head_branch == \"$TAG\" and .name == \"$name\" and (.event == \"push\" or .event == \"workflow_dispatch\")) | [.id, .status, .conclusion] | @tsv" \
                 | sort -n | tail -1)
               if [[ -z "$line" ]]; then
                 echo "waiting for $name"

@@ -159,7 +159,7 @@ suite and a local Host attachment.
 3. 在该分支运行 `pnpm run release` 生成版本和变更日志提交；命令本身不创建标签、不推送。
 4. 提交 PR，通过检查后合入 `main`。
 5. 在通过发布验收的 `main` 提交上创建并推送 `kaying-code-v<版本>` 标签。
-6. 依次触发 Linux、macOS、Windows+Android 三套签名构建。全部成功后，`Publish GitHub release` 工作流会汇总制品、生成 `SHA256SUMS-<版本>.txt` 并创建或更新 GitHub Release。
+6. 推送标签会自动触发 Linux、macOS、Windows+Android 三套签名构建；失败时可手动 dispatch 同一标签重跑。全部成功后，`Publish GitHub release` 工作流会汇总制品、生成 `SHA256SUMS-<版本>.txt` 并创建或更新 GitHub Release。
 7. 自动发布不替代安装验收；对外宣布前仍需在目标平台完成安装与启动验证。
 
 发布细节见 [scripts/spec/product-release-version.md](scripts/spec/product-release-version.md)。

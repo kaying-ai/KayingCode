@@ -1,6 +1,10 @@
 name: Build signed Windows and Android releases
 
 on:
+  push:
+    tags:
+      - "kaying-code-v*"
+      - "kaying-code-preflight-v*"
   workflow_dispatch:
 
 permissions:
