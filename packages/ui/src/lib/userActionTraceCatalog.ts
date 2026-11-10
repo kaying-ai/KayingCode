@@ -69,7 +69,11 @@ export const SETTINGS_USER_ACTION_FEATURES = {
   "settings.network": ["save_http_proxy", "save_no_proxy", "save_ca_certificate"],
   "settings.desktop": ["toggle_hardware_acceleration", "toggle_close_to_tray", "toggle_keep_awake"],
   "settings.update": ["toggle_preview_updates", "toggle_auto_update"],
-  "settings.notification": ["toggle_notification", "toggle_notification_sound"],
+  "settings.notification": [
+    "toggle_notification",
+    "toggle_notification_sound",
+    "toggle_task_unread_badge",
+  ],
   "settings.conversation": [
     "change_interaction_behavior",
     "toggle_ask_user_auto_resolution",

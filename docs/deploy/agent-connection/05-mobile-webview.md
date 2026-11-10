@@ -12,8 +12,8 @@ flowchart LR
 ## 部署与连接
 
 1. 让 Desktop 和 Web 使用同一 Relay 部署，打开目标项目。若使用远端目录，先在 Desktop 连接 Ubuntu 并确认会话可用。Provider 沿用对应工作区的配置方式。 [Relay 部署与授权](../../../apps/kayingcode-relay-cloudflare/DEPLOYMENT.md)
-2. 在 Desktop 开启移动远控，生成完整 HTTPS V2 授权链接。在手机「会话列表」添加设备，扫码或粘贴链接，再打开工作台。连接管理在会话模块内，终端与会话操作在 Web 工作台内完成。
-3. Taro 微信真机使用有权限的小程序 AppID，配置工作台的 HTTPS WebView 业务域名。Flutter 按目标平台的固定 SDK 构建。验证「项目列表」前部署包含最近项目桥接的 Web 制品。 [Taro 构建](../kayingcode-mobile-taro.md#构建) · [Flutter 构建](../kayingcode-mobile-flutter.md#固定-sdk-与构建) · [Web 项目桥接](../../../packages/web/spec/mobile-web-workbench.md)
+2. 在 Desktop 开启移动远控，生成完整 HTTPS V2 授权链接。在手机「会话列表」添加设备，扫码或粘贴链接，再打开工作台。连接管理在会话模块内，终端与会话操作在 Web 工作台内完成。应用审核等多天场景使用独立审核 Relay 配置更长邀请有效期/领取次数，见[审核环境部署](../kayingcode-review-environment.md)。
+3. Taro 微信真机使用有权限的小程序 AppID，配置工作台的 HTTPS WebView 业务域名；审核场景还需把审核 origin 加入业务域名。Flutter 按目标平台的固定 SDK 构建。验证「项目列表」前部署包含最近项目桥接的 Web 制品。 [Taro 构建](../kayingcode-mobile-taro.md#构建) · [Flutter 构建](../kayingcode-mobile-flutter.md#固定-sdk-与构建) · [Web 项目桥接](../../../packages/web/spec/mobile-web-workbench.md)
 
 ## 验收
 

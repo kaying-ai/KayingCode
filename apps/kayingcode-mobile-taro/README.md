@@ -29,4 +29,4 @@ pnpm --filter @kayingcode/mobile build:weapp
 
 H5 WebView E2E：先 build:h5，再执行 `node apps/kayingcode-mobile-taro/scripts/kayingcode-web-h5.e2e.mjs`。该场景使用受控 HTTPS 页面替身，验证三入口、布局、刷新、错误重试与无原生协议调用；真实会话链路由 Cloudflare 与 Web 集成覆盖。
 
-规则见 [当前接入 spec](spec/legacy-relay-retirement.md)、[WebView spec](spec/zcode-webview.md)，服务部署见 [Cloudflare 教程](../../docs/deploy/kayingcode-relay-cloudflare.md)。
+规则见 [当前接入 spec](spec/legacy-relay-retirement.md)、[WebView spec](spec/zcode-webview.md)、[审核接入 spec](spec/review-environment.md)，服务部署见 [Cloudflare 教程](../../docs/deploy/kayingcode-relay-cloudflare.md)。

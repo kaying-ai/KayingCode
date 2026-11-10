@@ -1,5 +1,44 @@
 import { expect, it, vi } from "vitest";
-import { createDesktopRemoteAccount } from "./desktopRemoteAccount.js";
+import {
+  createDesktopRemoteAccount,
+  DEFAULT_DESKTOP_REMOTE_ORIGIN,
+  resolveDesktopRemoteOrigin,
+} from "./desktopRemoteAccount.js";
+it("resolves a self-hosted relay origin from the process environment first", () => {
+  expect(
+    resolveDesktopRemoteOrigin({
+      processEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: " https://review.example/path " },
+      localEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: "https://local.example" },
+    }),
+  ).toBe("https://review.example");
+  expect(
+    resolveDesktopRemoteOrigin({
+      localEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: "https://local.example" },
+    }),
+  ).toBe("https://local.example");
+  expect(resolveDesktopRemoteOrigin()).toBe(DEFAULT_DESKTOP_REMOTE_ORIGIN);
+  expect(() =>
+    resolveDesktopRemoteOrigin({
+      processEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: "not a url" },
+    }),
+  ).toThrow();
+});
+
+it("user relay setting overrides deployment defaults", () => {
+  expect(
+    resolveDesktopRemoteOrigin({
+      overrideOrigin: " https://mine.example/path ",
+      processEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: "https://review.example" },
+      localEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: "https://local.example" },
+    }),
+  ).toBe("https://mine.example");
+  expect(
+    resolveDesktopRemoteOrigin({
+      overrideOrigin: "",
+      processEnv: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN: "https://review.example" },
+    }),
+  ).toBe("https://review.example");
+});
 it("persists the owner before registration and shares concurrent initialization", async () => {
   let stored: string | null = null;
   const calls: string[] = [];

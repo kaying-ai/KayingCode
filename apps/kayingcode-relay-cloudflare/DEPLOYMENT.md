@@ -75,6 +75,38 @@ mise exec -- pnpm --dir apps/kayingcode-relay-cloudflare exec wrangler deploy --
 
 deploy 的实际顺序是 build:web → 清理/复制 public → wrangler deploy --keep-vars。keep-vars 保留远端已有普通变量，不会替你设置构建期 origin；运行时控制台变量不能修正已经编入 JS 的地址。自定义 origin 是公开地址，不是 secret；改变它必须重新构建、部署，并让 Desktop 对齐。
 
+### 4.1 审核/受控部署的有效期设置
+
+普通部署保持默认：邀请 5 分钟、单次领取，terminal 凭据 30 天。应用商店审核或内部演示需要 2–4 周、多人使用时，建议部署**独立的审核 Worker 和域名**，不要在生产 Worker 上放宽限制。
+
+审核 Worker 使用普通变量（Cloudflare 控制台该 Worker 的 Settings → Variables and Secrets；这些不是 secret）：
+
+| 变量                                  | 审核示例 | 作用                        |
+| ------------------------------------- | -------- | --------------------------- |
+| `KAYINGCODE_REMOTE_INVITE_TTL_DAYS`   | `30`     | 邀请有效 30 天              |
+| `KAYINGCODE_REMOTE_INVITE_MAX_CLAIMS` | `5`      | 同一邀请最多供 5 次授权领取 |
+| `KAYINGCODE_REMOTE_TERMINAL_TTL_DAYS` | `30`     | 每次领取的凭据有效 30 天    |
+
+时长变量以天为单位，支持小数（例如 `0.5` 为 12 小时）。变量只影响新签发的邀请；已经签发的邀请保留签发时的 `expiresAt` 和 `remainingClaims`，降低配置不会缩短旧链接。非法或越界值回退默认值，不会阻断服务。
+
+独立 Worker 的构建与部署示例（把 `review.example.com` 换成审核域名）：
+
+```sh
+KAYINGCODE_REMOTE_ORIGIN=https://review.example.com mise exec -- pnpm --dir apps/kayingcode-relay-cloudflare run build:web
+mise exec -- pnpm --dir apps/kayingcode-relay-cloudflare exec wrangler deploy --name kayingcode-relay-review --keep-vars
+```
+
+`--name` 覆盖 wrangler.jsonc 中的 Worker 名称，审核 Worker 使用独立 Durable Object namespace。部署后在 Cloudflare 控制台为该 Worker 绑定审核域名，再填入上表变量。审核结束后删除审核 Worker/域名；至少应删除设备、停止远控并移除变量。
+
+审核主机启动 Desktop 时指向审核 origin，并使用独立数据目录，避免把生产 owner 身份带到审核 Worker：
+
+```sh
+export KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN=https://review.example.com
+export KAYINGCODE_DATA_BASE_DIR=/srv/kayingcode-review
+```
+
+注意：`build:web` 会把审核 origin 写入 `packages/web/dist` 和 `public/`；之后若要发布生产，必须用生产 origin 重新构建再部署。
+
 public 是构建产物目录，通过 build:web 生成并部署。Web 来源由 packages/web/upstream-web.json 固定；构建必要时只获取该官方提交，不移动产品分支。manifest 写入来源、relayOrigin 和审计哈希。两份第三方声明随资产交付；材料检查为显式命令，不是全仓待办清零后才允许打包，见 [许可规则](../../third-party/SPEC.md)。
 
 ## 5. Desktop 与手机接入
@@ -85,7 +117,7 @@ public 是构建产物目录，通过 build:web 生成并部署。Web 来源由 
 $env:KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN = "https://relay.example.com"
 ```
 
-POSIX 使用 `export KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN=https://relay.example.com`。随后从该环境启动实际 Desktop；若从系统图标或后台进程启动，应确认进程确实继承该变量。教程不假设本机安装路径。
+POSIX 使用 `export KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN=https://relay.example.com`。随后从该环境启动实际 Desktop；若从系统图标或后台进程启动，应确认进程确实继承该变量。Desktop 优先读取进程环境，其次桌面包目录的 `.env` 快照，最后回退默认生产 origin；打包版同样支持进程环境。教程不假设本机安装路径。
 
 若使用 KAYINGCODE_WEB_REMOTE_CONTROL_URL 或 KAYINGCODE_WEB_REMOTE_CONTROL_RELAY_WS_URL 覆盖项，它们也必须对应同一部署；通常只需设置上面的 origin。
 

@@ -52,6 +52,7 @@ export function GeneralSectionContent({
   setInterfaceMode = () => {},
   notificationEnabled,
   notificationSoundEnabled,
+  taskUnreadBadgeEnabled = false,
   closeToTrayOnWindows,
   keepAwakeWhileRunning = false,
   desktopChromiumHardwareAccelerationEnabled = true,
@@ -73,6 +74,7 @@ export function GeneralSectionContent({
   setLocalePreference,
   setNotificationEnabled,
   setNotificationSoundEnabled,
+  setTaskUnreadBadgeEnabled = () => {},
   taskAutoArchiveEnabled,
   taskAutoArchiveOlderThanDays,
   messageStreamShowReasoning,
@@ -114,6 +116,7 @@ export function GeneralSectionContent({
   setInterfaceMode?: (mode: InterfaceMode) => void;
   notificationEnabled: boolean;
   notificationSoundEnabled: boolean;
+  taskUnreadBadgeEnabled?: boolean;
   closeToTrayOnWindows: boolean;
   keepAwakeWhileRunning?: boolean;
   desktopChromiumHardwareAccelerationEnabled?: boolean;
@@ -136,6 +139,7 @@ export function GeneralSectionContent({
   setLocalePreference: (locale: LocalePreference) => void;
   setNotificationEnabled: (enabled: boolean) => void;
   setNotificationSoundEnabled: (enabled: boolean) => void;
+  setTaskUnreadBadgeEnabled?: (enabled: boolean) => void;
   taskAutoArchiveEnabled: boolean;
   taskAutoArchiveOlderThanDays: number;
   messageStreamShowReasoning: boolean;
@@ -633,6 +637,22 @@ export function GeneralSectionContent({
             />
           }
         />
+        {isDesktop ? (
+          <SettingsRow
+            label={intl.formatMessage({ id: "settings.taskUnreadBadge" })}
+            description={intl.formatMessage({
+              id: "settings.taskUnreadBadgeDescription",
+            })}
+            control={
+              <Switch
+                aria-label={intl.formatMessage({ id: "settings.taskUnreadBadge" })}
+                checked={taskUnreadBadgeEnabled}
+                disabled={!notificationEnabled}
+                onCheckedChange={setTaskUnreadBadgeEnabled}
+              />
+            }
+          />
+        ) : null}
         {isWindowsDesktop ? (
           <SettingsRow
             label={intl.formatMessage({ id: "settings.closeToTrayOnWindows" })}

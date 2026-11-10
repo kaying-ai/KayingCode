@@ -40,11 +40,13 @@ owner/terminal 是账号权限，device/terminal 是 WS 角色。owner 只能申
 
 | key / attachment       | 内容                                                    | 当前时效                              |
 | ---------------------- | ------------------------------------------------------- | ------------------------------------- |
-| `credential:<SHA-256>` | userId、owner/terminal、expiresAt                       | owner 使用远期到期值；terminal 30 天  |
-| `invitation:<SHA-256>` | userId、expiresAt                                       | 5 分钟；成功 claim 删除               |
-| `device:<device_sid>`  | SID、MID、userId、created_at、meta                      | owner 删除前保留                      |
-| `token:<SHA-256>`      | authority、WS 角色、credentialDigest、expiresAt         | 60 秒；upgrade 前删除，失败也不能重用 |
-| socket attachment      | ticket 信息及 lease、SID、terminalSid、initialized、mid | 每个 SID 每种角色一个配对资格         |
+| `credential:<SHA-256>` | userId、owner/terminal、expiresAt                       | owner 使用远期到期值；terminal 默认 30 天 |
+| `invitation:<SHA-256>` | userId、expiresAt、remainingClaims                      | 默认 5 分钟；成功 claim 扣减或删除        |
+| `device:<device_sid>`  | SID、MID、userId、created_at、meta                      | owner 删除前保留                          |
+| `token:<SHA-256>`      | authority、WS 角色、credentialDigest、expiresAt         | 60 秒；upgrade 前删除，失败也不能重用     |
+| socket attachment      | ticket 信息及 lease、SID、terminalSid、initialized、mid | 每个 SID 每种角色一个配对资格             |
+
+邀请有效期、领取次数和 terminal 凭据有效期由 `KAYINGCODE_REMOTE_INVITE_TTL_DAYS`、`KAYINGCODE_REMOTE_INVITE_MAX_CLAIMS`、`KAYINGCODE_REMOTE_TERMINAL_TTL_DAYS` 控制，时长以天为单位并支持小数；默认值与允许范围见 [protocol spec](spec/upstream-v2.md#邀请与凭据有效期配置)。旧邀请记录没有 `remainingClaims` 时仍按一次性领取。
 
 账号凭据和邀请是 32 字节随机数的无填充 Base64URL（43 字符）；连接票据是 16 字节（22 字符）。storage 不存 bearer、邀请或票据原文。读取时检查有效期；alarm 约每分钟扫描到期记录并关闭到期或超时未初始化连接。alarm 不负责业务心跳或业务重放。
 

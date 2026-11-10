@@ -6,7 +6,7 @@
 
 | 项目             | 当前值                                      | 规则                                                                                      |
 | ---------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Flutter 工程版本 | 见 `pubspec.yaml`                            | `+` 前是商店版本，`+` 后是 Apple build number                                              |
+| Flutter 工程版本 | 见 `pubspec.yaml`                           | `+` 前是商店版本，`+` 后是 Apple build number                                             |
 | Bundle ID        | `com.lingdian.kayingai.agent.code`          | 必须与 App ID 和 App Store Connect app record 完全一致                                    |
 | App 展示名称     | `KayingCode`                                | 来自 `ios/Runner/Info.plist` 的 `CFBundleDisplayName`                                     |
 | 最低 iOS         | 13.0                                        | 当前 `IPHONEOS_DEPLOYMENT_TARGET`                                                         |
@@ -21,7 +21,7 @@
 2. 使用 App Store Connect 当前接受的 Xcode 与 iOS SDK。**截至 2026-04-28，上传应用要求 Xcode 26 或更新版本及 iOS 26 SDK**；发布当天核对 [Apple Upcoming Requirements](https://developer.apple.com/news/upcoming-requirements/) 和上传页面。
 3. 安装项目指定 Flutter 3.35.5、依赖、Xcode Command Line Tools 和 CocoaPods。
 4. 准备商店资料：名称、副标题、描述、关键词、分类、支持 URL、隐私政策 URL、截图、年龄评级、定价/地区和联系信息。
-5. 准备审核说明与可用测试路径。KayingCode 核心功能连接桌面端/Relay；为审核员提供稳定可访问的演示环境、配对步骤和必要测试凭据，不要提供生产用户凭据。
+5. 准备审核说明与可用测试路径。KayingCode 核心功能连接桌面端/Relay；为审核员提供稳定可访问的演示环境、配对步骤和必要测试凭据，不要提供生产用户凭据。自托管 V2 链接默认 5 分钟、单次领取；审核周期较长时，使用独立审核 Relay 并配置邀请有效期、领取次数和终端凭据有效期，为每位审核员提供单独链接，或提供一条明确配置为多次领取的链接。审核期间保持 Desktop 远控和工作区在线。
 
 本工程 Flutter 固定为 3.35.5。先在发布 Mac 上确认该版本与 App Store 当期要求的 Xcode/SDK 能正常构建；若不兼容，按项目 FVM 流程升级并提交 `.fvmrc`/`.flutter-version`，不要混用全局 Flutter 来规避构建错误。
 
@@ -72,7 +72,7 @@ App Store profile 不需要登记测试设备 UDID；Ad Hoc profile 面向设备
 3. 上传 build 之前必须创建 app record；Bundle ID 必须与 Xcode target 一致。
 4. 补齐商品页元数据、支持 URL、隐私政策 URL、年龄评级、版权、价格和可用地区。
 5. 在 **App Privacy** 申报 app 与第三方 SDK 收集/使用的数据。以当前代码、Relay/Node 数据流、网络服务和所有 SDK 行为为依据；隐私政策 URL 对 iOS app 必填。
-6. 在审核备注中写清用途、测试设备/系统、配对和连接步骤、外部服务依赖、演示环境和进入核心功能的方法。
+6. 在审核备注中写清用途、测试设备/系统、配对和连接步骤、外部服务依赖、演示环境和进入核心功能的方法。当前审核域名、链接规则和备注模板见[应用审核方案](../../../../docs/deploy/kayingcode-app-review.md)。
 
 ## 更新版本并构建
 
@@ -137,7 +137,7 @@ iOS 发布必须在 macOS/Xcode 运行，不能在 Windows 上生成可提交的
 3. App Privacy 应覆盖 app 和第三方合作方。凭据加密保存在设备，不代表 Relay/Node 端没有接收或处理数据。
 4. 如包含加密功能，按实际情况完成 Export Compliance 问题；不要盲目声明“免出口合规”。
 5. 提交真实截图、应用描述和当前年龄评级问卷，不放尚未实现功能的宣传图。
-6. 为审核员提供可用配对/服务环境。一次性配对码需安排测试时段，并在备注中提供有效时长和备用步骤。
+6. 为审核员提供可用配对/服务环境。默认一次性、5 分钟的 V2 链接需要安排测试时段；跨多天审核使用独立审核 Relay 的长有效期/多领取配置，并在备注中写明有效时长、Desktop 在线要求和备用链接。
 7. 先用 TestFlight 在真实设备测试冷启动、扫码/粘贴二维码、连接、会话列表、附件及拒绝权限路径。
 
 Apple 对部分常见第三方 SDK 要求包含有效 privacy manifest。提交前检查[当前隐私清单要求](https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk)和 App Store Connect 构建验证报告。

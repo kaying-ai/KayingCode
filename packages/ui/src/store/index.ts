@@ -19,8 +19,10 @@ import {
 import {
   isTaskNotificationEnabled,
   isTaskNotificationSoundPreferenceEnabled,
+  isTaskUnreadBadgeEnabled,
   persistTaskNotificationEnabled,
   persistTaskNotificationSoundEnabled,
+  persistTaskUnreadBadgeEnabled,
 } from "@/lib/taskNotificationPreferences.js";
 import type { Theme } from "../useTheme.js";
 import { applyTheme, normalizeThemePreference, resolveTheme } from "../useTheme.js";
@@ -117,6 +119,10 @@ export interface KayingCodeState {
   /** 是否启用任务通知声音（依附于任务通知总开关） */
   notificationSoundEnabled: boolean;
   setNotificationSoundEnabled: (enabled: boolean) => void;
+
+  /** 是否在 Dock/任务栏显示未读任务角标（依附于任务通知总开关，默认关闭） */
+  taskUnreadBadgeEnabled: boolean;
+  setTaskUnreadBadgeEnabled: (enabled: boolean) => void;
 
   /** 当前用户信息 */
   user: UserInfo | null;
@@ -264,6 +270,12 @@ export function createKayingCodeStore(
     setNotificationSoundEnabled: (enabled: boolean) => {
       persistTaskNotificationSoundEnabled(enabled);
       set({ notificationSoundEnabled: enabled });
+    },
+
+    taskUnreadBadgeEnabled: isTaskUnreadBadgeEnabled(),
+    setTaskUnreadBadgeEnabled: (enabled: boolean) => {
+      persistTaskUnreadBadgeEnabled(enabled);
+      set({ taskUnreadBadgeEnabled: enabled });
     },
 
     user: null,

@@ -2169,6 +2169,9 @@ const enUS: Record<string, string> = {
   "settings.notificationSound": "Notification sound",
   "settings.notificationSoundDescription":
     "When notifications are enabled, you can mute the task notification sound separately.",
+  "settings.taskUnreadBadge": "Show unread badge",
+  "settings.taskUnreadBadgeDescription":
+    "Show the unread task count on the Dock or taskbar. The sidebar dot is unaffected when disabled.",
   "notification.taskWithTitle": "Task: {title}",
   "notification.taskWaiting": "Task waiting for your confirmation",
   "notification.completed": "Task completed",
@@ -6195,7 +6198,7 @@ const enUS: Record<string, string> = {
   "scheduledPreview.toast.view": "View",
   "scheduledPreview.addSchedule": "Add schedule",
   "desktopMobile.v2Description":
-    "Scan to authorize the upstream Web workbench. The link expires in five minutes and can be used once.",
+    "Scan to authorize the upstream Web workbench. The link is valid only for its configured lifetime; refresh the QR code on desktop if it expires or has been used.",
   "desktopMobile.v2Start": "Start remote control",
   "desktopMobile.v2Status.active": "Phone connected",
   "desktopMobile.v2Status.waiting": "Waiting for phone",
@@ -6388,6 +6391,14 @@ const enUS: Record<string, string> = {
   "settings.source.startupAutoReconnect": "Reconnect automatically at startup",
   "settings.source.startupAutoReconnectDescription":
     "Reconnects devices seen online in the last 7 days at startup. Changes take effect on the next startup.",
+  "settings.source.mobileRelayOrigin": "Mobile control relay address",
+  "settings.source.mobileRelayOriginDescription":
+    "Enter the origin of an https relay service you trust, for example https://relay.example.com. Leave empty to use the default relay; regenerate the QR code after changing it.",
+  "settings.source.mobileRelayOriginSave": "Save",
+  "settings.source.mobileRelayOriginSaved":
+    "Relay address saved. Regenerate the QR code to use it.",
+  "settings.source.mobileRelayOriginInvalid":
+    "Enter a valid https address, for example https://relay.example.com.",
   "settings.source.identityChangeTitle": "Connection target identity has changed",
   "settings.source.identityChangeDescription":
     "Confirm to create a new device record and independent connection record. Existing task history stays with the previous device.",

@@ -30,6 +30,15 @@ pnpm --filter @kayingcode/mobile build:weapp
 
 授权链接及凭据不得写入源码、日志、截图或发布配置。小程序运行时兼容逻辑位于 src/ports，不将平台全局注入共享协议代码。
 
+## 审核环境
+
+应用商店或微信提审需要多天有效的链接时，使用独立审核 Relay 配置邀请有效期、领取次数和终端凭据有效期，并在 Ubuntu 审核主机设置 token 预算；Taro 不需要额外配置。完整步骤见[审核环境部署](kayingcode-review-environment.md)，Taro 侧规则见[审核接入规范](../../apps/kayingcode-mobile-taro/spec/review-environment.md)，平台提交位置与备注模板见[应用审核方案](kayingcode-app-review.md)。
+
+- 微信 WebView 的审核 origin 必须加入提交 AppID 的业务域名，保持 `urlCheck` 开启。校验文件由 Relay 构建复制到根路径（默认 AppID 的校验文件为 `69txzPKb7q.txt`）；换用其他 AppID 需先扩展 Relay 静态白名单并重新构建。
+- 建议审核 origin 使用 `kayingai.com` 等已知域名的子域，避免添加设备时的「未知服务器」确认；否则在审核备注写明点击继续。
+- 微信提审备注限 200 字。审核主机设置 `KAYINGCODE_REVIEW_COMPACT_LINK=1` 生成只含 `sid` 和 authorize fragment 的紧凑链接，示例约 135 字；审核期间保持 Desktop 在线，重启后重新签发链接。
+- H5 没有业务域名限制，但跨域 iframe 的存储分区可能让重开链接多 claim 一次，不作为商店提审产物。
+
 ## 验收
 
 先 build:h5，再从根运行：

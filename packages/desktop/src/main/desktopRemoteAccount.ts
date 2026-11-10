@@ -2,6 +2,25 @@ export const DEFAULT_DESKTOP_REMOTE_ORIGIN = "https://relay.service.kaying.ai";
 import { randomBytes } from "node:crypto";
 import type { ICredentialService } from "@zcode/services";
 import type { WebRemoteControlLogin } from "./web-remote-relay/contract.js";
+
+/**
+ * 手机远控 Relay origin 的解析顺序：
+ * 用户设置 > 进程环境 > 本地 .env 快照 > 默认生产 origin。
+ * 用户设置只来自已校验的 AppSettings；非法环境变量仍按原有语义抛错。
+ */
+export function resolveDesktopRemoteOrigin(
+  options: {
+    overrideOrigin?: string;
+    processEnv?: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN?: string };
+    localEnv?: { KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN?: string };
+  } = {},
+): string {
+  const configured =
+    options.overrideOrigin?.trim() ||
+    options.processEnv?.KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN?.trim() ||
+    options.localEnv?.KAYINGCODE_OFFICIAL_CLOUDFLARE_RELAY_ORIGIN?.trim();
+  return configured ? new URL(configured).origin : DEFAULT_DESKTOP_REMOTE_ORIGIN;
+}
 /** 本机 owner 与浏览器 terminal 分离；Main 只向二维码暴露一次性邀请。 */
 export function createDesktopRemoteAccount(options: {
   origin: string;

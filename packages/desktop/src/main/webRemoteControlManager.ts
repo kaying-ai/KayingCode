@@ -177,6 +177,8 @@ interface WebRemoteControlManagerDependencies {
   deviceMid: string;
   deviceName: string;
   appVersion: string;
+  /** 审核/受控部署生成省略 name 的紧凑链接，适配提审备注等字段长度限制。 */
+  compactLink?: boolean;
   getLogin(): Promise<WebRemoteControlLogin | undefined>;
   /** 只返回短期邀请，不把 Main owner 凭据交给手机。 */
   createMobileAuthorization?(signal: AbortSignal): Promise<string>;
@@ -1793,6 +1795,7 @@ export function createWebRemoteControlManager(dependencies: WebRemoteControlMana
         deviceMid: dependencies.deviceMid,
         deviceName: dependencies.deviceName,
         appVersion: dependencies.appVersion,
+        compact: dependencies.compactLink,
       }),
     );
     if (authorization) url.hash = authorization;

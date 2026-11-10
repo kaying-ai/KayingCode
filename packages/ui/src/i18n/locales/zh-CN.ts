@@ -2058,6 +2058,9 @@ const zhCN: Record<string, string> = {
   "settings.notificationDescription": "任务完成、失败或需要确认时发送桌面通知。",
   "settings.notificationSound": "通知声音",
   "settings.notificationSoundDescription": "通知开启后，可单独关闭任务通知提示音。",
+  "settings.taskUnreadBadge": "显示未读角标",
+  "settings.taskUnreadBadgeDescription":
+    "在 Dock 或任务栏显示未读任务数量；关闭后侧栏蓝点不受影响。",
   "notification.taskWithTitle": "任务：{title}",
   "notification.taskWaiting": "任务等待你的确认",
   "notification.completed": "任务已完成",
@@ -5940,7 +5943,7 @@ const zhCN: Record<string, string> = {
   "scheduledPreview.toast.view": "查看",
   "scheduledPreview.addSchedule": "添加计划",
   "desktopMobile.v2Description":
-    "扫码授权后使用上游 Web 工作台。授权链接五分钟内有效，且只能使用一次。",
+    "扫码授权后使用上游 Web 工作台。授权链接只在有效期内可用；过期或用完后请在桌面刷新二维码。",
   "desktopMobile.v2Start": "开启远控",
   "desktopMobile.v2Status.active": "手机已连接",
   "desktopMobile.v2Status.waiting": "等待手机连接",
@@ -6125,6 +6128,13 @@ const zhCN: Record<string, string> = {
   "settings.source.startupAutoReconnect": "启动时自动重连",
   "settings.source.startupAutoReconnectDescription":
     "启动时自动重连最近 7 天内在线过的设备。修改在下次启动时生效。",
+  "settings.source.mobileRelayOrigin": "手机远控 Relay 地址",
+  "settings.source.mobileRelayOriginDescription":
+    "只填写你信任的 https 服务 origin，例如 https://relay.example.com；留空使用默认 Relay。修改后需重新生成二维码。",
+  "settings.source.mobileRelayOriginSave": "保存",
+  "settings.source.mobileRelayOriginSaved": "Relay 地址已保存。请重新生成二维码。",
+  "settings.source.mobileRelayOriginInvalid":
+    "请输入有效的 https 地址，例如 https://relay.example.com。",
   "settings.source.identityChangeTitle": "检测到连接目标身份已变化",
   "settings.source.identityChangeDescription":
     "确认后会创建新的设备记录和独立连接记录；旧任务历史仍保留在原设备下。",

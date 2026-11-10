@@ -124,6 +124,12 @@ export interface WebRemoteControlV2QrParams {
 
 export type BuildWebRemoteControlExternalQrUrlOptions = WebRemoteControlV2QrParams & {
   baseUrl: string;
+  /**
+   * 审核/受控部署的紧凑链接：只保留 sid 和由调用方追加的 authorize fragment，
+   * 省略 name、mid、app_version，适配微信提审备注等 200 字字段限制。
+   * 审核期间需保持 Desktop 在线；重启导致 SID 变化后应重新签发链接。
+   */
+  compact?: boolean;
 };
 
 function readNonEmptySearchParam(params: URLSearchParams, name: string): string | undefined {
@@ -171,6 +177,7 @@ export function buildWebRemoteControlExternalQrUrl({
   deviceMid,
   deviceName,
   appVersion,
+  compact = false,
 }: BuildWebRemoteControlExternalQrUrlOptions): string {
   const url = new URL(baseUrl);
   if (deviceSid !== undefined) url.searchParams.set("sid", deviceSid);
@@ -178,6 +185,14 @@ export function buildWebRemoteControlExternalQrUrl({
   url.searchParams.delete("hash");
   url.searchParams.delete("t");
 
+  if (compact) {
+    // 审核备注字段很短时只保留设备 SID；名称、MID 和 Desktop 版本在连接后由
+    // Relay 注册信息与 Web bootstrap 取得，不再挤占链接长度。
+    url.searchParams.delete("name");
+    url.searchParams.delete("mid");
+    url.searchParams.delete("app_version");
+    return url.toString();
+  }
   if (deviceMid?.trim()) {
     url.searchParams.set("mid", deviceMid);
   }

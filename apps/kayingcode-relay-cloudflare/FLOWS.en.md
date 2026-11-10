@@ -21,12 +21,12 @@ sequenceDiagram
   D->>R: Owner Bearer registers device_mid
   R-->>D: New device_sid
   D->>R: Owner Bearer creates invitation
-  R-->>D: One-use invitation, five minutes
+  R-->>D: Invitation (one-use/five minutes by default; configurable)
   D-->>W: Complete /remote/v4?sid=…#authorize=… link
   W->>W: Remove fragment first; retain sid
   W->>R: POST account/claim(invitation)
-  R->>R: Consume invitation; store terminal digest
-  R-->>W: Independent terminal credential, 30 days
+  R->>R: Decrement remaining claims; store terminal digest
+  R-->>W: Independent terminal credential, 30 days by default
   W->>W: Save browser session; load workbench
 ```
 

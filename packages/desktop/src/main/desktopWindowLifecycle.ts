@@ -16,6 +16,7 @@ import {
   createWindowsTaskbarOverlayApplier,
   maxWindowUnreadCounts,
   parseWindowUnreadCount,
+  removeWindowUnreadCount,
   renderTaskbarStatusDotPixels,
   syncUnreadBadgeForPlatform,
 } from "./unreadBadge.js";
@@ -34,6 +35,7 @@ export function createWindow(options: {
   forceQuitRef: { current: boolean };
   handleBeforeClose?: (win: BrowserWindow, label: string) => boolean;
   windowHostProcessMap: Map<number, ElectronUtilityProcess>;
+  windowUnreadCountMap: Map<number, number>;
   spawnHostProcess: (
     win: BrowserWindow,
     label: string,
@@ -276,6 +278,9 @@ export function createWindow(options: {
     unregisterMainApplicationWindow(wcId);
     cancelRuntimeProcessEnvWait?.();
     cancelRuntimeProcessEnvWait = null;
+    // renderer 销毁后不会再上报 0，先移除窗口计数再重新聚合，避免角标永久残留。
+    removeWindowUnreadCount(options.windowUnreadCountMap, browserWindowId);
+    syncApplicationUnreadBadge(options.windowUnreadCountMap);
     options.logger.info(`[createWindow] window closed, killing host process (${label})`);
     const child = options.windowHostProcessMap.get(wcId);
     if (child) {
@@ -329,7 +334,7 @@ export function focusWorkspaceInExistingWindow(
 }
 
 // Windows 任务栏 overlay 的 electron 侧装配：像素渲染在 unreadBadge.ts（纯逻辑，可单测），
-// 这里只负责 BrowserWindow 枚举与 nativeImage 构造。spec 见 docs/desktop/windows-taskbar-unread-badge.md
+// 这里只负责 BrowserWindow 枚举与 nativeImage 构造。spec 见 packages/desktop/spec/task-unread-badge.md
 const windowsTaskbarOverlayLayout = supportsNativeWindowsRoundedCorners(
   process.platform,
   readPlatformRelease(),

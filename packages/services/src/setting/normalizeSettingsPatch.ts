@@ -79,6 +79,16 @@ export function normalizeSettingsPatch(patch: Partial<AppSettings>): Partial<App
   }
 
   if (
+    "mobileRelayOrigin" in normalizedPatch &&
+    typeof normalizedPatch.mobileRelayOrigin === "string"
+  ) {
+    // 清空输入表示恢复部署默认 Relay；RPC/JSON 对 undefined 不稳定时用空串作为删除哨兵。
+    const trimmedMobileRelayOrigin = normalizedPatch.mobileRelayOrigin.trim();
+    normalizedPatch.mobileRelayOrigin =
+      trimmedMobileRelayOrigin.length > 0 ? trimmedMobileRelayOrigin : undefined;
+  }
+
+  if (
     "providerFamilyDomain" in normalizedPatch &&
     typeof normalizedPatch.providerFamilyDomain === "string"
   ) {
