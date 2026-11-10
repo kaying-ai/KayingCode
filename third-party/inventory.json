@@ -153,7 +153,7 @@
     ".agents/skills/dogfood/templates/dogfood-report-template.md": "1d77ae5193a12a77b2a2dad0bdcf90808e222c6cf6fe5206aff5197f5dc2c27a",
     ".agents/skills/electron/SKILL.md": "9b65ca4232a166cc77a13005c4e2f47c833b2368e9e7fbbf6c20637472785bdf",
     "apps/dev-docs/package.json": "3830c01890b83081debf6596aceb19734924f43b4dee2111c5ea85584f3e944b",
-    "apps/kayingcode-mobile-taro/package.json": "722d592613c1c6d3b3465894737c9bab59a01423a096eb2673203070c725b63d",
+    "apps/kayingcode-mobile-taro/package.json": "070df8c269f6db0634b72e3c569cde1ac617767791b966b9be771f3736da72cf",
     "apps/kayingcode-mobile-taro/src/ui/icons/icon-set.json": "9ecc1cfa3ab8b63ef17c5676fbdaf4210e35b5af1f5a581580c356576e8bf0a6",
     "apps/kayingcode-mobile-taro/src/ui/icons/icon.css": "4867c54bd92acbb15d29b69e0e43ce58d332775dfc55e0512a362b6ed3453c77",
     "apps/kayingcode-mobile-taro/src/ui/icons/Icon.tsx": "244be90786ef7efb6143d7a067cd2388596e63323f73e4e02ad2e287bed1d178",
@@ -200,7 +200,7 @@
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/uv.lock": "93a6297318bd1b0de2c48c389b89820ff1dd95f1baa094ddf8326f22d91901af",
     "apps/zcode-cli/packages/bootstrap/package.json": "7214b7b5bd7c42821836d3882148e813262ce10da78bd28e19372f82b4e310be",
     "apps/zcode-cli/packages/browser-use-plugin/package.json": "052a205e344e5d97f0fcb5a9ec18f7f69f425342f1e0989021a41c8ffb9cf4f4",
-    "apps/zcode-cli/packages/cli/package.json": "501bb7a7ffac63f62aec4f21ccd5dbca7e5918731819c839b3f06f819cba9f8d",
+    "apps/zcode-cli/packages/cli/package.json": "0be1db7613f924fe92857f222183f6cdb18da7f2f34d799fb5e01d75ae86535a",
     "apps/zcode-cli/packages/contracts/package.json": "cb57834e02990d7e57ba3ac0f1e2c00cc21fe2b00a07f54db0462ebc2de84f8e",
     "apps/zcode-cli/packages/core/package.json": "2bd6ad39ab887147eeb9ee1dd3b055db03f52dd33e694bd38134d8ea0be55ca9",
     "apps/zcode-cli/packages/core/src/tool/handlers/generated/bash-command-registry.ts": "60fa5acd9f5c357f4e51b1d1e944ee39da92680e4bc5e98dd708f1457fcf612b",
@@ -232,7 +232,7 @@
     "apps/zcode-cli/tools/prompt-trajectory/package.json": "7f161fc87f36691f01eb8c2034bd89cf28107da36db02bc20e76f059edd36af6",
     "apps/zcode-cli/tools/provider-regression/package.json": "65065e1cba48ffbac435ae7490623b2ccb79f664e813892592de3fca4fce099c",
     "apps/zcode-cli/tools/typescript/package.json": "23d7e50d2089d205ce3022c5bafbb6b3e31d000e41ac678a5934e0b72627cf3a",
-    "package.json": "c074d3d510693c02eed182373434c3aa86370d1f7d6beff2edab8e9baef33657",
+    "package.json": "8e161a290e4ff964fe7db5c605cf81c2957022c1c82a7aee33ed6487791b2e35",
     "packages/agent-gateway/package.json": "f1a85d6a4cad71d3f61f7518e91bdb38975b416be270dfa2ab0a2ea025226541",
     "packages/client/package.json": "2f17ae2602e5c0e99c0853dd147195e89a2b1f01fc14ff42c6163f73fa97e9c0",
     "packages/desktop/package.json": "142483a9bc53e326031d95f0dd84f61df817ea2e39d420efbdc19b89fd0159b9",
@@ -1420,7 +1420,7 @@
     "packages/ui/src/components/ai-elements/artifact.tsx": "4d8382b54b3299b827152fd0c18bee9c62cada9871e5315c85b4e886d1cfc569",
     "packages/ui/src/components/ai-elements/attachments.tsx": "a56b00d62d2e67c874db56202395876e686aa6ecfbefe8fc4d412f10d496c019",
     "packages/ui/src/components/ai-elements/canvas.tsx": "7bc92905e97c182c9a2f52b421a4d70414c8700a66039af9a4466587f74d2687",
-    "packages/ui/src/components/ai-elements/chat-loading.tsx": "26711718fabf7c757405f9030bd50ff537ab302d650410a9a4fc283caaf084f6",
+    "packages/ui/src/components/ai-elements/chat-loading.tsx": "e982b563fb9f61c5c50331bf76cb05474cd42361ba74c8924d3e36e953f56c3c",
     "packages/ui/src/components/ai-elements/checkpoint.tsx": "9f1d5294dfe5f86fc91546c8c0abf8de9286df455a455cca0742044e1f58f71f",
     "packages/ui/src/components/ai-elements/code-block.tsx": "ba356cecd57bccf6b6bcfb624fde49ccbc94f966241fd192209374745c341de9",
     "packages/ui/src/components/ai-elements/commit.tsx": "25ddbaf2620d8bfe3790fb2397f6d285b3518139e19744e52e5c09d76604e874",
@@ -1508,7 +1508,7 @@
     "packages/ui/src/components/ui/tooltip.tsx": "301dbf3a6f8b1bc496f9bdc6fbc5fe6202ed373182897f39cd1ecd19b00fdfbe",
     "packages/ui/src/components/ui/usePdfZoomOverlay.ts": "c8c91b003ce2fded32c7a2369dc6eac43aa4b9dc9c830a0f5ceccb21d366b610",
     "packages/ui/src/lib/builtinSkillI18n.ts": "4cefbc45cb02c3510e0838a3d4457c66c6b4d20104df65a2ec097a98ed0287db",
-    "packages/ui/src/styles.css": "20f45bf18907b21ff99c005815f9ead2e288e3a30fd2cbabaf41ae8323871317",
+    "packages/ui/src/styles.css": "ab1bf6ba221a5445c7d1498dd23c4a3669c7c9aa09bdcb867a41c11473cbf37e",
     "packages/web-share/package.json": "ec2e1afe29cf23aac743c5da0ff92acc5992f1b2466efaa253a5055fb0b38cec",
     "packages/web/package.json": "db071af8474084304e7a019b8132020f49338727c02b44ba68ee60762a716d66",
     "packages/web/public/material-icons/3d.svg": "9527b849f0fba57ca7640e2717b3a19cb5f5e046712cbbd8b75d73af338c68fb",
@@ -23831,7 +23831,7 @@
         },
         {
           "file": "packages/ui/src/styles.css",
-          "sha256": "0fad9aa08213a945d7a06e49d2957e59166bdeaa64689306e441bb589f31a8e6"
+          "sha256": "1129acb14eb22b342f28de7992651e26989b8d2237436c408f1a71942a37aa6d"
         }
       ]
     },
@@ -24009,7 +24009,7 @@
         },
         {
           "file": "packages/ui/src/components/ai-elements/chat-loading.tsx",
-          "sha256": "5b081b6ae6981ff67f383105eacf6f550cd8a6b6cfba60053eb931ba6071171b"
+          "sha256": "51694bdee10d31a100c6f74c16953ce6687f2981499e5c009aaea536bbf2a98b"
         },
         {
           "file": "packages/ui/src/components/ai-elements/checkpoint.tsx",
