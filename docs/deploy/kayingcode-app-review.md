@@ -28,17 +28,18 @@ flowchart LR
 
 核验时间：2026-11-10。
 
-| 项                   | 值                                                                     |
-| -------------------- | ---------------------------------------------------------------------- |
-| 审核 origin          | `https://review-relay.kaying.ai`                                       |
-| Worker 名            | `kayingcode-relay-review`                                              |
-| 当前版本             | `8c4ded21-c847-4d2f-8648-eaa1a16a7c88`（2026-11-09 部署，100% 流量）   |
-| 代码来源             | `review/0.1.2` 的 `e90df725`，尚未合入 `main`；生产 Relay 未部署该分支 |
-| 邀请有效期           | `KAYINGCODE_REMOTE_INVITE_TTL_DAYS=30`                                 |
-| 同一邀请领取次数     | `KAYINGCODE_REMOTE_INVITE_MAX_CLAIMS=20`                               |
-| 终端凭据有效期       | `KAYINGCODE_REMOTE_TERMINAL_TTL_DAYS=30`                               |
-| 微信业务域名校验文件 | `/69txzPKb7q.txt`，HTTP 200，SHA-256 与仓库文件一致                    |
-| 已知域名             | 是（`kaying.ai` 子域）；Flutter 和 Taro 不弹「未知服务器」确认         |
+| 项                   | 值                                                                                                        |
+| -------------------- | --------------------------------------------------------------------------------------------------------- |
+| 审核 origin          | `https://review-relay.kaying.ai`                                                                          |
+| Worker 名            | `kayingcode-relay-review`                                                                                 |
+| 当前版本             | `09085ec3-c55b-4bdc-bd90-7bd07d192056`（2026-11-10 部署，100% 流量）                                      |
+| 代码来源             | `review/0.1.2` 的 `4912044d`，尚未合入 `main`；生产 Relay 未部署该分支                                    |
+| 审核 Desktop         | `KayingCode Preview 0.1.2 linux-x86_64`（SHA-256 `b7caf89b…`），已启用 `KAYINGCODE_REVIEW_COMPACT_LINK=1` |
+| 邀请有效期           | `KAYINGCODE_REMOTE_INVITE_TTL_DAYS=30`                                                                    |
+| 同一邀请领取次数     | `KAYINGCODE_REMOTE_INVITE_MAX_CLAIMS=20`                                                                  |
+| 终端凭据有效期       | `KAYINGCODE_REMOTE_TERMINAL_TTL_DAYS=30`                                                                  |
+| 微信业务域名校验文件 | `/69txzPKb7q.txt`，HTTP 200，SHA-256 与仓库文件一致                                                       |
+| 已知域名             | 是（`kaying.ai` 子域）；Flutter 和 Taro 不弹「未知服务器」确认                                            |
 
 已核对：
 
@@ -46,6 +47,7 @@ flowchart LR
 - `mobile-web-manifest.json` 的 `relayOrigin` 为 `https://review-relay.kaying.ai`，`entryVersion` 为 2，`auth` 为 `desktop-invitation`。
 - 部署的 Web 认证制品包含同一邀请重开复用的摘要逻辑，与 `review/0.1.2` 一致。
 - `/remote/v4` 与全部 JS 资产返回 200；根路径 `/` 返回 404，符合只开放 `/remote` 和校验文件的预期。
+- 审核 Desktop 生成的链接为 135 字，只含 `sid` 和 authorize fragment；生成后未预领取，保留全部 20 次领取额度。
 
 提醒：
 
