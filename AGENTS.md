@@ -22,7 +22,20 @@ KayingCode 以 ZCode harness 为载体，全面接入游戏开发场景，面向
 - 上游采纳从产品 `main` 开适配分支，比较 `UPSTREAM_BASE.json.commit` 和 `upstream/main`。先更新相关 spec，再按模块审阅和验收，保留品牌、配置和平台边界。目标差异全部验收后更新采纳基线，单独同步镜像和部分采纳时保留原基线。
 - 维护者 clone 的 `origin` 指 GitHub 产品主库，`upstream` 指官方 ZCode，`gitee` 指 GitHub 单向更新的产品备份库，`legacy` 用于查阅旧历史。开工运行新鲜度检查，产品基线为 `origin/main`。镜像和迁移步骤见 [仓库同步指南](docs/deploy/github-gitee-repository.md)。
 - 清理旧分支前核对有无独有提交及其他 worktree 占用。旧历史归档标签推送到所属归档库。
-- 在短期 `release/<版本>` 分支执行根 `pnpm run release`，生成版本和变更日志提交，随后提交 PR。正式 `kaying-code-v<版本>` 标签指向发布验收通过的 GitHub `main` 提交。热修也通过 PR 进入 `main`。
+- 版本发布按下方 [版本发布](#版本发布) 执行；正式 `kaying-code-v<版本>` 标签指向发布验收通过的 GitHub `main` 提交。热修也通过 PR 进入 `main`。
+
+## 版本发布
+
+发布由标签自动驱动，不要在本地手工创建 Release 或上传制品，也不要为了等构建在前台持续轮询；推送标签后按需用 `gh run list` / `gh run view` 查询，`Publish GitHub release` 会在三套签名构建全部成功后自动创建或更新 Release。
+
+1. 从同步后的 `origin/main` 开 `release/<版本>`，保持工作区干净；无关本地改动先 stash，发布提交不能混入。
+2. 根 `package.json` 是产品版本基准。执行 `pnpm exec release-it --ci --increment patch` 生成版本与 CHANGELOG。必须用 `pnpm exec` 传参；`pnpm run release -- --ci ...` 会把参数当位置参数并退回交互模式。release-it 推荐 minor 时，仍按维护者决定显式指定 patch。
+3. 同步各端显式版本：`apps/zcode-cli/packages/cli/package.json`、`apps/kayingcode-mobile-taro/package.json` 与 `src/ui/appVersion.ts`、`apps/kayingcode-mobile-flutter/pubspec.yaml`（build number 递增）与 `lib/update/app_version.dart`、`README.md` / `README.en.md` 下载链接。
+4. 运行 `pnpm run source:map`、`node scripts/licenses.mjs notices`、`node scripts/licenses.mjs check`（strict 缺口如实记录）、`node --test scripts/first-public-release.test.mjs`、`pnpm run verify:pre-push`、`pnpm run typecheck`；把同步文件 amend 进同一个 `chore: release` 提交。
+5. 推送 `release/<版本>` 并开 PR；可启用 auto-merge，让 `Source checks (Windows)` 通过后自动合入，不必前台等待。
+6. 预验收：在合入后的 `main` 提交创建 `kaying-code-preflight-v<版本>-<提交前12位SHA>` 标签。推送前为精确标签临时放行 `macos-release`、`linux-release`、`windows-release`、`android-release` 四个环境，验收后立即删除规则并确认只剩 `kaying-code-v*`。预验收只上传带 `preflight` 名称的 Actions 制品，不创建 Release。
+7. 正式发布：同一 `main` 提交推送 `kaying-code-v<版本>` 标签，自动触发三套签名构建；全部成功后自动发布。任一步失败只重跑失败 job（`gh run rerun <run-id> --failed`），不放宽签名、公证或验签标准。
+8. 0.1.4 起默认恢复“先预验收、再正式标签”；确需跳过预验收时，必须在 `scripts/spec/product-release-version.md` 记录一次性偏离、原因、影响范围和验证依据。
 
 ## 命令与仓库结构
 
