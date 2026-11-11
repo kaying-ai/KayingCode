@@ -1,6 +1,6 @@
 # 移动端审核环境部署（Ubuntu + Cloudflare Relay）
 
-用于应用商店与微信小程序审核（2–4 周、多名审核员）。审核员在 Flutter 或 Taro（微信小程序/H5）中粘贴一条自托管 V2 连接链接，WebView 打开官方 Web 工作台，业务仍由 Ubuntu 上的 Desktop Host 执行。Flutter 与 Taro 共用同一套 Relay、邀请策略和 Host 预算；微信侧另需配置业务域名，见第 5.1 节。平台提交位置、当前审核域名和审核备注模板见[应用审核方案](kayingcode-app-review.md)。返回[部署入口](../deploy.md)。
+用于应用商店与微信小程序审核（2–4 周、多名审核员）。审核员在 Flutter 或 Taro（微信小程序/H5）中粘贴一条自托管 V2 连接链接，WebView 打开官方 Web 工作台，业务仍由 Ubuntu 上的 Desktop Host 执行。Flutter 与 Taro 共用同一套 Relay、邀请策略和 Host 预算；微信侧另需配置业务域名，见第 5.1 节。平台提交位置、当前审核域名和审核备注模板见[应用审核方案](kayingcode-app-review.md)；逐步操作清单见[审核操作手册](kayingcode-review-runbook.md)。返回[部署入口](../deploy.md)。
 
 ```mermaid
 flowchart LR

@@ -8,6 +8,7 @@
 | 选择桌面、Ubuntu 与移动端连接方式 | [Agent 连接方式总览](deploy/agent-connection/README.md)                        |
 | 自建手机远控与同源 Web            | [Cloudflare Relay 首次部署](../apps/kayingcode-relay-cloudflare/DEPLOYMENT.md) |
 | 移动端审核环境（Ubuntu 主机）     | [审核环境部署](deploy/kayingcode-review-environment.md)                        |
+| 审核环境逐步操作（主机与链接）    | [审核操作手册](deploy/kayingcode-review-runbook.md)                            |
 | Flutter / Taro 应用审核           | [审核方案与提交指南](deploy/kayingcode-app-review.md)                          |
 | 上游 Web 构建与来源校验           | [Web](deploy/kayingcode-desktop-web.md)                                        |
 | GitHub 主库与 Gitee 备份镜像      | [仓库同步指南](deploy/github-gitee-repository.md)                              |
