@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Root workspace action hook 集中编排项目、远程和 conversation 入口；合并期保持动作边界完整，后续按领域拆分。 */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DesktopCommandIds,
   type AppSettings,
@@ -13,6 +13,7 @@ import {
 import type { IServiceAccessor } from "@zcode/services";
 import type { CreateTaskRequest } from "@/app-shell/types.js";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog.js";
+import { toast } from "@/components/ui/toast.js";
 import { reportAppTelemetryEvent } from "@/lib/appTelemetry.js";
 import { resolveLogoutProviderFamilyDomain } from "@/lib/providerFamilyDomainSettings.js";
 import { isRendererReloadNavigation } from "@/lib/rendererNavigation.js";
@@ -20,6 +21,10 @@ import { parseWslUncWorkspacePath } from "@/lib/wslUncWorkspace.js";
 import { logger } from "@/logger.js";
 import { openFolderFromWorkspaceEntry } from "@/root/openWorkspaceFolderEntry.js";
 import { useConversationWorkspaceActions } from "@/root/useConversationWorkspaceActions.js";
+import {
+  resolvePreparedProjectNewTaskTarget,
+  type PreparedProjectNewTaskTarget,
+} from "@/root/newTaskProjectTarget.js";
 import { useKayingCodeSessionStore } from "@/store/kayingcodeSessionStore.js";
 import { isWorkspaceReadOnly, type TabStore, type TabStoreState } from "@/store/tabStore.js";
 import type { RootProps } from "@/root/types.js";
@@ -118,6 +123,7 @@ export function useRootWorkspaceActions({
   onOpenRemoteConnection?: (preference?: OpenRemoteConnectionPreference) => void;
   workbenchGroupClientMode?: KayingCodeTaskClientMode;
 }) {
+  const navigationSequence = useRef(0);
   const [workspaceActionError, setWorkspaceActionError] = useState<string | null>(null);
   const requestConfirmation = useConfirmDialog();
   const {
@@ -192,8 +198,36 @@ export function useRootWorkspaceActions({
   );
 
   const startNewTaskFromActiveWorkspace = useCallback(
-    (source: string, request?: CreateTaskRequest) => {
+    async (source: string, request?: CreateTaskRequest) => {
       const state = tabStoreApi.getState();
+      const sequence = ++navigationSequence.current;
+      const originTabId = state.activeTabId;
+      const originWorkspace = state.activeWorkspacePath
+        ? useKayingCodeSessionStore
+            .getState()
+            .getWorkspaceState(
+              state.activeWorkspacePath,
+              state.activeWorkspaceIdentity ?? undefined,
+            )
+        : null;
+      // 目录准备是异步的；期间切换 tab/草稿或发起另一次新建后，本次结果不得再导航。
+      const isCurrent = () =>
+        (typeof request !== "object" || !request?.isCurrent || request.isCurrent() !== false) &&
+        sequence === navigationSequence.current &&
+        tabStoreApi.getState().activeTabId === originTabId &&
+        (!state.activeWorkspacePath ||
+          (() => {
+            const current = useKayingCodeSessionStore
+              .getState()
+              .getWorkspaceState(
+                state.activeWorkspacePath!,
+                state.activeWorkspaceIdentity ?? undefined,
+              );
+            return (
+              current.activeTaskId === originWorkspace?.activeTaskId &&
+              current.draftFocusVersion === originWorkspace?.draftFocusVersion
+            );
+          })());
       const {
         activeWorkspacePath: currentActiveWorkspacePath,
         activeWorkspaceIdentity: currentActiveWorkspaceIdentity,
@@ -207,7 +241,7 @@ export function useRootWorkspaceActions({
       // 跨项目发起已保存工作流时，新任务必须落在工作流归属项目，而非活动项目
       // request 显式带 targetWorkspace 时采用它，
       // 否则惰性回退到 workbench 焦点解析，无 target 时行为与旧版逐字节一致。
-      const newTaskTarget = resolveNewTaskTargetFromRequest(request, () =>
+      let newTaskTarget = resolveNewTaskTargetFromRequest(request, () =>
         resolveWorkbenchNewTaskTarget({
           activeWorkspacePath: currentActiveWorkspacePath,
           activeWorkspaceIdentity: currentActiveWorkspaceIdentity,
@@ -220,6 +254,45 @@ export function useRootWorkspaceActions({
               : INITIAL_PANE_LAYOUT,
         }),
       );
+      const requestedProjectId =
+        typeof request === "string"
+          ? undefined
+          : (request?.projectId ?? request?.targetWorkspace?.projectId);
+      const requestedHostId = typeof request === "string" ? undefined : request?.hostId;
+      // 项目选择器只提交 projectId/hostId；cwd 由 Host prepareSession 解析（含零 root 建目录、
+      // 主目录复检和远程身份），不能沿用当前活动 workspace。
+      let preparedProjectTarget: PreparedProjectNewTaskTarget | null = null;
+      try {
+        preparedProjectTarget = await resolvePreparedProjectNewTaskTarget({
+          request,
+          projectService: services.projectService,
+        });
+      } catch (error) {
+        if (!isCurrent()) return;
+        logger.error(`[Root] ${source} failed to prepare project workspace`, {
+          error,
+          projectId: requestedProjectId,
+          hostId: requestedHostId,
+        });
+        // Bug 原因：项目准备失败若只写 workspaceActionError，当前 Root 没有消费者，
+        // 用户看到的就是“点了没反应”。动作出口直接提示，主目录失效文案沿用既有翻译。
+        const message = error instanceof Error ? error.message : String(error);
+        setWorkspaceActionError(message);
+        toast(
+          message === "project.primaryRootMissing" || message === "project.primaryRootUnavailable"
+            ? intl.formatMessage({ id: message })
+            : message,
+        );
+        return;
+      }
+      if (!isCurrent()) return;
+      if (preparedProjectTarget) {
+        newTaskTarget = {
+          workspacePath: preparedProjectTarget.workspacePath,
+          workspaceIdentity: preparedProjectTarget.workspaceIdentity,
+        };
+      }
+      const draftProjectId = preparedProjectTarget?.projectId ?? requestedProjectId;
 
       if (
         typeof request === "object" &&
@@ -239,7 +312,7 @@ export function useRootWorkspaceActions({
       // 必须在动作边界再次校验，避免历史只读页被隐式切回可发送草稿态。
       if (
         isWorkspaceReadOnly(
-          state,
+          tabStoreApi.getState(),
           newTaskTarget.workspacePath,
           newTaskTarget.workspaceIdentity ?? undefined,
         )
@@ -268,11 +341,10 @@ export function useRootWorkspaceActions({
       const groupedDraftPlacement =
         typeof request === "string" ? undefined : request?.groupedDraftPlacement;
       // 项目/分组是未提交草稿的组织意图；Root 在导航前冻结本次目标，迟到导航不能改写归属。
-      const requestedProjectId = typeof request === "string" ? undefined : request?.projectId;
       const requestedTaskGroupId = typeof request === "string" ? undefined : request?.taskGroupId;
       const requestedCreateSource = typeof request === "string" ? undefined : request?.createSource;
       const draftScope = resolveComposerScope(
-        requestedProjectId,
+        draftProjectId,
         newTaskTarget.workspaceIdentity ?? undefined,
         composerClientNamespace,
       );
@@ -301,7 +373,7 @@ export function useRootWorkspaceActions({
           {
             groupedDraftPlacement,
             createSource: requestedCreateSource,
-            projectId: requestedProjectId,
+            projectId: draftProjectId,
             taskGroupId: requestedTaskGroupId,
           },
         );
@@ -316,7 +388,7 @@ export function useRootWorkspaceActions({
           {
             text: initialPrompt,
             ...(initialPromptMention ? { mention: initialPromptMention } : {}),
-            ...(requestedProjectId !== undefined ? { projectId: requestedProjectId } : {}),
+            ...(draftProjectId !== undefined ? { projectId: draftProjectId } : {}),
             ...(requestedTaskGroupId !== undefined ? { taskGroupId: requestedTaskGroupId } : {}),
           },
           draftScope,
@@ -331,7 +403,14 @@ export function useRootWorkspaceActions({
           );
       }
     },
-    [addTab, composerClientNamespace, intl, tabStoreApi, workbenchGroupClientMode],
+    [
+      addTab,
+      composerClientNamespace,
+      intl,
+      services.projectService,
+      tabStoreApi,
+      workbenchGroupClientMode,
+    ],
   );
 
   const handleLogout = useCallback(async () => {
@@ -594,7 +673,7 @@ export function useRootWorkspaceActions({
 
   const handleCreateTask = useCallback(
     (request?: CreateTaskRequest) => {
-      startNewTaskFromActiveWorkspace("sidebar new task", request);
+      void startNewTaskFromActiveWorkspace("sidebar new task", request);
     },
     [startNewTaskFromActiveWorkspace],
   );

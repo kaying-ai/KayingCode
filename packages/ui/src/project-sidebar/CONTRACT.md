@@ -46,6 +46,8 @@ UI 纠偏：分区复用 WorkspacePurposeSection 和原折叠/顺序偏好；项
 
 `ProjectDirectoryProvider` 是 shell 内项目树读取和排序偏好的唯一 UI owner；`ProjectSidebar` 与公开 `ProjectComposerMenu` 共用该投影。菜单不得从 tabs/cwd 生成项目或推断归属。候选为未删除项目（包括离线入口），按侧栏顺序，搜索名称和 roots；离线不可选。选中来自草稿 projectId + Host 身份，命令复用 onCreateTask -> prepareSession，目录绑定与桌面/手机导航仍由 Root/Host 承担。零 roots 不被过滤。旧 ChatEmptyState 的 tab 菜单退场。
 
+2026-11-11：选择项目只提交 `projectId`/`hostId`，Root 在启动草稿前必须调用 `projectService.prepareSession` 取得主目录与（远程）workspaceIdentity；不得继续把当前活动 workspace 当作 cwd，否则零 root 项目、跨项目选择和远程项目会在首发预留时报 `project.cwd-not-in-roots`。显式带 `targetWorkspace` 的侧栏/工作流入口继续使用已解析目录，不重复准备。异步准备期间用户切换 tab/草稿或发起另一次新建时，迟到结果不得导航。
+
 归档管理经 index 公开，属于 project-sidebar/ui。RootWorkspaceContent 提供单一项目目录 owner，嵌套 Provider 复用；设置、侧栏、composer 共用树。归档按 Host+projectId 分组，删除容器和未归类不按目录重绑；操作复用模块内 mutation adapter 与现有 Controller/TaskService。页面只保存筛选/分页/确认候选和在途状态，批量部分失败不伪造全部成功。见 `docs/superpowers/specs/2026-09-11-archive-management.md`。
 
 项目管理（设置 › 项目）同样经 index 公开、复用同一目录 owner。行、疑似原因、筛选与排序是 `project-management-view.ts` 的纯派生；`useProjectManagement` 只持有在途批次锁与最近一次失败，本地走 `deleteProject` / `restoreProject`，远程只增删本机入口（`removeEntry` / `addEntry`），每批结束只刷新一次树。选择是页面草稿，生效集合取草稿与当前可见可移除行的交集。侧栏更多菜单末尾的「管理项目…」仅桌面端。见 `docs/superpowers/specs/2026-10-24-project-management.md`。

@@ -12,6 +12,7 @@ import type {
   PluginHookDetail,
   PluginLoadOutcome,
   PluginManifest,
+  PluginUiContributions,
   PluginUiSurfaceDefinition,
   PluginMetadata,
   PluginOperationOptions,
@@ -230,6 +231,9 @@ export class NodePluginAdapter implements PluginPort {
           enabled,
           declaredMcpServerNames,
           request.config.options[loaded.id] ?? {},
+          // 声明式 UI 面板（uiContributions.sidePanes）必须随插件元数据下发；否则 renderer
+          // 收不到“转写对比”等入口，菜单和回执自动打开都会变成空集合。
+          enabled ? uiContributionResult.contributions : undefined,
           // 插件 UI 面板入口（A5）：与启用态无关地解析，禁用插件的入口由 listUiSurfaces 过滤。
           parsePluginUiSurfaces({ loaded, declaredMcpServerNames, diagnostics }),
         ),
@@ -311,6 +315,7 @@ function createPluginMetadata(
   enabled: boolean,
   declaredMcpServerNames: string[],
   configuredOptions: Record<string, string | number | boolean>,
+  uiContributions: PluginUiContributions | undefined,
   uiSurfaces: PluginUiSurfaceDefinition[],
 ): PluginMetadata {
   // manifest 的 author/homepage 作为详情页信息区的回退来源（商店 listing 优先）。
@@ -345,6 +350,7 @@ function createPluginMetadata(
     skillCount: component.skillCount,
     skillRootCount: component.skillRoots.length,
     source: loaded.source,
+    ...(uiContributions ? { uiContributions } : {}),
     ...(uiSurfaces.length > 0 ? { uiSurfaces } : {}),
     userConfig: loaded.manifest.userConfig,
     version: loaded.manifest.version,

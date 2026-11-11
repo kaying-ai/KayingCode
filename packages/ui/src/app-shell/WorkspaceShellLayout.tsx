@@ -1244,7 +1244,6 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutContent({
           workspaceIdentity={workspaceIdentity}
           onCreateTask={handleCreateTaskInChat}
           onSelectConversationWorkspace={handleSelectConversationWorkspace}
-          onOpenFolder={onOpenFolderFromWorkspaceMenu}
           allowRemoteWorkspace={allowRemoteWorkspace}
           onOpenRemoteWorkspace={onOpenRemoteWorkspace}
         >

@@ -59,6 +59,8 @@ export interface WorkspaceShellKayingCodeState {
 }
 
 export interface CreateTaskOptions {
+  /** 异步准备目录期间取消或切换后不得再导航。 */
+  isCurrent?: () => boolean;
   /** 异步预填只能提交到解析 Skill 时的同一新任务目标。 */
   expectedWorkspaceKey?: string;
   provider?: KayingCodeProvider;
@@ -67,6 +69,8 @@ export interface CreateTaskOptions {
    * 仅作为 startDraft 输入，不在 UI 侧另存第二份项目状态。
    */
   projectId?: string | null;
+  /** 显式项目所属 Host；与 projectId 一起交给 prepareSession 固化 cwd。 */
+  hostId?: string;
   /** 仅分组组织意图，不决定执行项目或 cwd。 */
   taskGroupId?: string | null;
   groupedDraftPlacement?: GroupedDraftTaskPlacement;
@@ -76,7 +80,12 @@ export interface CreateTaskOptions {
   /** 与 initialPrompt canonical 前缀对应的结构化 mention；仅用于编辑器展示。 */
   initialPromptMention?: ComposerMentionPrefill;
   /** 新任务落在哪个 workspace；缺省取活动 workspace。 */
-  targetWorkspace?: { workspacePath: string; workspaceIdentity?: string };
+  targetWorkspace?: {
+    projectId?: string | null;
+    hostId?: string;
+    workspacePath: string;
+    workspaceIdentity?: string;
+  };
 }
 
 export type CreateTaskRequest = KayingCodeProvider | CreateTaskOptions;
