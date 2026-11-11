@@ -1,6 +1,6 @@
 {
   "name": "@zcode/cli",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Main CLI application for kayingcode",
   "bin": {

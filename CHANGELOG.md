@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.1.4](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.1.3...kaying-code-v0.1.4) (2026-11-11)
+
+### Features
+
+* **mobile:** add Russian UI locale ([637a3c2](https://github.com/kaying-ai/KayingCode/commit/637a3c20a84045e9bb26c5d9bc2ca0cb47c587d0))
+
+
+### Bug Fixes
+
+* restore project picker and embedded browser panels ([ef93fcc](https://github.com/kaying-ai/KayingCode/commit/ef93fcc06fd8aec49ba546f2fb3e58505d42e4df))
+  * resolve selected project cwd through Host prepareSession and keep
+  * retain plugin uiContributions in PluginMetadata so TapTap
+  * consume the injected node_repl browser broker env and send
+  * allow the TapTap preview partition in BrowserViewLoadUrl owner
+
+
+### Documentation
+
+* **mobile:** add Russian RuStore screenshots ([9c77d51](https://github.com/kaying-ai/KayingCode/commit/9c77d51b273fedb52af0c7623d00cf15fa73c43b))
+
+* **review:** add review environment runbook ([84ccc19](https://github.com/kaying-ai/KayingCode/commit/84ccc192c779aa246a2a8a5919ab418c0f691468))
+  * add step-by-step Ubuntu host deployment and link issuance runbook
+  * document fixed Xvfb + VNC + xclip flow for headless hosts
+  * link the runbook from deployment index and review docs
+
 ## [0.1.3](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.1.2...kaying-code-v0.1.3) (2026-11-10)
 
 ### 设置
