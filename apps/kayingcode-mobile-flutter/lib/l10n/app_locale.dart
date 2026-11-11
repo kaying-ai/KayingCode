@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 
-/// 支持的三门 UI 语言；`system` 只是「跟随系统」的偏好值，不是语言。
-enum AppLanguage { system, zhCN, zhTW, enUS }
+/// 支持的四门 UI 语言；`system` 只是「跟随系统」的偏好值，不是语言。
+enum AppLanguage { system, zhCN, zhTW, enUS, ruRU }
 
 const String appLanguageSystem = 'system';
 
@@ -11,11 +11,13 @@ const List<String> appLanguageCodes = <String>[
   'zh-CN',
   'zh-TW',
   'en-US',
+  'ru-RU',
 ];
 
 const Locale appLocaleZhCN = Locale('zh', 'CN');
 const Locale appLocaleZhTW = Locale('zh', 'TW');
 const Locale appLocaleEnUS = Locale('en', 'US');
+const Locale appLocaleRuRU = Locale('ru', 'RU');
 
 /// MaterialApp 的 supportedLocales；顺序影响 Flutter 自身的兜底匹配，
 /// 生效语言仍由 [resolveAppLocale] 显式决定。
@@ -23,6 +25,7 @@ const List<Locale> supportedAppLocales = <Locale>[
   appLocaleZhCN,
   appLocaleZhTW,
   appLocaleEnUS,
+  appLocaleRuRU,
 ];
 
 const Locale defaultAppLocale = appLocaleZhCN;
@@ -31,6 +34,7 @@ AppLanguage appLanguageFromCode(String? code) => switch (code) {
   'zh-CN' => AppLanguage.zhCN,
   'zh-TW' => AppLanguage.zhTW,
   'en-US' => AppLanguage.enUS,
+  'ru-RU' => AppLanguage.ruRU,
   _ => AppLanguage.system,
 };
 
@@ -39,12 +43,13 @@ String appLanguageToCode(AppLanguage language) => switch (language) {
   AppLanguage.zhCN => 'zh-CN',
   AppLanguage.zhTW => 'zh-TW',
   AppLanguage.enUS => 'en-US',
+  AppLanguage.ruRU => 'ru-RU',
 };
 
 /// 系统语言 → 应用语言。
 ///
 /// zh-Hant / TW / HK / MO 统一落到繁体；其他中文（含 zh-Hans、zh、zh-SG）
-/// 落到简体；英文落到 en-US；其余语言回落产品默认 zh-CN。
+/// 落到简体；英文落到 en-US；俄文落到 ru-RU；其余语言回落产品默认 zh-CN。
 Locale resolveAppLocale(List<Locale> systemLocales) {
   for (final locale in systemLocales) {
     final language = locale.languageCode.toLowerCase();
@@ -60,6 +65,7 @@ Locale resolveAppLocale(List<Locale> systemLocales) {
       return appLocaleZhCN;
     }
     if (language == 'en') return appLocaleEnUS;
+    if (language == 'ru') return appLocaleRuRU;
   }
   return defaultAppLocale;
 }
@@ -73,6 +79,7 @@ Locale effectiveAppLocale({
     AppLanguage.zhCN => appLocaleZhCN,
     AppLanguage.zhTW => appLocaleZhTW,
     AppLanguage.enUS => appLocaleEnUS,
+    AppLanguage.ruRU => appLocaleRuRU,
   };
 }
 

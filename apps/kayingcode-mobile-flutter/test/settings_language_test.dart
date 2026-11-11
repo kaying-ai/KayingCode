@@ -10,7 +10,7 @@ import 'package:kayingcode_mobile/ui/theme.dart';
 import 'package:kayingcode_mobile/ui/ui_settings.dart';
 
 void main() {
-  testWidgets('设置页提供跟随系统与三语选项，切换后持久化', (tester) async {
+  testWidgets('设置页提供跟随系统与四语选项，切换后持久化', (tester) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     final ui = UiSettings();
     await ui.load();
@@ -52,14 +52,15 @@ void main() {
     expect(find.widgetWithText(ChoiceChip, '简体中文'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '繁體中文'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, 'English'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, 'Русский'), findsOneWidget);
     expect(ui.language, AppLanguage.system);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, '繁體中文'));
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Русский'));
     await tester.pumpAndSettle();
-    expect(ui.language, AppLanguage.zhTW);
+    expect(ui.language, AppLanguage.ruRU);
 
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString('zflow_ui_locale'), 'zh-TW');
+    expect(prefs.getString('zflow_ui_locale'), 'ru-RU');
     expect(tester.takeException(), isNull);
   });
 }

@@ -49,4 +49,22 @@ const zcodeAuthStrings = AppStringTable(
     'zcodeAuth.required':
         'Sign in again with the same ZCode account as on your computer.',
   },
+  ruRU: {
+    'zcodeAuth.title': 'Вход в ZCode',
+    'zcodeAuth.description':
+        'Выберите тот же способ входа и ту же учётную запись, что на компьютере.',
+    'zcodeAuth.zai': 'Войти через Z.ai',
+    'zcodeAuth.bigmodel': 'Войти через BigModel',
+    'zcodeAuth.copy': 'Скопировать ссылку для входа',
+    'zcodeAuth.check': 'Проверить вход',
+    'zcodeAuth.waiting': 'Завершите авторизацию в браузере и вернитесь сюда.',
+    'zcodeAuth.failed': 'Вход не завершён или истёк. Повторите попытку.',
+    'zcodeAuth.openFailed':
+        'Не удалось открыть браузер. Скопируйте ссылку и откройте её в браузере.',
+    'zcodeAuth.copied':
+        'Ссылка скопирована. Завершите авторизацию в браузере и вернитесь сюда.',
+    'zcodeAuth.required':
+        'Войдите снова в ту же учётную запись ZCode, что на компьютере.',
+    'zcodeAuth.waitingDevice': 'Ожидание подключения компьютера…',
+  },
 );

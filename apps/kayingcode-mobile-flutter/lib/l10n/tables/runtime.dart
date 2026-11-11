@@ -146,4 +146,68 @@ const AppStringTable runtimeStrings = AppStringTable(
     'protocol.workspaceGenerationChanged':
         'The workspace restore request was superseded',
   },
+  ruRU: <String, String>{
+    'notify.completion.failed': 'Задача не выполнена',
+    'notify.completion.interrupted': 'Задача прервана',
+    'notify.completion.completed': 'Задача выполнена',
+    'notify.permission.waiting': 'Запрос разрешения ожидает подтверждения',
+    'notify.permission.withTool': 'Запрос разрешения · {tool}',
+    'notify.attention.input': 'Ожидается ваш ответ',
+    'notify.running': 'Выполняется задач: {count}',
+    'device.unnamed': 'Безымянное устройство',
+    'connect.invalidUrl':
+        'Не удалось разобрать URL подключения (нужен https и параметры sid/hash/t)',
+    'connect.accountRemoved': 'Подключение было удалено',
+    'connect.cancelled': 'Подключение отменено',
+    'connect.cancelledDuringConnect':
+        'Подключение отменено: устройство отключилось или было удалено до завершения',
+    'connect.sessionInvalid':
+        'Учётные данные недействительны: создайте ссылку удалённого управления заново в настольном KayingCode, удалите это устройство и добавьте его снова',
+    'connect.sessionConflict':
+        'Конфликт подключения: с этими учётными данными уже работает другой удалённый клиент. Закройте его или создайте новую ссылку.',
+    'connect.desktopDisconnected':
+        'Компьютер не подключён: откройте настольный KayingCode и убедитесь, что удалённое управление включено',
+    'connect.notConfirmed':
+        'Компьютер не подтвердил подключение до истечения времени: убедитесь, что он в сети, и повторите или создайте новую ссылку',
+    'connect.relayUnavailable':
+        'Не удалось связаться с сервером-ретранслятором: проверьте сеть — возможно, сервис временно недоступен',
+    'connect.kicked': 'Компьютер отключил это устройство (kicked)',
+    'connect.authMalformed':
+        'Ошибка протокола сопряжения (изменился формат кадра запроса): протокол компьютера мог обновиться. Экспортируйте журнал протокола и сообщите о проблеме.',
+    'connect.pairingTimeout':
+        'Время сопряжения истекло: компьютер не ответил. Учётные данные могли устареть или протокол изменился (экспортируйте журнал протокола для диагностики).',
+    'connect.network': 'Ошибка сети: сервер недоступен ({error})',
+    'protocol.savedCredentialUnavailable':
+        'Сохранённые учётные данные сопряжения недоступны. Добавьте новый код сопряжения с компьютером.',
+    'protocol.reviewClaimFailed': 'Не удалось получить код проверки',
+    'protocol.pairingClaimFailed': 'Не удалось запросить сопряжение',
+    'protocol.pairingStatusFailed': 'Не удалось проверить состояние сопряжения',
+    'protocol.nodeListFailed': 'Не удалось загрузить список узлов',
+    'protocol.workspaceListFailed':
+        'Не удалось загрузить список рабочих областей',
+    'protocol.attachmentFailed': 'Не удалось запросить вложение Relay',
+    'protocol.credentialRefreshFailed':
+        'Не удалось обновить учётные данные устройства',
+    'protocol.credentialMissing':
+        'Учётные данные устройства отсутствуют. Выполните сопряжение заново.',
+    'protocol.credentialInvalid':
+        'Учётные данные устройства недействительны. Выполните сопряжение заново.',
+    'protocol.credentialRefreshUnknown':
+        'Результат обновления учётных данных неизвестен. Выполните сопряжение заново.',
+    'protocol.deviceRevoked':
+        'Устройство отозвано. Выполните сопряжение заново.',
+    'protocol.credentialExpired':
+        'Срок действия учётных данных истёк. Выполните сопряжение заново.',
+    'protocol.credentialRefreshInvalid':
+        'Некорректный ответ на обновление учётных данных. Выполните сопряжение заново.',
+    'protocol.credentialSaveFailed':
+        'Не удалось безопасно сохранить новые учётные данные. Выполните сопряжение заново.',
+    'protocol.grantUnavailable':
+        'Разрешение на сопряжение больше недоступно. Добавьте новый код сопряжения с компьютером.',
+    'protocol.pairingTargetAmbiguous':
+        'Цель сопряжения неоднозначна. Обновите Relay и добавьте новый код сопряжения с компьютером.',
+    'protocol.connectionClosed': 'Подключение к устройству закрыто',
+    'protocol.workspaceGenerationChanged':
+        'Запрос восстановления рабочей области устарел',
+  },
 );

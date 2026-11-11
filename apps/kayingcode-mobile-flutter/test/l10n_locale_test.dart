@@ -6,7 +6,7 @@ import 'package:kayingcode_mobile/l10n/strings.dart';
 void main() {
   tearDown(AppLocale.resetForTest);
 
-  test('系统语言解析：繁中、简中、英文与其他语言', () {
+  test('系统语言解析：繁中、简中、英文、俄文与其他语言', () {
     expect(resolveAppLocale([const Locale('zh', 'CN')]), appLocaleZhCN);
     expect(resolveAppLocale([const Locale('zh', 'SG')]), appLocaleZhCN);
     expect(resolveAppLocale([const Locale('zh')]), appLocaleZhCN);
@@ -20,6 +20,8 @@ void main() {
     expect(resolveAppLocale([const Locale('zh', 'HK')]), appLocaleZhTW);
     expect(resolveAppLocale([const Locale('zh', 'MO')]), appLocaleZhTW);
     expect(resolveAppLocale([const Locale('en', 'GB')]), appLocaleEnUS);
+    expect(resolveAppLocale([const Locale('ru', 'RU')]), appLocaleRuRU);
+    expect(resolveAppLocale([const Locale('ru', 'KZ')]), appLocaleRuRU);
     expect(resolveAppLocale([const Locale('ja', 'JP')]), appLocaleZhCN);
     expect(resolveAppLocale(const []), appLocaleZhCN);
   });
@@ -64,6 +66,13 @@ void main() {
       ),
       appLocaleEnUS,
     );
+    expect(
+      effectiveAppLocale(
+        override: AppLanguage.ruRU,
+        systemLocales: const [Locale('zh', 'CN')],
+      ),
+      appLocaleRuRU,
+    );
   });
 
   test('偏好编码往返，未知编码回落到跟随系统', () {
@@ -81,6 +90,8 @@ void main() {
     expect(t('notify.running', args: {'count': 2}), '2 個任務執行中');
     AppLocale.update(appLocaleEnUS);
     expect(t('notify.running', args: {'count': 2}), '2 tasks running');
+    AppLocale.update(appLocaleRuRU);
+    expect(t('notify.running', args: {'count': 2}), 'Выполняется задач: 2');
   });
 
   test('缺失参数保留占位符，缺失 key 返回 key 本身', () {
@@ -98,5 +109,6 @@ void main() {
     expect(isTraditionalLocale(const Locale('zh', 'HK')), isTrue);
     expect(isTraditionalLocale(const Locale('zh', 'CN')), isFalse);
     expect(isTraditionalLocale(const Locale('en', 'US')), isFalse);
+    expect(isTraditionalLocale(const Locale('ru', 'RU')), isFalse);
   });
 }

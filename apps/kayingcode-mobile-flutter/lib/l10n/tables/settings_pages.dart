@@ -394,4 +394,152 @@ const AppStringTable settingsPagesStrings = AppStringTable(
     'services.enabled': 'Enabled',
     'services.disabled': 'Disabled',
   },
+  ruRU: <String, String>{
+    'settings.support.title': 'Связаться с поддержкой',
+    'settings.support.qrSemantic': 'QR-код поддержки',
+    'settings.support.qrHint':
+        'Отсканируйте QR-код, чтобы связаться с поддержкой; можно также сделать снимок и распознать из галереи',
+    'settings.close': 'Закрыть',
+    'settings.home.privacyOpenFailed':
+        'Не удалось открыть политику конфиденциальности. Повторите позже.',
+    'settings.home.version': 'Мобильная версия · v{version}',
+    'settings.home.companySite': 'Сайт компании',
+    'settings.home.companyCopied': 'Адрес сайта скопирован',
+    'settings.home.privacy': 'Политика конфиденциальности',
+    'settings.home.supportSubtitle': 'Показать QR-код поддержки',
+    'settings.home.supportThumbSemantic': 'Миниатюра QR-кода поддержки',
+    'settings.home.appearanceLanguage': 'Оформление и язык',
+    'settings.home.connectionsNotifications': 'Подключения и уведомления',
+    'settings.home.modelsServices': 'Модели и сервисы',
+    'settings.home.automation': 'Автоматизация',
+    'settings.home.diagnosticsAbout': 'Диагностика и о программе',
+    'settings.group.devicesConnections': 'Устройства и подключения',
+    'settings.group.backgroundNotifications': 'Фон и уведомления',
+    'settings.group.models': 'Модели',
+    'settings.group.about': 'О программе',
+    'settings.models.noBridge':
+        'Доступно после подключения бота и выбора рабочей области',
+    'settings.models.providers': 'Провайдеры моделей',
+    'settings.models.providersSubtitleKaying':
+        'Просмотреть провайдеров и модели, настроенные на узле',
+    'settings.models.providersSubtitle':
+        'Добавление, включение/отключение и удаление провайдеров моделей',
+    'settings.usage': 'Использование',
+    'settings.usageSubtitle': 'Квота / лимиты / сведения о подписке',
+    'settings.services': 'Сервисы',
+    'settings.servicesSubtitle': 'Плагины / навыки / команды',
+    'settings.diagnostics.title': 'Диагностика и журналы',
+    'settings.diagnostics.subtitle':
+        'Диагностический журнал / журнал протокола / отладчик',
+    'settings.about.body':
+        'Мобильная версия содержит открытый код Zflow (MIT, Copyright (c) 2026 Zemote contributors).',
+    'settings.about.licenseHint':
+        'Полные сведения об авторских правах и зависимостях — в разделе «Открытые лицензии».',
+    'settings.about.licenses': 'Открытые лицензии',
+    'settings.verboseFrames.title': 'Журнал кадров протокола (подробный)',
+    'settings.verboseFrames.subtitle':
+        'Записывает каждый отправленный и полученный кадр; во время потоковой передачи создаёт нагрузку — включайте при отладке протокола',
+    'settings.diagLog.title': 'Диагностический журнал (logcat)',
+    'settings.diagLog.subtitle':
+        'Выводит метки времени подключения, подписки и отправки в системный журнал; включайте при поиске неисправностей',
+    'settings.devices.title': 'Устройства',
+    'settings.devices.unreadDevices':
+        'Непрочитанных: {unread} · устройств: {count}',
+    'settings.devices.devicesAdd':
+        'Устройств: {count} · добавьте сканированием или импортом',
+    'settings.keepAlive.title': 'Поддерживать сеанс активным',
+    'settings.keepAlive.subtitle':
+        'Постоянная служба переднего плана сохраняет подключение в фоне и при выключенном экране; показывает малозначимое уведомление',
+    'settings.wakeLock.title': 'Не отключаться при выключенном экране',
+    'settings.wakeLock.subtitle':
+        'Не даёт процессору засыпать при выключенном экране для стабильного подключения; немного увеличивает расход батареи',
+    'settings.battery.title': 'Белый список оптимизации батареи',
+    'settings.battery.whitelisted':
+        'Добавлено в белый список: оптимизация батареи не влияет на фоновые подключения',
+    'settings.battery.flyme':
+        'На Flyme может не работать: разрешите KayingCode работу в фоне в «Диспетчере телефона» → «Управление фоном»',
+    'settings.battery.notWhitelisted':
+        'Не добавлено в белый список: система может замораживать фоновые подключения; рекомендуется разрешить',
+    'settings.notify.approvals': 'Запросы подтверждения',
+    'settings.notify.approvalsSubtitle':
+        'Баннер, когда задача ожидает разрешения или ввода',
+    'settings.notify.completions': 'Задача выполнена',
+    'settings.notify.completionsSubtitle':
+        'Тихое уведомление при завершении задачи',
+    'settings.notify.failures': 'Задача не выполнена',
+    'settings.notify.failuresSubtitle':
+        'Тихое уведомление при ошибке или прерывании задачи',
+    'settings.diagnostics.log': 'Диагностический журнал',
+    'settings.diagnostics.logSubtitle':
+        'Причины сбоев и подсказки о несовпадении протокола',
+    'settings.diagnostics.protocolLogSubtitle':
+        'Просмотр журналов relay / IPC / V4',
+    'settings.diagnostics.rpc': 'Отладчик RPC',
+    'settings.diagnostics.rpcSubtitle': 'Отправка необработанных relay payload',
+    'settings.diagnostics.channel': 'Обозреватель каналов',
+    'settings.diagnostics.channelSubtitle':
+        'Вызов любого метода канала (zcode-task / skills / mcp …)',
+    'settings.crash.details':
+        'Время: {time}\nТип: {kind}\nВерсия: v{version}\n\n{error}\n\n{stack}',
+    'settings.crash.title': 'Последний сбой',
+    'settings.crash.copied': 'Сведения о сбое скопированы',
+    'settings.copy': 'Копировать',
+    'settings.clear': 'Очистить',
+    'log.copied': 'Скопировано записей журнала: {count}',
+    'log.exportTitle': 'Экспорт журнала протокола',
+    'log.exported':
+        'Журнал экспортирован. Внимание: он может содержать фрагменты учётных данных устройств — храните его надёжно',
+    'log.exportFailed': 'Ошибка экспорта: {error}',
+    'log.diagnosticsTitle': 'Диагностический журнал',
+    'log.protocolTitle': 'Журнал протокола',
+    'log.copyAll': 'Копировать всё',
+    'log.exportToFile': 'Экспортировать в файл',
+    'log.clear': 'Очистить',
+    'log.emptyDiagnostics': 'Диагностических записей нет',
+    'log.empty': 'Журналов нет',
+    'rpc.parseFailed': 'Ошибка разбора JSON: {error}',
+    'rpc.sentWaiting': 'Отправлено, requestId={requestId}\nОжидание ответа…',
+    'rpc.noResponse': 'Нет ответа или ошибка: {error}',
+    'rpc.title': 'Отладчик RPC (relay payload)',
+    'rpc.payloadLabel': 'payload JSON (requestId добавляется автоматически)',
+    'rpc.send': 'Отправить',
+    'channel.parseFailed':
+        'Ошибка разбора args JSON (ожидался массив): {error}',
+    'channel.calling': 'Вызов…',
+    'channel.failed': 'Ошибка: {error}',
+    'channel.title': 'Отладчик Channel RPC',
+    'channel.argsLabel': 'args (массив JSON)',
+    'channel.call': 'Вызвать',
+    'usage.title': 'Использование',
+    'usage.loadFailed': 'Не удалось загрузить: {error}',
+    'usage.remainingMcp': 'Остаток квоты MCP',
+    'usage.remainingReset': 'Осталось {percent}% · сброс в {time}',
+    'usage.quotaLimits': 'Лимиты квоты',
+    'usage.subscription': 'Подписка',
+    'usage.product': 'Продукт',
+    'usage.billingCycle': 'Расчётный период',
+    'usage.renewTime': 'Продление',
+    'usage.expireTime': 'Срок действия',
+    'usage.remainingPercent': 'Осталось {percent}%',
+    'usage.resetAt': 'Сброс {time}',
+    'usage.usedPercent': 'Использовано {percent}%',
+    'usage.window.fiveHours': 'Остаток за 5 часов',
+    'usage.window.weekly': 'Остаток за неделю',
+    'usage.window.remaining': 'Остаток квоты',
+    'services.title': 'Сервисы',
+    'services.tabPlugins': 'Плагины',
+    'services.tabSkillsCommands': 'Навыки / команды',
+    'services.loadFailed': 'Не удалось загрузить: {error}',
+    'services.retry': 'Повторить',
+    'services.mcpServers': 'Серверы MCP',
+    'services.mcpHint':
+        'Удалённый протокол не предоставляет чтение серверов MCP (только синхронную запись). Используйте «Настройки → Управление MCP» на компьютере.',
+    'services.skillsHeader': 'Навыки ({total} · включено {enabled})',
+    'services.noSkills': 'Навыков нет',
+    'services.commandsHeader': 'Команды ({count})',
+    'services.noCommands': 'Пользовательских команд нет',
+    'services.empty': '(Пусто)',
+    'services.enabled': 'Включено',
+    'services.disabled': 'Отключено',
+  },
 );

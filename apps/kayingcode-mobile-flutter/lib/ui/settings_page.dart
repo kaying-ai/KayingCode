@@ -442,6 +442,10 @@ class SettingsPage extends StatelessWidget {
                             controller.setMode(modes.first),
                         style: const ButtonStyle(
                           visualDensity: VisualDensity.compact,
+                          // 俄语主题名较长；收紧段内边距，避免在窄屏上把单词拆行。
+                          padding: WidgetStatePropertyAll(
+                            EdgeInsets.symmetric(horizontal: 8),
+                          ),
                           textStyle: WidgetStatePropertyAll(
                             TextStyle(fontSize: EmberType.secondary),
                           ),
@@ -471,6 +475,7 @@ class SettingsPage extends StatelessWidget {
                             (AppLanguage.zhCN, '简体中文'),
                             (AppLanguage.zhTW, '繁體中文'),
                             (AppLanguage.enUS, 'English'),
+                            (AppLanguage.ruRU, 'Русский'),
                           ];
                           return Wrap(
                             spacing: 8,
