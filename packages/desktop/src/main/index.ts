@@ -94,6 +94,7 @@ import {
   type UpdateStatePayload,
   type TelemetryEventPayload,
   HostMessageTypes,
+  TAPTAP_PREVIEW_WEBVIEW_PARTITION,
 } from "@zcode/shared";
 import { logger, webRemoteControlRelayLogger, flushLocalTtftLogs } from "./logger.js";
 import { resolveCurrentDesktopDataPaths } from "./desktopDataBaseDirBootstrap.js";
@@ -2168,7 +2169,10 @@ app.whenReady().then(async () => {
       ? { registryMaxEntries: Number(process.env.KAYINGCODE_E2E_PLUGIN_SANDBOX_MAX_ENTRIES) }
       : {}),
   });
-  installBrowserLocalPreview(session.fromPartition(EMBEDDED_BROWSER_PARTITION));
+  installBrowserLocalPreview([
+    session.fromPartition(EMBEDDED_BROWSER_PARTITION),
+    session.fromPartition(TAPTAP_PREVIEW_WEBVIEW_PARTITION),
+  ]);
   installBrowserRestoreBootstrapProtocol(
     session.fromPartition(EMBEDDED_BROWSER_PARTITION).protocol,
   );

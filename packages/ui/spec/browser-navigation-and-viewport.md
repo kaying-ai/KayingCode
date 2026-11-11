@@ -8,6 +8,7 @@
 - 分辨率工具栏新增“横竖屏切换”：交换已提交的宽高，经同一 updateResponsiveViewportSize 路径同步 Main viewport。若交换后超出共享协议范围，按钮禁用并说明原因；无效/未提交草稿不参与交换。正方形不产生尺寸变化。
 - 同一工具栏提供“填满面板”：退出固定视口模式，复用 toggleResponsiveMode，将 Main override 设为 null，网页使用容器真实尺寸；不 reload、不换 webview、不丢场景/历史。保留原固定尺寸，以便重新进入自由尺寸。
 - 字体、色系、按钮、图标与工具提示复用 DESIGN.md、Button/Tooltip 和 text-ui 尺度，中英文文案配套。视口状态仍由现有 hook/Main owner 管理，无独立 orientation 状态。
+- `BrowserViewLoadUrl` 的 owner 校验必须同时允许 UnifiedBrowserView 使用的两个受控 partition：内置浏览器与 TapTap 预览。两者都要安装受控本地预览协议并封锁原生 `file`；只允许单一 session 会把右侧“TapTap 预览”误报为 `Browser navigation owner mismatch`。新增内嵌浏览器 partition 时必须同步扩展 allowlist。
 
 ## 顺序
 

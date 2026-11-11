@@ -16,7 +16,6 @@ import { InputGroup, InputGroupAddon } from "@/components/ui/input-group.js";
 import {
   ChevronDownIcon,
   Cloud,
-  Folder,
   FolderPlus,
   MessageCircle,
   Plus,
@@ -59,7 +58,6 @@ export function ProjectComposerMenu({
   onSelectConversationWorkspace,
   allowRemoteWorkspace = true,
   onOpenRemoteWorkspace,
-  onOpenFolder,
   containerClassName,
   triggerClassName,
   triggerIndicator,
@@ -76,8 +74,6 @@ export function ProjectComposerMenu({
   onSelectConversationWorkspace: () => void | Promise<void>;
   allowRemoteWorkspace?: boolean;
   onOpenRemoteWorkspace?: ProjectSidebarProps["onOpenRemoteWorkspace"];
-  /** 保留本地“打开文件夹”入口；项目候选本身不按 tab/cwd 生成。 */
-  onOpenFolder?: () => void;
   /** 调用方局部调整 workspace chip 外层视觉，不改变普通会话默认样式。 */
   containerClassName?: string;
   /** 调用方局部调整 workspace trigger 视觉，不改变普通会话默认样式。 */
@@ -373,12 +369,6 @@ export function ProjectComposerMenu({
               <FolderPlus className="size-4 text-foreground-subtle" />
               <span>{intl.formatMessage({ id: "project.create" })}</span>
             </DropdownMenuItem>
-            {onOpenFolder ? (
-              <DropdownMenuItem data-testid="composer-open-folder" onSelect={() => onOpenFolder()}>
-                <Folder className="size-4 text-foreground-subtle" />
-                <span>{intl.formatMessage({ id: "workspace.openFolder" })}</span>
-              </DropdownMenuItem>
-            ) : null}
             {canUseRemoteWorkspace ? (
               <DropdownMenuItem
                 data-testid={TID_COMPOSER_REMOTE_CONNECTION}

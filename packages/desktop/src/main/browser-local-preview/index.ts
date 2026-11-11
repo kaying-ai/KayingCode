@@ -97,13 +97,18 @@ export function createBrowserLocalPreview(): BrowserLocalPreviewContract {
   };
 }
 
-export function installBrowserLocalPreview(browserSession: Session): void {
-  // 只作用于内置浏览器 partition；先封住原始 file，初始化失败也不得退回不受限的 loader。
-  browserSession.protocol.handle("file", () => Response.error());
+export function installBrowserLocalPreview(requestedSessions: readonly Session[]): void {
+  if (requestedSessions.length === 0) throw new Error("Browser preview requires a session");
+  // 同一 session 重复注册 protocol.handle 会抛错；去重后所有受控 partition 共享一份预览实现。
+  const browserSessions = [...new Set(requestedSessions)];
+  // 只作用于受控的浏览器 partition；先封住原始 file，初始化失败也不得退回不受限的 loader。
   const preview = createBrowserLocalPreview();
-  browserSession.protocol.handle(BROWSER_LOCAL_PREVIEW_SCHEME, (request) =>
-    preview.respond(request),
-  );
+  for (const browserSession of browserSessions) {
+    browserSession.protocol.handle("file", () => Response.error());
+    browserSession.protocol.handle(BROWSER_LOCAL_PREVIEW_SCHEME, (request) =>
+      preview.respond(request),
+    );
+  }
   const generations = new WeakMap<WebContents, number>();
   ipcMain.handle(PlatformChannels.BrowserViewLoadUrl, async (event, payload: unknown) => {
     if (
@@ -119,13 +124,18 @@ export function installBrowserLocalPreview(browserSession: Session): void {
     }
     const win = BrowserWindow.fromWebContents(event.sender);
     const guest = webContents.fromId(payload.webContentsId);
+    // UnifiedBrowserView 同时承载内置浏览器与 TapTap 预览两个受控 partition；
+    // 只允许其中一个会把右侧 TapTap 预览导航误判成跨 owner 调用。
+    const guestSessionAllowed = Boolean(
+      guest && browserSessions.some((candidate) => candidate === guest.session),
+    );
     if (
       !win ||
       win.webContents !== event.sender ||
       event.senderFrame !== event.sender.mainFrame ||
       !guest ||
       guest.hostWebContents !== event.sender ||
-      guest.session !== browserSession
+      !guestSessionAllowed
     ) {
       throw new Error("Browser navigation owner mismatch");
     }
