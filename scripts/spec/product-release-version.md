@@ -23,9 +23,10 @@
 
 ## macOS 正式签名构建
 
-- 推送正式 `kaying-code-v<版本>` 标签或提交绑定的预验收标签后，`Build signed macOS release` 自动运行；重跑时仍可手动 dispatch 同一标签。预验收环境仅临时允许具体标签，制品名区分预验收和正式。校验任务先确认标签版本与根清单一致，且提交属于 `origin/main` 的历史。通过后，Intel 与 Apple Silicon 两个构建任务各自使用 `macos-release` 环境。
+- 推送正式 `kaying-code-v<版本>` 标签或提交绑定的预验收标签后，`Build signed macOS release` 自动运行；重跑时仍可手动 dispatch 同一标签。预验收环境仅临时允许具体标签，制品名区分预验收和正式。校验任务先确认标签版本与根清单一致，且提交属于 `origin/main` 的历史。通过后，Apple Silicon 构建任务使用 `macos-release` 环境。
+- macOS Intel（x64）自 0.1.5 起暂停构建，不再进入默认发布矩阵；0.1.4 及更早版本仍保留已发布制品。恢复 x64 构建前，须先记录实际用户需求、验收范围和签名/公证验证计划，再更新本节与工作流矩阵。
 - GitHub Environment 保管证书和公证凭据。构建任务将 Developer ID Application 导入临时钥匙串，再调用现有 `bundle:desktop`。这样随包 Computer Use 插件、桌面应用和 DMG 都能使用发行身份。公证继续由现有 DMG hook 完成。
-- 只有通过 DMG 签名校验和公证票据校验的制品才上传到本次 Actions 运行。`stapler validate` 的在线票据复核依赖 Apple 服务，Intel runner 偶发 Error 68 网络抖动；构建脚本对该复核做有界重试（默认 3 次），重试耗尽仍失败则构建失败，不放宽验收标准。GitHub Release 由 `Publish GitHub release` 工作流在全部平台构建成功后创建；维护者仍应在对外分发前完成安装验收。
+- 只有通过 DMG 签名校验和公证票据校验的制品才上传到本次 Actions 运行。`stapler validate` 的在线票据复核依赖 Apple 服务，0.1.4 及更早版本的 Intel runner 曾偶发 Error 68 网络抖动；构建脚本对该复核做有界重试（默认 3 次），重试耗尽仍失败则构建失败，不放宽验收标准。GitHub Release 由 `Publish GitHub release` 工作流在全部平台构建成功后创建；维护者仍应在对外分发前完成安装验收。
 
 ```text
 正式标签 → 版本与 main 祖先校验 → macos-release 环境 → 签名与公证 → 验签 → Actions DMG

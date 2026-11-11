@@ -34,7 +34,7 @@ KayingCode 以 ZCode harness 为载体，全面接入游戏开发场景，面向
 4. 运行 `pnpm run source:map`、`node scripts/licenses.mjs notices`、`node scripts/licenses.mjs check`（strict 缺口如实记录）、`node --test scripts/first-public-release.test.mjs`、`pnpm run verify:pre-push`、`pnpm run typecheck`；把同步文件 amend 进同一个 `chore: release` 提交。
 5. 推送 `release/<版本>` 并开 PR；可启用 auto-merge，让 `Source checks (Windows)` 通过后自动合入，不必前台等待。
 6. 预验收：在合入后的 `main` 提交创建 `kaying-code-preflight-v<版本>-<提交前12位SHA>` 标签。推送前为精确标签临时放行 `macos-release`、`linux-release`、`windows-release`、`android-release` 四个环境，验收后立即删除规则并确认只剩 `kaying-code-v*`。预验收只上传带 `preflight` 名称的 Actions 制品，不创建 Release。
-7. 正式发布：同一 `main` 提交推送 `kaying-code-v<版本>` 标签，自动触发三套签名构建；全部成功后自动发布。任一步失败只重跑失败 job（`gh run rerun <run-id> --failed`），不放宽签名、公证或验签标准。
+7. 正式发布：同一 `main` 提交推送 `kaying-code-v<版本>` 标签，自动触发三套签名构建；全部成功后自动发布。任一步失败只重跑失败 job（`gh run rerun <run-id> --failed`），不放宽签名、公证或验签标准。macOS 默认只构建 Apple Silicon；Intel（x64）自 0.1.5 起暂停，恢复前先在发布版本 spec 记录需求与验证范围。
 8. 0.1.4 起默认恢复“先预验收、再正式标签”；确需跳过预验收时，必须在 `scripts/spec/product-release-version.md` 记录一次性偏离、原因、影响范围和验证依据。
 
 ## 命令与仓库结构

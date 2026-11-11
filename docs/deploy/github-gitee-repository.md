@@ -64,7 +64,7 @@ git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main &&
 | `APPLE_API_KEY_ID`     | 该密钥的 Key ID                                     |
 | `APPLE_API_ISSUER`     | App Store Connect 的 Issuer ID                      |
 
-工作流合入 `main` 后，先使用绑定该提交的预验收标签，并仅为该精确标签临时放行 `macos-release`；验收通过并撤销临时规则后，使用同一提交的正式标签在 Actions 手动运行 **Build signed macOS release**。也可以用 GitHub CLI 选择标签，例如 `gh workflow run release-macos.yml --ref kaying-code-v0.1.1`。成功任务会上传已签名并附有 Apple 公证票据的 Intel 或 Apple Silicon DMG。下载后完成安装验收，再上传到对应的 GitHub Release。
+工作流合入 `main` 后，先使用绑定该提交的预验收标签，并仅为该精确标签临时放行 `macos-release`；验收通过并撤销临时规则后，使用同一提交的正式标签在 Actions 手动运行 **Build signed macOS release**。也可以用 GitHub CLI 选择标签，例如 `gh workflow run release-macos.yml --ref kaying-code-v0.1.1`。成功任务会上传已签名并附有 Apple 公证票据的 Apple Silicon DMG。macOS Intel（x64）自 0.1.5 起暂停构建，恢复前须先在发布版本 spec 记录需求和验证范围。下载后完成安装验收，再上传到对应的 GitHub Release。
 
 ## 同步到 Gitee
 
