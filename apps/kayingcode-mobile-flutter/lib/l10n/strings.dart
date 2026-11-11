@@ -13,7 +13,7 @@ import 'tables/settings_pages.dart';
 import 'tables/zcode_auth.dart';
 import 'tables/zcode_web.dart';
 
-/// 新增区域表时在此登记；`test/l10n_tables_test.dart` 会校验三语 key 一致、
+/// 新增区域表时在此登记；`test/l10n_tables_test.dart` 会校验四语 key 一致、
 /// 跨区域无重复 key。
 final List<AppStringTable> appStringTables = <AppStringTable>[
   commonStrings,
@@ -37,6 +37,9 @@ final Map<String, String> _zhTW = <String, String>{
 final Map<String, String> _enUS = <String, String>{
   for (final table in appStringTables) ...table.enUS,
 };
+final Map<String, String> _ruRU = <String, String>{
+  for (final table in appStringTables) ...table.ruRU,
+};
 
 /// Widget 内取文案：语言来自 [Localizations.localeOf]，与 MaterialApp 生效
 /// 语言同源。
@@ -58,6 +61,8 @@ String lookupAppString(
   final language = locale.languageCode.toLowerCase();
   final primary = language == 'en'
       ? _enUS
+      : language == 'ru'
+      ? _ruRU
       : isTraditionalLocale(locale)
       ? _zhTW
       : _zhCN;
@@ -66,7 +71,10 @@ String lookupAppString(
 }
 
 bool hasAppString(String key) =>
-    _zhCN.containsKey(key) || _zhTW.containsKey(key) || _enUS.containsKey(key);
+    _zhCN.containsKey(key) ||
+    _zhTW.containsKey(key) ||
+    _enUS.containsKey(key) ||
+    _ruRU.containsKey(key);
 
 String _interpolate(String value, Map<String, Object?>? args) {
   if (args == null || args.isEmpty || !value.contains('{')) return value;

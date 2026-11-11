@@ -1,6 +1,6 @@
-# 多语言支持（简体中文 / 繁體中文 / English）
+# 多语言支持（简体中文 / 繁體中文 / English / Русский）
 
-状态：已确认（2026-10-20）。适用范围：`apps/kayingcode-mobile-flutter`。
+状态：已确认（2026-10-20）；2026-11-11 增补俄语。适用范围：`apps/kayingcode-mobile-flutter`。
 
 ## 1. 背景与现状证据
 
@@ -17,23 +17,25 @@
 
 ## 2. 语言集合与解析规则
 
-- 支持的 UI 语言：`zh-CN`（简体中文）、`zh-TW`（繁體中文）、`en-US`（English）。
-- 设置项额外提供「跟随系统」；它是**默认值**，不是第四种语言。
+- 支持的 UI 语言：`zh-CN`（简体中文）、`zh-TW`（繁體中文）、`en-US`（English）、`ru-RU`（Русский）。
+- 设置项额外提供「跟随系统」；它是**默认值**，不是第五种语言。
 - 系统语言解析（`system` 时）：
   - `zh-Hant` / `zh-TW` / `zh-HK` / `zh-MO` → `zh-TW`
   - 其他 `zh-*`（含 `zh-Hans`、`zh-CN`、`zh-SG`）→ `zh-CN`
   - `en-*` → `en-US`
+  - `ru-*` → `ru-RU`（不区分 `ru-RU` / `ru-KZ` / `ru-UA` 等地区）
   - 其余语言 → `zh-CN`（产品默认）
 - 文案回落链：当前语言表 → `zh-CN` → `en-US` → key 本身。任何表缺 key 不得显示空白。
 - 切换语言立即生效，无需重启；选择结果持久化。
+- 俄语复数：文案表保持扁平 map，不引入 ICU。含数量的整句统一写成「名词（复数第二格）+ 冒号 + `{count}`」（如 `Проектов: {count}`），在任何数量下语法成立；日期与相对时间的复数变格由 `formatting.dart` 的专用函数处理。
 
 ## 3. 状态所有权（唯一写入路径）
 
 ```
-                 ┌─────────────────────────────┐
-用户选择 ───────▶│ UiSettings.localeOverride   │ 持久化 zflow_ui_locale
-                 │ system|zh-CN|zh-TW|en-US     │ 唯一偏好所有者
-                 └──────────────┬──────────────┘
+                 ┌──────────────────────────────┐
+用户选择 ───────▶│ UiSettings.localeOverride    │ 持久化 zflow_ui_locale
+                 │ system|zh-CN|zh-TW|en-US|ru-RU│ 唯一偏好所有者
+                 └──────────────┬───────────────┘
                                 │ notifyListeners / platformDispatcher.didChangeLocales
                                 ▼
                  ┌─────────────────────────────┐
@@ -59,12 +61,12 @@
 | --- | --- |
 | `app_locale.dart` | 支持列表、系统 locale 解析、回落链、`AppLocale` 派生快照 |
 | `strings.dart` | 汇总各区域表；`tr(context, key, {args})`、`t(key, {args})`；`{name}` 占位符替换 |
-| `tables/<area>.dart` | 每文件包含同 key 的三张 `const Map<String, String>`（简体/繁体/英文） |
+| `tables/<area>.dart` | 每文件包含同 key 的四张 `const Map<String, String>`（简体/繁体/英文/俄文） |
 
 - key 命名沿用现状：`<area>.<feature>.<item>`，例如 `settings.language`、`chat.inputHint`。
-- 插值用命名占位符：`t('notify.running', args: {'count': n})`，表内写 `'{count} 个任务运行中'`。缺失参数时保留占位符原样，便于测试发现。
+- 插值用命名占位符：`t('notify.running', args: {'count': n})`，表内写 `'{count} 个任务运行中'`。缺失参数时保留占位符原样，便于测试发现。四语表的占位符集合必须完全一致。
 - 纯函数文案（`modeLabelOf` / `modeDescriptionOf` 等无 `BuildContext` 且被既有测试直接调用的 helper）通过 `AppLocale.current` 读取派生快照；UI 侧仍以 `Localizations.localeOf` 为准，二者由同一个 `ZflowApp.build` 写入/解析，不会分叉。
-- 复数：当前不引入 ICU 复数引擎；数量文案按语言写整句（如 `1 task running` / `{count} tasks running` 由调用方选择 key 或表内变体）。若后续需要，再升级到 ARB/intl，不在本次范围。
+- 复数：当前不引入 ICU 复数引擎；数量文案按语言写整句（如 `1 task running` / `{count} tasks running` 由调用方选择 key 或表内变体）。若后续需要，再升级到 ARB/intl，不在本次范围。俄语按 §2 的「名词 + 冒号 + `{count}`」约定写成数量中立句式；`formatting.dart` 内的时间文案按俄语变格表处理。
 
 ## 5. 抽取范围
 
@@ -88,11 +90,11 @@
 
 ## 6. 字体覆盖
 
-- 目标：三语文案用到的所有汉字（含繁体专属字）都由内置字体渲染，不再回落系统字体。
+- 目标：四语文案用到的所有字符（含繁体专属汉字与西里尔字母）都由内置字体渲染，不再回落系统字体。
 - 做法：新增 `tool/subset_fonts.py`（补齐 README 已声明的路径），字符集 = 现有 `assets/fonts/subset-chars.txt` ∪ GB2312 ∪ Big5 常用字 ∪ 三语表实际用字；母版对齐上游 **Sarasa 1.0.41 unhinted**（与现有字体 version/族名一致）。
 - 产物：`Zflow-UI-Regular.ttf`、`Zflow-UI-Bold.ttf`、`Zflow-Term-Regular.ttf` 重新生成，重建 `subset-chars.txt` 并记录母版版本与生成命令。
 - 字形策略：仍使用 Sarasa **SC** 变体，共享汉字按简体字形标准；若后续要求台湾字形标准，另挂 Sarasa UI TC 子集，本次不做。
-- 验收：新增测试直接读取打包 TTF 的 cmap，断言三张表里出现的每个汉字都在 cmap 内。
+- 验收：新增测试直接读取打包 TTF 的 cmap，断言四张表里出现的每个汉字都在 cmap 内；俄文表中出现的西里尔字母同样必须在 cmap 内。
 
 ## 7. 需要一并修正的既有缺陷
 
@@ -100,18 +102,18 @@
 
 ## 8. 验收场景
 
-1. 首次启动（系统为简体中文 / 繁体中文 / 英文 / 日文）分别落到 zh-CN / zh-TW / en-US / zh-CN，设置页显示「跟随系统」。
-2. 设置页语言项出现四项：跟随系统、简体中文、繁體中文、English；切换后当前页面立即刷新，重启后保持。
-3. 任一界面在三种语言下无中文残留（日志页除外）；缺 key 时按回落链显示，不出现空白或 key 原文。
-4. Material 内置文案跟随语言：文本选择工具条、日期/时间选择器在 zh-TW 下为繁体，en-US 下为英文。
+1. 首次启动（系统为简体中文 / 繁体中文 / 英文 / 俄文 / 日文）分别落到 zh-CN / zh-TW / en-US / ru-RU / zh-CN，设置页显示「跟随系统」。
+2. 设置页语言项出现五项：跟随系统、简体中文、繁體中文、English、Русский；切换后当前页面立即刷新，重启后保持。
+3. 任一界面在四种语言下无中文残留（日志页除外）；缺 key 时按回落链显示，不出现空白或 key 原文。
+4. Material 内置文案跟随语言：文本选择工具条、日期/时间选择器在 zh-TW 下为繁体，en-US 下为英文，ru-RU 下为俄文。
 5. 通知标题、连接失败说明随语言变化；任务失败通知仍走「失败」开关，完成通知走「完成」开关。
-6. 三语表 key 集合完全一致；`lib/ui/**` 无中文字面量（门禁测试）。
-7. 打包字体 cmap 覆盖三语表全部汉字；繁体界面不出现字形回退。
+6. 四语表 key 集合完全一致；`lib/ui/**` 无中文字面量（门禁测试）。
+7. 打包字体 cmap 覆盖四语表全部汉字与俄文西里尔字母；繁体与俄文界面不出现字形回退。
 8. `node scripts/flutter-target.mjs android analyze` 输出 `No issues found`，`test` 全绿。
 
 ## 9. 非目标
 
-- 不新增除中/繁/英之外的语言。
+- 不新增除中/繁/英/俄之外的语言。
 - 不引入 ARB/intl 代码生成（保持现有轻量 map 方案），除非后续出现复数/日期格式化需求。
 - 不翻译协议日志、崩溃日志与宿主下发的业务内容。
 - 不改造桌面端 i18n，也不要求桌面端同步新增 zh-TW（移动端先支持）。
@@ -152,3 +154,30 @@
 2. 设置子页面的 `AppBar` 标题在 push 时用 `tr()` 结果固化，切换语言后标题不更新。修复：路由改为接收本地化 key，在路由 builder 内用 `tr(routeContext, key)` 实时解析。
 
 未验证项：OHOS 仅通过同一 Dart 层校验，未在真机或 OHOS 模拟器做视觉与字体验收；iOS 未做真机验收（仅模拟器），Material 内置文案（选择工具条、日期选择器）仅由 locale 解析与 delegates 注入测试覆盖，未做逐项截图。
+
+## 11. 俄语增补验证记录（2026-11-11）
+
+在 `apps/kayingcode-mobile-flutter` 下经平台入口执行：
+
+| 命令 | 结果 |
+| --- | --- |
+| `node scripts/flutter-target.mjs android check` | 上游 Flutter 3.35.5 已核对 |
+| `node scripts/flutter-target.mjs android analyze` | `No issues found! (ran in 1.3s)` |
+| `node scripts/flutter-target.mjs android test` | `All tests passed!`（75 项） |
+
+- 10 张区域表各新增同 key 的 `ruRU` 表，四语共 669 个 key；`test/l10n_tables_test.dart` 现校验四语 key 集合一致、非空与占位符一致。
+- `test/l10n_locale_test.dart` 覆盖 `ru-*` → `ru-RU`、显式俄语覆盖与俄文 `t()` 插值。
+- `test/l10n_formatting_test.dart` 覆盖俄语消息时间、相对时间、周几与紧凑数字单位（逗号小数）。
+- `test/l10n_font_coverage_test.dart` 增加俄文西里尔字母的 cmap 覆盖断言；三款内置字体实测覆盖全部俄文字母。
+- `test/settings_language_test.dart` 校验第五项 `Русский` 与 `zflow_ui_locale=ru-RU` 持久化。
+- `test/app_locale_wiring_test.dart` 增加从根 `MaterialApp` 切换到 `Русский` 的断言。
+
+### Android 真机验收（Samsung SM-G9500，Android 9 / API 28）
+
+- 设备系统语言为 `zh-Hans-CN`；debug APK 因与已安装 0.1.2 正式签名不一致被拒绝，改用 release 签名构建并 `adb install -r` 覆盖安装 0.1.3，原有数据与语言偏好保留。
+- 设置 → 外观与语言出现五项：跟随系统、简体中文、繁體中文、English、Русский；选择 `Русский` 后 AppBar、主题、字体设置项与底部导航立即变为俄语。
+- 俄语字形由内置字体渲染，无缺字方框；设置首页、连接与通知、模型与服务、诊断与关于、关于页均无中文残留。
+- 验收到并修复布局缺陷：主题三段控件在俄语下把 «Светлая» / «Как в системе» 拆成两行。修复为俄语系统项改用 «Система»，并将段内水平内边距收紧到 8dp；复测 «Тёмная / Светлая / Система» 单行显示，英文与简中布局无回归。
+- 强制停止并重新启动应用后仍保持 `ru-RU`；切换「跟随系统」后按设备 `zh-Hans-CN` 回落简体中文，再切回俄语正常。
+- `adb logcat` 未发现 Flutter 异常、RenderFlex 溢出或崩溃记录。
+- 未验证：设备系统语言本身设为 `ru-*` 的跟随场景（由 `test/l10n_locale_test.dart` 覆盖）；未连接桌面端，会话/对话页面与 Material 内置文案（选择工具条、日期选择器）未逐项截图。

@@ -38,6 +38,14 @@ void main() {
     expect(find.text('外觀與語言'), findsOneWidget);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('zflow_ui_locale'), 'zh-TW');
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Русский'));
+    await tester.pumpAndSettle();
+
+    expect(AppLocale.current, appLocaleRuRU);
+    expect(find.text('Язык'), findsOneWidget);
+    expect(find.text('Оформление и язык'), findsOneWidget);
+    expect(prefs.getString('zflow_ui_locale'), 'ru-RU');
     expect(tester.takeException(), isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());

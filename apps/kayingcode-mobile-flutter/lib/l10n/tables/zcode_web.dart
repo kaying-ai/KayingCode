@@ -35,4 +35,17 @@ const zcodeWebStrings = AppStringTable(
         'Could not load ZCode. Check your network and system WebView, or open in your browser.',
     'zcodeWeb.openFailed': 'Could not open the system browser.',
   },
+  ruRU: {
+    'zcodeWeb.website': 'Официальный сайт',
+    'zcodeWeb.workbench': 'Веб-рабочая среда',
+    'zcodeWeb.sessionsInWeb':
+        'Диалоги управляются в веб-рабочей среде каждого бота — откройте бота, чтобы продолжить.',
+    'zcodeWeb.kayingcodeFailed':
+        'Не удалось загрузить рабочую среду. Проверьте веб-сервис, сеть и системный WebView.',
+    'zcodeWeb.reload': 'Обновить',
+    'zcodeWeb.external': 'Открыть в браузере',
+    'zcodeWeb.failed':
+        'Не удалось загрузить ZCode. Проверьте сеть и системный WebView или откройте в браузере.',
+    'zcodeWeb.openFailed': 'Не удалось открыть системный браузер.',
+  },
 );

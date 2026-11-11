@@ -11,6 +11,7 @@ const _fontFiles = <String>[
 ];
 
 final RegExp _cjk = RegExp(r'[\u4e00-\u9fff]');
+final RegExp _cyrillic = RegExp(r'[\u0400-\u04ff]');
 
 Set<int> _unicodeCmap(String path) {
   final bytes = File(path).readAsBytesSync();
@@ -91,31 +92,48 @@ void _readFormat12(ByteData data, int offset, Set<int> codepoints) {
 }
 
 void main() {
-  test('打包字体 cmap 覆盖三语表全部汉字', () {
-    final required = <int>{};
+  test('打包字体 cmap 覆盖四语表全部汉字与俄文西里尔字母', () {
+    final requiredCjk = <int>{};
+    final requiredCyrillic = <int>{};
     for (final table in appStringTables) {
       for (final map in [table.zhCN, table.zhTW, table.enUS]) {
         for (final value in map.values) {
           for (final rune in value.runes) {
             final char = String.fromCharCode(rune);
-            if (_cjk.hasMatch(char)) required.add(rune);
+            if (_cjk.hasMatch(char)) requiredCjk.add(rune);
           }
         }
       }
+      for (final value in table.ruRU.values) {
+        for (final rune in value.runes) {
+          final char = String.fromCharCode(rune);
+          if (_cyrillic.hasMatch(char)) requiredCyrillic.add(rune);
+        }
+      }
     }
-    expect(required, isNotEmpty);
+    expect(requiredCjk, isNotEmpty);
+    expect(requiredCyrillic, isNotEmpty);
 
     for (final path in _fontFiles) {
       expect(File(path).existsSync(), isTrue, reason: '$path 缺失');
       final cmap = _unicodeCmap(path);
-      final missing = required.where((cp) => !cmap.contains(cp)).toList()
+      final missingCjk = requiredCjk.where((cp) => !cmap.contains(cp)).toList()
         ..sort();
       expect(
-        missing,
+        missingCjk,
         isEmpty,
         reason:
-            '$path 缺少 ${missing.length} 个字：'
-            '${missing.map(String.fromCharCode).join()}',
+            '$path 缺少 ${missingCjk.length} 个汉字：'
+            '${missingCjk.map(String.fromCharCode).join()}',
+      );
+      final missingCyrillic =
+          requiredCyrillic.where((cp) => !cmap.contains(cp)).toList()..sort();
+      expect(
+        missingCyrillic,
+        isEmpty,
+        reason:
+            '$path 缺少 ${missingCyrillic.length} 个西里尔字母：'
+            '${missingCyrillic.map(String.fromCharCode).join()}',
       );
     }
   });

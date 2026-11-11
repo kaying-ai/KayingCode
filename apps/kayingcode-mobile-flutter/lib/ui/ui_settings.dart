@@ -3,8 +3,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../l10n/app_locale.dart';
 
-/// UI preferences: language (system / zh-CN / zh-TW / en-US), text scale,
-/// code font size. 这里是语言偏好的唯一持久化与写入点。
+/// UI preferences: language (system / zh-CN / zh-TW / en-US / ru-RU), text
+/// scale, code font size. 这里是语言偏好的唯一持久化与写入点。
 class UiSettings extends ChangeNotifier {
   static const _localeKey = 'zflow_ui_locale';
   static const _scaleKey = 'zflow_ui_text_scale';

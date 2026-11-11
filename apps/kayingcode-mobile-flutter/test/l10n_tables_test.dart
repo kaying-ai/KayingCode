@@ -7,19 +7,21 @@ Set<String> _placeholders(String value) =>
     _placeholder.allMatches(value).map((match) => match[1]!).toSet();
 
 void main() {
-  test('每张区域表三语 key 集合完全一致', () {
+  test('每张区域表四语 key 集合完全一致', () {
     for (final table in appStringTables) {
       final zhCN = table.zhCN.keys.toSet();
-      expect(
-        table.zhTW.keys.toSet(),
-        zhCN,
-        reason: '${table.area} 的 zhTW 缺少或多出 key',
-      );
-      expect(
-        table.enUS.keys.toSet(),
-        zhCN,
-        reason: '${table.area} 的 enUS 缺少或多出 key',
-      );
+      final others = <String, Map<String, String>>{
+        'zhTW': table.zhTW,
+        'enUS': table.enUS,
+        'ruRU': table.ruRU,
+      };
+      for (final entry in others.entries) {
+        expect(
+          entry.value.keys.toSet(),
+          zhCN,
+          reason: '${table.area} 的 ${entry.key} 缺少或多出 key',
+        );
+      }
     }
   });
 
@@ -37,29 +39,27 @@ void main() {
     }
   });
 
-  test('三语文案非空且占位符一致', () {
+  test('四语文案非空且占位符一致', () {
     for (final table in appStringTables) {
       for (final key in table.zhCN.keys) {
         final zhCN = table.zhCN[key]!;
-        final zhTW = table.zhTW[key]!;
-        final enUS = table.enUS[key]!;
-        for (final entry in {
+        final values = <String, String>{
           'zhCN': zhCN,
-          'zhTW': zhTW,
-          'enUS': enUS,
-        }.entries) {
+          'zhTW': table.zhTW[key]!,
+          'enUS': table.enUS[key]!,
+          'ruRU': table.ruRU[key]!,
+        };
+        for (final entry in values.entries) {
           expect(entry.value.trim(), isNotEmpty, reason: '$key/${entry.key}');
         }
-        expect(
-          _placeholders(zhTW),
-          _placeholders(zhCN),
-          reason: '$key 的 zhTW 占位符与 zhCN 不一致',
-        );
-        expect(
-          _placeholders(enUS),
-          _placeholders(zhCN),
-          reason: '$key 的 enUS 占位符与 zhCN 不一致',
-        );
+        for (final entry in values.entries) {
+          if (entry.key == 'zhCN') continue;
+          expect(
+            _placeholders(entry.value),
+            _placeholders(zhCN),
+            reason: '$key 的 ${entry.key} 占位符与 zhCN 不一致',
+          );
+        }
       }
     }
   });
