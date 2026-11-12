@@ -1,8 +1,9 @@
 import { join } from "node:path";
+import { TID_TASK_NEW_BUTTON } from "@zcode/shared";
 import { waitForWorkspaceApp, DEFAULT_WORKSPACE } from "../helpers/desktop-app.js";
 
 describe("输入框项目选择器", () => {
-  it("VP30：未打开项目与侧栏一致、搜索项目、零 root 选择与改名同步", async function () {
+  it("VP30：项目选择器与侧栏一致，插件试用后保留所选项目", async function () {
     this.timeout(120_000);
     await waitForWorkspaceApp(DEFAULT_WORKSPACE, 45_000);
     await browser.execute(() => {
@@ -19,6 +20,7 @@ describe("输入框项目选择器", () => {
       // 列表先收到保存结果，编辑器遮罩在退出动画结束后才卸载；不能先点击下一个创建入口。
       await $('[data-slot="dialog-overlay"]').waitForExist({ reverse: true });
     }
+    await $(`[data-testid="${TID_TASK_NEW_BUTTON}"]`).click();
     const sidebarNames = await browser.execute(() =>
       [...document.querySelectorAll("aside [data-project-name]")].map((n) =>
         n.getAttribute("data-project-name"),
@@ -43,6 +45,16 @@ describe("输入框项目选择器", () => {
     await menu.$("[data-project-id]").click();
     const trigger = $('[data-testid="composer-workspace-trigger"]');
     await browser.waitUntil(async () => (await trigger.getText()).includes(names[6]!));
+    await $('[data-testid="plugin-store-sidebar-open"]').click();
+    await $('[data-testid="plugin-store-segment-game-development"]').click();
+    await $(
+      '[data-testid="plugin-store-card"][data-plugin-id="blender@kayingcode-plugins-official"]',
+    ).click();
+    await $('[data-testid="plugin-store-try-now"]').click();
+    const blenderMention = $('[data-mention-id="plugin:blender@kayingcode-plugins-official"]');
+    await blenderMention.waitForDisplayed();
+    expect(await blenderMention.getText()).toContain("KayingForBlender");
+    expect(await trigger.getText()).toContain(names[6]!);
     const project = $(`[data-project-name="${names[6]}"]`);
     await project.$('[data-testid="virtual-project-row"]').click({ button: "right" });
     await $('[data-testid="virtual-project-edit"]').click();

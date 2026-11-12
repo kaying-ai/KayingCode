@@ -1,5 +1,56 @@
-import { describe, expect, it, vi } from "vitest";
-import { resolvePreparedProjectNewTaskTarget } from "@/root/newTaskProjectTarget.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  resolveNewTaskDraftProjectId,
+  resolvePreparedProjectNewTaskTarget,
+} from "@/root/newTaskProjectTarget.js";
+import {
+  rememberComposerWorkspaceScope,
+  resolveComposerScope,
+} from "@/v4/composer/composerDraftStore.js";
+
+describe("resolveNewTaskDraftProjectId", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("inherits a prefilled draft's project only from the matching workspace and client", () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", {
+      localStorage: { getItem: storage.get.bind(storage), setItem: storage.set.bind(storage) },
+    });
+    const workspacePath = "/work/game";
+    const workspaceIdentity = "server:device-1:/work/game";
+    const target = { workspacePath, workspaceIdentity };
+    const tryPlugin = { initialPrompt: "[@Blender](plugin://blender) " };
+    rememberComposerWorkspaceScope(
+      workspacePath,
+      workspaceIdentity,
+      resolveComposerScope("project-1", workspaceIdentity, "desktop"),
+    );
+
+    expect(resolveNewTaskDraftProjectId(tryPlugin, target, "desktop")).toBe("project-1");
+    expect(resolveNewTaskDraftProjectId(tryPlugin, target, "web")).toBeUndefined();
+    expect(
+      resolveNewTaskDraftProjectId(
+        tryPlugin,
+        { workspacePath, workspaceIdentity: null },
+        "desktop",
+      ),
+    ).toBeUndefined();
+    expect(resolveNewTaskDraftProjectId(undefined, target, "desktop")).toBeUndefined();
+    expect(
+      resolveNewTaskDraftProjectId({ ...tryPlugin, projectId: null }, target, "desktop"),
+    ).toBeNull();
+    expect(
+      resolveNewTaskDraftProjectId({ ...tryPlugin, targetWorkspace: target }, target, "desktop"),
+    ).toBeUndefined();
+    expect(
+      resolveNewTaskDraftProjectId(
+        { ...tryPlugin, targetWorkspace: { ...target, projectId: "project-2" } },
+        target,
+        "desktop",
+      ),
+    ).toBe("project-2");
+  });
+});
 
 function createProjectService(result: {
   projectId: string | null;

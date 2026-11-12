@@ -40,6 +40,16 @@
 - Root：`startNewTaskFromActiveWorkspace` 把 `CreateTaskOptions.projectId/taskGroupId`
   传给 `startDraft`，并在导航前调用 `rememberComposerWorkspaceScope`；
   `startDraftInWorkspace` 同样记忆 scope（显式项目优先，否则恢复该 workspace 上次 scope）。
+- 插件市场「立即试用」、示例提示词等预填入口使用隐式工作区目标时，Root 在写入新草稿前读取
+  同一客户端、同一工作区身份的 composer scope，并沿用其中的项目。显式项目（含 `null`）
+  与显式工作区目标优先。全局空白新建仍清除项目归属。继承项目复用已解析的工作区，
+  显式项目选择继续由 Host 的 `prepareSession` 校验主目录。
+
+  ```text
+  输入框选项目 → Host 准备主目录 → Root 写入草稿项目和 composer scope
+  插件试用 → Root 读取目标工作区的 scope → startDraft + 预填 → 输入框显示原项目
+  ```
+
 - Composer：`useDraftConfigControl` 读取 `draftProjectId` 解析 root scope，用项目草稿 key
   读写 `__draft__`；`draftFocusVersion` 进入 scope key，保证 New Task 重新初始化；
   一次性 `composerInitialization` 只在匹配当前 task 时作为草稿种子并在挂载后消费。
@@ -75,6 +85,8 @@
    同一 command 重试复用预留行。Host 无项目服务时返回 `project.creation-unavailable`。
 8. 远程项目：含历史 `remote-agent` target 的设置可渲染远程项目行；编码 path 的 host
    身份可被侧栏与任务 scope 往返构造。
+9. 全局新建任务后用输入框选择项目，打开插件详情并点击「立即试用」：返回草稿显示同一
+   项目与插件引用，用户手动发送。无项目的草稿仍显示「选择项目」。
 
 ## 批次 2 接线（2026-10-31）
 
