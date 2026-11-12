@@ -11,6 +11,12 @@ composition, layout, typography, colors, animation and VFX. Do not trigger it fo
 data-only, build-only, publication-only, documentation or read-only diagnosis work. Respect an
 explicit request not to capture screenshots.
 
+For three.js/Canvas transcription, do not use this skill as the repair loop. Transcription visual
+fixes must follow `threejs-to-taptapmaker`'s source-first rule: screenshots are clues, not specs;
+use the source/target Transcription Compare pane, freeze the same state, cite `source_evidence`
+before editing, and batch fixes by root cause. The single-target TapTap Game Preview below is for
+ordinary Maker visual work only.
+
 This is a completion check, not a replacement for project validation. Read the Browser Use
 `control-browser` skill before browser work and follow its setup and model-visible tab-selection
 protocol. Load its screenshot lookup guidance because visual judgment is required.

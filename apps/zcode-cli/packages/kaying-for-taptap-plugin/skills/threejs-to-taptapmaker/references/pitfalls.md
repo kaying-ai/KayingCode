@@ -379,3 +379,39 @@
 - **先跑通最小闭环再堆内容**：拿到第一帧画面（哪怕只有一个方块）之后再铺棋盘/角色/装饰，
   比"全写完再跑"便宜一个数量级。
 - **实跑优先于自证**：本轮的唯一决定性动作是"把本机 runtime 跑起来 + 读 runtime.log + 截图"。
+
+## H. 转写流程反例（Turbo Tails 实测）
+
+> 这一节的共同根因：**把截图当成了修改规格**。正确做法是先回源码找 owner，写
+> `source_evidence`（`file:line` + 值/分支/资源），再批量修；截图只用于发现差异和复验。
+
+### H1 按截图调相机：4.45 m → 6.6 m → 10.2 m，最后回到源码 6.3 m
+
+- **症状**：标题屏车手/车体构图怎么调都不像原版；每次发布后按截图挪相机距离、高度、lookAt。
+- **错误做法**：把“车太大/太小/被 UI 挡住”直接当成相机参数问题，连续改 `dist/height/lookAt`。
+- **源码证据**：原版 `rC()` 的标题分支已经写死：`heading - lerp(1.2,0.3,s)`、
+  `kart + (sin p, lerp(1,1.5,s), cos p) * 6.3`、`lookAt kart+0.5`、`fov 40`，再按竖屏做
+  `2*atan(tan(fov/2)*clamp(0.8/aspect,1,1.75))` 修正。
+- **正确做法**：先读 `rC()`，把公式整段转写；截图只用来确认“是否同相位、是否被 UI 遮挡”。
+  如果构图仍不对，查模型分支/模型缩放/UI 遮挡，不要改相机。
+
+### H2 误读模型分支：把 `ab()` 的 fallback 当成主路径
+
+- **症状**：标题车像原版，比赛车完全不一样；比赛车是通用车 + 独立车手，标题是合并的 r13a。
+- **错误做法**：只看到 `ab()` 里的 `s.kart + s["driver_"+id]`，就认定原版主路径是“通用车 + 独立车手”。
+- **源码证据**：`ab()` 第一行是 `let t = rb(s,e); if (t) return t;`；`rb()` 用
+  `ib()` 取 `s["kart_"+id+"_r13"+nb]`，`nb` 默认 `"a"`，只有 `?char=old` 才为空。
+  所以默认路径是 **r13a 合并模型**，generic + driver 只是 `char=old` 的 fallback。
+- **正确做法**：写 `source/audit/control-flow.md`，列出 URL 参数/feature flag/主备分支/模型选择；
+  每个分支标 `file:line` + 触发条件，再决定目标实现走哪条。
+
+### H3 只看大色块：图集 V 翻转后“看起来对”，眼睛/法线/双面仍然错
+
+- **症状**：翻转 r13a 图集后车身大色块恢复，但车手眼睛发黑、额头有黑纹、尾巴/围巾像贴片。
+- **错误做法**：用“车身颜色对了”判断材质已经对齐，继续按截图调亮度/颜色。
+- **源码证据**：`rb()` 还做了 `ex()`（normal/NaN/颜色边界修复）、`m_()`（face decal / 眼睛法线）、
+  `g_()`（neck shader）、`envMapIntensity=1.15`；源材质还有 `doubleSided`、clearcoat、
+  emissiveStrength；导出器 warning 明确说 `Accent` 的 `VERTEX_COLOR` 未支持。
+- **正确做法**：做 `source/audit/materials.md` + `animations.md`，逐项对比
+  clearcoat/emissiveStrength/doubleSided/COLOR_0/normal/tangent/UV；
+  用 A/B 逐项排除（关阴影、关 normal、加 `cull="none"`、关 mipmap），不要靠截图调色。

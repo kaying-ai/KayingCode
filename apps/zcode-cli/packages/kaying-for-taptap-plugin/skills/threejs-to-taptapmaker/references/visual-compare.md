@@ -1,5 +1,23 @@
 # KayingCode 双预览与像素对齐
 
+## 0. 铁律：diff 是线索，不是规格
+
+> **截图/对比图只回答“哪里不一样”，不回答“应该改成什么”。**
+> 任何视觉修改前，必须在 `source/` 中找到并记录证据：`文件:行号 + 具体值/分支/资源 + 期望行为`。
+> 找不到源码证据时禁止编辑，先补取证（源码、运行时 DOM、GLB 材质、资源、动画）。
+> 修复按根因批量进行，禁止按截图逐像素/逐区域微调。
+> 同一检查点视觉修复最多 2 轮；超过则停止截图重试，回到源码审计。
+
+使用顺序：
+
+1. 冻结同一状态/视口的双端截图（标题/菜单/比赛等动画画面先冻结时间或暂停）；
+2. 用 diff/metrics 定位差异区域，只把区域当作“线索”；
+3. 把区域映射到源码 owner：DOM/CSS、custom shader、材质、模型、动画、相机、光照、UI；
+4. 写 root-cause note（`source_evidence` + `root_cause`）后再改代码；
+5. 修完在同一状态/视口复验；不达标先回 `source/audit/*`，不要继续截图微调。
+
+不同相位的截图只能做线索，**不能做验收**。像素统计、材质取值、光照标定只用于定位，不作为修改规格。
+
 ## 1. 发布比较会话
 
 **源码本地化完成后的第一组外部动作**就是创建 TapTap 空项目、判定屏幕方向（用户明确方向时服从用户；
@@ -73,9 +91,10 @@ comparison receipt 成功且双 guest 可用后，检查点轮次固定为修改
 同一 scope 对已认领 tab 再次 `claimTab` 是**幂等成功**（续预算 / 换 tool cell 重绑）。不要因为
 第二次 claim 返回成功就以为 tab 被替换；也不要改成新建替代页。
 
-把游戏带到同一个可复现状态：优先菜单、暂停页、固定关卡起点、无随机粒子的 HUD。最终证据按
+把游戏带到同一个可复现状态：优先菜单、暂停页、固定关卡起点、无随机粒子的 HUD。**有动画/计时的画面必须先冻结时间或暂停**（例如标题屏固定 `self.st`），两端必须同状态、同 viewport；随机/计时元素用最小 mask 并写明理由。最终证据按
 source → target 顺序串行调用 `nodeRepl.emitImage(await tab.screenshot())`，记录工具返回的
-`Browser screenshot saved to:` 原始 PNG 绝对路径，按下节复制到工作区。
+`Browser screenshot saved to:` 原始 PNG 绝对路径，按下节复制到工作区。截图完成后必须运行
+`t3m compare` 并记录 `compare_metrics`；只有截图、没有 metrics 的结果不能作为验收依据。
 
 默认预算是**最多 3 个 comparison pair、最多 2 轮自动修复**。任一侧截图失败即消耗当前 pair，
 本轮结论为“证据不足”并停止原样重试；先定位并修复截图/页面状态问题，只有状态发生变化后才能进入下一 pair。
@@ -85,17 +104,17 @@ source → target 顺序串行调用 `nodeRepl.emitImage(await tab.screenshot())
 `browser.user.openTabs()` 为空、claim 失败、或截图/点击 `backend_unavailable` 时，**按 error.reason 分支**，
 不要空转重试同一调用：
 
-| reason / 现象 | 含义 | 下一步 |
-|---|---|---|
-| `agent.browsers.list()` 抛错或当前未提供 IAB | 当前会话未能连接内置浏览器 | 记录本次调用的原始错误或实际后端列表及当前 revision |
-| （openTabs 空 + tabs.list 空） | 双 guest 尚未挂载，或 host 未暴露 user tabs | 确认 `prepare_visual_comparison` 已成功且面板已挂载；仍空则记 `visual_review_mode=host-guests-unavailable` 并停止视觉分支 |
-| `tab_not_found` | tabId 不在注册表（旧 UUID / 已关闭） | 重新读 openTabs 取**当前** pair 的新 id；禁止复用历史 tabId |
-| `tab_closed` | tombstone | 同上；关闭后重开会是新 child UUID，不能续用旧 id |
-| `tab_claimed_elsewhere` | 已被其它 scope 认领 | 只能在同一 session/workspace 操作；换会话则停止并报告 |
-| `tab_scope_mismatch` | window/workspace/session 不一致 | 用 receipt 的 sessionId 重读 openTabs，核对 tabGroup |
-| `tab_not_ready` | 普通 human tab 仍是空白页 | 等页面加载出真实 URL 再 claim；产品壳层 guest（`:source:`/`:target:`/`taptap-preview:`）不受此限 |
-| 截图 `backend_unavailable` | guest 未附着 / CDP 未就绪 | 先 claim 并 `tabs.list()` 确认 tab 仍在；仍在则等一拍后重试**一次**截图 |
-| 点击无效果 | 可能点在游戏画布外或页面状态已变 | 重新 screenshot observation 后再点；不要复用旧 observation 坐标 |
+| reason / 现象                                | 含义                                        | 下一步                                                                                                                    |
+| -------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `agent.browsers.list()` 抛错或当前未提供 IAB | 当前会话未能连接内置浏览器                  | 记录本次调用的原始错误或实际后端列表及当前 revision                                                                       |
+| （openTabs 空 + tabs.list 空）               | 双 guest 尚未挂载，或 host 未暴露 user tabs | 确认 `prepare_visual_comparison` 已成功且面板已挂载；仍空则记 `visual_review_mode=host-guests-unavailable` 并停止视觉分支 |
+| `tab_not_found`                              | tabId 不在注册表（旧 UUID / 已关闭）        | 重新读 openTabs 取**当前** pair 的新 id；禁止复用历史 tabId                                                               |
+| `tab_closed`                                 | tombstone                                   | 同上；关闭后重开会是新 child UUID，不能续用旧 id                                                                          |
+| `tab_claimed_elsewhere`                      | 已被其它 scope 认领                         | 只能在同一 session/workspace 操作；换会话则停止并报告                                                                     |
+| `tab_scope_mismatch`                         | window/workspace/session 不一致             | 用 receipt 的 sessionId 重读 openTabs，核对 tabGroup                                                                      |
+| `tab_not_ready`                              | 普通 human tab 仍是空白页                   | 等页面加载出真实 URL 再 claim；产品壳层 guest（`:source:`/`:target:`/`taptap-preview:`）不受此限                          |
+| 截图 `backend_unavailable`                   | guest 未附着 / CDP 未就绪                   | 先 claim 并 `tabs.list()` 确认 tab 仍在；仍在则等一拍后重试**一次**截图                                                   |
+| 点击无效果                                   | 可能点在游戏画布外或页面状态已变            | 重新 screenshot observation 后再点；不要复用旧 observation 坐标                                                           |
 
 恢复顺序固定为：**重新 list → 按 tabGroup/URL 精确匹配 → claim（可幂等）→ 设 viewport → 截图/点击**。
 仍失败才写 `visual_review_mode` 降级原因；禁止伪造截图、禁止把单侧画面当 pair、禁止新建替代网页冒充 guest。

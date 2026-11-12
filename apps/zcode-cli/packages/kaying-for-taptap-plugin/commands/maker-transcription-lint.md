@@ -22,9 +22,12 @@ description: 对转写后的 Maker 项目跑体检（t3m lint）与运行时门�
    publication 诊断不足时，才按 Skill 记录降级原因。
 3. 把结果按风险分组回报：**高风险必须全部修掉、`t3m rlog` 必须 PASS**（两者不通过都是退出码 1，当 CI 门禁用）。
 4. 每条 finding 都带 `fix:`，按它改；不确定上下文时读对应文件确认（规则有少量启发式，需要人工判断"这是 UI 控件还是场景节点"这类问题）。
+   **视觉类 finding 走 source-first**：先用 `source/audit/*` + `source/SOURCE_NOTES.md` 找到源码 owner，写 `source_evidence`（`file:line` + 值/分支/资源）后再改；禁止按截图逐像素调参数。
 5. 修完重跑这两条直到都通过，再记录证据收尾：
    `t3m note project-info.json runtime_log <路径>`（另有 `screenshot` / `pixel_stats` / `maker_url`），
    KayingCode 中还要按 `references/visual-compare.md` 更新五个 `compare_*` artifact；最后
    `t3m mark project-info.json accept` —— 缺 `runtime_log` 或 `maker_url` 会被拒绝，compare 缺失/过期会警告。
+   accept 前确认：`source/SOURCE_NOTES.md` 存在且关键事实带 `file:line`；`project-info.json` 的
+   `visual_fixes` 每条都有 `source_evidence`；至少一张最终 gameplay 截图（不只标题屏）；known gaps 与已完成分开。
 
 参数：工作目录（默认当前 `convert_game_*` 目录，目标固定为其 `dest/`）、`--json`（机器可读，便于自动化）。
