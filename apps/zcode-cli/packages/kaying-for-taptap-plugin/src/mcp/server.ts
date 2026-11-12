@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { TAPMAKER_PROJECTS_MCP_TOOL } from "@zcode/shared";
+import { buildPluginBrowserCompareTabGroup, TAPMAKER_PROJECTS_MCP_TOOL } from "@zcode/shared";
 import { manageMakerProjects } from "../maker/project-management.js";
 import { realpath } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
@@ -60,8 +60,22 @@ export function createTapTapMakerMcpServer(): Server {
     if (request.params.name === PREPARE_VISUAL_COMPARISON_TOOL.name) {
       try {
         const result = await prepareVisualComparison(request.params.arguments, meta);
+        const { pluginId, contributionId, sessionId } = result.publication;
+        const tabGroup = buildPluginBrowserCompareTabGroup(pluginId, contributionId, sessionId);
         return {
-          content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }],
+          content: [
+            { type: "text" as const, text: JSON.stringify(result, null, 2) },
+            {
+              type: "text" as const,
+              // 恢复的任务曾沿用旧版本的 Browser Use 错误，跳过了新版本的双 guest 探测。
+              text: [
+                "For automated comparison, run agent.browsers.list() in the current Desktop session even if Browser Use failed in an earlier run.",
+                `Select the IAB backend. Match tabs.list() by ID prefix (${tabGroup}:source: or ${tabGroup}:target:) and user.openTabs() by tabGroup (${tabGroup}).`,
+                "Verify one source and one target with the receipt URLs. Use tabs.get(id) for claimed guests and user.claimTab(id) for unclaimed guests. Set both to the receipt viewport, then emit ordinary viewport screenshots serially from source to target.",
+                "Copy the original PNG artifacts into the current workspace evidence directory, then run t3m compare through kaying-for-taptap_transcription on those copies. If discovery fails, report the current tool error or missing guest for this revision.",
+              ].join(" "),
+            },
+          ],
           structuredContent: result,
         };
       } catch (error) {

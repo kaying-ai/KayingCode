@@ -122,6 +122,9 @@ convert_game_YYYYMMDDHHMMSS/
   不可逆的高成本操作才打断用户。
 - 第一次 comparison receipt 成功后，所有画面观察、截图点击、亮度/布局判断和修复复查都优先在右侧 source/target
   guest 完成。阶段性验证用的目标代码变化后必须重新发布、重新 prepare；旧 target 截图不能验证新代码。
+- **续做先实测**：恢复旧任务或更新 KayingCode 后需要继续对拍时，先按 [visual-compare.md](references/visual-compare.md)
+  在当前会话调用 `agent.browsers.list()`。若已有回执属于当前会话且仍对应当前发布 revision，直接用它认领双 guest；
+  若没有匹配的回执，先为当前会话和发布 revision prepare。历史错误和项目记忆不能作为本轮降级依据。
 - **旧 receipt 不是 fallback**：每次 Maker publish 成功后，下一项外部动作必须是
   `prepare_visual_comparison`。旧 comparison receipt、旧 guest、旧截图或未指定 `--dir` 的旧 rlog 都不得验证新代码，
   也不得触发 LocalRuntime。必须先为当前 revision prepare，并核对 target publication revision。
@@ -304,7 +307,7 @@ t3m mark project-info.json accept    # 缺 runtime_log / maker_url 会被拒绝�
 
 - **KayingCode 的视觉检查从首个可发布检查点就必须走双预览**：成功发布 TapTap 预览后，立即调用
   `prepare_visual_comparison`（传最终 playable 原版 URL 与 `dest/`），再按
-  [references/visual-compare.md](references/visual-compare.md) 精确认领同一 `tabGroup` 下的 source / target
+  [references/visual-compare.md](references/visual-compare.md) 匹配回执对应的 source / target
   两个 tab。两边进入相同确定性检查点、按 receipt viewport 串行截图后，运行 `t3m compare`；后续视觉修复轮
   重复 publish → prepare → 双截图，不回退到本地窗口截图。
 - 默认最多执行 3 个 comparison pair、最多 2 轮自动修复；单侧截图失败也消耗该 pair，先修复取证条件，

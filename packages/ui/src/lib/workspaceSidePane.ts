@@ -1,5 +1,6 @@
 /* eslint-disable max-lines -- Side pane tab 状态集中维护 Browser/Git/CodeViewer/Treemapping/Whiteboard 的打开、复用、关闭和排序规则；拆分需要同步迁移现有内存恢复逻辑。 */
 import {
+  buildPluginBrowserCompareTabGroup,
   createUuid,
   type BrowserTabResidencyState,
   type KayingCodePluginBrowserCompareSidePane,
@@ -1336,7 +1337,11 @@ export function openPluginBrowserCompareSidePane(
     activate?: boolean;
   },
 ): WorkspaceSidePaneState {
-  const id = `plugin-compare:${options.pluginId}:${options.contribution.id}:${options.ownerTaskId}`;
+  const id = buildPluginBrowserCompareTabGroup(
+    options.pluginId,
+    options.contribution.id,
+    options.ownerTaskId,
+  );
   const existing = current?.tabs.find(
     (tab): tab is PluginBrowserCompareSidePaneTab =>
       tab.type === "plugin-browser-compare" &&
@@ -1373,7 +1378,7 @@ export function getSidePaneGuestTabIds(tab: WorkspaceSidePaneTab): string[] {
 }
 
 export function getPluginBrowserCompareTabGroup(tab: PluginBrowserCompareSidePaneTab): string {
-  return `plugin-compare:${tab.pluginId}:${tab.contribution.id}:${tab.sessionId}`;
+  return buildPluginBrowserCompareTabGroup(tab.pluginId, tab.contribution.id, tab.sessionId);
 }
 
 export function getPluginBrowserCompareNavigationRequestId({
