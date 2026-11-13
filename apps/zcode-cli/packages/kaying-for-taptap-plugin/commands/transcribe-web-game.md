@@ -18,7 +18,7 @@ description: 把一个已授权的网页游戏按模块转写为 TapTap Maker（
 2. **源码本地化**：`t3m fetch "<游戏地址>" --out source/`，**按结尾的 iframe / game entry 提示再抓一跳**（门户页是外壳，游戏在 `/embed/` → `<cdn>/v/<hash>/index.html`）到 `source/game/`。只抓到 `_next/` 外壳说明停错了层，先解决取证再动手。
 3. **本地化完成后立即（不插入人工确认）**：
    - `t3m analyze source/game/ --out source/report.md` 与 `t3m ui source/game/ --out source/UI_INVENTORY.md`，高风险清单作为**工作清单**写入 report 后自动按序推进，**不要回报给用户等待确认**；
-   - **源码审计**：先跑 `t3m audit source/game/ --out source/audit`（control-flow/shaders/materials/models/animations/ui 证据清单 + GLB 材质表），再人工回源码补漏；把已确认事实写入 `source/SOURCE_NOTES.md`，每条带 `file:line`；`t3m note project-info.json audit source/audit`；
+   - **源码审计**：先跑 `t3m audit source/game/ --out source/audit`（control-flow/shaders/materials/models/animations/lighting/ui 证据清单 + GLB 材质表），再人工回源码补漏；把已确认事实写入 `source/SOURCE_NOTES.md`，每条带 `file:line`；`t3m note project-info.json audit source/audit`；
    - 在 `dest/` 创建 TapTap **空项目**（KayingCode 用 `kaying-for-taptap_ensure_project`/`kaying-for-taptap_init_project`，禁止系统 `taptap-maker init`/`login` 写 `~/.taptap-maker`；无官方插件才 `taptap-maker init`。已绑定则确认 `dest/.maker-mcp/config.json`）；
    - 按 Skill 0.2 在对比面板/source 形态上判定屏幕方向：**竖屏可正常运行和交互则优先竖屏**，写入项目配置与
      `t3m note project-info.json orientation portrait|landscape` + `orientation_reason`；

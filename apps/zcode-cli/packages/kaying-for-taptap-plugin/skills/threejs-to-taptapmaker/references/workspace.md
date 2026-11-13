@@ -10,7 +10,7 @@ convert_game_YYYYMMDDHHMMSS/      时间戳为北京时间（UTC+8），精确�
 ├─ source/                        原版文件（t3m fetch 落这里）
 │  ├─ game/                       门户地址是外壳时，真正游戏入口的第二跳抓这里（分析以它为准）
 │  ├─ SOURCE_NOTES.md             已确认源码事实台账（file:line + 值/分支/资源）
-│  └─ audit/                      control-flow/shaders/materials/models/animations/ui 审计
+│  └─ audit/                      control-flow/shaders/materials/models/animations/lighting/ui 审计
 ├─ dest/                          Maker 游戏工程（源码本地化后立刻在此创建空项目）
 └─ verify/                        自检脚本与验证记录（可选：Lua/JS 对拍、绕序检查、像素统计）
 ```

@@ -69,6 +69,7 @@ const SOURCE_AUDIT_README: &str = r#"# source/audit
 - `materials.md`：baseColor/metallic/roughness/clearcoat/emissiveStrength/doubleSided/COLOR_0/texture/UV/tangent
 - `models.md`：id/显示名/模型/图集/颜色映射
 - `animations.md`：车轮/Wob_/眨眼/头部/UI tween 与目标实现状态
+- `lighting.md`：标题/比赛太阳、阴影相机/bias、色调映射、Bloom/DOF/环境贴图
 - `ui.md`：控件与骨架件对照
 
 截图/对比图只用于发现差异；修复前先在这里找到源码 owner，再把 `source_evidence` 写进
@@ -114,7 +115,7 @@ pub fn run(url: &str, name: Option<&str>, parent: &Path, t3m_version: &str) -> C
     );
     crate::outln!("  {SOURCE_NOTES_REL}  源码事实台账（每条带 file:line；压缩前更新）");
     crate::outln!(
-        "  {SOURCE_AUDIT_REL}/  control-flow/shaders/materials/models/animations/ui 审计"
+        "  {SOURCE_AUDIT_REL}/  control-flow/shaders/materials/models/animations/lighting/ui 审计"
     );
     crate::outln!("  dest/              Maker 工程（在其中执行 taptap-maker init）");
     Ok(dir)

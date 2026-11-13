@@ -37,7 +37,7 @@ t3m note project-info.json report source/report.md
 t3m note project-info.json audit source/audit
 ```
 
-- **`t3m audit` 先跑，再人工补漏**：它输出 control-flow/shaders/materials/models/animations/ui 的证据清单
+- **`t3m audit` 先跑，再人工补漏**：它输出 control-flow/shaders/materials/models/animations/lighting/ui 的证据清单
   （每条带 `file:line`），以及 **GLB 材质表**（baseColor/metallic/roughness/clearcoat/emissiveStrength/
   doubleSided/alphaMode/COLOR_0）。JS 命中可能包含 bundle 内联的 three.js 库代码，优先看游戏自有脚本和 GLB 表；
   清单是线索，不是规格，确认后把事实写进 `source/SOURCE_NOTES.md`。

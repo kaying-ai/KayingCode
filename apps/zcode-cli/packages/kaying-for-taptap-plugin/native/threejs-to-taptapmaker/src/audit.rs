@@ -115,6 +115,26 @@ const TOPICS: &[Topic] = &[
         ],
     },
     Topic {
+        id: "lighting",
+        title: "光照 / 阴影 / 色调映射 / 后期",
+        patterns: &[
+            "tonemapping",
+            "tonemappingexposure",
+            "shadowmap",
+            "shadow.bias",
+            "shadow.normalbias",
+            "shadow.camera",
+            "shadowcamera",
+            "\"tsun\"",
+            "directionallight",
+            "hemispherelight",
+            "ambientlight",
+            "effectcomposer",
+            "unrealbloom",
+            "bokehpass",
+        ],
+    },
+    Topic {
         id: "ui",
         title: "DOM/CSS UI / 输入 / 布局骨架",
         patterns: &[
@@ -417,6 +437,15 @@ fn topic_hits<'a>(hits: &'a BTreeMap<&'static str, Vec<Hit>>, id: &str) -> &'a [
     hits.get(id).map(Vec::as_slice).unwrap_or(&[])
 }
 
+fn push_hit_row(r: &mut String, hit: &Hit) {
+    let snippet = hit.snippet.replace('|', "\\|");
+    let matches = hit.matches.iter().copied().collect::<Vec<_>>().join(", ");
+    r.push_str(&format!(
+        "| `{}:{}` | `{}` | {} |\n",
+        hit.file, hit.line, snippet, matches
+    ));
+}
+
 fn write_topic(
     out: &Path,
     topic: &Topic,
@@ -434,17 +463,52 @@ fn write_topic(
     if hits.is_empty() {
         r.push_str("_未命中。可能是模式不适用，也可能是资源已烘焙/压缩；请人工确认，不要直接判定“没有”。_\n\n");
     } else {
-        r.push_str("| 文件:行 | 片段 | 命中词 |\n|---|---|---|\n");
-        for hit in hits.iter().take(80) {
-            let snippet = hit.snippet.replace('|', "\\|");
-            let matches = hit.matches.iter().copied().collect::<Vec<_>>().join(", ");
-            r.push_str(&format!(
-                "| `{}:{}` | `{}` | {} |\n",
-                hit.file, hit.line, snippet, matches
-            ));
+        let mut per_file: BTreeMap<&str, (usize, usize, usize)> = BTreeMap::new();
+        for hit in hits {
+            let entry = per_file
+                .entry(hit.file.as_str())
+                .or_insert((0, hit.line, hit.line));
+            entry.0 += 1;
+            entry.1 = entry.1.min(hit.line);
+            entry.2 = entry.2.max(hit.line);
         }
-        if hits.len() > 80 {
-            r.push_str(&format!("\n… 另有 {} 处未列出。\n", hits.len() - 80));
+        r.push_str("| 文件 | 命中 | 行范围 |\n|---|---:|---|\n");
+        for (file, (count, first, last)) in &per_file {
+            r.push_str(&format!("| `{file}` | {count} | {first}–{last} |\n"));
+        }
+        r.push('\n');
+
+        let mut by_file_rows: BTreeMap<&str, Vec<&Hit>> = BTreeMap::new();
+        for hit in hits {
+            by_file_rows.entry(hit.file.as_str()).or_default().push(hit);
+        }
+        let per_file_limit = 400usize;
+        let truncated = by_file_rows
+            .values()
+            .any(|rows| rows.len() > per_file_limit);
+        if truncated {
+            r.push_str(
+                "> 按文件采样：每个文件最多 400 条（首 200 + 尾 200）；完整列表用 `--json`。\n\n",
+            );
+        }
+        r.push_str("| 文件:行 | 片段 | 命中词 |\n|---|---|---|\n");
+        for rows in by_file_rows.values() {
+            if rows.len() <= per_file_limit {
+                for hit in rows {
+                    push_hit_row(&mut r, hit);
+                }
+            } else {
+                for hit in rows.iter().take(200) {
+                    push_hit_row(&mut r, hit);
+                }
+                r.push_str(&format!(
+                    "| … | 同一文件中间省略 {} 处（用 `--json` 查看完整列表） | … |\n",
+                    rows.len() - per_file_limit
+                ));
+                for hit in rows.iter().skip(rows.len() - 200) {
+                    push_hit_row(&mut r, hit);
+                }
+            }
         }
         r.push('\n');
     }
@@ -525,6 +589,14 @@ pub fn run(dir: &Path, out: Option<&Path>, as_json: bool) -> CliResult<String> {
                 "GLTF animation 与程序化动画各有哪些？",
                 "车轮 spin/steer、Wob_ 弹簧、眨眼、头部 look 是否在目标每帧更新？",
                 "UI tween/相机 intro 是否按原版时长与缓动？",
+            ][..],
+        ),
+        (
+            "lighting",
+            &[
+                "标题/比赛的太阳方向、仰角、阴影相机范围是否来自源码？",
+                "shadow bias / normalBias / mapSize / cascade 是否照搬？",
+                "色调映射（Neutral/ACES）、Bloom、DOF、环境贴图、最终调色是否缺失？",
             ][..],
         ),
         (
@@ -643,6 +715,7 @@ const variant = params.get("char");
 if (char === "old") useFallback();
 const model = assets["kart_fox_r13a"];
 const driver = assets["driver_fox"];
+const tsun = params.get("tsun");
 material.onBeforeCompile = (shader) => { shader.fragmentShader = "uFace"; };
 </script>"#,
         )
@@ -666,6 +739,7 @@ head.rotation.y = lookY;
             "materials",
             "models",
             "animations",
+            "lighting",
             "ui",
         ] {
             let path = out.join(format!("{topic}.md"));
@@ -676,6 +750,8 @@ head.rotation.y = lookY;
         assert!(control.contains("char === \"old\""));
         let shaders = fs::read_to_string(out.join("shaders.md")).unwrap();
         assert!(shaders.contains("onBeforeCompile"));
+        let lighting = fs::read_to_string(out.join("lighting.md")).unwrap();
+        assert!(lighting.contains("tsun"));
         let materials = fs::read_to_string(out.join("materials.md")).unwrap();
         assert!(materials.contains("clearcoat"));
         assert!(materials.contains("color_0"));

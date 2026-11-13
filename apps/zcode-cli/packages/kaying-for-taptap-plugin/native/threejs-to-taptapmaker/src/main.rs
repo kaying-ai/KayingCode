@@ -54,8 +54,8 @@ USAGE:
       把抓到的源码映射成「引擎差异工作清单」，按风险排序
 
   t3m audit <source-dir> [--out <audit-dir>] [--json]
-      源码审计：控制流/feature flag/模型选择、custom shader、材质特性、动画、UI
-      默认写 source/audit/{control-flow,shaders,materials,models,animations,ui}.md + SUMMARY.md
+      源码审计：控制流/feature flag/模型选择、custom shader、材质特性、动画、光照/阴影、UI
+      默认写 source/audit/{control-flow,shaders,materials,models,animations,lighting,ui}.md + SUMMARY.md
       输出是证据线索，不是修改规格；确认后写 SOURCE_NOTES.md
 
   t3m levels <file.js> [--out <file.lua>] [--name NAME] [--raw]
