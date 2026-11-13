@@ -5,8 +5,8 @@
 - 分支基线：`codex/fix-transcription-compare` @ `564dbb9e`
   - 该基线比 `origin/main` @ `44bf9e86` 多一个已有提交：`fix(taptap): discover comparison guests through Browser Use`
   - 如果要只把本次优化合入 `main`，可从 `origin/main` 建分支后 cherry-pick `f5165b25`；如果对比 guest 修复也要一起合，则直接使用本分支
-- 状态：**Phase 1 完成；Phase 2/3 未开始**
-- 注意：工作区里 `bin/darwin-arm64/kaying-for-taptap-core`、`bin/darwin-arm64/t3m` 是本次之前就存在的本地改动，**没有纳入提交**
+- 状态：**Phase 1 完成；Phase 2（warning 级）已实现；Phase 3/0/4 未开始**
+- 注意：工作区里 `bin/darwin-arm64/kaying-for-taptap-core`、`bin/darwin-arm64/t3m` 是本次之前就存在的本地改动，**没有纳入提交**；Phase 2 改了 native Rust 源码，但**没有重建/提交发布用二进制**，发布前需要走 `build:native` 或 CI
 
 ---
 
@@ -111,41 +111,47 @@
 
 ---
 
-## 3. 剩余工作
+## 3. Phase 2 已实现与剩余工作
 
-### Phase 2：证据台账与半硬门禁（建议下一轮，2–3 天）
+### Phase 2：已实现（warning 级）
 
-目标：让 `SOURCE_NOTES.md` / `visual_fixes` / compare metrics 从“文档要求”变成 `mark accept` 能检查的产物。
+目标：让 `SOURCE_NOTES.md` / `visual_fixes` / `gameplay_screenshot` 从“文档要求”变成 `mark accept` 能检查的产物。
 
-**需要改 native CLI**（`native/threejs-to-taptapmaker`）：
+**已实现**（`native/threejs-to-taptapmaker`）：
 
-1. `t3m init` 自动生成 `source/SOURCE_NOTES.md` 模板（或至少 `source/audit/` 目录）。
-2. `project-info.json` 的 `visual_fixes` 作为 artifact：
-   - `t3m note project-info.json visual_fixes source/audit/visual-fixes.md`
-   - `mark accept` 检查文件存在，并至少包含 `source_evidence` 字样。
-3. `mark accept` 增加 warning：
-   - 缺 `source/SOURCE_NOTES.md`
-   - 缺 `visual_fixes`
-   - `visual_fixes` 没有 `source_evidence`
-   - compare metrics 与最新 publication revision 不一致
-   - 只有标题截图、没有最终 gameplay 截图（如果 artifacts 里有 `screenshot`）
-4. 保持 `--force` 逃生口，先 warning 后 hard fail。
-5. 补 Rust/TS 测试：
-   - `workspace.rs` 的 accept gate 分支
-   - 现有项目不被误判
-   - warning 文案包含修复命令
+1. `t3m init` 自动生成：
+   - `source/SOURCE_NOTES.md` 模板（含 `（待填）` 占位）
+   - `source/audit/README.md`（control-flow/shaders/materials/models/animations/ui 清单）
+2. `mark accept` 新增 warning（不阻断 accept）：
+   - 缺 `source/SOURCE_NOTES.md` / 空文件 / 仍是模板 / 没有 `file:line` 证据
+   - 缺 `artifacts.visual_fixes` / 文件不存在 / 没有 `source_evidence`
+   - 缺 `artifacts.gameplay_screenshot` / 文件不存在
+3. `--force` 行为不变；`runtime_log` / `maker_url` 仍是硬门禁。
+4. 原有 compare 警告继续生效：缺 `compare_*`、文件不存在、metrics 比代码/publication 旧、verdict 未通过。
 
-**验收**：
+**改动文件**：
 
-- 现有 `mark accept` 行为不回归（缺 runtime_log/maker_url 仍然拒绝）。
-- 新 warning 在缺证据时出现，带明确修复命令。
-- 带完整证据的项目不产生新 warning。
-- `pnpm test` / `typecheck` / `lint` 全绿。
+- `native/threejs-to-taptapmaker/src/workspace.rs`：模板、`source_evidence_warnings`、accept 调用、单元测试
+- `native/threejs-to-taptapmaker/src/main.rs`：`init`/`mark`/`note` 帮助文案
+- `skills/threejs-to-taptapmaker/references/acceptance.md`：`gameplay_screenshot` / `visual_fixes` 证据
+- `skills/threejs-to-taptapmaker/references/workspace.md`：init 自动生成与记录点
+- `commands/transcribe-web-game.md` / `commands/maker-transcription-lint.md`：accept 前记录 `visual_fixes` / `gameplay_screenshot`
+- `test/transcription-skill-policy.test.ts`：断言 `gameplay_screenshot`
 
-**风险**：
+**验证**：
 
-- native 二进制跨平台构建/发布；不要只提交 macOS 二进制。
-- 如果暂时不改 native，可以先只保留文档要求，Phase 3 再统一做门禁。
+- `cargo test`：7 passed / 0 failed
+- `cargo build --release`：通过
+- 冒烟：`t3m init` 生成 `SOURCE_NOTES.md` + `source/audit/README.md`；`mark accept` 在缺证据时输出上述 warning，仍成功标记 done
+- 插件 `pnpm test`：40 passed / 0 failed
+- 插件 `pnpm typecheck` / `pnpm lint`：通过
+
+**未做 / 注意**：
+
+- 没有把 warning 升级为 hard fail；Phase 3 再按回放校准。
+- 没有重建/提交发布用二进制；发布前走 `build:native` 或 CI，三平台一起更新。
+- compare 的 revision 一致性仍用 mtime 代理（现有逻辑），没有做 receipt/revision 的精确比对。
+- `visual_fixes` 只检查是否包含 `source_evidence` 字样，不校验每行；Phase 3 可做结构化校验。
 
 ### Phase 3：工具化（1–2 周）
 

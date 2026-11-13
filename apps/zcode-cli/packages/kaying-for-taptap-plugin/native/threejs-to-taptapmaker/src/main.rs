@@ -31,15 +31,20 @@ fn usage() -> String {
 
 USAGE:
   t3m init <url> [--name NAME] [--dir PARENT]
-      新建转写工作目录 convert_game_YYYYMMDDHHMMSS/（project-info.json + source/ + dest/）
+      新建转写工作目录 convert_game_YYYYMMDDHHMMSS/
+      （project-info.json + source/ + source/SOURCE_NOTES.md + source/audit/ + dest/）
 
   t3m mark <project-info.json> <stage> [status] [--force]
       更新 project-info.json 里某阶段的状态（默认 done；阶段见 init 建出的 stages）
       `accept` 是硬门禁：必须先记录 runtime_log 与 maker_url 才允许标记 done；
+      缺失 SOURCE_NOTES.md / visual_fixes / gameplay_screenshot 时给出源码证据警告；
       确实要跳过时用 --force
 
   t3m note <project-info.json> <key> <value>
       往 project-info.json 的 artifacts 里记录产物路径（如 report → source/report.md）
+      accept 前建议记录：
+        visual_fixes source/audit/visual-fixes.md
+        gameplay_screenshot <最终比赛截图>
 
   t3m fetch <url> [--out <dir>] [--insecure] [--max-files N] [-v]
       抓取网页游戏的 index.html、ES 模块图与 CSS（库文件只记录不下载）

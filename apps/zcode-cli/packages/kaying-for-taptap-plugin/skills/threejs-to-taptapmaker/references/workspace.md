@@ -17,6 +17,10 @@ convert_game_YYYYMMDDHHMMSS/      时间戳为北京时间（UTC+8），精确�
 
 时间戳精确到秒，同一秒内不会建两个目录（`t3m init` 遇到已存在目录会报错，让调用方等一秒重试）。
 
+`t3m init` 会自动生成 `source/SOURCE_NOTES.md` 模板和 `source/audit/README.md`；`mark accept` 会对
+缺失/空模板/没有 `file:line` 的 `SOURCE_NOTES.md`、缺失 `visual_fixes`、缺失 `gameplay_screenshot`
+给出警告（Phase 2 为 warning，不阻断 accept）。
+
 ## 建目录
 
 ```bash
@@ -130,7 +134,8 @@ t3m note convert_game_…/project-info.json report source/report.md
 - 建议的记录点：`fetch` → 取证清单、`analyze` → report.md、`ui` → `ui_inventory`（控件清单）、
   `levels` → 转出的 Lua、`accept` → `maker_url`（`t3m note … maker_url "<url>"`）以及
   `compare_source` / `compare_target` / `compare_diff` / `compare_metrics` / `compare_operation`。
-  `mark accept` 会警告这些 compare 证据缺失、文件不存在、verdict 未通过或比目标代码/最新 publication 旧。
+  另外记录 `visual_fixes`（`source/audit/visual-fixes.md`）和 `gameplay_screenshot`（最终比赛截图）。
+  `mark accept` 会警告这些证据缺失、文件不存在、verdict 未通过或比目标代码/最新 publication 旧。
 - 检查点/压缩前更新 `source/SOURCE_NOTES.md`；视觉修复记录 `visual_fixes`（`source/audit/visual-fixes.md`）。
   `mark accept` 前确认关键事实有 `file:line`、每条视觉修复有 `source_evidence`。
 

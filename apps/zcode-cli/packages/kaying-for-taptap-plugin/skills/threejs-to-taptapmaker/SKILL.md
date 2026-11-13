@@ -29,9 +29,9 @@ description: 把网页 three.js / Canvas 游戏“按模块转写”为 TapTap M
 
 **证据落盘**（不依赖上下文记忆）：
 
-- `source/SOURCE_NOTES.md`：已确认的源码事实 + `file:line`；每次上下文压缩前/检查点更新，压缩后先读它。
-- `source/audit/control-flow.md`、`shaders.md`、`materials.md`、`models.md`、`animations.md`、`ui.md`：审计产物。
-- `project-info.json` 的 `visual_fixes`：每条视觉修复记录 `symptom / region / source_evidence / root_cause / fix / confidence`。
+- `source/SOURCE_NOTES.md`：已确认的源码事实 + `file:line`；`t3m init` 会生成模板；每次上下文压缩前/检查点更新，压缩后先读它。
+- `source/audit/control-flow.md`、`shaders.md`、`materials.md`、`models.md`、`animations.md`、`ui.md`：审计产物（`t3m init` 会建 `source/audit/` 并放 README）。
+- `project-info.json` 的 `visual_fixes`：每条视觉修复记录 `symptom / region / source_evidence / root_cause / fix / confidence`；`t3m mark accept` 会检查这个 artifact。
 
 **反例**：Turbo Tails 转写中，Agent 按截图把标题相机从 4.45 m 调到 6.6 m、10.2 m，最后回到源码
 `rC()` 的 6.3 m；根因是没先读源码，不是相机难调。同类反例见

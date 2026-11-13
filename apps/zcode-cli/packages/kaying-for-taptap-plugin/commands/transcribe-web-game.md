@@ -41,7 +41,9 @@ description: 把一个已授权的网页游戏按模块转写为 TapTap Maker（
    只有远端 publish/preview 明确失败，且远端错误与 publication runtime log 不足以定位时，才能记录 `visual_review_mode=local-runtime-fallback` 与具体原因后降级；
    官方工具报错时不得绕过插件读取 PAT 再直接调用 Maker CLI；不得复制 `pat.json`、`tap-auth.json`。收尾再执行一次同 revision 的对拍并记录五个 `compare_*` artifact。
    同时要求 `t3m lint dest` 高风险 0，并逐条走查 `references/acceptance.md`；
-   再记录 `runtime_log` / `screenshot` / `pixel_stats` / `maker_url` 后 `t3m mark project-info.json accept`；
+   再记录 `runtime_log` / `screenshot` / `gameplay_screenshot` / `pixel_stats` / `visual_fixes` / `maker_url` 后
+   `t3m mark project-info.json accept`（`t3m note project-info.json visual_fixes source/audit/visual-fixes.md`、
+   `t3m note project-info.json gameplay_screenshot <最终比赛截图>`）；
    再用 `maker_build_current_directory` 交付；确认探针与临时代码已清除。
 
 约束：

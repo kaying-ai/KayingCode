@@ -1,6 +1,6 @@
 # 转写插件优化评估方案（草案）
 
-- 状态：**Phase 1 已实施（文档/命令/参考/测试）；Phase 2/3 待评审**
+- 状态：**Phase 1 已实施；Phase 2（warning 级）已实施；Phase 3/0/4 待评审**
 - 范围：`apps/zcode-cli/packages/kaying-for-taptap-plugin` 的 `threejs-to-taptapmaker` 技能、命令、参考文档、测试与工具门禁
 - 复盘案例：Turbo Tails 转写会话 `session_56a5e1cd5acc1baede1e73f20e2975a2`
 - 目标：回答三个问题，并给出可分批落地的方案
@@ -530,11 +530,25 @@ Phase 1 只改文档和测试，风险最低，先让规则可发现、可引用
 - `pnpm test`：40 tests pass / 0 fail
 - `pnpm typecheck`：通过
 - `pnpm lint`：0 warnings / 0 errors
+- `cargo test`（native）：7 tests pass / 0 fail
+- `cargo build --release`（native）：通过
+- `t3m init` 冒烟：生成 `source/SOURCE_NOTES.md` + `source/audit/README.md`
+- `t3m mark accept` 冒烟：缺证据时输出 `SOURCE_NOTES` / `visual_fixes` / `gameplay_screenshot` warning，仍成功标记 done
 
-### 10.3 未做（Phase 2/3）
+### 10.3 Phase 2 已实施（warning 级）
 
-- `SOURCE_NOTES.md` 自动生成模板（目前由文档要求，未生成）；
-- `project-info.json` 的 `visual_fixes` 结构化写入与 `mark accept` warning；
+- `t3m init` 自动生成 `source/SOURCE_NOTES.md` 模板 + `source/audit/README.md`；
+- `mark accept` 对缺失/空模板/无 `file:line` 的 `SOURCE_NOTES.md` 给出 warning；
+- `mark accept` 对缺失 `visual_fixes`、文件不存在、无 `source_evidence` 给出 warning；
+- `mark accept` 对缺失 `gameplay_screenshot`、文件不存在给出 warning；
+- `--force` 与 `runtime_log`/`maker_url` 硬门禁保持不变；
+- 新增 Rust 单元测试与命令帮助文案；
+- 没有重建/提交发布用二进制（发布前走 `build:native` 或 CI）。
+
+### 10.4 剩余（Phase 3/0/4）
+
 - `t3m audit` 命令（自动扫描 control-flow/custom shader/material/animation）；
-- `t3m compare` metrics 作为 accept 硬门禁；
-- Turbo Tails 回放 A/B（Phase 0/4）。
+- `t3m compare` metrics 作为 accept 硬门禁（结构化的 revision 精确比对）；
+- 把 warning 升级为 hard fail（按回放校准）；
+- Turbo Tails 回放 A/B（Phase 0/4）；
+- 三平台 native 二进制构建与发布。

@@ -92,11 +92,14 @@ t3m rlog <Maker项目目录> --dir <dest>/.maker/logs/runtime/runtime.log
       只有 host 未暴露双 guest / 远程工作区时才可降级，且必须写清 `visual_review_mode` 与原因。
       **UI/装饰/材质仍在 known_gaps 时，禁止在无双预览截图的情况下 `t3m mark accept`。**
 - [ ] **同状态截图**：有动画/计时的画面已冻结时间或暂停，两端同状态、同 viewport；不同相位截图不算验收
-- [ ] **最终 gameplay 截图**：至少一张最终版本的比赛/核心玩法截图，不能只有标题屏
-- [ ] **源码证据**：`source/SOURCE_NOTES.md` 存在，关键事实带 `file:line`；`project-info.json` 的
-      `visual_fixes` 每条都有 `source_evidence`（没有源码证据的视觉修改不算完成）
+- [ ] **最终 gameplay 截图**：至少一张最终版本的比赛/核心玩法截图，不能只有标题屏；
+      记录 `t3m note project-info.json gameplay_screenshot <路径>`
+- [ ] **源码证据**：`source/SOURCE_NOTES.md` 存在（`t3m init` 会生成模板），关键事实带 `file:line`；
+      `project-info.json` 的 `visual_fixes` 每条都有 `source_evidence`
+      （`t3m note project-info.json visual_fixes source/audit/visual-fixes.md`；没有源码证据的视觉修改不算完成）
 - [ ] **compare 对齐**：`compare_metrics` 存在，且 comparison receipt / metrics 与最新 publication revision 一致
-- [ ] **产物留痕**：远端 `runtime_log`、target guest `screenshot`、`pixel_stats`；KayingCode 双预览还要记录
+- [ ] **产物留痕**：远端 `runtime_log`、target guest `screenshot`、`gameplay_screenshot`、`pixel_stats`；
+      `visual_fixes`；KayingCode 双预览还要记录
       `compare_source` / `compare_target` / `compare_diff` / `compare_metrics` / `compare_operation`
 - [ ] **界面文字**：`t3m lint <dest>` 不再报 `ui-button-newline` / `ui-text-width-hardcoded`，
       并有一张每个界面都走到的截图或自驱记录（见 [pitfalls.md](pitfalls.md) F5 的界面×状态矩阵）
