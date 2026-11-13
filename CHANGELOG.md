@@ -1,5 +1,73 @@
 # Changelog
 
+## [0.1.5](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.1.4...kaying-code-v0.1.5) (2026-11-13)
+
+### Features
+
+* **taptap:** add lighting audit and per-file sampling ([2521880](https://github.com/kaying-ai/KayingCode/commit/2521880623385072e0eea561fd8a811aa7252dd1))
+  * add a lighting topic for tone mapping, shadow bias/camera, tsun and post-processing
+  * sample long topics per file (first/last 400) so late game code is not truncated
+  * narrow the tsun pattern to the quoted source token
+  * skip game.bundle.js when game.pretty.js exists
+
+* **taptap:** add source audit and compare acceptance gate ([af48c1c](https://github.com/kaying-ai/KayingCode/commit/af48c1cfb986d1b10cf36799d53c0481ce9efbee))
+  * add t3m audit with control-flow, shader, material, model, animation and UI evidence
+  * include a GLB material table (clearcoat/emissiveStrength/doubleSided/COLOR_0)
+  * skip *.bundle.js when its readable *.pretty.js exists
+  * reject accept when side-pane compare metrics are missing, failed or stale
+  * keep non-side-pane compare evidence as a warning for fallback workflows
+  * update commands, references and policy tests
+
+* **taptap:** close replay P0/P1 evidence gaps ([53b1470](https://github.com/kaying-ai/KayingCode/commit/53b1470e322485f2f4016128baafd12ea8792ad7))
+  * add rb/ab/return-null control-flow patterns and library hit counts
+  * add target-consistency report via audit --target
+  * warn when gameplay screenshots are older than the latest scripts
+  * validate visual_fixes source_evidence row by row
+  * reject compare evidence without visual_review_mode
+  * add compare profile state/freeze and a Turbo Tails golden fixture
+
+* **taptap:** warn on missing source evidence at accept ([602188b](https://github.com/kaying-ai/KayingCode/commit/602188bd02ea3043816c1ccd6a7270fd14cba39f))
+  * create source/SOURCE_NOTES.md and source/audit/ templates on init
+  * warn when SOURCE_NOTES is missing, empty, unfilled or lacks file:line
+  * warn when visual_fixes or gameplay_screenshot artifacts are missing
+  * keep runtime_log/maker_url as hard gates and --force as the escape hatch
+  * cover the warning branches with native unit tests
+
+
+### Bug Fixes
+
+* **taptap:** discover comparison guests through Browser Use ([564dbb9](https://github.com/kaying-ai/KayingCode/commit/564dbb9e209e3e0c3113e01bb8c7f77b024b2abe))
+  * prepare_visual_comparison 成功响应返回回执 tab group，并提示在当前桌面会话探测、认领双 guest、串行截图后用 t3m compare
+  * 新增 buildPluginBrowserCompareTabGroup，UI 与 MCP 共用同一组名构造，避免两边字符串漂移
+  * 续做任务按当前会话重新探测，不沿用历史 Browser Use 错误；原始 PNG 先复制到工作区证据目录再交给转写 MCP
+  * 同步 SKILL、visual-compare 参考与 preview-workflow spec，新增 MCP 端到端测试
+
+* **ui:** preserve selected project when trying a plugin ([adfc469](https://github.com/kaying-ai/KayingCode/commit/adfc469ca3d75ee0c1ac296ead06fd74b85e041c))
+
+
+### Documentation
+
+* **agents:** document automated release workflow ([6ac70ec](https://github.com/kaying-ai/KayingCode/commit/6ac70ecce996c84e977ae7cbd9aa7b96df983dca))
+
+* **taptap:** add real-project replay evaluation ([e5ac8ac](https://github.com/kaying-ai/KayingCode/commit/e5ac8ac01615a9c224961646d3eb59c583c49b69))
+
+* **taptap:** add transcription plugin optimization handoff ([6dd824e](https://github.com/kaying-ai/KayingCode/commit/6dd824e98d38c8edc90f561997c5dbff59c74f53))
+
+* **taptap:** enforce source-first transcription workflow ([57bfaf1](https://github.com/kaying-ai/KayingCode/commit/57bfaf120b6fe10162b9d4b6c3144435b4efcbb1))
+  * add the source-first iron rule: screenshots identify differences,
+  * add read-only subagent policy and contract for parallel audits
+  * add source audit checklists: control flow, custom shaders, materials,
+  * require SOURCE_NOTES, visual_fixes evidence and deterministic compare
+  * add Turbo Tails anti-patterns and policy regression tests
+
+* **taptap:** record P0/P1 commit in handoff status ([2074f9d](https://github.com/kaying-ai/KayingCode/commit/2074f9d6fdc2158592884766f407ef9c695260a8))
+
+* **taptap:** record phase 2 commit in handoff status ([07e5d38](https://github.com/kaying-ai/KayingCode/commit/07e5d3860c88e663bf069f9cdeb522b529b2b0e6))
+
+* **taptap:** record phase 3 commit in handoff status ([bcc956d](https://github.com/kaying-ai/KayingCode/commit/bcc956d59aea9579bac4cb8e4e3bd90933e54aa0))
+
+* **taptap:** record replay commits in handoff status ([84f52b1](https://github.com/kaying-ai/KayingCode/commit/84f52b13329d7f9cc122b15ed4b89ed97f541279))
+
 ## [0.1.4](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.1.3...kaying-code-v0.1.4) (2026-11-11)
 
 ### Features
