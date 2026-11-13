@@ -5,6 +5,7 @@
 - Phase 2 提交：`892a0d96` `feat(taptap): warn on missing source evidence at accept`
 - Phase 3 提交：`34cb98c5` `feat(taptap): add source audit and compare acceptance gate`
 - Phase 3.1 回放修复：`c0d0a785` `feat(taptap): add lighting audit and per-file sampling`
+- P0/P1 修复提交：`e28f0dbd` `feat(taptap): close replay P0/P1 evidence gaps`
 - 回放评估提交：`66cb2181` `docs(taptap): add real-project replay evaluation`
 - 交接文档提交：`4fb50b0e` `docs(taptap): add transcription plugin optimization handoff`
 - 分支基线：`codex/fix-transcription-compare` @ `564dbb9e`
