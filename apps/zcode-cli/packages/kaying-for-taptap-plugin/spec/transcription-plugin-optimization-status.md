@@ -2,6 +2,8 @@
 
 - 分支：`plugin/transcription-source-first`
 - Phase 1 提交：`f5165b25` `docs(taptap): enforce source-first transcription workflow`
+- Phase 2 提交：`892a0d96` `feat(taptap): warn on missing source evidence at accept`
+- 交接文档提交：`4fb50b0e` `docs(taptap): add transcription plugin optimization handoff`
 - 分支基线：`codex/fix-transcription-compare` @ `564dbb9e`
   - 该基线比 `origin/main` @ `44bf9e86` 多一个已有提交：`fix(taptap): discover comparison guests through Browser Use`
   - 如果要只把本次优化合入 `main`，可从 `origin/main` 建分支后 cherry-pick `f5165b25`；如果对比 guest 修复也要一起合，则直接使用本分支
