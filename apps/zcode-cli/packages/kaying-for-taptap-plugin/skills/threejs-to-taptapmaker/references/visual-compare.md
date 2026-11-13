@@ -129,6 +129,8 @@ profile 由具体转换工程维护。坐标是 receipt viewport 的 CSS pixel�
   "schemaVersion": 1,
   "checkpoint": "level-1-paused",
   "reason": "暂停后棋盘、HUD 与菜单均为确定性画面",
+  "state": "level-1-paused",
+  "freeze": "paused",
   "thresholds": {
     "pixelDelta": 8,
     "changedPixelRatioMax": 0.02,

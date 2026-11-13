@@ -43,7 +43,7 @@ test("transcription invocation accepts declared commands and workspace-local pat
       {
         command: "audit",
         cwd: "convert_game_demo",
-        arguments: ["source", "--out", "source/audit", "--json"],
+        arguments: ["source", "--out", "source/audit", "--target", "dest", "--json"],
       },
       workspace,
     );

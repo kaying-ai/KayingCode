@@ -566,17 +566,27 @@ Phase 1 只改文档和测试，风险最低，先让规则可发现、可引用
   - 非 side-pane 缺 compare 仍只 warning，避免破坏 remote/local fallback
 - 文档更新：`pipeline.md` step 0 加 `t3m audit`、`transcribe-web-game.md` step 3 加 `t3m audit`、`acceptance.md`/`maker-transcription-lint.md` 加 compare 硬门禁说明
 
-### 10.5 剩余（Phase 0/4 与发布）
+### 10.5 P0/P1 已实施与剩余
 
 真实项目回放已完成，报告见 [transcription-plugin-replay-evaluation.md](transcription-plugin-replay-evaluation.md)。
 回放中发现并修复了缺 lighting topic、全局采样截断、`tsun` 模式过宽、pretty/bundle 重复四个问题。
 
-- 把 Turbo Tails audit 回放固化成自动化 golden test（当前是人工冒烟）；
-- `t3m audit` 噪声调优（bundle 内联的 three.js 库代码仍有通用命中；摘要已提示优先看游戏自有脚本和 GLB 表）；
-- 目标侧一致性审计（`t3m audit --target dest`）；
-- `visual_fixes` 结构化逐行校验（当前只检查 `source_evidence` 字样）；
-- `gameplay_screenshot` freshness/内容检查；
-- `visual_review_mode` 缺失时的硬门禁策略；
+P0/P1 已实施：
+
+- audit 控制流模式：`function rb(` / `function ab(` / `return null` / `if (t) return`；
+- `gameplay_screenshot` freshness（无 `dest_project` 时回退 `dest/`）；
+- `visual_fixes` 逐行 `source_evidence` 校验；
+- 有 `compare_*` 但缺 `visual_review_mode` → 拒绝 accept；
+- audit 库命中统计/行级 `L` 标记/JSON `library`；
+- `t3m audit --target dest` 生成 `target-consistency.md`；
+- compare profile `state`/`freeze` 与缺失 warning；
+- Turbo Tails 紧凑 golden fixture + 14 个 Rust 测试。
+
+剩余：
+
+- audit 库代码过滤（当前只统计/标记，不剔除）；
+- 目标侧一致性从 token 存在性升级为语义级判断；
+- 把紧凑 golden fixture 扩展为完整源码回放；
 - 把 source evidence warning 升级为 hard fail（按回放校准）；
 - Turbo Tails 回放 A/B（Phase 0/4）；
 - 三平台 native 二进制构建与发布。

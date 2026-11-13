@@ -43,6 +43,10 @@ const TOPICS: &[Topic] = &[
             "char ===",
             "char ==",
             "nb =",
+            "function rb(",
+            "function ab(",
+            "return null",
+            "if (t) return",
             "variant",
             "feature flag",
             "debug flag",
@@ -160,6 +164,34 @@ struct Hit {
     line: usize,
     snippet: String,
     matches: BTreeSet<&'static str>,
+    library: bool,
+}
+
+/// Heuristic: lines that look like three.js/WebGL engine internals rather than
+/// game code. They are still useful context, but should not outrank game hits.
+fn is_library_line(line: &str) -> bool {
+    let low = line.to_lowercase();
+    const MARKERS: &[&str] = &[
+        "#include",
+        "#define",
+        "#ifdef",
+        "#if ",
+        "gl_",
+        "webgl",
+        "shaderchunk",
+        "three.",
+        "getsunlight",
+        "getshadow",
+        "khr_materials_",
+        "parseobject",
+        "material.clearcoat",
+        "material.clearcoatroughness",
+        "outputcolorspace",
+        "programvariants",
+        "uniformslist",
+        "webglprogram",
+    ];
+    MARKERS.iter().any(|marker| low.contains(marker))
 }
 
 fn collect_source_files(dir: &Path) -> CliResult<Vec<PathBuf>> {
@@ -211,6 +243,7 @@ fn scan(dir: &Path, files: &[PathBuf]) -> CliResult<BTreeMap<&'static str, Vec<H
             .replace('\\', "/");
         for (index, line) in text.lines().enumerate() {
             let lower = line.to_lowercase();
+            let library = is_library_line(line);
             for topic in TOPICS {
                 for pattern in topic.patterns {
                     if !lower.contains(pattern) {
@@ -225,6 +258,7 @@ fn scan(dir: &Path, files: &[PathBuf]) -> CliResult<BTreeMap<&'static str, Vec<H
                             line: index + 1,
                             snippet: truncate_snippet(line),
                             matches: BTreeSet::new(),
+                            library,
                         });
                     entry.matches.insert(pattern);
                 }
@@ -384,6 +418,195 @@ fn scan_glb_files(dir: &Path) -> CliResult<Vec<GlbFile>> {
     Ok(out)
 }
 
+struct TargetCheck {
+    topic: &'static str,
+    token: &'static str,
+    note: &'static str,
+}
+
+const TARGET_CHECKS: &[TargetCheck] = &[
+    TargetCheck {
+        topic: "control-flow",
+        token: "r13a",
+        note: "源默认 r13a 合并模型；目标是否出现？",
+    },
+    TargetCheck {
+        topic: "control-flow",
+        token: "showroot",
+        note: "标题/比赛 root 切换",
+    },
+    TargetCheck {
+        topic: "control-flow",
+        token: "raceroot",
+        note: "race 分支",
+    },
+    TargetCheck {
+        topic: "control-flow",
+        token: "driver_",
+        note: "generic fallback 车手",
+    },
+    TargetCheck {
+        topic: "shaders",
+        token: "uface",
+        note: "face decal",
+    },
+    TargetCheck {
+        topic: "shaders",
+        token: "udecal",
+        note: "眼睛 decal",
+    },
+    TargetCheck {
+        topic: "shaders",
+        token: "uneck",
+        note: "neck shader",
+    },
+    TargetCheck {
+        topic: "materials",
+        token: "clearcoat",
+        note: "清漆层",
+    },
+    TargetCheck {
+        topic: "materials",
+        token: "cull=\"none\"",
+        note: "doubleSided 材质",
+    },
+    TargetCheck {
+        topic: "materials",
+        token: "diffvcol",
+        note: "顶点色 technique",
+    },
+    TargetCheck {
+        topic: "animations",
+        token: "wheelspin",
+        note: "车轮旋转",
+    },
+    TargetCheck {
+        topic: "animations",
+        token: "wob_",
+        note: "尾巴/耳朵弹簧",
+    },
+    TargetCheck {
+        topic: "animations",
+        token: "blink",
+        note: "眨眼",
+    },
+    TargetCheck {
+        topic: "animations",
+        token: "looky",
+        note: "头部 look",
+    },
+    TargetCheck {
+        topic: "lighting",
+        token: "tsun",
+        note: "标题太阳参数",
+    },
+    TargetCheck {
+        topic: "lighting",
+        token: "shadowbias",
+        note: "阴影 bias",
+    },
+    TargetCheck {
+        topic: "lighting",
+        token: "shadowcascade",
+        note: "级联阴影",
+    },
+    TargetCheck {
+        topic: "lighting",
+        token: "tonemapping",
+        note: "色调映射",
+    },
+    TargetCheck {
+        topic: "lighting",
+        token: "bloom",
+        note: "Bloom",
+    },
+    TargetCheck {
+        topic: "lighting",
+        token: "bokeh",
+        note: "DOF",
+    },
+];
+
+fn scan_target(target: &Path) -> CliResult<BTreeMap<&'static str, (String, usize, String)>> {
+    let mut files = Vec::new();
+    // Only the shipped project code/assets: never engine docs, type stubs,
+    // examples or other scaffolding that happens to mention the same tokens.
+    // Scan `scripts` first so token locations point at implementation, not an
+    // asset filename that merely contains the token.
+    for dir in ["scripts", "assets", "Shaders"] {
+        let root = target.join(dir);
+        if !root.is_dir() {
+            continue;
+        }
+        let mut dir_files = Vec::new();
+        for ext in ["lua", "xml", "shader"] {
+            collect_files(&root, ext, &mut dir_files)?;
+        }
+        dir_files.sort();
+        files.extend(dir_files);
+    }
+    let mut hits = BTreeMap::new();
+    for file in files {
+        let rel = file
+            .strip_prefix(target)
+            .unwrap_or(&file)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let Ok(text) = read_text(&file) else {
+            continue;
+        };
+        for (index, line) in text.lines().enumerate() {
+            let lower = line.to_lowercase();
+            for check in TARGET_CHECKS {
+                if hits.contains_key(check.token) || !lower.contains(check.token) {
+                    continue;
+                }
+                hits.insert(
+                    check.token,
+                    (rel.clone(), index + 1, truncate_snippet(line)),
+                );
+            }
+        }
+    }
+    Ok(hits)
+}
+
+fn target_consistency_report(target: &Path) -> CliResult<(String, usize)> {
+    let hits = scan_target(target)?;
+    let mut r = String::new();
+    r.push_str("# 目标侧一致性 audit\n\n");
+    r.push_str(&format!("- 目标工程：`{}`\n", target.display()));
+    r.push_str(
+        "> token 存在性只是线索，不代表实现正确；命中位置可能是注释/声明，\n\
+         > 缺失项要回目标代码确认，确认后写进 `visual_fixes` 或 `SOURCE_NOTES.md`。\n\n",
+    );
+    r.push_str("| 主题 | 目标 token | 状态 | 片段 | 说明 |\n|---|---|---|---|---|\n");
+    let mut missing = 0usize;
+    for check in TARGET_CHECKS {
+        let hit = hits.get(check.token);
+        if hit.is_none() {
+            missing += 1;
+        }
+        let (status, snippet) = match hit {
+            Some((file, line, snippet)) => (
+                format!("发现 @ `{file}:{line}`"),
+                snippet.replace('|', "\\|"),
+            ),
+            None => ("未发现".to_string(), "—".to_string()),
+        };
+        r.push_str(&format!(
+            "| {} | `{}` | {} | {} | {} |\n",
+            check.topic, check.token, status, snippet, check.note
+        ));
+    }
+    r.push_str(&format!(
+        "\n**未发现 token：{} / {}**。未发现不等于一定缺失（可能命名不同/被烘焙），要回代码确认。\n",
+        missing,
+        TARGET_CHECKS.len()
+    ));
+    Ok((r, missing))
+}
+
 fn materials_extra(glb_files: &[GlbFile]) -> String {
     let mut r = String::new();
     r.push_str("## GLB 材质（源文件）\n\n");
@@ -440,8 +663,9 @@ fn topic_hits<'a>(hits: &'a BTreeMap<&'static str, Vec<Hit>>, id: &str) -> &'a [
 fn push_hit_row(r: &mut String, hit: &Hit) {
     let snippet = hit.snippet.replace('|', "\\|");
     let matches = hit.matches.iter().copied().collect::<Vec<_>>().join(", ");
+    let library = if hit.library { "L" } else { "" };
     r.push_str(&format!(
-        "| `{}:{}` | `{}` | {} |\n",
+        "| `{}:{}` | `{}` | {} | {library} |\n",
         hit.file, hit.line, snippet, matches
     ));
 }
@@ -463,18 +687,23 @@ fn write_topic(
     if hits.is_empty() {
         r.push_str("_未命中。可能是模式不适用，也可能是资源已烘焙/压缩；请人工确认，不要直接判定“没有”。_\n\n");
     } else {
-        let mut per_file: BTreeMap<&str, (usize, usize, usize)> = BTreeMap::new();
+        let mut per_file: BTreeMap<&str, (usize, usize, usize, usize)> = BTreeMap::new();
         for hit in hits {
             let entry = per_file
                 .entry(hit.file.as_str())
-                .or_insert((0, hit.line, hit.line));
+                .or_insert((0, hit.line, hit.line, 0));
             entry.0 += 1;
             entry.1 = entry.1.min(hit.line);
             entry.2 = entry.2.max(hit.line);
+            if hit.library {
+                entry.3 += 1;
+            }
         }
-        r.push_str("| 文件 | 命中 | 行范围 |\n|---|---:|---|\n");
-        for (file, (count, first, last)) in &per_file {
-            r.push_str(&format!("| `{file}` | {count} | {first}–{last} |\n"));
+        r.push_str("| 文件 | 命中 | 其中库/引擎 | 行范围 |\n|---|---:|---:|---|\n");
+        for (file, (count, first, last, library)) in &per_file {
+            r.push_str(&format!(
+                "| `{file}` | {count} | {library} | {first}–{last} |\n"
+            ));
         }
         r.push('\n');
 
@@ -491,7 +720,7 @@ fn write_topic(
                 "> 按文件采样：每个文件最多 400 条（首 200 + 尾 200）；完整列表用 `--json`。\n\n",
             );
         }
-        r.push_str("| 文件:行 | 片段 | 命中词 |\n|---|---|---|\n");
+        r.push_str("| 文件:行 | 片段 | 命中词 | 库 |\n|---|---|---|---|\n");
         for rows in by_file_rows.values() {
             if rows.len() <= per_file_limit {
                 for hit in rows {
@@ -530,7 +759,12 @@ fn write_topic(
 /// Run the audit and write `SUMMARY.md` + one Markdown file per topic.
 ///
 /// Returns the human summary, or JSON when `as_json` is true.
-pub fn run(dir: &Path, out: Option<&Path>, as_json: bool) -> CliResult<String> {
+pub fn run(
+    dir: &Path,
+    out: Option<&Path>,
+    target: Option<&Path>,
+    as_json: bool,
+) -> CliResult<String> {
     if !dir.is_dir() {
         return err(format!("{} is not a directory", dir.display()));
     }
@@ -548,6 +782,16 @@ pub fn run(dir: &Path, out: Option<&Path>, as_json: bool) -> CliResult<String> {
     let hits = scan(dir, &files)?;
     let glb_files = scan_glb_files(dir)?;
     let materials_section = materials_extra(&glb_files);
+    let target_missing = if let Some(target) = target {
+        if !target.is_dir() {
+            return err(format!("{} is not a directory", target.display()));
+        }
+        let (report, missing) = target_consistency_report(target)?;
+        write_text(&out_dir.join("target-consistency.md"), &report)?;
+        Some(missing)
+    } else {
+        None
+    };
 
     let checklists: BTreeMap<&'static str, &[&'static str]> = BTreeMap::from([
         (
@@ -632,17 +876,28 @@ pub fn run(dir: &Path, out: Option<&Path>, as_json: bool) -> CliResult<String> {
     summary.push_str(&format!("- 源码目录：`{}`\n", dir.display()));
     summary.push_str(&format!("- 扫描文件：{} 个\n", files.len()));
     summary.push_str(&format!("- 证据命中：{} 处\n", total));
+    let library_total = hits.values().flatten().filter(|hit| hit.library).count();
+    summary.push_str(&format!("- 其中库/引擎代码命中：{} 处\n", library_total));
     summary.push_str(&format!(
         "- GLB 材质：{} 个；带 COLOR_0 的网格：{} 个\n\n",
         glb_material_count, glb_vertex_color_count
     ));
-    summary.push_str("| 主题 | 命中 | 文件 |\n|---|---:|---|\n");
-    for topic in TOPICS {
-        let count = hits.get(topic.id).map(Vec::len).unwrap_or(0);
+    if let Some(missing) = target_missing {
         summary.push_str(&format!(
-            "| {} | {} | `{}/{}.md` |\n",
+            "- 目标侧一致性：{} 个 token 未在目标发现（见 `target-consistency.md`）\n\n",
+            missing
+        ));
+    }
+    summary.push_str("| 主题 | 命中 | 其中库/引擎 | 文件 |\n|---|---:|---:|---|\n");
+    for topic in TOPICS {
+        let rows = hits.get(topic.id).map(Vec::as_slice).unwrap_or(&[]);
+        let count = rows.len();
+        let library = rows.iter().filter(|hit| hit.library).count();
+        summary.push_str(&format!(
+            "| {} | {} | {} | `{}/{}.md` |\n",
             topic.title,
             count,
+            library,
             out_dir.display(),
             topic.id
         ));
@@ -662,12 +917,14 @@ pub fn run(dir: &Path, out: Option<&Path>, as_json: bool) -> CliResult<String> {
                     "id": topic.id,
                     "title": topic.title,
                     "count": hits.get(topic.id).map(Vec::len).unwrap_or(0),
+                    "libraryCount": hits.get(topic.id).map(|rows| rows.iter().filter(|hit| hit.library).count()).unwrap_or(0),
                     "file": out_dir.join(format!("{}.md", topic.id)),
                     "hits": hits.get(topic.id).map(|rows| rows.iter().map(|hit| json!({
                         "file": hit.file,
                         "line": hit.line,
                         "snippet": hit.snippet,
                         "matches": &hit.matches,
+                        "library": hit.library,
                     })).collect::<Vec<_>>()).unwrap_or_default(),
                 })
             })
@@ -677,6 +934,8 @@ pub fn run(dir: &Path, out: Option<&Path>, as_json: bool) -> CliResult<String> {
             "audit_dir": out_dir,
             "files": files.len(),
             "total_hits": total,
+            "library_hits": library_total,
+            "target_consistency_missing": target_missing,
             "glb_materials": glb_material_count,
             "glb_vertex_color_meshes": glb_vertex_color_count,
             "topics": topics,
@@ -717,6 +976,7 @@ const model = assets["kart_fox_r13a"];
 const driver = assets["driver_fox"];
 const tsun = params.get("tsun");
 material.onBeforeCompile = (shader) => { shader.fragmentShader = "uFace"; };
+function ab(s, e) { let t = rb(s, e); if (t) return t; return null; }
 </script>"#,
         )
         .unwrap();
@@ -731,7 +991,7 @@ head.rotation.y = lookY;
         .unwrap();
 
         let out = root.join("source/audit");
-        let summary = run(&source, Some(&out), false).unwrap();
+        let summary = run(&source, Some(&out), None, false).unwrap();
         assert!(summary.contains("t3m audit summary"));
         for topic in [
             "control-flow",
@@ -748,6 +1008,7 @@ head.rotation.y = lookY;
         let control = fs::read_to_string(out.join("control-flow.md")).unwrap();
         assert!(control.contains("URLSearchParams"));
         assert!(control.contains("char === \"old\""));
+        assert!(control.contains("function ab("));
         let shaders = fs::read_to_string(out.join("shaders.md")).unwrap();
         assert!(shaders.contains("onBeforeCompile"));
         let lighting = fs::read_to_string(out.join("lighting.md")).unwrap();
@@ -771,7 +1032,7 @@ head.rotation.y = lookY;
         )
         .unwrap();
         let out = root.join("source/audit");
-        let json = run(&source, Some(&out), true).unwrap();
+        let json = run(&source, Some(&out), None, true).unwrap();
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["total_hits"], 2);
         assert_eq!(value["topics"][1]["id"], "shaders");
@@ -818,7 +1079,7 @@ head.rotation.y = lookY;
         fs::write(source.join("asset_test.glb"), glb).unwrap();
 
         let out = root.join("source/audit");
-        let summary = run(&source, Some(&out), false).unwrap();
+        let summary = run(&source, Some(&out), None, false).unwrap();
         assert!(summary.contains("GLB 材质：1"));
         let materials = fs::read_to_string(out.join("materials.md")).unwrap();
         assert!(materials.contains("Paint"));
@@ -829,9 +1090,71 @@ head.rotation.y = lookY;
     }
 
     #[test]
+    fn audit_matches_turbo_tails_golden_patterns() {
+        let root = temp_dir("t3m-audit-golden");
+        let source = root.join("source/game");
+        fs::create_dir_all(&source).unwrap();
+        fs::write(
+            source.join("game.js"),
+            include_str!("../testdata/turbo-tails-golden.js"),
+        )
+        .unwrap();
+        let out = root.join("source/audit");
+        run(&source, Some(&out), None, false).unwrap();
+
+        let read = |name: &str| fs::read_to_string(out.join(format!("{name}.md"))).unwrap();
+        let control = read("control-flow");
+        assert!(control.contains("function ab("));
+        assert!(control.contains("return null"));
+        let models = read("models");
+        assert!(models.contains("kart_fox_r13a"));
+        assert!(models.contains("driver_"));
+        let shaders = read("shaders");
+        assert!(shaders.contains("uFace"));
+        assert!(shaders.contains("uNeckM"));
+        let animations = read("animations");
+        assert!(animations.contains("wheelSpin"));
+        assert!(animations.contains("Wob_"));
+        let lighting = read("lighting");
+        assert!(lighting.contains("\"tsun\""));
+        assert!(lighting.contains("shadow.bias"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn audit_reports_target_consistency_tokens() {
+        let root = temp_dir("t3m-audit-target");
+        let source = root.join("source/game");
+        let target = root.join("dest");
+        fs::create_dir_all(&source).unwrap();
+        fs::create_dir_all(target.join("scripts")).unwrap();
+        fs::create_dir_all(target.join("assets/models/test")).unwrap();
+        fs::write(source.join("game.js"), "const x = 1;\n").unwrap();
+        fs::write(
+            target.join("scripts/Game.lua"),
+            "local wheelSpin = 0\nlocal model = 'r13a'\n",
+        )
+        .unwrap();
+        fs::write(
+            target.join("assets/models/test/Material.xml"),
+            "<material cull=\"none\" />\n",
+        )
+        .unwrap();
+
+        let out = root.join("source/audit");
+        let summary = run(&source, Some(&out), Some(&target), false).unwrap();
+        assert!(summary.contains("目标侧一致性"));
+        let report = fs::read_to_string(out.join("target-consistency.md")).unwrap();
+        assert!(report.contains("| animations | `wheelspin` | 发现 @"));
+        assert!(report.contains("| materials | `cull=\"none\"` | 发现 @"));
+        assert!(report.contains("| shaders | `uface` | 未发现 |"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn audit_rejects_an_empty_source_dir() {
         let root = temp_dir("t3m-audit-empty");
-        let error = run(&root, Some(&root.join("audit")), false).unwrap_err();
+        let error = run(&root, Some(&root.join("audit")), None, false).unwrap_err();
         assert!(error.0.contains("no .js/.mjs/.html/.css"));
         fs::remove_dir_all(root).unwrap();
     }

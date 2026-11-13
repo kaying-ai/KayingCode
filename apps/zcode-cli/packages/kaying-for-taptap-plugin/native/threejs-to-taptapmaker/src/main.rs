@@ -53,9 +53,10 @@ USAGE:
   t3m analyze <dir> [--out <report.md>] [-v]
       把抓到的源码映射成「引擎差异工作清单」，按风险排序
 
-  t3m audit <source-dir> [--out <audit-dir>] [--json]
+  t3m audit <source-dir> [--out <audit-dir>] [--target <maker-project>] [--json]
       源码审计：控制流/feature flag/模型选择、custom shader、材质特性、动画、光照/阴影、UI
       默认写 source/audit/{control-flow,shaders,materials,models,animations,lighting,ui}.md + SUMMARY.md
+      --target 额外生成 target-consistency.md（源线索在目标 Lua/XML 里的 token 存在性）
       输出是证据线索，不是修改规格；确认后写 SOURCE_NOTES.md
 
   t3m levels <file.js> [--out <file.lua>] [--name NAME] [--raw]
@@ -110,7 +111,14 @@ impl Args {
                     // value flags consume the next token when it is not a flag
                     let takes_value = matches!(
                         key.as_str(),
-                        "out" | "name" | "dir" | "max-files" | "lines" | "check" | "profile"
+                        "out"
+                            | "name"
+                            | "dir"
+                            | "max-files"
+                            | "lines"
+                            | "check"
+                            | "profile"
+                            | "target"
                     );
                     if takes_value {
                         if let Some(next) = argv.get(i + 1) {
@@ -314,7 +322,8 @@ fn run(argv: &[String]) -> CliResult<i32> {
                 .value("out")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("source/audit"));
-            let report = audit::run(&dir, Some(&out), args.flag("json"))?;
+            let target = args.value("target").map(PathBuf::from);
+            let report = audit::run(&dir, Some(&out), target.as_deref(), args.flag("json"))?;
             if let Some(info_path) = find_project_info_for_output(&out) {
                 let value = out.to_string_lossy().to_string();
                 workspace::note_artifact(&info_path, "audit", &value)?;

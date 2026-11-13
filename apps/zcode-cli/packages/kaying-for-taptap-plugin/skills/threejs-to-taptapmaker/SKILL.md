@@ -139,6 +139,7 @@ convert_game_YYYYMMDDHHMMSS/
 
 - 标题/菜单/比赛等有动画的画面，先冻结时间/状态（如 `self.st = 0.0` 或暂停），再截双端；
 - 两端同 viewport、同 UI 状态；随机/计时元素用最小 mask，并写明理由；
+- compare profile 写 `state`（如 title/race-paused）和 `freeze`（如 `self.st=4.5`/paused）；缺失会 warning；
 - 必须跑 `t3m compare` 并记录 `compare_metrics`；不同相位截图只能做线索，不能做验收；
 - `visual_review_mode=kayingcode-side-pane` 时必须记录 `t3m note project-info.json visual_review_mode kayingcode-side-pane`；
   `compare_metrics` 缺失、verdict 未通过、或比目标代码/最新 publication 旧时，`t3m mark accept` 会拒绝

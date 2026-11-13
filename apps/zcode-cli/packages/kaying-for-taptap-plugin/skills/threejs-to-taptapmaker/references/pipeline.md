@@ -31,7 +31,7 @@ t3m fetch "<游戏地址>" --out source/
 # 门户页只是外壳时：按结尾提示抓真正入口（/embed/ → <cdn>/v/<hash>/index.html）
 t3m fetch "<game entry candidate>" --out source/game/
 t3m analyze source/game/ --out source/report.md
-t3m audit source/game/ --out source/audit
+t3m audit source/game/ --out source/audit --target dest
 t3m mark project-info.json fetch && t3m mark project-info.json analyze
 t3m note project-info.json report source/report.md
 t3m note project-info.json audit source/audit
@@ -39,7 +39,9 @@ t3m note project-info.json audit source/audit
 
 - **`t3m audit` 先跑，再人工补漏**：它输出 control-flow/shaders/materials/models/animations/lighting/ui 的证据清单
   （每条带 `file:line`），以及 **GLB 材质表**（baseColor/metallic/roughness/clearcoat/emissiveStrength/
-  doubleSided/alphaMode/COLOR_0）。JS 命中可能包含 bundle 内联的 three.js 库代码，优先看游戏自有脚本和 GLB 表；
+  doubleSided/alphaMode/COLOR_0）。`--target dest` 额外生成 `target-consistency.md`，给出源线索在目标
+  Lua/XML 里的 token 命中位置（命中可能是注释/声明，缺失也不等于一定没做，必须回代码确认）。
+  JS 命中可能包含 bundle 内联的 three.js 库代码，优先看游戏自有脚本和 GLB 表；
   清单是线索，不是规格，确认后把事实写进 `source/SOURCE_NOTES.md`。
 
 - 确认渲染栈（three.js / Canvas 2D）、模块划分、关卡与配置的来源文件。

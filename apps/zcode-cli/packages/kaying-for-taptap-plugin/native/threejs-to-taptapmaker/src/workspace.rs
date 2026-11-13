@@ -300,10 +300,95 @@ fn find_ancestor_file(base: &Path, relative_path: &Path) -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
+fn target_project_dir(arts: &[(String, String)], base: &Path) -> Option<PathBuf> {
+    if let Some(value) = artifact(arts, "dest_project") {
+        let path = resolve_artifact_path(base, value);
+        if path.is_dir() {
+            return Some(path);
+        }
+    }
+    let fallback = base.join("dest");
+    fallback.is_dir().then_some(fallback)
+}
+
+fn newest_target_script(arts: &[(String, String)], base: &Path) -> Option<std::time::SystemTime> {
+    let project = target_project_dir(arts, base)?;
+    let mut files = Vec::new();
+    crate::util::collect_files(&project.join("scripts"), "lua", &mut files).ok()?;
+    files
+        .iter()
+        .filter_map(|file| std::fs::metadata(file).ok()?.modified().ok())
+        .max()
+}
+
+/// Parse the `visual_fixes` table and require a non-empty `source_evidence`
+/// cell on every data row. A substring check is not enough: a template/header
+/// plus one empty row used to pass as evidence.
+fn visual_fixes_evidence_issue(text: &str) -> Option<String> {
+    let mut evidence_column: Option<usize> = None;
+    let mut data_rows = 0usize;
+    for (index, line) in text.lines().enumerate() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('|') {
+            continue;
+        }
+        let cells: Vec<&str> = trimmed
+            .trim_matches('|')
+            .split('|')
+            .map(str::trim)
+            .collect();
+        if let Some(column) = cells
+            .iter()
+            .position(|cell| cell.eq_ignore_ascii_case("source_evidence"))
+        {
+            evidence_column = Some(column);
+            continue;
+        }
+        let separator = cells.iter().all(|cell| {
+            !cell.is_empty() && cell.chars().all(|ch| ch == '-' || ch == ':' || ch == ' ')
+        });
+        if separator {
+            continue;
+        }
+        let Some(column) = evidence_column else {
+            continue;
+        };
+        data_rows += 1;
+        let value = cells.get(column).copied().unwrap_or("");
+        let has_evidence = !value.is_empty()
+            && value != "—"
+            && value != "-"
+            && (value.contains("file:")
+                || value.contains(".js:")
+                || value.contains(".html:")
+                || value.contains(".lua:")
+                || value.contains(".xml")
+                || value.contains(".glb")
+                || value.contains(".json"));
+        if !has_evidence {
+            return Some(format!(
+                "visual_fixes 第 {} 行缺有效 source_evidence: {trimmed}",
+                index + 1
+            ));
+        }
+    }
+    if evidence_column.is_none() {
+        return Some("visual_fixes 没有 source_evidence 列".into());
+    }
+    if data_rows == 0 {
+        return Some("visual_fixes 没有数据行".into());
+    }
+    None
+}
+
 /// Warnings for the source-first evidence ledger. These are deliberately soft
 /// (warnings, not a hard gate) in the first rollout: existing projects should
 /// keep accepting, while missing evidence becomes visible and actionable.
-fn source_evidence_warnings(arts: &[(String, String)], base: &Path) -> Vec<String> {
+fn source_evidence_warnings(
+    arts: &[(String, String)],
+    base: &Path,
+    newest_target_code: Option<std::time::SystemTime>,
+) -> Vec<String> {
     let mut warnings = Vec::new();
 
     match crate::util::read_text(&base.join(SOURCE_NOTES_REL)) {
@@ -341,14 +426,14 @@ fn source_evidence_warnings(arts: &[(String, String)], base: &Path) -> Vec<Strin
         Some(value) => {
             let path = resolve_artifact_path(base, value);
             match crate::util::read_text(&path) {
-                Err(_) => warnings.push(format!(
-                    "artifacts.visual_fixes 指向的文件不存在: {value}"
-                )),
-                Ok(text) if !text.to_lowercase().contains("source_evidence") => warnings.push(
-                    "artifacts.visual_fixes 没有 source_evidence 列/字段；每条视觉修复必须带 file:line 证据"
-                        .into(),
-                ),
-                Ok(_) => {}
+                Err(_) => {
+                    warnings.push(format!("artifacts.visual_fixes 指向的文件不存在: {value}"))
+                }
+                Ok(text) => {
+                    if let Some(issue) = visual_fixes_evidence_issue(&text) {
+                        warnings.push(issue);
+                    }
+                }
             }
         }
     }
@@ -365,6 +450,15 @@ fn source_evidence_warnings(arts: &[(String, String)], base: &Path) -> Vec<Strin
                 warnings.push(format!(
                     "artifacts.gameplay_screenshot 指向的文件不存在: {value}"
                 ));
+            } else if let (Ok(captured), Some(code)) = (
+                std::fs::metadata(&path).and_then(|meta| meta.modified()),
+                newest_target_code,
+            ) {
+                if captured < code {
+                    warnings.push(format!(
+                        "artifacts.gameplay_screenshot 比 scripts/ 最新代码旧: {value}；重新截图并 note"
+                    ));
+                }
             }
         }
     }
@@ -457,7 +551,24 @@ fn comparison_evidence_errors(
     newest_target_code: Option<std::time::SystemTime>,
 ) -> Vec<String> {
     let mut errors = Vec::new();
-    let side_pane = artifact(arts, "visual_review_mode") == Some("kayingcode-side-pane");
+    let mode = artifact(arts, "visual_review_mode");
+    let has_compare = [
+        "compare_source",
+        "compare_target",
+        "compare_diff",
+        "compare_metrics",
+        "compare_operation",
+    ]
+    .iter()
+    .any(|key| artifact(arts, key).is_some());
+    if has_compare && mode.is_none() {
+        errors.push(
+            "记录了 compare_* 但缺 artifacts.visual_review_mode；\
+             必须写明 kayingcode-side-pane 或 local-runtime-fallback，不能绕过硬门禁"
+                .into(),
+        );
+    }
+    let side_pane = mode == Some("kayingcode-side-pane");
     let Some(value) = artifact(arts, "compare_metrics") else {
         if side_pane {
             errors.push(
@@ -827,6 +938,8 @@ pub fn mark(info_path: &Path, stage: &str, status: &str, force: bool) -> CliResu
             }
         }
         if !force {
+            let newest_target_code =
+                newest_target_code.or_else(|| newest_target_script(&arts, base));
             let errors = comparison_evidence_errors(&arts, base, newest_target_code);
             if !errors.is_empty() {
                 return Err(CliError(format!(
@@ -837,7 +950,8 @@ pub fn mark(info_path: &Path, stage: &str, status: &str, force: bool) -> CliResu
                 )));
             }
         }
-        for warning in source_evidence_warnings(&arts, base) {
+        let newest_target_code = newest_target_code.or_else(|| newest_target_script(&arts, base));
+        for warning in source_evidence_warnings(&arts, base, newest_target_code) {
             crate::errln!("warn: {warning}");
         }
         for warning in comparison_evidence_warnings(&arts, base, newest_target_code) {
@@ -1024,7 +1138,7 @@ mod tests {
         ));
         std::fs::create_dir_all(root.join(SOURCE_AUDIT_REL)).unwrap();
 
-        let missing = source_evidence_warnings(&[], &root);
+        let missing = source_evidence_warnings(&[], &root, None);
         assert!(missing
             .iter()
             .any(|warning| warning.contains("SOURCE_NOTES.md")));
@@ -1042,7 +1156,7 @@ mod tests {
         .unwrap();
         std::fs::write(
             root.join(SOURCE_AUDIT_REL).join("visual-fixes.md"),
-            "| symptom | source_evidence | fix |\n",
+            "| symptom | source_evidence | fix |\n|---|---|---|\n| x | game.js:12 | y |\n",
         )
         .unwrap();
         std::fs::write(root.join("gameplay.png"), b"png").unwrap();
@@ -1050,20 +1164,39 @@ mod tests {
             ("visual_fixes".into(), "source/audit/visual-fixes.md".into()),
             ("gameplay_screenshot".into(), "gameplay.png".into()),
         ];
-        assert!(source_evidence_warnings(&arts, &root).is_empty());
+        assert!(source_evidence_warnings(&arts, &root, None).is_empty());
+
+        let warnings = source_evidence_warnings(
+            &arts,
+            &root,
+            Some(SystemTime::now() + Duration::from_secs(1)),
+        );
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("gameplay_screenshot 比")));
 
         std::fs::write(
             root.join(SOURCE_AUDIT_REL).join("visual-fixes.md"),
-            "| symptom | fix |\n",
+            "| symptom | source_evidence | fix |\n|---|---|---|\n| x |  | y |\n",
         )
         .unwrap();
-        let warnings = source_evidence_warnings(&arts, &root);
+        let warnings = source_evidence_warnings(&arts, &root, None);
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("缺有效 source_evidence")));
+
+        std::fs::write(
+            root.join(SOURCE_AUDIT_REL).join("visual-fixes.md"),
+            "| symptom | fix |\n|---|---|\n| x | y |\n",
+        )
+        .unwrap();
+        let warnings = source_evidence_warnings(&arts, &root, None);
         assert!(warnings
             .iter()
             .any(|warning| warning.contains("source_evidence")));
 
         std::fs::write(root.join(SOURCE_NOTES_REL), "# SOURCE_NOTES\n（待填）\n").unwrap();
-        let warnings = source_evidence_warnings(&arts, &root);
+        let warnings = source_evidence_warnings(&arts, &root, None);
         assert!(warnings.iter().any(|warning| warning.contains("仍是模板")));
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -1085,6 +1218,12 @@ mod tests {
         assert!(errors
             .iter()
             .any(|error| error.contains("没有 artifacts.compare_metrics")));
+
+        let no_mode = vec![("compare_source".into(), "source.png".into())];
+        let errors = comparison_evidence_errors(&no_mode, &root, None);
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("visual_review_mode")));
 
         let metrics = root.join("metrics.json");
         std::fs::write(&metrics, "{\"verdict\":{\"passed\":false}}\n").unwrap();

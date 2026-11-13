@@ -91,14 +91,16 @@ t3m rlog <Maker项目目录> --dir <dest>/.maker/logs/runtime/runtime.log
 - [ ] **双预览取证**：KayingCode 本地工作区必须留下 source/target 同尺寸截图 + `t3m compare` 产物；
       只有 host 未暴露双 guest / 远程工作区时才可降级，且必须写清 `visual_review_mode` 与原因。
       **UI/装饰/材质仍在 known_gaps 时，禁止在无双预览截图的情况下 `t3m mark accept`。**
-- [ ] **同状态截图**：有动画/计时的画面已冻结时间或暂停，两端同状态、同 viewport；不同相位截图不算验收
+- [ ] **同状态截图**：有动画/计时的画面已冻结时间或暂停，两端同状态、同 viewport；不同相位截图不算验收；
+      compare profile 写清 `state`（如 title/race-paused）和 `freeze`（如 `self.st=4.5`/paused），缺失会 warning
 - [ ] **最终 gameplay 截图**：至少一张最终版本的比赛/核心玩法截图，不能只有标题屏；
-      记录 `t3m note project-info.json gameplay_screenshot <路径>`
+      记录 `t3m note project-info.json gameplay_screenshot <路径>`；截图不能比 `scripts/` 最新代码旧
 - [ ] **源码证据**：`source/SOURCE_NOTES.md` 存在（`t3m init` 会生成模板），关键事实带 `file:line`；
-      `project-info.json` 的 `visual_fixes` 每条都有 `source_evidence`
+      `project-info.json` 的 `visual_fixes` 每一行都有非空 `source_evidence`
       （`t3m note project-info.json visual_fixes source/audit/visual-fixes.md`；没有源码证据的视觉修改不算完成）
 - [ ] **compare 对齐**：`compare_metrics` 存在，且 comparison receipt / metrics 与最新 publication revision 一致；
-      `visual_review_mode=kayingcode-side-pane` 时，缺失 / verdict 未通过 / 比代码或 publication 旧会**拒绝 accept**
+      记录 `visual_review_mode`（`kayingcode-side-pane` 或 `local-runtime-fallback`）；有 `compare_*` 但缺
+      `visual_review_mode` 会**拒绝 accept**。side-pane 下缺失 / verdict 未通过 / 比代码或 publication 旧也会拒绝
       （确实无法双预览时才用 `--force` 并在 notes 写明原因）
 - [ ] **产物留痕**：远端 `runtime_log`、target guest `screenshot`、`gameplay_screenshot`、`pixel_stats`；
       `visual_fixes`；KayingCode 双预览还要记录

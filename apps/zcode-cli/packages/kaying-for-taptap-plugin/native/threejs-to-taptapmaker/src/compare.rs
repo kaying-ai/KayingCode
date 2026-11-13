@@ -18,6 +18,12 @@ struct CompareProfile {
     schema_version: u32,
     checkpoint: String,
     reason: String,
+    /// Deterministic checkpoint state (e.g. `title`, `race-paused`).
+    #[serde(default)]
+    state: Option<String>,
+    /// How time/animation was frozen (e.g. `self.st=4.5`, `paused`).
+    #[serde(default)]
+    freeze: Option<String>,
     thresholds: Thresholds,
     #[serde(default)]
     regions: Vec<RegionProfile>,
@@ -70,6 +76,10 @@ struct MetricsDocument {
     schema_version: u32,
     checkpoint: String,
     reason: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    freeze: Option<String>,
     dimensions: Dimensions,
     source_file: String,
     target_file: String,
@@ -155,6 +165,20 @@ pub fn run(
     let profile: CompareProfile = serde_json::from_str(&read_text(profile_path)?)
         .map_err(|error| CliError(format!("parse {}: {error}", profile_path.display())))?;
     validate_profile(&profile)?;
+    let state_ok = profile
+        .state
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty());
+    let freeze_ok = profile
+        .freeze
+        .as_deref()
+        .is_some_and(|value| !value.trim().is_empty());
+    if !state_ok || !freeze_ok {
+        crate::errln!(
+            "warn: compare profile 缺 state/freeze —— 动画/计时画面可能不是同一相位；\
+             建议写 state（如 title/race-paused）和 freeze（如 self.st=4.5 或 paused）"
+        );
+    }
 
     let source = decode_rgb(source_path)?;
     let target = decode_rgb(target_path)?;
@@ -233,6 +257,8 @@ pub fn run(
         schema_version: 1,
         checkpoint: profile.checkpoint,
         reason: profile.reason,
+        state: profile.state,
+        freeze: profile.freeze,
         dimensions: Dimensions {
             width: source.width(),
             height: source.height(),

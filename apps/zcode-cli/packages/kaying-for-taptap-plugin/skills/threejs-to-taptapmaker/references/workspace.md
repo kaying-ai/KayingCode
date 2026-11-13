@@ -18,8 +18,9 @@ convert_game_YYYYMMDDHHMMSS/      时间戳为北京时间（UTC+8），精确�
 时间戳精确到秒，同一秒内不会建两个目录（`t3m init` 遇到已存在目录会报错，让调用方等一秒重试）。
 
 `t3m init` 会自动生成 `source/SOURCE_NOTES.md` 模板和 `source/audit/README.md`；`mark accept` 会对
-缺失/空模板/没有 `file:line` 的 `SOURCE_NOTES.md`、缺失 `visual_fixes`、缺失 `gameplay_screenshot`
-给出警告（Phase 2 为 warning，不阻断 accept）。
+缺失/空模板/没有 `file:line` 的 `SOURCE_NOTES.md`、缺失/空行 `visual_fixes`、缺失或比代码旧的
+`gameplay_screenshot` 给出警告。记录了 `compare_*` 但没有 `visual_review_mode` 会**拒绝 accept**
+（`--force` 例外）。
 
 ## 建目录
 

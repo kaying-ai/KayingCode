@@ -84,6 +84,8 @@ test("transcription references require source audits and deterministic compariso
   assert.match(combined, /source\/audit\/materials\.md/su);
   assert.match(combined, /source\/audit\/animations\.md/su);
   assert.match(combined, /t3m audit/su);
+  assert.match(combined, /t3m audit.*--target|--target.*t3m audit/su);
+  assert.match(combined, /state.*freeze|freeze.*state/su);
   assert.match(combined, /source\/SOURCE_NOTES\.md/su);
   assert.match(combined, /visual_fixes/su);
   assert.match(combined, /gameplay_screenshot/su);

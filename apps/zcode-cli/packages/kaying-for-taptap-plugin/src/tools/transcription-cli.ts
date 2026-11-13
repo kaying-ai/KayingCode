@@ -16,7 +16,7 @@ const COMMAND_SPECS = {
   note: spec(3, 3, [], [], [0]),
   fetch: spec(1, 1, ["out"], ["out", "max-files"], [], ["insecure", "verbose"]),
   analyze: spec(1, 1, ["out"], ["out"], [0], ["verbose"]),
-  audit: spec(1, 1, ["out"], ["out"], [0], ["json", "verbose"]),
+  audit: spec(1, 1, ["out", "target"], ["out", "target"], [0], ["json", "verbose"]),
   ui: spec(1, 1, ["out", "check"], ["out", "check"], [0], ["json", "verbose"]),
   levels: spec(1, 1, ["out"], ["out", "name"], [0], ["raw"]),
   lint: spec(1, 1, [], [], [0], ["json", "all"]),

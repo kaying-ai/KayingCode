@@ -263,10 +263,27 @@ SRC=/Users/feng/codes/games/opentaptap/1111/convert_game_20261111130547/source
 
 ---
 
-## 7. 结论
+## 7. P0/P1 后续修复（2026-11-13）
+
+回放报告的 P0/P1 已落地：
+
+| 项                         | 修复                                                                                       | 验证                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| P0 控制流线索              | audit 新增 `function rb(`/`function ab(`/`return null`/`if (t) return` 模式                | golden fixture 命中 `function ab(`/`return null` |
+| P0 gameplay 截图 freshness | `gameplay_screenshot` 比 `scripts/` 最新代码旧时 warning；无 `dest_project` 时回退 `dest/` | 单元测试旧截图触发 warning                       |
+| P0 visual_fixes 逐行校验   | 解析 `source_evidence` 列，逐行要求非空且含路径/行号；支持 `.js/.lua/.xml/.glb/.json`      | 空行/缺列/无数据行均 warning                     |
+| P0 visual_review_mode      | 有 `compare_*` 但无 `visual_review_mode` → 拒绝 accept                                     | 单元测试命中                                     |
+| P1 库命中标注              | 每主题/每文件统计“其中库/引擎”；行级 `L` 标记；JSON `library` 字段                         | Turbo Tails：1,220 命中中 267 条库命中           |
+| P1 目标侧一致性            | `t3m audit --target dest` 生成 `target-consistency.md`，给 token 命中位置/片段             | 真实项目生成 20 项 token 报告                    |
+| P1 compare 确定性          | profile 新增 `state`/`freeze`；缺失 warning；metrics 记录这两个字段                        | 测试 profile 缺字段打印 warning                  |
+| P1 golden test             | 新增 `testdata/turbo-tails-golden.js` + 14 个 Rust 测试                                    | `cargo test` 14 pass                             |
+
+**注意**：目标工程在回放后继续更新（`VisualsLib.lua` 已改为 r13a/doubleSided，`Build.lua` 已有 shadowCascade/bias），所以 `target-consistency.md` 只是 token 线索，不代表目标仍然缺失；以最新代码和截图验收为准。
+
+## 8. 结论
 
 - **插件已经能在真实项目上自动发现本次复盘的主要根因**：模型分支、face/neck shader、GLB 材质特性、车辆动画、标题光照/阴影。
 - **compare 硬门禁按设计工作**：真实失败 metrics 被拒绝，`--force` 可用，合成通过路径能走通。
-- **剩余问题主要是“证据强度”和“信噪比”**：`ab()` 提前返回、旧 `gameplay_screenshot`、`visual_fixes` 只查子串、`visual_review_mode` 依赖、库代码噪声。
-- **本次回放还发现并修复了 4 个插件缺陷**：缺 lighting topic、全局采样截断、`tsun` 模式过宽、pretty/bundle 重复。
-- 建议按 P0/P1 继续：补控制流线索、加强截图/台账校验、降低库噪声、做目标侧一致性审计，然后进入 Phase 0/4 的 subagent A/B。
+- **P0/P1 已补**：控制流线索、截图 freshness、visual_fixes 逐行校验、visual_review_mode 门禁、库命中统计、目标侧一致性、compare state/freeze、golden test。
+- **剩余问题主要是“信噪比”和“自动判断”**：库代码仍占一部分命中；目标侧一致性只查 token，不能判断实现正确；subagent A/B 与三平台二进制仍未做。
+- 下一步进入 Phase 0/4：用 Turbo Tails 做 subagent A/B，并校准 audit 噪声与 compare 阈值。
