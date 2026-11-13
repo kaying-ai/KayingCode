@@ -13,6 +13,7 @@
 //! See `../skills/threejs-to-taptapmaker/SKILL.md` for the full workflow.
 
 mod analyze;
+mod audit;
 mod compare;
 mod fetch;
 mod knowledge;
@@ -51,6 +52,11 @@ USAGE:
 
   t3m analyze <dir> [--out <report.md>] [-v]
       把抓到的源码映射成「引擎差异工作清单」，按风险排序
+
+  t3m audit <source-dir> [--out <audit-dir>] [--json]
+      源码审计：控制流/feature flag/模型选择、custom shader、材质特性、动画、UI
+      默认写 source/audit/{control-flow,shaders,materials,models,animations,ui}.md + SUMMARY.md
+      输出是证据线索，不是修改规格；确认后写 SOURCE_NOTES.md
 
   t3m levels <file.js> [--out <file.lua>] [--name NAME] [--raw]
       把 JS 的关卡/配置数组转成 Lua 表（默认包成 local NAME = {...} + return）
@@ -296,6 +302,24 @@ fn run(argv: &[String]) -> CliResult<i32> {
             } else {
                 crate::outln!("\n{}", out.unwrap().display());
             }
+            Ok(0)
+        }
+        "audit" => {
+            let dir = args
+                .positional
+                .get(1)
+                .ok_or_else(|| util::CliError("audit needs a source directory".into()))?;
+            let dir = PathBuf::from(dir);
+            let out = args
+                .value("out")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("source/audit"));
+            let report = audit::run(&dir, Some(&out), args.flag("json"))?;
+            if let Some(info_path) = find_project_info_for_output(&out) {
+                let value = out.to_string_lossy().to_string();
+                workspace::note_artifact(&info_path, "audit", &value)?;
+            }
+            crate::outln!("{report}");
             Ok(0)
         }
         "levels" => {

@@ -131,11 +131,12 @@ t3m note convert_game_…/project-info.json report source/report.md
   两道阶段门禁：`ui` 必须先有 `ui_inventory`（`t3m ui` 出的控件清单，见 [ui-parity.md](ui-parity.md)）、
   `accept` 必须先有 `runtime_log` + `maker_url`（有意设计，要跳过时用 `--force` 并写明原因）。
 - `note <info> <key> <value>`：往 `artifacts` 里记产物相对路径（相对工作目录）。
-- 建议的记录点：`fetch` → 取证清单、`analyze` → report.md、`ui` → `ui_inventory`（控件清单）、
+- 建议的记录点：`fetch` → 取证清单、`analyze` → report.md、`audit` → `source/audit`、`ui` → `ui_inventory`（控件清单）、
   `levels` → 转出的 Lua、`accept` → `maker_url`（`t3m note … maker_url "<url>"`）以及
   `compare_source` / `compare_target` / `compare_diff` / `compare_metrics` / `compare_operation`。
   另外记录 `visual_fixes`（`source/audit/visual-fixes.md`）和 `gameplay_screenshot`（最终比赛截图）。
-  `mark accept` 会警告这些证据缺失、文件不存在、verdict 未通过或比目标代码/最新 publication 旧。
+  `mark accept` 会警告这些证据缺失、文件不存在、verdict 未通过或比目标代码/最新 publication 旧；
+  `visual_review_mode=kayingcode-side-pane` 时，compare 缺失/未通过/过期会拒绝 accept（`--force` 例外）。
 - 检查点/压缩前更新 `source/SOURCE_NOTES.md`；视觉修复记录 `visual_fixes`（`source/audit/visual-fixes.md`）。
   `mark accept` 前确认关键事实有 `file:line`、每条视觉修复有 `source_evidence`。
 

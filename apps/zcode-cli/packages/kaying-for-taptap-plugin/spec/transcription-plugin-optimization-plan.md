@@ -1,6 +1,6 @@
 # 转写插件优化评估方案（草案）
 
-- 状态：**Phase 1 已实施；Phase 2（warning 级）已实施；Phase 3/0/4 待评审**
+- 状态：**Phase 1、Phase 2（warning 级）、Phase 3（audit + compare hard gate）已实施；Phase 0/4 待回放**
 - 范围：`apps/zcode-cli/packages/kaying-for-taptap-plugin` 的 `threejs-to-taptapmaker` 技能、命令、参考文档、测试与工具门禁
 - 复盘案例：Turbo Tails 转写会话 `session_56a5e1cd5acc1baede1e73f20e2975a2`
 - 目标：回答三个问题，并给出可分批落地的方案
@@ -530,10 +530,13 @@ Phase 1 只改文档和测试，风险最低，先让规则可发现、可引用
 - `pnpm test`：40 tests pass / 0 fail
 - `pnpm typecheck`：通过
 - `pnpm lint`：0 warnings / 0 errors
-- `cargo test`（native）：7 tests pass / 0 fail
+- `cargo test`（native）：12 tests pass / 0 fail
 - `cargo build --release`（native）：通过
 - `t3m init` 冒烟：生成 `source/SOURCE_NOTES.md` + `source/audit/README.md`
-- `t3m mark accept` 冒烟：缺证据时输出 `SOURCE_NOTES` / `visual_fixes` / `gameplay_screenshot` warning，仍成功标记 done
+- `t3m audit` 冒烟：生成 `SUMMARY.md` + 6 个 topic 文件 + GLB 材质表
+- 真实 Turbo Tails 回放：3 个文件、640 处证据、281 个 GLB 材质、97 个带 COLOR_0 的网格；
+  命中 `39175` / `39186` / `39253` / `40101` / `39543` 等关键行
+- `t3m mark accept` 冒烟：缺证据时输出 `SOURCE_NOTES` / `visual_fixes` / `gameplay_screenshot` warning；side-pane + verdict 未通过时退出码 2
 
 ### 10.3 Phase 2 已实施（warning 级）
 
@@ -545,10 +548,28 @@ Phase 1 只改文档和测试，风险最低，先让规则可发现、可引用
 - 新增 Rust 单元测试与命令帮助文案；
 - 没有重建/提交发布用二进制（发布前走 `build:native` 或 CI）。
 
-### 10.4 剩余（Phase 3/0/4）
+### 10.4 Phase 3 已实施（audit + compare hard gate）
 
-- `t3m audit` 命令（自动扫描 control-flow/custom shader/material/animation）；
-- `t3m compare` metrics 作为 accept 硬门禁（结构化的 revision 精确比对）；
-- 把 warning 升级为 hard fail（按回放校准）；
+- 新增 `native/threejs-to-taptapmaker/src/audit.rs`：
+  - `t3m audit <source-dir> [--out <audit-dir>] [--json]`
+  - 输出 `SUMMARY.md` + control-flow/shaders/materials/models/animations/ui 六个 Markdown
+  - 每条命中带 `file:line` + 片段 + 命中词 + “需要回答”清单
+  - `materials.md` 额外输出 GLB 材质表（baseColor/metallic/roughness/clearcoat/emissiveStrength/doubleSided/alphaMode/COLOR_0）
+  - 当 `*.pretty.js` 存在时跳过对应 `*.bundle.js`，避免重复命中
+  - 自动把 `audit` 记进 `project-info.json` artifacts
+- `main.rs` 注册 `audit` 命令与帮助文案；
+- `src/tools/transcription-cli.ts` 白名单加入 `audit`，TS 测试覆盖；
+- `workspace.rs` 新增 `comparison_evidence_errors`：
+  - side-pane 无 `compare_metrics`、文件缺失/非法 JSON/缺 `verdict.passed`、verdict 未通过、比代码或 publication 旧 → **拒绝 accept**
+  - `--force` 例外
+  - 非 side-pane 缺 compare 仍只 warning，避免破坏 remote/local fallback
+- 文档更新：`pipeline.md` step 0 加 `t3m audit`、`transcribe-web-game.md` step 3 加 `t3m audit`、`acceptance.md`/`maker-transcription-lint.md` 加 compare 硬门禁说明
+
+### 10.5 剩余（Phase 0/4 与发布）
+
+- 把 Turbo Tails audit 回放固化成自动化 golden test（当前是人工冒烟）；
+- `t3m audit` 噪声调优（bundle 内联的 three.js 库代码仍有通用命中；摘要已提示优先看游戏自有脚本和 GLB 表）；
+- `visual_fixes` 结构化逐行校验（当前只检查 `source_evidence` 字样）；
+- 把 source evidence warning 升级为 hard fail（按回放校准）；
 - Turbo Tails 回放 A/B（Phase 0/4）；
 - 三平台 native 二进制构建与发布。

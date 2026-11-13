@@ -18,7 +18,7 @@ description: 把一个已授权的网页游戏按模块转写为 TapTap Maker（
 2. **源码本地化**：`t3m fetch "<游戏地址>" --out source/`，**按结尾的 iframe / game entry 提示再抓一跳**（门户页是外壳，游戏在 `/embed/` → `<cdn>/v/<hash>/index.html`）到 `source/game/`。只抓到 `_next/` 外壳说明停错了层，先解决取证再动手。
 3. **本地化完成后立即（不插入人工确认）**：
    - `t3m analyze source/game/ --out source/report.md` 与 `t3m ui source/game/ --out source/UI_INVENTORY.md`，高风险清单作为**工作清单**写入 report 后自动按序推进，**不要回报给用户等待确认**；
-   - **源码审计**：写代码前补齐 `source/audit/control-flow.md`（URL 参数/feature flag/主备分支/模型选择）、`shaders.md`（`onBeforeCompile`/`ShaderMaterial`/`customProgramCacheKey`）、`materials.md`（clearcoat/emissiveStrength/doubleSided/vertex color）、`animations.md`（车轮/Wob\_/眨眼/头部/UI tween）、`models.md`（id/显示名/模型/图集）；把已确认事实写入 `source/SOURCE_NOTES.md`，每条带 `file:line`；
+   - **源码审计**：先跑 `t3m audit source/game/ --out source/audit`（control-flow/shaders/materials/models/animations/ui 证据清单 + GLB 材质表），再人工回源码补漏；把已确认事实写入 `source/SOURCE_NOTES.md`，每条带 `file:line`；`t3m note project-info.json audit source/audit`；
    - 在 `dest/` 创建 TapTap **空项目**（KayingCode 用 `kaying-for-taptap_ensure_project`/`kaying-for-taptap_init_project`，禁止系统 `taptap-maker init`/`login` 写 `~/.taptap-maker`；无官方插件才 `taptap-maker init`。已绑定则确认 `dest/.maker-mcp/config.json`）；
    - 按 Skill 0.2 在对比面板/source 形态上判定屏幕方向：**竖屏可正常运行和交互则优先竖屏**，写入项目配置与
      `t3m note project-info.json orientation portrait|landscape` + `orientation_reason`；
@@ -40,6 +40,7 @@ description: 把一个已授权的网页游戏按模块转写为 TapTap Maker（
    每个视觉修复先写 root-cause note（`source_evidence` + `root_cause`），再改代码；禁止只凭截图调相机/颜色/logo/布局。同一检查点视觉修复最多 2 轮。
    只有远端 publish/preview 明确失败，且远端错误与 publication runtime log 不足以定位时，才能记录 `visual_review_mode=local-runtime-fallback` 与具体原因后降级；
    官方工具报错时不得绕过插件读取 PAT 再直接调用 Maker CLI；不得复制 `pat.json`、`tap-auth.json`。收尾再执行一次同 revision 的对拍并记录五个 `compare_*` artifact。
+   `visual_review_mode=kayingcode-side-pane` 时记录该 artifact；`compare_metrics` 缺失/verdict 未通过/比代码或 publication 旧会**拒绝 accept**（`--force` 例外）。
    同时要求 `t3m lint dest` 高风险 0，并逐条走查 `references/acceptance.md`；
    再记录 `runtime_log` / `screenshot` / `gameplay_screenshot` / `pixel_stats` / `visual_fixes` / `maker_url` 后
    `t3m mark project-info.json accept`（`t3m note project-info.json visual_fixes source/audit/visual-fixes.md`、

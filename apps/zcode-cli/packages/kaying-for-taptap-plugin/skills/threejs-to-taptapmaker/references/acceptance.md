@@ -97,7 +97,9 @@ t3m rlog <Maker项目目录> --dir <dest>/.maker/logs/runtime/runtime.log
 - [ ] **源码证据**：`source/SOURCE_NOTES.md` 存在（`t3m init` 会生成模板），关键事实带 `file:line`；
       `project-info.json` 的 `visual_fixes` 每条都有 `source_evidence`
       （`t3m note project-info.json visual_fixes source/audit/visual-fixes.md`；没有源码证据的视觉修改不算完成）
-- [ ] **compare 对齐**：`compare_metrics` 存在，且 comparison receipt / metrics 与最新 publication revision 一致
+- [ ] **compare 对齐**：`compare_metrics` 存在，且 comparison receipt / metrics 与最新 publication revision 一致；
+      `visual_review_mode=kayingcode-side-pane` 时，缺失 / verdict 未通过 / 比代码或 publication 旧会**拒绝 accept**
+      （确实无法双预览时才用 `--force` 并在 notes 写明原因）
 - [ ] **产物留痕**：远端 `runtime_log`、target guest `screenshot`、`gameplay_screenshot`、`pixel_stats`；
       `visual_fixes`；KayingCode 双预览还要记录
       `compare_source` / `compare_target` / `compare_diff` / `compare_metrics` / `compare_operation`

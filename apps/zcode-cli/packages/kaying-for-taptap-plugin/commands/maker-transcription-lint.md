@@ -27,7 +27,8 @@ description: 对转写后的 Maker 项目跑体检（t3m lint）与运行时门�
    `t3m note project-info.json runtime_log <路径>`（另有 `screenshot` / `gameplay_screenshot` / `pixel_stats` /
    `visual_fixes` / `maker_url`），KayingCode 中还要按 `references/visual-compare.md` 更新五个 `compare_*` artifact；最后
    `t3m mark project-info.json accept` —— 缺 `runtime_log` 或 `maker_url` 会被拒绝；缺 `SOURCE_NOTES.md` /
-   `visual_fixes` / `gameplay_screenshot` 会给出源码证据警告，compare 缺失/过期也会警告。
+   `visual_fixes` / `gameplay_screenshot` 会给出源码证据警告；`visual_review_mode=kayingcode-side-pane` 时，
+   `compare_metrics` 缺失/verdict 未通过/比代码或 publication 旧会**拒绝 accept**（`--force` 例外）。
    accept 前确认：`source/SOURCE_NOTES.md` 存在且关键事实带 `file:line`；`project-info.json` 的
    `visual_fixes` 每条都有 `source_evidence`；至少一张最终 gameplay 截图（不只标题屏）；known gaps 与已完成分开。
 

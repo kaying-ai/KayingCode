@@ -440,6 +440,79 @@ fn comparison_evidence_warnings(
     warnings
 }
 
+/// Hard errors for compare evidence. Unlike [`comparison_evidence_warnings`],
+/// these block `accept` unless `--force` is used:
+///
+/// - KayingCode side-pane mode but no `compare_metrics` at all;
+/// - metrics file missing / not JSON / no `verdict.passed`;
+/// - `verdict.passed == false`;
+/// - metrics older than the target scripts or the latest publication.
+///
+/// Missing compare evidence outside side-pane mode stays a warning, so remote
+/// or explicitly recorded local-runtime fallbacks are not broken by this gate.
+fn comparison_evidence_errors(
+    arts: &[(String, String)],
+    base: &Path,
+    newest_target_code: Option<std::time::SystemTime>,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    let side_pane = artifact(arts, "visual_review_mode") == Some("kayingcode-side-pane");
+    let Some(value) = artifact(arts, "compare_metrics") else {
+        if side_pane {
+            errors.push(
+                "visual_review_mode=kayingcode-side-pane 但没有 artifacts.compare_metrics；\
+                 KayingCode 必须发布 → prepare → 双 guest 截图 → t3m compare"
+                    .into(),
+            );
+        }
+        return errors;
+    };
+    let path = resolve_artifact_path(base, value);
+    if !path.is_file() {
+        errors.push(format!(
+            "artifacts.compare_metrics 指向的文件不存在: {value}"
+        ));
+        return errors;
+    }
+    let Ok(text) = crate::util::read_text(&path) else {
+        errors.push(format!("无法读取 compare_metrics: {value}"));
+        return errors;
+    };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+        errors.push(format!("compare_metrics 不是合法 JSON: {value}"));
+        return errors;
+    };
+    match json
+        .pointer("/verdict/passed")
+        .and_then(serde_json::Value::as_bool)
+    {
+        Some(true) => {}
+        Some(false) => errors.push(
+            "compare_metrics verdict 未通过；不得把 accept 标成 done（先修根因再重新对比）".into(),
+        ),
+        None => errors.push("compare_metrics 缺少 verdict.passed；无法判定像素对齐是否通过".into()),
+    }
+    let Ok(modified) = std::fs::metadata(&path).and_then(|meta| meta.modified()) else {
+        return errors;
+    };
+    if newest_target_code.is_some_and(|target| modified < target) {
+        errors
+            .push("compare_metrics 比目标工程最新代码旧；先重新发布、双截图并 t3m compare".into());
+    }
+    if find_ancestor_file(
+        base,
+        Path::new(".maker/kaying-for-taptap/preview-publication.v1.json"),
+    )
+    .and_then(|receipt| std::fs::metadata(receipt).ok()?.modified().ok())
+    .is_some_and(|receipt| modified < receipt)
+    {
+        errors.push(
+            "compare_metrics 比最新 TapTap publication 旧；不能用旧截图验收新 revision".into(),
+        );
+    }
+    errors
+}
+
 /// How many rows of the inventory's alignment table (section 七) still have an
 /// empty「Maker 实现」/「显隐条件」cell. `None` = the section is missing.
 pub(crate) fn unfilled_alignment_rows(text: &str) -> Option<(usize, usize)> {
@@ -752,6 +825,17 @@ pub fn mark(info_path: &Path, stage: &str, status: &str, force: bool) -> CliResu
                 }
             }
         }
+        if !force {
+            let errors = comparison_evidence_errors(&arts, base, newest_target_code);
+            if !errors.is_empty() {
+                return Err(CliError(format!(
+                    "拒绝把 accept 标成 done：compare 证据未通过\n  - {}\n\
+                     先修根因，再重新发布 → prepare_visual_comparison → 双 guest 截图 → t3m compare；\n\
+                     确实无法执行双预览时才用 --force，并在 notes 里写明原因（见 references/visual-compare.md）",
+                    errors.join("\n  - ")
+                )));
+            }
+        }
         for warning in source_evidence_warnings(&arts, base) {
             crate::errln!("warn: {warning}");
         }
@@ -980,6 +1064,48 @@ mod tests {
         std::fs::write(root.join(SOURCE_NOTES_REL), "# SOURCE_NOTES\n（待填）\n").unwrap();
         let warnings = source_evidence_warnings(&arts, &root);
         assert!(warnings.iter().any(|warning| warning.contains("仍是模板")));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn comparison_evidence_errors_block_side_pane_without_metrics_and_failed_verdict() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "t3m-workspace-compare-gate-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+
+        let side_pane_only = vec![("visual_review_mode".into(), "kayingcode-side-pane".into())];
+        let errors = comparison_evidence_errors(&side_pane_only, &root, None);
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("没有 artifacts.compare_metrics")));
+
+        let metrics = root.join("metrics.json");
+        std::fs::write(&metrics, "{\"verdict\":{\"passed\":false}}\n").unwrap();
+        let arts = vec![
+            ("visual_review_mode".into(), "kayingcode-side-pane".into()),
+            ("compare_metrics".into(), "metrics.json".into()),
+        ];
+        let errors = comparison_evidence_errors(&arts, &root, None);
+        assert!(errors.iter().any(|error| error.contains("verdict 未通过")));
+
+        std::fs::write(&metrics, "{\"verdict\":{\"passed\":true}}\n").unwrap();
+        let errors = comparison_evidence_errors(
+            &arts,
+            &root,
+            Some(SystemTime::now() - Duration::from_secs(10)),
+        );
+        assert!(errors.is_empty(), "{errors:?}");
+
+        let missing = vec![("compare_metrics".into(), "missing.json".into())];
+        let errors = comparison_evidence_errors(&missing, &root, None);
+        assert!(errors.iter().any(|error| error.contains("不存在")));
+
         std::fs::remove_dir_all(root).unwrap();
     }
 }

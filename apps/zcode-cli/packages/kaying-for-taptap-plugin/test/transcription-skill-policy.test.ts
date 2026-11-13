@@ -83,12 +83,14 @@ test("transcription references require source audits and deterministic compariso
   assert.match(combined, /source\/audit\/shaders\.md/su);
   assert.match(combined, /source\/audit\/materials\.md/su);
   assert.match(combined, /source\/audit\/animations\.md/su);
+  assert.match(combined, /t3m audit/su);
   assert.match(combined, /source\/SOURCE_NOTES\.md/su);
   assert.match(combined, /visual_fixes/su);
   assert.match(combined, /gameplay_screenshot/su);
   assert.match(combined, /diff 是线索，不是规格/su);
   assert.match(combined, /冻结.*时间|暂停.*再截/su);
   assert.match(combined, /compare_metrics/su);
+  assert.match(combined, /kayingcode-side-pane.*拒绝 accept|拒绝 accept.*kayingcode-side-pane/su);
 });
 
 test("transcription pitfalls record the Turbo Tails anti-patterns", async () => {

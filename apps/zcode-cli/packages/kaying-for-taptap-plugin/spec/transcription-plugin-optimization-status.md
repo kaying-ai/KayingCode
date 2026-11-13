@@ -7,7 +7,7 @@
 - 分支基线：`codex/fix-transcription-compare` @ `564dbb9e`
   - 该基线比 `origin/main` @ `44bf9e86` 多一个已有提交：`fix(taptap): discover comparison guests through Browser Use`
   - 如果要只把本次优化合入 `main`，可从 `origin/main` 建分支后 cherry-pick `f5165b25`；如果对比 guest 修复也要一起合，则直接使用本分支
-- 状态：**Phase 1 完成；Phase 2（warning 级）已实现；Phase 3/0/4 未开始**
+- 状态：**Phase 1 完成；Phase 2（warning 级）已实现；Phase 3（audit + compare hard gate）已实现；Phase 0/4 未开始**
 - 注意：工作区里 `bin/darwin-arm64/kaying-for-taptap-core`、`bin/darwin-arm64/t3m` 是本次之前就存在的本地改动，**没有纳入提交**；Phase 2 改了 native Rust 源码，但**没有重建/提交发布用二进制**，发布前需要走 `build:native` 或 CI
 
 ---
@@ -155,26 +155,44 @@
 - compare 的 revision 一致性仍用 mtime 代理（现有逻辑），没有做 receipt/revision 的精确比对。
 - `visual_fixes` 只检查是否包含 `source_evidence` 字样，不校验每行；Phase 3 可做结构化校验。
 
-### Phase 3：工具化（1–2 周）
+### Phase 3：已实现（audit + compare hard gate）
 
-目标：把“人肉审计”变成半自动审计。
+**已实现**：
 
-1. `t3m audit`（或在 `analyze` 上加 `--audit`）：
-   - 扫描源码：URL 参数/feature flag/主备分支/模型选择
-   - 扫描 custom shader：`onBeforeCompile`/`ShaderMaterial`/`customProgramCacheKey`/`onBeforeRender`
-   - 扫描材质关键词：clearcoat/emissiveStrength/doubleSided/COLOR_0
-   - 扫描动画关键词：wheel/Wob\_/blink/look/head
-   - 输出 `source/audit/*.md`，并标出“未转写/近似”
-2. `t3m compare` metrics 结构化输出，`mark accept` 可读取。
-3. 子 agent prompt 生成器（可选）：`t3m subagent <role>` 输出 prompt 模板。
-4. 把 Turbo Tails 的 `rb/ab/char=old`、face/neck/ex、clearcoat/emissive/doubleSided、wheel/wobble/blink 写成 audit 的黄金用例。
+1. `t3m audit <source-dir> [--out <audit-dir>] [--json]`
+   - 扫描 `js/mjs/html/css`（跳过 vendor/minified）
+   - 输出 `SUMMARY.md` + `control-flow.md` / `shaders.md` / `materials.md` / `models.md` / `animations.md` / `ui.md`
+   - 每个 topic 带 `file:line` + 片段 + 命中词 + “需要回答”清单
+   - 自动把 `audit` 记录到 `project-info.json` 的 artifacts（能找到 project-info 时）
+2. `t3m mark accept` 的 compare 硬门禁：
+   - `visual_review_mode=kayingcode-side-pane` 但没有 `compare_metrics` → 拒绝
+   - `compare_metrics` 文件不存在 / 非法 JSON / 缺 `verdict.passed` → 拒绝
+   - `verdict.passed=false` → 拒绝
+   - metrics 比目标代码或最新 publication 旧 → 拒绝
+   - `--force` 仍可绕过
+3. 非 side-pane 模式下缺 compare 证据仍只 warning，避免破坏 remote/local fallback。
+4. 文档与命令更新：`pipeline.md` step 0 加 `t3m audit`、`transcribe-web-game.md` step 3 加 `t3m audit`、`acceptance.md` 加硬门禁说明。
+5. `src/tools/transcription-cli.ts` 白名单加入 `audit`，TS 测试覆盖。
 
-**验收**：
+**验证**：
 
-- 对 Turbo Tails 源码，`t3m audit` 能命中上述关键事实。
-- 对一个小游戏，audit 不产生大量噪声。
-- `mark accept` 能读取 metrics 并给出 verdict。
-- 现有测试不回归。
+- `cargo test`：12 passed / 0 failed
+- `cargo build --release`：通过
+- 冒烟：`t3m audit` 生成 6 个 topic 文件 + SUMMARY + GLB 材质表；`mark accept` 在
+  `visual_review_mode=kayingcode-side-pane` + `verdict.passed=false` 时退出码 2
+- 真实 Turbo Tails 源码回放：扫描 3 个文件、640 处证据、**281 个 GLB 材质、97 个带 COLOR_0 的网格**；
+  命中 `39175`（`?char=old`）、`39186`（`kart_*_r13a`）、`39253`（uFace/uDecal）、
+  `40101`（wheelSpin）、`39543`（Wob\_）等关键行
+- 当 `game.pretty.js` 存在时自动跳过 `game.bundle.js`，避免重复命中
+- 插件 `pnpm test`：40 passed / 0 failed
+
+**未做**：
+
+- 子 agent prompt 生成器（可选，未实现）
+- 把 Turbo Tails 回放固化成自动化 golden test（当前是人工冒烟）
+- `t3m audit` 噪声调优：bundle 内联的 three.js 库代码仍会产生部分通用命中，摘要已提示优先看游戏自有脚本和 GLB 表
+- `t3m audit` 的噪声调优（当前是关键词启发式）
+- `visual_fixes` 的结构化逐行校验（仍只检查 `source_evidence` 字样）
 
 ### Phase 0/4：回放与 A/B（约 1 周）
 
