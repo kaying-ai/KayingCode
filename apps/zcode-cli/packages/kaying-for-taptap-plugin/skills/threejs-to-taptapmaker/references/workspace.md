@@ -8,12 +8,19 @@
 convert_game_YYYYMMDDHHMMSS/      时间戳为北京时间（UTC+8），精确到秒
 ├─ project-info.json              项目信息：名称/地址/版本/路径/阶段状态/产物记录
 ├─ source/                        原版文件（t3m fetch 落这里）
-│  └─ game/                       门户地址是外壳时，真正游戏入口的第二跳抓这里（分析以它为准）
+│  ├─ game/                       门户地址是外壳时，真正游戏入口的第二跳抓这里（分析以它为准）
+│  ├─ SOURCE_NOTES.md             已确认源码事实台账（file:line + 值/分支/资源）
+│  └─ audit/                      control-flow/shaders/materials/models/animations/lighting/ui 审计
 ├─ dest/                          Maker 游戏工程（源码本地化后立刻在此创建空项目）
 └─ verify/                        自检脚本与验证记录（可选：Lua/JS 对拍、绕序检查、像素统计）
 ```
 
 时间戳精确到秒，同一秒内不会建两个目录（`t3m init` 遇到已存在目录会报错，让调用方等一秒重试）。
+
+`t3m init` 会自动生成 `source/SOURCE_NOTES.md` 模板和 `source/audit/README.md`；`mark accept` 会对
+缺失/空模板/没有 `file:line` 的 `SOURCE_NOTES.md`、缺失/空行 `visual_fixes`、缺失或比代码旧的
+`gameplay_screenshot` 给出警告。记录了 `compare_*` 但没有 `visual_review_mode` 会**拒绝 accept**
+（`--force` 例外）。
 
 ## 建目录
 
@@ -68,6 +75,49 @@ t3m note project-info.json orientation_reason "竖屏 viewport 下玩法完整�
 }
 ```
 
+## 源码证据台账（SOURCE_NOTES.md）
+
+转写的“源码是规格，截图是线索”靠这个文件落地；不要只把结论留在对话或压缩摘要里。
+
+```markdown
+# SOURCE_NOTES
+
+## 已确认事实
+
+| 主题          | 证据                             | 结论                                                       | 验证方式                              |
+| ------------- | -------------------------------- | ---------------------------------------------------------- | ------------------------------------- |
+| 模型主路径    | `game.pretty.js:39186`, `:39514` | 默认走 `kart_<id>_r13a`；`?char=old` 才走 generic + driver | 读 `rb()`/`ab()` + 运行时 `__G.karts` |
+| 标题相机      | `game.pretty.js:46513`           | 6.3 m、smoothstep 9 s、fov 40 + 竖屏修正                   | 运行时相机坐标/截图同相位             |
+| 自定义 shader | `game.pretty.js:39238`, `:39329` | `m_()` face decal、`g_()` neck                             | 材质源码 + 目标实现状态               |
+| 材质          | `asset_kart.glb` material JSON   | Paint clearcoat 1.0、Accent 0.6、EmissiveStrength 3        | GLB JSON vs 目标 XML                  |
+
+## 未确认/待验证
+
+- …（每条写为什么未确认、下一步怎么验证）
+```
+
+配套审计文件：
+
+- `source/audit/control-flow.md`：URL 参数/feature flag/主备分支/模型选择/每角色覆盖。
+- `source/audit/shaders.md`：`onBeforeCompile`/`ShaderMaterial`/`customProgramCacheKey` 清单。
+- `source/audit/materials.md`：GLB 材质 vs 目标 XML 的 parity 表。
+- `source/audit/models.md`：id/显示名/模型/图集/颜色映射。
+- `source/audit/animations.md`：动画/程序化动画与目标实现状态。
+- `source/audit/ui.md`：UI 控件与骨架件对照。
+
+## 视觉修复台账（visual_fixes）
+
+每个视觉修复在 `project-info.json` 记录同一份台账（`t3m note project-info.json visual_fixes source/audit/visual-fixes.md`），
+内容至少包含：
+
+```markdown
+| 症状         | 区域     | source_evidence                                   | root_cause                          | fix                              | confidence | 复验                         |
+| ------------ | -------- | ------------------------------------------------- | ----------------------------------- | -------------------------------- | ---------- | ---------------------------- |
+| 车手眼睛发黑 | 标题车头 | `game.pretty.js:45463`, `:46582`; `Build.lua:759` | 标题太阳/阴影未按源码；normal green | 标题太阳 + shadow bias + N green | high       | compare metrics + 同相位截图 |
+```
+
+没有 `source_evidence` 的视觉修改不算完成；只有截图、没有源码证据的修改，下一轮很可能回归。
+
 ## 阶段状态维护
 
 每完成一步就更新状态、记录产物（agent 按流程执行，不 reliance 记忆）：
@@ -82,10 +132,14 @@ t3m note convert_game_…/project-info.json report source/report.md
   两道阶段门禁：`ui` 必须先有 `ui_inventory`（`t3m ui` 出的控件清单，见 [ui-parity.md](ui-parity.md)）、
   `accept` 必须先有 `runtime_log` + `maker_url`（有意设计，要跳过时用 `--force` 并写明原因）。
 - `note <info> <key> <value>`：往 `artifacts` 里记产物相对路径（相对工作目录）。
-- 建议的记录点：`fetch` → 取证清单、`analyze` → report.md、`ui` → `ui_inventory`（控件清单）、
+- 建议的记录点：`fetch` → 取证清单、`analyze` → report.md、`audit` → `source/audit`、`ui` → `ui_inventory`（控件清单）、
   `levels` → 转出的 Lua、`accept` → `maker_url`（`t3m note … maker_url "<url>"`）以及
   `compare_source` / `compare_target` / `compare_diff` / `compare_metrics` / `compare_operation`。
-  `mark accept` 会警告这些 compare 证据缺失、文件不存在、verdict 未通过或比目标代码/最新 publication 旧。
+  另外记录 `visual_fixes`（`source/audit/visual-fixes.md`）和 `gameplay_screenshot`（最终比赛截图）。
+  `mark accept` 会警告这些证据缺失、文件不存在、verdict 未通过或比目标代码/最新 publication 旧；
+  `visual_review_mode=kayingcode-side-pane` 时，compare 缺失/未通过/过期会拒绝 accept（`--force` 例外）。
+- 检查点/压缩前更新 `source/SOURCE_NOTES.md`；视觉修复记录 `visual_fixes`（`source/audit/visual-fixes.md`）。
+  `mark accept` 前确认关键事实有 `file:line`、每条视觉修复有 `source_evidence`。
 
 ## 命令路径对照（新流程）
 

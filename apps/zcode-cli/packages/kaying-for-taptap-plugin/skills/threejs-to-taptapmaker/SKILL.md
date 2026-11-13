@@ -9,6 +9,34 @@ description: 把网页 three.js / Canvas 游戏“按模块转写”为 TapTap M
 
 前置：目标游戏已获授权。
 
+## 转写铁律：源码是规格，截图是线索
+
+> **截图/对比图只回答“哪里不一样”，不回答“应该改成什么”。**
+> 任何视觉修改前，必须在 `source/` 中找到并记录证据：`文件:行号 + 具体值/分支/资源 + 期望行为`。
+> 找不到源码证据时禁止编辑，先补取证（源码、运行时 DOM、GLB 材质、资源、动画）。
+> 修复按根因批量进行，禁止按截图逐像素/逐区域微调。
+> 同一检查点视觉修复最多 2 轮；超过则停止截图重试，回到源码审计。
+
+执行顺序：
+
+1. 冻结同一状态/视口的双端截图，用 diff/metrics 定位差异区域；
+2. 把差异区域映射到源码 owner：DOM/CSS、custom shader、材质、模型、动画、相机、光照、UI；
+3. 写 root-cause note：`file:line` + 值/分支/资源 + 期望行为；
+4. 按根因批量修改，修完在同一状态/视口复验；
+5. 复验不过先回源码审计，不要继续调截图。
+
+例外：源码没有显式数值（烘焙贴图、运行时 DOM 生成的资源）时，证据取自**源资源/运行时 DOM**，不靠肉眼估色/估值。
+
+**证据落盘**（不依赖上下文记忆）：
+
+- `source/SOURCE_NOTES.md`：已确认的源码事实 + `file:line`；`t3m init` 会生成模板；每次上下文压缩前/检查点更新，压缩后先读它。
+- `source/audit/control-flow.md`、`shaders.md`、`materials.md`、`models.md`、`animations.md`、`ui.md`：审计产物（`t3m init` 会建 `source/audit/` 并放 README）。
+- `project-info.json` 的 `visual_fixes`：每条视觉修复记录 `symptom / region / source_evidence / root_cause / fix / confidence`；`t3m mark accept` 会检查这个 artifact。
+
+**反例**：Turbo Tails 转写中，Agent 按截图把标题相机从 4.45 m 调到 6.6 m、10.2 m，最后回到源码
+`rC()` 的 6.3 m；根因是没先读源码，不是相机难调。同类反例见
+[references/pitfalls.md](references/pitfalls.md) 的 H 节。
+
 ## KayingCode 内置调用约定
 
 本 Skill 已属于内置 `kaying-for-taptap`，不再依赖独立的 `threejs-to-taptapmaker`
@@ -93,6 +121,30 @@ convert_game_YYYYMMDDHHMMSS/
 **禁止**把闭环当成开发循环：改一个函数、调一个颜色、补一个控件就 publish + prepare + 截图对比——太浪费。
 **不要每改一处就发布对比**。阶段内允许连做多类代码修改，攒到检查点再验；阶段验证失败时**批量修根因 → 再进入下一轮**，不要逐次微调重试。
 纯逻辑模块（关卡/规则/求解器）的完成标志以离线对拍为准，**不**为了它们单独跑视觉闭环。
+
+## 0.0.2 子 agent：只读并行，写入串行
+
+`Agent`/subagent 可用时，按“**1 个主写手 + N 个只读分析员**”使用：
+
+- **主 agent 独占**：`dest/` 写入、`publish`、`prepare_visual_comparison`、双 guest 截图、`t3m compare`、最终验收。
+- **只读子 agent 适合**：源码控制流、custom shader、材质/模型/动画/UI 盘点、独立复核。
+- **禁止**：子 agent 并发写共享 `dest/scripts`、场景、UI 根节点；子 agent 调用 publish/prepare/截图/compare；子 agent 的结论未经主 agent 回源码验证就直接改代码。
+- 只有文件所有权完全不重叠时，才允许模块写手（如 `TracksData.lua`/`Audio.lua` 各一个），主 agent 合并、lint、验收。
+- 小项目（源码 < 5k 行、资产 < 30）默认不用子 agent；只在源码 > 5k 行、资产 > 30、或至少 3 个独立审计任务时启用。
+- 子 agent prompt 必须包含：只读、不 publish/prepare、每条结论 `file:line`、输出 schema、停止条件。模板见 [references/subagents.md](references/subagents.md)。
+
+子 agent 的输出是**假设**，不是事实；主 agent 必须回源码验证、去重、更新 `SOURCE_NOTES.md` 后才改代码。
+
+## 0.0.3 视觉验收：同状态、同视口、有指标
+
+- 标题/菜单/比赛等有动画的画面，先冻结时间/状态（如 `self.st = 0.0` 或暂停），再截双端；
+- 两端同 viewport、同 UI 状态；随机/计时元素用最小 mask，并写明理由；
+- compare profile 写 `state`（如 title/race-paused）和 `freeze`（如 `self.st=4.5`/paused）；缺失会 warning；
+- 必须跑 `t3m compare` 并记录 `compare_metrics`；不同相位截图只能做线索，不能做验收；
+- `visual_review_mode=kayingcode-side-pane` 时必须记录 `t3m note project-info.json visual_review_mode kayingcode-side-pane`；
+  `compare_metrics` 缺失、verdict 未通过、或比目标代码/最新 publication 旧时，`t3m mark accept` 会拒绝
+  （确实无法双预览时才用 `--force` 并在 `notes` 写明原因）；
+- 同一检查点的视觉修复最多 2 轮；第 2 轮仍不达标，回到 `source/audit/*` 查根因，不要继续截图微调。
 
 ## 0.1 KayingCode：源码本地化后立刻建空项目并打开对比面板
 

@@ -31,9 +31,18 @@ t3m fetch "<游戏地址>" --out source/
 # 门户页只是外壳时：按结尾提示抓真正入口（/embed/ → <cdn>/v/<hash>/index.html）
 t3m fetch "<game entry candidate>" --out source/game/
 t3m analyze source/game/ --out source/report.md
+t3m audit source/game/ --out source/audit --target dest
 t3m mark project-info.json fetch && t3m mark project-info.json analyze
 t3m note project-info.json report source/report.md
+t3m note project-info.json audit source/audit
 ```
+
+- **`t3m audit` 先跑，再人工补漏**：它输出 control-flow/shaders/materials/models/animations/lighting/ui 的证据清单
+  （每条带 `file:line`），以及 **GLB 材质表**（baseColor/metallic/roughness/clearcoat/emissiveStrength/
+  doubleSided/alphaMode/COLOR_0）。`--target dest` 额外生成 `target-consistency.md`，给出源线索在目标
+  Lua/XML 里的 token 命中位置（命中可能是注释/声明，缺失也不等于一定没做，必须回代码确认）。
+  JS 命中可能包含 bundle 内联的 three.js 库代码，优先看游戏自有脚本和 GLB 表；
+  清单是线索，不是规格，确认后把事实写进 `source/SOURCE_NOTES.md`。
 
 - 确认渲染栈（three.js / Canvas 2D）、模块划分、关卡与配置的来源文件。
 - **抓对层**：`t3m fetch` 会自动跟随同站 wrapper 页一跳并打印 iframe / game entry 候选；
@@ -44,13 +53,29 @@ t3m note project-info.json report source/report.md
   控件清单（`data-a`/`data-r`/`data-k` + class + 文案 key）、屏幕与导航、键盘/指针映射、节奏与计时节点。
   这是第 6 步的规格书：**控件 1:1、位置尺寸按 CSS 直译、功能与显隐条件逐条对照**（见 [ui-parity.md](ui-parity.md)）。
   清单是骨架，模板字符串里看不见的东西要回源码补齐。
+- **源码控制流认证**（写代码前必做）：URL/query 参数、feature flag、主路径 vs fallback（如
+  `rb()`/`ab()`/`?char=old`）、模型/资源选择、每角色/每关卡覆盖。每条写 `file:line` + 触发条件 +
+  目标实现位置，写入 `source/audit/control-flow.md`。
+- **custom shader 盘点**：搜 `onBeforeCompile`、`ShaderMaterial`、`customProgramCacheKey`、
+  `onBeforeRender`、`material.clone`、`envMapIntensity`、`emissiveIntensity`；列出注入点、uniform、
+  依赖的几何/UV/法线、目标实现状态（已转/近似/未转），写入 `source/audit/shaders.md`。
+- **材质 parity**：对每个源 GLB 材质与目标 XML 对比 baseColor、metallic/roughness、clearcoat、
+  emissiveFactor/emissiveStrength、doubleSided、alphaMode、COLOR_0 顶点色、texture/UV/tangent；
+  写入 `source/audit/materials.md`。
+- **模型语义映射**：建立 `id → 显示名 → 模型 → 图集 → 颜色` 表，用运行时资源或 GLB 节点验证；
+  不要假设 id 等于显示名（例如 `frog` id 的模型可能是狐狸）。写入 `source/audit/models.md`。
+- **动画盘点**：GLTF animation + 程序化动画（车轮 spin/steer、Wob\_ 弹簧、眨眼、头部 look、UI tween），
+  标出目标实现位置与状态，写入 `source/audit/animations.md`。
+- 以上审计的**已确认事实**同步写入 `source/SOURCE_NOTES.md`，每条带 `file:line`；上下文压缩前/检查点更新，
+  压缩后先读它，不凭摘要记忆。
 - 同时开始读 Maker 工程自带的资料：`dest/AGENTS.md`、`dest/engine-docs/`（`api/globals.md`、
   `recipes/procedural-geometry.md`、`recipes/surface-shader.md`、`recipes/rendering.md`、
   `gotchas/`）与 `.emmylua/*.d.lua` 类型存根。**引擎 API 的"能调用什么"以这些为准**，
   不要照 three.js 的记忆猜（`renderer:Render()` 这类不存在的 API 就是这么来的，见 pitfalls E4）。
 - **KayingCode：源码本地化完成立刻接空项目 + 对比面板**（见 SKILL.md 0.1/0.2），不要把 analyze/ui
   做成“报告完等确认”的停顿点。
-- **完成标志**：`report.md` 生成，高风险项清单能逐条说清"在哪、要做什么"；`UI_INVENTORY.md` 生成。
+- **完成标志**：`report.md` 生成，高风险项清单能逐条说清"在哪、要做什么"；`UI_INVENTORY.md` 生成；
+  `source/audit/*.md` 与 `source/SOURCE_NOTES.md` 已建立，关键分支/材质/动画/模型语义都有 `file:line` 证据。
 
 ## 1 数据
 
@@ -85,6 +110,8 @@ t3m mark project-info.json levels
 ## 4 角色
 
 - 部件清单（靴/裤/衬衫/帽/围巾）按原版尺寸搭；动画队列（步伐/滑行/下落/传送）按原版时长与缓动。
+- **按 `source/audit/animations.md` 逐条接**：GLTF animation 与程序化动画（车轮 spin/steer、Wob\_ 弹簧、
+  眨眼、头部 look、UI tween）都要有目标实现位置；不要只做静态模型，也不要假设“模型自带”就会动。
 - **朝向表要跟着坐标镜像一起改**。
 - 关节角色走"每部件一个节点 + `CustomGeometry` 直挂"，静态道具走"合并几何 + 共享 Model"（pitfalls D3/D4）。
 - **完成标志**：角色**在画面里可见**（截图确认，不要只看 `inView`）+ 四个方向的朝向与行进方向一致；
@@ -154,6 +181,11 @@ t3m mark project-info.json accept  # 缺 runtime_log / maker_url 会被拒绝（
 - 逐条走查 [acceptance.md](acceptance.md)（17 项 + 运行时门禁）。
 - KayingCode Desktop 按 [visual-compare.md](visual-compare.md) 完成双 guest 同 viewport 对拍；默认最多 3 pair、
   2 轮自动修复，单侧失败即停止本轮。`mark accept` 会警告 compare 证据缺失或比代码/publication 旧。
+- **验收前先对证据**：`source/SOURCE_NOTES.md` 存在且关键事实带 `file:line`；`project-info.json` 的
+  `visual_fixes` 每条都有 `source_evidence`；compare metrics 与最新 publication revision 对齐；
+  至少一张最终 gameplay 截图（不只标题屏）；known gaps 与已完成分开写。
+- **确定性对比**：有动画/计时的画面先冻结时间或暂停，两端同状态、同 viewport；随机/计时元素用最小 mask
+  并写理由；必须跑 `t3m compare`。不同相位的截图只能做线索，不能做验收。
 - **未达标的项要写清**：实测数字 + 已知差异 + 为什么停在这里（见 acceptance.md 第四节），
   不要用"基本一致"糊过去——门禁只校验证据存在，判定由你负责。
 - **完成标志**：17 项验收全过 + `t3m rlog` PASS + 真机可玩 + maker_url 交付

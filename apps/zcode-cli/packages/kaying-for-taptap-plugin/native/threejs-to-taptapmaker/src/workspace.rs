@@ -38,6 +38,44 @@ pub const STAGES: &[&str] = &[
     "accept",
 ];
 
+/// Persistent source-fact ledger created by `init`; `accept` warns when it is
+/// missing, empty, still a template, or has no `file:line` evidence.
+pub const SOURCE_NOTES_REL: &str = "source/SOURCE_NOTES.md";
+/// Directory for the pre-coding source audits.
+pub const SOURCE_AUDIT_REL: &str = "source/audit";
+
+const SOURCE_NOTES_TEMPLATE: &str = r#"# SOURCE_NOTES
+
+> 转写铁律：截图/对比图只回答“哪里不一样”，不回答“应该改成什么”。
+> 每条已确认事实必须带 `file:line` + 值/分支/资源 + 期望行为；上下文压缩前更新，压缩后先读它。
+
+## 已确认事实
+
+| 主题 | 证据 | 结论 | 验证方式 |
+|---|---|---|---|
+| （待填） | `source/game/...:行号` | … | … |
+
+## 未确认/待验证
+
+- （待填）
+"#;
+
+const SOURCE_AUDIT_README: &str = r#"# source/audit
+
+转写前/检查点补齐以下审计；每条结论带 `file:line`，已确认事实同步到 `../SOURCE_NOTES.md`。
+
+- `control-flow.md`：URL 参数/feature flag/主路径 vs fallback/模型选择/每角色覆盖
+- `shaders.md`：`onBeforeCompile`/`ShaderMaterial`/`customProgramCacheKey`/`onBeforeRender`
+- `materials.md`：baseColor/metallic/roughness/clearcoat/emissiveStrength/doubleSided/COLOR_0/texture/UV/tangent
+- `models.md`：id/显示名/模型/图集/颜色映射
+- `animations.md`：车轮/Wob_/眨眼/头部/UI tween 与目标实现状态
+- `lighting.md`：标题/比赛太阳、阴影相机/bias、色调映射、Bloom/DOF/环境贴图
+- `ui.md`：控件与骨架件对照
+
+截图/对比图只用于发现差异；修复前先在这里找到源码 owner，再把 `source_evidence` 写进
+`project-info.json` 的 `visual_fixes`（`t3m note project-info.json visual_fixes source/audit/visual-fixes.md`）。
+"#;
+
 /// Create the working directory and write the initial `project-info.json`.
 ///
 /// Returns the created directory path. Fails if it already exists — a new
@@ -52,7 +90,13 @@ pub fn run(url: &str, name: Option<&str>, parent: &Path, t3m_version: &str) -> C
         )));
     }
     ensure_dir(&dir.join("source"))?;
+    ensure_dir(&dir.join(SOURCE_AUDIT_REL))?;
     ensure_dir(&dir.join("dest"))?;
+    write_text(&dir.join(SOURCE_NOTES_REL), SOURCE_NOTES_TEMPLATE)?;
+    write_text(
+        &dir.join(SOURCE_AUDIT_REL).join("README.md"),
+        SOURCE_AUDIT_README,
+    )?;
 
     let project_name = name
         .map(str::trim)
@@ -68,6 +112,10 @@ pub fn run(url: &str, name: Option<&str>, parent: &Path, t3m_version: &str) -> C
     crate::outln!(
         "  source/            原版文件（下一步: t3m fetch <url> --out {}/source）",
         dir.display()
+    );
+    crate::outln!("  {SOURCE_NOTES_REL}  源码事实台账（每条带 file:line；压缩前更新）");
+    crate::outln!(
+        "  {SOURCE_AUDIT_REL}/  control-flow/shaders/materials/models/animations/lighting/ui 审计"
     );
     crate::outln!("  dest/              Maker 工程（在其中执行 taptap-maker init）");
     Ok(dir)
@@ -252,6 +300,172 @@ fn find_ancestor_file(base: &Path, relative_path: &Path) -> Option<PathBuf> {
         .find(|candidate| candidate.is_file())
 }
 
+fn target_project_dir(arts: &[(String, String)], base: &Path) -> Option<PathBuf> {
+    if let Some(value) = artifact(arts, "dest_project") {
+        let path = resolve_artifact_path(base, value);
+        if path.is_dir() {
+            return Some(path);
+        }
+    }
+    let fallback = base.join("dest");
+    fallback.is_dir().then_some(fallback)
+}
+
+fn newest_target_script(arts: &[(String, String)], base: &Path) -> Option<std::time::SystemTime> {
+    let project = target_project_dir(arts, base)?;
+    let mut files = Vec::new();
+    crate::util::collect_files(&project.join("scripts"), "lua", &mut files).ok()?;
+    files
+        .iter()
+        .filter_map(|file| std::fs::metadata(file).ok()?.modified().ok())
+        .max()
+}
+
+/// Parse the `visual_fixes` table and require a non-empty `source_evidence`
+/// cell on every data row. A substring check is not enough: a template/header
+/// plus one empty row used to pass as evidence.
+fn visual_fixes_evidence_issue(text: &str) -> Option<String> {
+    let mut evidence_column: Option<usize> = None;
+    let mut data_rows = 0usize;
+    for (index, line) in text.lines().enumerate() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('|') {
+            continue;
+        }
+        let cells: Vec<&str> = trimmed
+            .trim_matches('|')
+            .split('|')
+            .map(str::trim)
+            .collect();
+        if let Some(column) = cells
+            .iter()
+            .position(|cell| cell.eq_ignore_ascii_case("source_evidence"))
+        {
+            evidence_column = Some(column);
+            continue;
+        }
+        let separator = cells.iter().all(|cell| {
+            !cell.is_empty() && cell.chars().all(|ch| ch == '-' || ch == ':' || ch == ' ')
+        });
+        if separator {
+            continue;
+        }
+        let Some(column) = evidence_column else {
+            continue;
+        };
+        data_rows += 1;
+        let value = cells.get(column).copied().unwrap_or("");
+        let has_evidence = !value.is_empty()
+            && value != "—"
+            && value != "-"
+            && (value.contains("file:")
+                || value.contains(".js:")
+                || value.contains(".html:")
+                || value.contains(".lua:")
+                || value.contains(".xml")
+                || value.contains(".glb")
+                || value.contains(".json"));
+        if !has_evidence {
+            return Some(format!(
+                "visual_fixes 第 {} 行缺有效 source_evidence: {trimmed}",
+                index + 1
+            ));
+        }
+    }
+    if evidence_column.is_none() {
+        return Some("visual_fixes 没有 source_evidence 列".into());
+    }
+    if data_rows == 0 {
+        return Some("visual_fixes 没有数据行".into());
+    }
+    None
+}
+
+/// Warnings for the source-first evidence ledger. These are deliberately soft
+/// (warnings, not a hard gate) in the first rollout: existing projects should
+/// keep accepting, while missing evidence becomes visible and actionable.
+fn source_evidence_warnings(
+    arts: &[(String, String)],
+    base: &Path,
+    newest_target_code: Option<std::time::SystemTime>,
+) -> Vec<String> {
+    let mut warnings = Vec::new();
+
+    match crate::util::read_text(&base.join(SOURCE_NOTES_REL)) {
+        Err(_) => warnings.push(format!(
+            "accept 缺 {SOURCE_NOTES_REL} —— 没有源码事实台账；t3m init 会生成模板，补完后重试"
+        )),
+        Ok(text) => {
+            if text.trim().is_empty() {
+                warnings.push(format!(
+                    "{SOURCE_NOTES_REL} 是空文件；至少记录关键事实与 file:line"
+                ));
+            } else if text.contains("（待填）") {
+                warnings.push(format!(
+                    "{SOURCE_NOTES_REL} 仍是模板（含“（待填）”）；填入已确认事实后再 accept"
+                ));
+            } else if !text.contains("file:")
+                && !text.contains("行号")
+                && !text.contains(".js:")
+                && !text.contains(".html:")
+                && !text.contains(".lua:")
+            {
+                warnings.push(format!(
+                    "{SOURCE_NOTES_REL} 没有 file:line 证据；关键事实必须能回源码核对"
+                ));
+            }
+        }
+    }
+
+    match artifact(arts, "visual_fixes") {
+        None => warnings.push(
+            "accept 缺 artifacts.visual_fixes —— 视觉修复没有源码证据台账；\
+             t3m note project-info.json visual_fixes source/audit/visual-fixes.md"
+                .into(),
+        ),
+        Some(value) => {
+            let path = resolve_artifact_path(base, value);
+            match crate::util::read_text(&path) {
+                Err(_) => {
+                    warnings.push(format!("artifacts.visual_fixes 指向的文件不存在: {value}"))
+                }
+                Ok(text) => {
+                    if let Some(issue) = visual_fixes_evidence_issue(&text) {
+                        warnings.push(issue);
+                    }
+                }
+            }
+        }
+    }
+
+    match artifact(arts, "gameplay_screenshot") {
+        None => warnings.push(
+            "accept 缺 artifacts.gameplay_screenshot —— 只有标题截图不能证明核心玩法；\
+             t3m note project-info.json gameplay_screenshot <最终比赛截图>"
+                .into(),
+        ),
+        Some(value) => {
+            let path = resolve_artifact_path(base, value);
+            if !path.is_file() {
+                warnings.push(format!(
+                    "artifacts.gameplay_screenshot 指向的文件不存在: {value}"
+                ));
+            } else if let (Ok(captured), Some(code)) = (
+                std::fs::metadata(&path).and_then(|meta| meta.modified()),
+                newest_target_code,
+            ) {
+                if captured < code {
+                    warnings.push(format!(
+                        "artifacts.gameplay_screenshot 比 scripts/ 最新代码旧: {value}；重新截图并 note"
+                    ));
+                }
+            }
+        }
+    }
+
+    warnings
+}
+
 fn comparison_evidence_warnings(
     arts: &[(String, String)],
     base: &Path,
@@ -319,6 +533,96 @@ fn comparison_evidence_warnings(
         warnings.push("compare_metrics verdict 未通过；不得宣称像素对齐通过".into());
     }
     warnings
+}
+
+/// Hard errors for compare evidence. Unlike [`comparison_evidence_warnings`],
+/// these block `accept` unless `--force` is used:
+///
+/// - KayingCode side-pane mode but no `compare_metrics` at all;
+/// - metrics file missing / not JSON / no `verdict.passed`;
+/// - `verdict.passed == false`;
+/// - metrics older than the target scripts or the latest publication.
+///
+/// Missing compare evidence outside side-pane mode stays a warning, so remote
+/// or explicitly recorded local-runtime fallbacks are not broken by this gate.
+fn comparison_evidence_errors(
+    arts: &[(String, String)],
+    base: &Path,
+    newest_target_code: Option<std::time::SystemTime>,
+) -> Vec<String> {
+    let mut errors = Vec::new();
+    let mode = artifact(arts, "visual_review_mode");
+    let has_compare = [
+        "compare_source",
+        "compare_target",
+        "compare_diff",
+        "compare_metrics",
+        "compare_operation",
+    ]
+    .iter()
+    .any(|key| artifact(arts, key).is_some());
+    if has_compare && mode.is_none() {
+        errors.push(
+            "记录了 compare_* 但缺 artifacts.visual_review_mode；\
+             必须写明 kayingcode-side-pane 或 local-runtime-fallback，不能绕过硬门禁"
+                .into(),
+        );
+    }
+    let side_pane = mode == Some("kayingcode-side-pane");
+    let Some(value) = artifact(arts, "compare_metrics") else {
+        if side_pane {
+            errors.push(
+                "visual_review_mode=kayingcode-side-pane 但没有 artifacts.compare_metrics；\
+                 KayingCode 必须发布 → prepare → 双 guest 截图 → t3m compare"
+                    .into(),
+            );
+        }
+        return errors;
+    };
+    let path = resolve_artifact_path(base, value);
+    if !path.is_file() {
+        errors.push(format!(
+            "artifacts.compare_metrics 指向的文件不存在: {value}"
+        ));
+        return errors;
+    }
+    let Ok(text) = crate::util::read_text(&path) else {
+        errors.push(format!("无法读取 compare_metrics: {value}"));
+        return errors;
+    };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+        errors.push(format!("compare_metrics 不是合法 JSON: {value}"));
+        return errors;
+    };
+    match json
+        .pointer("/verdict/passed")
+        .and_then(serde_json::Value::as_bool)
+    {
+        Some(true) => {}
+        Some(false) => errors.push(
+            "compare_metrics verdict 未通过；不得把 accept 标成 done（先修根因再重新对比）".into(),
+        ),
+        None => errors.push("compare_metrics 缺少 verdict.passed；无法判定像素对齐是否通过".into()),
+    }
+    let Ok(modified) = std::fs::metadata(&path).and_then(|meta| meta.modified()) else {
+        return errors;
+    };
+    if newest_target_code.is_some_and(|target| modified < target) {
+        errors
+            .push("compare_metrics 比目标工程最新代码旧；先重新发布、双截图并 t3m compare".into());
+    }
+    if find_ancestor_file(
+        base,
+        Path::new(".maker/kaying-for-taptap/preview-publication.v1.json"),
+    )
+    .and_then(|receipt| std::fs::metadata(receipt).ok()?.modified().ok())
+    .is_some_and(|receipt| modified < receipt)
+    {
+        errors.push(
+            "compare_metrics 比最新 TapTap publication 旧；不能用旧截图验收新 revision".into(),
+        );
+    }
+    errors
 }
 
 /// How many rows of the inventory's alignment table (section 七) still have an
@@ -633,6 +937,23 @@ pub fn mark(info_path: &Path, stage: &str, status: &str, force: bool) -> CliResu
                 }
             }
         }
+        if !force {
+            let newest_target_code =
+                newest_target_code.or_else(|| newest_target_script(&arts, base));
+            let errors = comparison_evidence_errors(&arts, base, newest_target_code);
+            if !errors.is_empty() {
+                return Err(CliError(format!(
+                    "拒绝把 accept 标成 done：compare 证据未通过\n  - {}\n\
+                     先修根因，再重新发布 → prepare_visual_comparison → 双 guest 截图 → t3m compare；\n\
+                     确实无法执行双预览时才用 --force，并在 notes 里写明原因（见 references/visual-compare.md）",
+                    errors.join("\n  - ")
+                )));
+            }
+        }
+        let newest_target_code = newest_target_code.or_else(|| newest_target_script(&arts, base));
+        for warning in source_evidence_warnings(&arts, base, newest_target_code) {
+            crate::errln!("warn: {warning}");
+        }
         for warning in comparison_evidence_warnings(&arts, base, newest_target_code) {
             crate::errln!("warn: {warning}");
         }
@@ -781,6 +1102,150 @@ mod tests {
         assert!(warnings
             .iter()
             .any(|warning| warning.contains("verdict 未通过")));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn init_creates_source_notes_and_audit_templates() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let parent =
+            std::env::temp_dir().join(format!("t3m-workspace-init-{}-{stamp}", std::process::id()));
+        std::fs::create_dir_all(&parent).unwrap();
+        let dir = run("https://example.com/game/", None, &parent, "0.2.6").unwrap();
+        let notes = std::fs::read_to_string(dir.join(SOURCE_NOTES_REL)).unwrap();
+        assert!(notes.contains("SOURCE_NOTES"));
+        assert!(notes.contains("file:line"));
+        assert!(notes.contains("（待填）"));
+        let audit_readme =
+            std::fs::read_to_string(dir.join(SOURCE_AUDIT_REL).join("README.md")).unwrap();
+        assert!(audit_readme.contains("control-flow.md"));
+        assert!(dir.join(SOURCE_AUDIT_REL).is_dir());
+        std::fs::remove_dir_all(parent).unwrap();
+    }
+
+    #[test]
+    fn source_evidence_warnings_report_missing_and_incomplete_ledger() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "t3m-workspace-source-evidence-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(root.join(SOURCE_AUDIT_REL)).unwrap();
+
+        let missing = source_evidence_warnings(&[], &root, None);
+        assert!(missing
+            .iter()
+            .any(|warning| warning.contains("SOURCE_NOTES.md")));
+        assert!(missing
+            .iter()
+            .any(|warning| warning.contains("artifacts.visual_fixes")));
+        assert!(missing
+            .iter()
+            .any(|warning| warning.contains("gameplay_screenshot")));
+
+        std::fs::write(
+            root.join(SOURCE_NOTES_REL),
+            "# SOURCE_NOTES\n\n| topic | game.js:12 | fact | verify |\n",
+        )
+        .unwrap();
+        std::fs::write(
+            root.join(SOURCE_AUDIT_REL).join("visual-fixes.md"),
+            "| symptom | source_evidence | fix |\n|---|---|---|\n| x | game.js:12 | y |\n",
+        )
+        .unwrap();
+        std::fs::write(root.join("gameplay.png"), b"png").unwrap();
+        let arts = vec![
+            ("visual_fixes".into(), "source/audit/visual-fixes.md".into()),
+            ("gameplay_screenshot".into(), "gameplay.png".into()),
+        ];
+        assert!(source_evidence_warnings(&arts, &root, None).is_empty());
+
+        let warnings = source_evidence_warnings(
+            &arts,
+            &root,
+            Some(SystemTime::now() + Duration::from_secs(1)),
+        );
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("gameplay_screenshot 比")));
+
+        std::fs::write(
+            root.join(SOURCE_AUDIT_REL).join("visual-fixes.md"),
+            "| symptom | source_evidence | fix |\n|---|---|---|\n| x |  | y |\n",
+        )
+        .unwrap();
+        let warnings = source_evidence_warnings(&arts, &root, None);
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("缺有效 source_evidence")));
+
+        std::fs::write(
+            root.join(SOURCE_AUDIT_REL).join("visual-fixes.md"),
+            "| symptom | fix |\n|---|---|\n| x | y |\n",
+        )
+        .unwrap();
+        let warnings = source_evidence_warnings(&arts, &root, None);
+        assert!(warnings
+            .iter()
+            .any(|warning| warning.contains("source_evidence")));
+
+        std::fs::write(root.join(SOURCE_NOTES_REL), "# SOURCE_NOTES\n（待填）\n").unwrap();
+        let warnings = source_evidence_warnings(&arts, &root, None);
+        assert!(warnings.iter().any(|warning| warning.contains("仍是模板")));
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn comparison_evidence_errors_block_side_pane_without_metrics_and_failed_verdict() {
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "t3m-workspace-compare-gate-{}-{stamp}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+
+        let side_pane_only = vec![("visual_review_mode".into(), "kayingcode-side-pane".into())];
+        let errors = comparison_evidence_errors(&side_pane_only, &root, None);
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("没有 artifacts.compare_metrics")));
+
+        let no_mode = vec![("compare_source".into(), "source.png".into())];
+        let errors = comparison_evidence_errors(&no_mode, &root, None);
+        assert!(errors
+            .iter()
+            .any(|error| error.contains("visual_review_mode")));
+
+        let metrics = root.join("metrics.json");
+        std::fs::write(&metrics, "{\"verdict\":{\"passed\":false}}\n").unwrap();
+        let arts = vec![
+            ("visual_review_mode".into(), "kayingcode-side-pane".into()),
+            ("compare_metrics".into(), "metrics.json".into()),
+        ];
+        let errors = comparison_evidence_errors(&arts, &root, None);
+        assert!(errors.iter().any(|error| error.contains("verdict 未通过")));
+
+        std::fs::write(&metrics, "{\"verdict\":{\"passed\":true}}\n").unwrap();
+        let errors = comparison_evidence_errors(
+            &arts,
+            &root,
+            Some(SystemTime::now() - Duration::from_secs(10)),
+        );
+        assert!(errors.is_empty(), "{errors:?}");
+
+        let missing = vec![("compare_metrics".into(), "missing.json".into())];
+        let errors = comparison_evidence_errors(&missing, &root, None);
+        assert!(errors.iter().any(|error| error.contains("不存在")));
+
         std::fs::remove_dir_all(root).unwrap();
     }
 }

@@ -39,6 +39,14 @@ test("transcription invocation accepts declared commands and workspace-local pat
       },
       workspace,
     );
+    await validateTranscriptionInvocation(
+      {
+        command: "audit",
+        cwd: "convert_game_demo",
+        arguments: ["source", "--out", "source/audit", "--target", "dest", "--json"],
+      },
+      workspace,
+    );
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

@@ -91,7 +91,19 @@ t3m rlog <Maker项目目录> --dir <dest>/.maker/logs/runtime/runtime.log
 - [ ] **双预览取证**：KayingCode 本地工作区必须留下 source/target 同尺寸截图 + `t3m compare` 产物；
       只有 host 未暴露双 guest / 远程工作区时才可降级，且必须写清 `visual_review_mode` 与原因。
       **UI/装饰/材质仍在 known_gaps 时，禁止在无双预览截图的情况下 `t3m mark accept`。**
-- [ ] **产物留痕**：远端 `runtime_log`、target guest `screenshot`、`pixel_stats`；KayingCode 双预览还要记录
+- [ ] **同状态截图**：有动画/计时的画面已冻结时间或暂停，两端同状态、同 viewport；不同相位截图不算验收；
+      compare profile 写清 `state`（如 title/race-paused）和 `freeze`（如 `self.st=4.5`/paused），缺失会 warning
+- [ ] **最终 gameplay 截图**：至少一张最终版本的比赛/核心玩法截图，不能只有标题屏；
+      记录 `t3m note project-info.json gameplay_screenshot <路径>`；截图不能比 `scripts/` 最新代码旧
+- [ ] **源码证据**：`source/SOURCE_NOTES.md` 存在（`t3m init` 会生成模板），关键事实带 `file:line`；
+      `project-info.json` 的 `visual_fixes` 每一行都有非空 `source_evidence`
+      （`t3m note project-info.json visual_fixes source/audit/visual-fixes.md`；没有源码证据的视觉修改不算完成）
+- [ ] **compare 对齐**：`compare_metrics` 存在，且 comparison receipt / metrics 与最新 publication revision 一致；
+      记录 `visual_review_mode`（`kayingcode-side-pane` 或 `local-runtime-fallback`）；有 `compare_*` 但缺
+      `visual_review_mode` 会**拒绝 accept**。side-pane 下缺失 / verdict 未通过 / 比代码或 publication 旧也会拒绝
+      （确实无法双预览时才用 `--force` 并在 notes 写明原因）
+- [ ] **产物留痕**：远端 `runtime_log`、target guest `screenshot`、`gameplay_screenshot`、`pixel_stats`；
+      `visual_fixes`；KayingCode 双预览还要记录
       `compare_source` / `compare_target` / `compare_diff` / `compare_metrics` / `compare_operation`
 - [ ] **界面文字**：`t3m lint <dest>` 不再报 `ui-button-newline` / `ui-text-width-hardcoded`，
       并有一张每个界面都走到的截图或自驱记录（见 [pitfalls.md](pitfalls.md) F5 的界面×状态矩阵）
@@ -107,6 +119,10 @@ t3m rlog <Maker项目目录> --dir <dest>/.maker/logs/runtime/runtime.log
 1. 把实测数字写进 `t3m note project-info.json pixel_stats "<数字 + 差距 + 判定>"`，写清"未达标"；
 2. 在交付说明里列为**已知差异**（和"没做的功能"分开列）；
 3. 说明**为什么停在这里**（引擎能力边界 / 尚未定位），便于下一轮接手。
+
+**视觉修改的准入**：每个视觉修复都要有 `source_evidence`（`file:line` + 值/分支/资源）。
+只有截图、没有源码证据的修改，即使指标变好也不算完成——它可能是按相位/像素凑出来的，下一轮会回归。
+同一检查点的视觉修复最多 2 轮；超过后先回 `source/audit/*` 查根因，不要继续调截图。
 
 `t3m mark accept` 对 runtime_log 与 maker_url 做硬门禁，并对 compare 文件缺失、metrics 比目标代码或
 最新 TapTap publication 旧、以及 metrics verdict 未通过给出警告；它仍不会替你判断所有玩法与视觉语义。

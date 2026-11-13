@@ -37,6 +37,13 @@
 | `texture.repeat` / `RepeatWrapping`                   | UV 固定 0..1；改在纹理内部画多份，或缩小几何体                          | 中   |
 | `InstancedMesh` + `setColorAt()`                      | 每格一个节点 + 共享 Model；逐实例色用 `MatDiffColor` 乘贴图复现         | 高   |
 | 无光照材质（`MeshBasicMaterial`）                     | `NoTextureUnlit.xml`                                                    | 低   |
+| `material.onBeforeCompile` / `ShaderMaterial`         | 没有直接对应物；移植为 surface shader / 材质注入，或烘焙近似            | 高   |
+| `customProgramCacheKey` / `onBeforeRender`            | 运行时逻辑，需在 Lua 侧重建；不要假设材质 XML 能表达                    | 高   |
+| `KHR_materials_clearcoat`                             | 目标材质 XML 无 clearcoat；需自定义 shader 或接受近似                   | 高   |
+| `KHR_materials_emissive_strength > 1`                 | `MatEmissiveColor` 只有颜色；HDR 强度需 shader/后处理，不能只写颜色     | 高   |
+| `doubleSided: true`                                   | 材质需 `cull="none"`；否则薄片/眼睛/尾内侧可能被剔除、露黑面            | 高   |
+| `COLOR_0` 顶点色（glTF 常与 baseColor 相乘）          | 目标 technique 必须支持顶点色（如 `DiffVCol`），否则颜色丢失            | 高   |
+| glTF 模型分支/feature flag（`?char=old` 等）          | 没有自动映射；先做 `source/audit/control-flow.md`，再决定目标模型       | 高   |
 
 ## 几何
 

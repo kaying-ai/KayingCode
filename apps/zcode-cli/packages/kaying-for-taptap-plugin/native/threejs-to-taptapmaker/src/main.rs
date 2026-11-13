@@ -13,6 +13,7 @@
 //! See `../skills/threejs-to-taptapmaker/SKILL.md` for the full workflow.
 
 mod analyze;
+mod audit;
 mod compare;
 mod fetch;
 mod knowledge;
@@ -31,21 +32,32 @@ fn usage() -> String {
 
 USAGE:
   t3m init <url> [--name NAME] [--dir PARENT]
-      新建转写工作目录 convert_game_YYYYMMDDHHMMSS/（project-info.json + source/ + dest/）
+      新建转写工作目录 convert_game_YYYYMMDDHHMMSS/
+      （project-info.json + source/ + source/SOURCE_NOTES.md + source/audit/ + dest/）
 
   t3m mark <project-info.json> <stage> [status] [--force]
       更新 project-info.json 里某阶段的状态（默认 done；阶段见 init 建出的 stages）
       `accept` 是硬门禁：必须先记录 runtime_log 与 maker_url 才允许标记 done；
+      缺失 SOURCE_NOTES.md / visual_fixes / gameplay_screenshot 时给出源码证据警告；
       确实要跳过时用 --force
 
   t3m note <project-info.json> <key> <value>
       往 project-info.json 的 artifacts 里记录产物路径（如 report → source/report.md）
+      accept 前建议记录：
+        visual_fixes source/audit/visual-fixes.md
+        gameplay_screenshot <最终比赛截图>
 
   t3m fetch <url> [--out <dir>] [--insecure] [--max-files N] [-v]
       抓取网页游戏的 index.html、ES 模块图与 CSS（库文件只记录不下载）
 
   t3m analyze <dir> [--out <report.md>] [-v]
       把抓到的源码映射成「引擎差异工作清单」，按风险排序
+
+  t3m audit <source-dir> [--out <audit-dir>] [--target <maker-project>] [--json]
+      源码审计：控制流/feature flag/模型选择、custom shader、材质特性、动画、光照/阴影、UI
+      默认写 source/audit/{control-flow,shaders,materials,models,animations,lighting,ui}.md + SUMMARY.md
+      --target 额外生成 target-consistency.md（源线索在目标 Lua/XML 里的 token 存在性）
+      输出是证据线索，不是修改规格；确认后写 SOURCE_NOTES.md
 
   t3m levels <file.js> [--out <file.lua>] [--name NAME] [--raw]
       把 JS 的关卡/配置数组转成 Lua 表（默认包成 local NAME = {...} + return）
@@ -99,7 +111,14 @@ impl Args {
                     // value flags consume the next token when it is not a flag
                     let takes_value = matches!(
                         key.as_str(),
-                        "out" | "name" | "dir" | "max-files" | "lines" | "check" | "profile"
+                        "out"
+                            | "name"
+                            | "dir"
+                            | "max-files"
+                            | "lines"
+                            | "check"
+                            | "profile"
+                            | "target"
                     );
                     if takes_value {
                         if let Some(next) = argv.get(i + 1) {
@@ -291,6 +310,25 @@ fn run(argv: &[String]) -> CliResult<i32> {
             } else {
                 crate::outln!("\n{}", out.unwrap().display());
             }
+            Ok(0)
+        }
+        "audit" => {
+            let dir = args
+                .positional
+                .get(1)
+                .ok_or_else(|| util::CliError("audit needs a source directory".into()))?;
+            let dir = PathBuf::from(dir);
+            let out = args
+                .value("out")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("source/audit"));
+            let target = args.value("target").map(PathBuf::from);
+            let report = audit::run(&dir, Some(&out), target.as_deref(), args.flag("json"))?;
+            if let Some(info_path) = find_project_info_for_output(&out) {
+                let value = out.to_string_lossy().to_string();
+                workspace::note_artifact(&info_path, "audit", &value)?;
+            }
+            crate::outln!("{report}");
             Ok(0)
         }
         "levels" => {
