@@ -124,7 +124,7 @@
 
 1. `t3m init` 自动生成：
    - `source/SOURCE_NOTES.md` 模板（含 `（待填）` 占位）
-   - `source/audit/README.md`（control-flow/shaders/materials/models/animations/ui 清单）
+   - `source/audit/README.md`（control-flow/shaders/materials/models/animations/lighting/ui 清单）
 2. `mark accept` 新增 warning（不阻断 accept）：
    - 缺 `source/SOURCE_NOTES.md` / 空文件 / 仍是模板 / 没有 `file:line` 证据
    - 缺 `artifacts.visual_fixes` / 文件不存在 / 没有 `source_evidence`
@@ -179,7 +179,7 @@
 
 - `cargo test`：12 passed / 0 failed
 - `cargo build --release`：通过
-- 冒烟：`t3m audit` 生成 6 个 topic 文件 + SUMMARY + GLB 材质表；`mark accept` 在
+- 冒烟：`t3m audit` 生成 7 个 topic 文件 + SUMMARY + GLB 材质表；`mark accept` 在
   `visual_review_mode=kayingcode-side-pane` + `verdict.passed=false` 时退出码 2
 - 真实 Turbo Tails 源码回放：扫描 3 个文件、640 处证据、**281 个 GLB 材质、97 个带 COLOR_0 的网格**；
   命中 `39175`（`?char=old`）、`39186`（`kart_*_r13a`）、`39253`（uFace/uDecal）、
@@ -187,13 +187,22 @@
 - 当 `game.pretty.js` 存在时自动跳过 `game.bundle.js`，避免重复命中
 - 插件 `pnpm test`：40 passed / 0 failed
 
+**真实项目回放**：已用 Turbo Tails 做有界回放，报告见
+[transcription-plugin-replay-evaluation.md](transcription-plugin-replay-evaluation.md)。
+
+- `t3m audit`：0.15 s、1,158 处命中、281 个 GLB 材质、97 个 COLOR_0 网格
+- `t3m compare`：真实旧截图 verdict FAIL，`accept` 拒绝、`--force` 通过
+- 回放中发现并修复：缺 lighting topic、全局采样截断晚行、`tsun` 模式过宽、pretty/bundle 重复
+
 **未做**：
 
 - 子 agent prompt 生成器（可选，未实现）
 - 把 Turbo Tails 回放固化成自动化 golden test（当前是人工冒烟）
-- `t3m audit` 噪声调优：bundle 内联的 three.js 库代码仍会产生部分通用命中，摘要已提示优先看游戏自有脚本和 GLB 表
-- `t3m audit` 的噪声调优（当前是关键词启发式）
+- `t3m audit` 噪声调优：bundle 内联的 three.js 库代码仍会产生通用命中
+- 目标侧一致性审计（`t3m audit --target dest`）
 - `visual_fixes` 的结构化逐行校验（仍只检查 `source_evidence` 字样）
+- `gameplay_screenshot` 的 freshness/内容检查
+- `visual_review_mode` 缺失时的硬门禁策略
 
 ### Phase 0/4：回放与 A/B（约 1 周）
 

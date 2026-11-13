@@ -533,7 +533,7 @@ Phase 1 只改文档和测试，风险最低，先让规则可发现、可引用
 - `cargo test`（native）：12 tests pass / 0 fail
 - `cargo build --release`（native）：通过
 - `t3m init` 冒烟：生成 `source/SOURCE_NOTES.md` + `source/audit/README.md`
-- `t3m audit` 冒烟：生成 `SUMMARY.md` + 6 个 topic 文件 + GLB 材质表
+- `t3m audit` 冒烟：生成 `SUMMARY.md` + 7 个 topic 文件 + GLB 材质表
 - 真实 Turbo Tails 回放：3 个文件、640 处证据、281 个 GLB 材质、97 个带 COLOR_0 的网格；
   命中 `39175` / `39186` / `39253` / `40101` / `39543` 等关键行
 - `t3m mark accept` 冒烟：缺证据时输出 `SOURCE_NOTES` / `visual_fixes` / `gameplay_screenshot` warning；side-pane + verdict 未通过时退出码 2
@@ -552,10 +552,11 @@ Phase 1 只改文档和测试，风险最低，先让规则可发现、可引用
 
 - 新增 `native/threejs-to-taptapmaker/src/audit.rs`：
   - `t3m audit <source-dir> [--out <audit-dir>] [--json]`
-  - 输出 `SUMMARY.md` + control-flow/shaders/materials/models/animations/ui 六个 Markdown
+  - 输出 `SUMMARY.md` + control-flow/shaders/materials/models/animations/lighting/ui 七个 Markdown
   - 每条命中带 `file:line` + 片段 + 命中词 + “需要回答”清单
   - `materials.md` 额外输出 GLB 材质表（baseColor/metallic/roughness/clearcoat/emissiveStrength/doubleSided/alphaMode/COLOR_0）
   - 当 `*.pretty.js` 存在时跳过对应 `*.bundle.js`，避免重复命中
+  - 按文件显示命中计数与行范围；每文件最多 400 条（首 200 + 尾 200），避免晚行游戏代码被截断
   - 自动把 `audit` 记进 `project-info.json` artifacts
 - `main.rs` 注册 `audit` 命令与帮助文案；
 - `src/tools/transcription-cli.ts` 白名单加入 `audit`，TS 测试覆盖；
@@ -567,9 +568,15 @@ Phase 1 只改文档和测试，风险最低，先让规则可发现、可引用
 
 ### 10.5 剩余（Phase 0/4 与发布）
 
+真实项目回放已完成，报告见 [transcription-plugin-replay-evaluation.md](transcription-plugin-replay-evaluation.md)。
+回放中发现并修复了缺 lighting topic、全局采样截断、`tsun` 模式过宽、pretty/bundle 重复四个问题。
+
 - 把 Turbo Tails audit 回放固化成自动化 golden test（当前是人工冒烟）；
 - `t3m audit` 噪声调优（bundle 内联的 three.js 库代码仍有通用命中；摘要已提示优先看游戏自有脚本和 GLB 表）；
+- 目标侧一致性审计（`t3m audit --target dest`）；
 - `visual_fixes` 结构化逐行校验（当前只检查 `source_evidence` 字样）；
+- `gameplay_screenshot` freshness/内容检查；
+- `visual_review_mode` 缺失时的硬门禁策略；
 - 把 source evidence warning 升级为 hard fail（按回放校准）；
 - Turbo Tails 回放 A/B（Phase 0/4）；
 - 三平台 native 二进制构建与发布。
