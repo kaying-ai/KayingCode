@@ -31,6 +31,14 @@ export type PluginBrowserComparePublicationV1 = z.infer<
   typeof pluginBrowserComparePublicationV1Schema
 >;
 
+export function buildPluginBrowserCompareTabGroup(
+  pluginId: string,
+  contributionId: string,
+  sessionId: string,
+): string {
+  return `plugin-compare:${pluginId}:${contributionId}:${sessionId}`;
+}
+
 export function parsePluginBrowserComparePublicationV1(
   value: unknown,
 ): PluginBrowserComparePublicationV1 {

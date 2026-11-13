@@ -59,18 +59,23 @@ comparison receipt 成功且双 guest 可用后，检查点轮次固定为修改
 
 ## 2. 精确认领两个 guest
 
-1. 读取完整 tabs；缺 pair 时再读取一次 user open tabs。
-2. 只选择 receipt 当前 session 对应的 `tabGroup`：
-   `plugin-compare:<pluginId>:transcription-compare:<sessionId>`。
-3. 组内必须恰好一个 ID 含 `:source:`、一个含 `:target:`；URL 必须分别等于 receipt。
-4. 分别 claim，分别设为 receipt viewport。多候选、缺候选、URL 不符都立即停止，不能按标题猜。
+1. 在当前会话按 Browser Use 的 `control-browser` 初始化，调用 `agent.browsers.list()` 确认可用的 IAB，
+   然后读取 `browser.tabs.list()` 和 `browser.user.openTabs()`。恢复任务或升级后可沿用同时匹配当前会话和当前发布
+   revision 的回执。以这次调用的结果为准，即使旧记录写过 Browser Use 不可用。
+2. 取 prepare 响应给出的组名 `plugin-compare:<pluginId>:transcription-compare:<sessionId>`，或用已保存回执的字段构造该组名。
+   对 `browser.user.openTabs()` 按 `tabGroup` 精确匹配。对已认领的 `browser.tabs.list()` 按组名加
+   `:source:` 或 `:target:` 的完整 ID 前缀匹配。
+3. 两份列表合起来必须恰好一个 source、一个 target，且 URL 分别等于 receipt。
+4. 已认领的用 `browser.tabs.get(id)`，其余用 `browser.user.claimTab(id)`。两边均调用
+   `tab.setViewportSize(publication.viewport)`。多候选、缺候选、URL 不符时记录本轮结果。
 5. 左右各自用自己的 screenshot observation 操作；不得把左侧 observation 用于右侧。
 
 同一 scope 对已认领 tab 再次 `claimTab` 是**幂等成功**（续预算 / 换 tool cell 重绑）。不要因为
 第二次 claim 返回成功就以为 tab 被替换；也不要改成新建替代页。
 
 把游戏带到同一个可复现状态：优先菜单、暂停页、固定关卡起点、无随机粒子的 HUD。最终证据按
-source → target 顺序串行使用普通 viewport screenshot；保存工具返回的真实 artifact 绝对路径。
+source → target 顺序串行调用 `nodeRepl.emitImage(await tab.screenshot())`，记录工具返回的
+`Browser screenshot saved to:` 原始 PNG 绝对路径，按下节复制到工作区。
 
 默认预算是**最多 3 个 comparison pair、最多 2 轮自动修复**。任一侧截图失败即消耗当前 pair，
 本轮结论为“证据不足”并停止原样重试；先定位并修复截图/页面状态问题，只有状态发生变化后才能进入下一 pair。
@@ -82,6 +87,7 @@ source → target 顺序串行使用普通 viewport screenshot；保存工具返
 
 | reason / 现象 | 含义 | 下一步 |
 |---|---|---|
+| `agent.browsers.list()` 抛错或当前未提供 IAB | 当前会话未能连接内置浏览器 | 记录本次调用的原始错误或实际后端列表及当前 revision |
 | （openTabs 空 + tabs.list 空） | 双 guest 尚未挂载，或 host 未暴露 user tabs | 确认 `prepare_visual_comparison` 已成功且面板已挂载；仍空则记 `visual_review_mode=host-guests-unavailable` 并停止视觉分支 |
 | `tab_not_found` | tabId 不在注册表（旧 UUID / 已关闭） | 重新读 openTabs 取**当前** pair 的新 id；禁止复用历史 tabId |
 | `tab_closed` | tombstone | 同上；关闭后重开会是新 child UUID，不能续用旧 id |
@@ -143,13 +149,25 @@ profile 由具体转换工程维护。坐标是 receipt viewport 的 CSS pixel�
 
 ## 4. 生成并阅读证据
 
-```bash
-t3m compare \
-  "/absolute/artifacts/source.png" \
-  "/absolute/artifacts/target.png" \
-  --profile verify/compare-profile.v1.json \
-  --out "verify/visual-compare/<comparison-operation-id>" \
-  --json
+将 Browser Use 保存的两张原始 PNG 按字节复制到转换工程的
+`verify/visual-compare/<comparison-operation-id>/`，分别命名为 `source.png` 和 `target.png`。
+转写 MCP 从工作区读取输入。`cwd` 使用转换工程相对工作区的路径，其余路径相对 `cwd`。
+调用 `kaying-for-taptap_transcription`，将示例中的目录和 operation ID 换成本次实际值。
+
+```json
+{
+  "command": "compare",
+  "cwd": "convert_game_demo",
+  "arguments": [
+    "verify/visual-compare/<comparison-operation-id>/source.png",
+    "verify/visual-compare/<comparison-operation-id>/target.png",
+    "--profile",
+    "verify/compare-profile.v1.json",
+    "--out",
+    "verify/visual-compare/<comparison-operation-id>",
+    "--json"
+  ]
+}
 ```
 
 输入尺寸不一致会直接失败，工具不会 resize、拉伸或裁剪。输出固定为：

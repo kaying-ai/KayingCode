@@ -3,7 +3,10 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { Client } from "@modelcontextprotocol/client";
+import { InMemoryTransport } from "@modelcontextprotocol/server";
 import { TAPTAP_PREVIEW_RECEIPT_RELATIVE_PATH } from "@zcode/shared";
+import { createTapTapMakerMcpServer } from "../src/mcp/server.js";
 import {
   prepareVisualComparison,
   TRANSCRIPTION_COMPARE_RECEIPT_RELATIVE_PATH,
@@ -109,4 +112,52 @@ test("comparison preparation rejects workspace and source URL violations", async
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
+});
+
+test("MCP prepare directs resumed tasks to discover the current comparison guests", async (t) => {
+  const { workspace, projectRoot } = await fixture();
+  t.after(() => rm(workspace, { recursive: true, force: true }));
+  const pluginId = process.env.KAYINGCODE_PLUGIN_ID;
+  process.env.KAYINGCODE_PLUGIN_ID = "kaying-for-taptap@official";
+  t.after(() => {
+    if (pluginId === undefined) delete process.env.KAYINGCODE_PLUGIN_ID;
+    else process.env.KAYINGCODE_PLUGIN_ID = pluginId;
+  });
+  const server = createTapTapMakerMcpServer();
+  const client = new Client({ name: "comparison-test", version: "1.0.0" });
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  t.after(async () => {
+    await client.close();
+    await server.close();
+  });
+  await server.connect(serverTransport);
+  await client.connect(clientTransport);
+  const request = {
+    name: "prepare_visual_comparison",
+    arguments: { projectRoot, sourceUrl: "https://example.com/game" },
+    _meta: {
+      workspace_path: workspace,
+      workspace_key: "workspace-key",
+      session_id: "resumed-task",
+    },
+  };
+  const result = await client.callTool(request);
+  assert.notEqual(result.isError, true);
+  const content = result.content as { type: string; text: string }[];
+  const guidance = content[1]?.text ?? "";
+  assert.match(
+    guidance,
+    /plugin-compare:kaying-for-taptap@official:transcription-compare:resumed-task/u,
+  );
+  assert.match(guidance, /agent\.browsers\.list\(\).*current Desktop session/u);
+  assert.match(guidance, /tabs\.list\(\).*ID prefix.*user\.openTabs\(\).*tabGroup/u);
+  assert.match(guidance, /Copy.*original PNG.*workspace.*t3m compare/u);
+  assert.deepEqual(JSON.parse(content[0]!.text), result.structuredContent);
+
+  const failed = await client.callTool({
+    ...request,
+    _meta: { ...request._meta, workspace_key: "other" },
+  });
+  assert.equal(failed.isError, true);
+  assert.equal((failed.content as unknown[]).length, 1);
 });
