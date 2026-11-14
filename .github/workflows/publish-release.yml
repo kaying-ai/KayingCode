@@ -148,3 +148,65 @@ jobs:
             gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" \
               --title "KayingCode $VERSION" --notes-file notes.md --verify-tag
           fi
+      - name: Trigger CNB site sync
+        if: success() && steps.runs.outputs.ids != ''
+        env:
+          CNB_TRIGGER_TOKEN: ${{ secrets.CNB_TRIGGER_TOKEN }}
+          CNB_RELEASE_TOKEN: ${{ secrets.CNB_RELEASE_TOKEN || secrets.CNB_TRIGGER_TOKEN }}
+          SITE_GITHUB_TOKEN: ${{ secrets.SITE_GITHUB_TOKEN || secrets.SITE_DISPATCH_TOKEN }}
+          CNB_SITE_REPO: kayingai/site-kayingai.com
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          test -n "$CNB_TRIGGER_TOKEN"
+          test -n "$CNB_RELEASE_TOKEN"
+          test -n "$SITE_GITHUB_TOKEN"
+          payload=$(mktemp)
+          trap 'rm -f "$payload"' EXIT
+          jq -n \
+            --arg tag "$RELEASE_TAG" \
+            --arg cnb "$CNB_RELEASE_TOKEN" \
+            --arg gh "$SITE_GITHUB_TOKEN" \
+            '{branch:"main",event:"api_trigger_release",env:{RELEASE_TAG:$tag,KAYING_RELEASE_CNB_TOKEN:$cnb,SITE_GITHUB_TOKEN:$gh},title:("Sync site for " + $tag)}' > "$payload"
+          response=$(curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${CNB_TRIGGER_TOKEN}" \
+            --header "Accept: application/vnd.cnb.api+json" \
+            --header "Content-Type: application/json" \
+            --data @"$payload" \
+            "https://api.cnb.cool/${CNB_SITE_REPO}/-/build/start")
+          printf '%s\n' "$response"
+          sn=$(printf '%s' "$response" | jq -r '.sn // empty')
+          build_url=$(printf '%s' "$response" | jq -r '.buildLogUrl // empty')
+          test -n "$sn"
+          echo "CNB build: $sn"
+          echo "CNB log: $build_url"
+          for attempt in $(seq 1 180); do
+            status_json=$(curl --silent --show-error --max-time 30 \
+              --header "Authorization: Bearer ${CNB_TRIGGER_TOKEN}" \
+              --header "Accept: application/vnd.cnb.api+json" \
+              "https://api.cnb.cool/${CNB_SITE_REPO}/-/build/status/${sn}" || true)
+            state=$(printf '%s' "$status_json" | jq -r '.status // empty' 2>/dev/null || true)
+            echo "CNB status [$attempt]: ${state:-unknown}"
+            case "$state" in
+              success|skipped) exit 0 ;;
+              error|cancel)
+                printf '%s\n' "$status_json"
+                pipeline_id=$(printf '%s' "$status_json" | jq -r '.pipelinesStatus | keys[0] // empty')
+                stage_id=$(printf '%s' "$status_json" | jq -r --arg pid "$pipeline_id" '.pipelinesStatus[$pid].stages[] | select(.status == "error") | .id' | head -n 1)
+                if [ -n "$pipeline_id" ] && [ -n "$stage_id" ]; then
+                  echo "--- CNB stage log: ${pipeline_id}/${stage_id} ---"
+                  curl --silent --show-error --max-time 30 \
+                    --header "Authorization: Bearer ${CNB_TRIGGER_TOKEN}" \
+                    --header "Accept: application/vnd.cnb.api+json" \
+                    "https://api.cnb.cool/${CNB_SITE_REPO}/-/build/logs/stage/${sn}/${pipeline_id}/${stage_id}" \
+                    | jq -r '.content[]?' || true
+                fi
+                echo "::error::CNB build ${sn} ended with ${state}: ${build_url}"
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::Timed out waiting for CNB build ${sn}: ${build_url}"
+          exit 1

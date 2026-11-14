@@ -46,6 +46,13 @@
 - 工作流使用 `contents: write` 创建 Release，`actions: read` 下载制品；构建工作流本身保持只读。发布失败时保留 Actions 制品，可手动运行同一工作流重试，不重新构建。
 - 自动发布不替代安装验收：维护者在对外宣布或推广前，仍应按目标平台完成安装与启动验证。
 
+## 站点与国内发行同步
+
+- `Publish GitHub release` 在创建或更新 GitHub Release 后，通过 `CNB_TRIGGER_TOKEN` 调用 CNB OpenAPI `POST /kayingai/site-kayingai.com/-/build/start`，事件为 `api_trigger_release`，通过 `env` 传入 `RELEASE_TAG`、`KAYING_RELEASE_CNB_TOKEN` 与 `SITE_GITHUB_TOKEN`。CNB 构建在后台异步执行，响应中的 `sn` 与 `buildLogUrl` 用于追踪。
+- 站点仓库的 `api_trigger_release` 流水线执行 `scripts/sync-kayingcode-release.mjs --tag <tag>`：校验 GitHub Release 的 macOS arm64、Windows x64、Android universal 与 `SHA256SUMS`，上传 CNB（`kayingai/kaying-code`）优先、GitCode（`kayingai/kaying-codex`）回退，更新站点 `download-info.json` 的 `cn` 与两个地区 `buildVersion`，提交并推送 CNB 与 GitHub；CNB 推送触发站点部署。站点 GitHub 仓库保持 private，不使用 GitHub Actions。
+- 凭据边界：KayingCode 仓库保存 `CNB_TRIGGER_TOKEN`（对站点 CNB 仓库有 `repo-cnb-trigger:rw`）、可选 `CNB_RELEASE_TOKEN`（缺省复用触发 Token，提供 `kayingai/kaying-code` 的 release 写权限）、`SITE_GITHUB_TOKEN` 或既有 `SITE_DISPATCH_TOKEN`（站点 GitHub Contents 写权限）。触发时通过 CNB `build/start` 的 `env` 传给站点流水线，不依赖 CNB 密钥仓库。
+- 站点同步失败不回滚已发布的 GitHub Release；重跑 `Publish GitHub release` 或在 CNB 重新触发 `api_trigger_release` 并传入同样的 `env` 即可。同名国内资产覆盖上传，站点文件无变化时不产生新提交。CNB 与 GitHub `main` 分叉时失败而不强推。
+
 ## 发布偏离记录
 
 ### 0.1.3：跳过预验收直接发布
