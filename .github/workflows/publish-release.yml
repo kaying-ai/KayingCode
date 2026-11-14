@@ -192,6 +192,16 @@ jobs:
               success|skipped) exit 0 ;;
               error|cancel)
                 printf '%s\n' "$status_json"
+                pipeline_id=$(printf '%s' "$status_json" | jq -r '.pipelinesStatus | keys[0] // empty')
+                stage_id=$(printf '%s' "$status_json" | jq -r --arg pid "$pipeline_id" '.pipelinesStatus[$pid].stages[] | select(.status == "error") | .id' | head -n 1)
+                if [ -n "$pipeline_id" ] && [ -n "$stage_id" ]; then
+                  echo "--- CNB stage log: ${pipeline_id}/${stage_id} ---"
+                  curl --silent --show-error --max-time 30 \
+                    --header "Authorization: Bearer ${CNB_TRIGGER_TOKEN}" \
+                    --header "Accept: application/vnd.cnb.api+json" \
+                    "https://api.cnb.cool/${CNB_SITE_REPO}/-/build/logs/stage/${sn}/${pipeline_id}/${stage_id}" \
+                    | jq -r '.content[]?' || true
+                fi
                 echo "::error::CNB build ${sn} ended with ${state}: ${build_url}"
                 exit 1
                 ;;
