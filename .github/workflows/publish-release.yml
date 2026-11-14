@@ -176,3 +176,27 @@ jobs:
             --data @"$payload" \
             "https://api.cnb.cool/${CNB_SITE_REPO}/-/build/start")
           printf '%s\n' "$response"
+          sn=$(printf '%s' "$response" | jq -r '.sn // empty')
+          build_url=$(printf '%s' "$response" | jq -r '.buildLogUrl // empty')
+          test -n "$sn"
+          echo "CNB build: $sn"
+          echo "CNB log: $build_url"
+          for attempt in $(seq 1 180); do
+            status_json=$(curl --silent --show-error --max-time 30 \
+              --header "Authorization: Bearer ${CNB_TRIGGER_TOKEN}" \
+              --header "Accept: application/vnd.cnb.api+json" \
+              "https://api.cnb.cool/${CNB_SITE_REPO}/-/build/status/${sn}" || true)
+            state=$(printf '%s' "$status_json" | jq -r '.status // empty' 2>/dev/null || true)
+            echo "CNB status [$attempt]: ${state:-unknown}"
+            case "$state" in
+              success|skipped) exit 0 ;;
+              error|cancel)
+                printf '%s\n' "$status_json"
+                echo "::error::CNB build ${sn} ended with ${state}: ${build_url}"
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo "::error::Timed out waiting for CNB build ${sn}: ${build_url}"
+          exit 1
