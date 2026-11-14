@@ -22,25 +22,26 @@ export const NODE_REPL_SERVER_VERSION = "0.7.0";
 
 // node_repl 的底层能力是通用 JS；模型入口仅由 Browser Use 技能引导。
 // Computer Use 已迁到独立原生 MCP，不再通过此宿主执行。
+// 旧文案的 "Import only" 被读成受限运行时，加载 node:child_process 因而被判为沙箱逃逸，所以如实写明不是沙箱。
+// 路由禁令不能随之放宽：js 不经过 Bash 的 guarded 危险命令确认，模型把它当 shell 用就绕过了确认。
+const NODE_REPL_CAPABILITY_AND_ROUTING =
+  "The code runs unsandboxed with the KayingCode agent's privileges and skips Bash's dangerous-command approval, " +
+  "so never use it for shell, file, package inspection, or data processing work; use the dedicated tools. ";
+
 export const NODE_REPL_SERVER_INSTRUCTIONS =
-  "Browser Use only. Use `js` to run JavaScript in a fresh Node-backed kernel only when " +
-  "the official Browser Use skill instructs you to control a browser. Do not use this server for unrelated tasks, " +
-  "including general-purpose JavaScript, filesystem, shell, package inspection, or data processing. " +
+  "Browser Use only. Use `js` to run JavaScript in a fresh Node.js kernel only when " +
+  "the official Browser Use skill instructs you to control a browser. " +
+  NODE_REPL_CAPABILITY_AND_ROUTING +
   `Calls default to a ${NODE_REPL_DEFAULT_TIMEOUT_MS} ms timeout. ` +
   "Always provide `title` as a short user-facing description in the user's language. " +
   "Every `js` call starts fresh; reconstruct browser wrappers and recover persistent tabs from current BrowserControl facts.";
 
 export const JS_TOOL_DESCRIPTION =
-  "Browser Use only. Run JavaScript in a fresh Node-backed kernel with top-level await only as " +
-  "instructed by the official Browser Use skill to control a browser. Do not use it as a general-purpose JavaScript runtime " +
-  "or for filesystem, shell, package inspection, data processing, or other non-browser work. " +
+  "Browser Use only. Run JavaScript in a fresh Node.js kernel with top-level await as " +
+  "instructed by the official Browser Use skill to control a browser. " +
+  NODE_REPL_CAPABILITY_AND_ROUTING +
   "Always provide the required `title` as a short " +
   "user-facing description in the user's language without implementation terms. If `timeout_ms` is omitted, execution times out " +
-  `after ${NODE_REPL_DEFAULT_TIMEOUT_MS} ms. If the code may take more than 30000 ms including all awaited operations, you MUST set \`timeout_ms\` to at least the estimated total runtime plus 15000 ms; split the work into multiple calls if that exceeds the 120000 ms maximum. Use \`nodeRepl.cwd\`, \`nodeRepl.homeDir\`, \`nodeRepl.tmpDir\`, ` +
-  "`nodeRepl.requestMeta`, `nodeRepl.setResponseMeta(meta)`, `nodeRepl.write(value)`, and " +
-  "`await nodeRepl.emitImage(imageLike)`. Global bindings and module cache do not persist across calls. " +
-  "Never rely on agent, " +
-  "runtime, browser, or imported bindings from an earlier call. " +
-  "Import only `node:*` builtins and absolute `file://` URLs built from the official skill root, " +
-  'for example `await import(pathToFileURL(join(root, "scripts", "client.mjs")).href)`; ' +
-  "bare package specifiers do not resolve. Bootstrap the requested official capability in every call.";
+  `after ${NODE_REPL_DEFAULT_TIMEOUT_MS} ms. If the code may take more than 30000 ms including all awaited operations, you MUST set \`timeout_ms\` to at least the estimated total runtime plus 15000 ms; split the work into multiple calls if that exceeds the 120000 ms maximum. ` +
+  "Use `nodeRepl.write(value)` for text and `await nodeRepl.emitImage(imageLike)` for images. " +
+  "Bootstrap the requested official capability in every call.";

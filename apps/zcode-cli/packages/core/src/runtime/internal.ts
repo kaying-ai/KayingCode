@@ -1,5 +1,6 @@
 import { PermissionService, ToolScheduler } from "./deps.js";
 import type { ModelRequestSessionFeature } from "@zcode/contracts";
+import type { PromptSnapshot } from "./helpers/prompt-snapshot.js";
 import type {
   Logger,
   ModelSelection,
@@ -109,6 +110,8 @@ export interface AgentRuntimeInternal
   // 从存储恢复的 runtime 还没有自己读过是否仓库；第一次环境公告读一次后清除。
   repositoryRecheckPending?: boolean;
   latestContextBuildResult?: ContextBuildResult;
+  // 主会话的 prompt 快照（helpers/prompt-snapshot.ts 是唯一写入方）；undefined 没有，null 已清掉。
+  promptSnapshot?: PromptSnapshot | null;
   memoryRoot?: string;
   memoryIndexContent?: string;
   memoryRecallState: MemoryRecallState;

@@ -8,6 +8,7 @@ import {
   type ForkCommitBundle,
 } from "@zcode/contracts";
 import { systemReminderRuntimeMetadata } from "../../agent/message-history.js";
+import { copyPromptSnapshotToFork } from "../helpers/prompt-snapshot.js";
 import {
   CoreErrorType,
   RewindStrategy,
@@ -868,6 +869,7 @@ export async function createForkedSession(
     parentSession: SessionInfo;
     forkedSessionId?: SessionId;
     stableForkMetadata?: StableConversationForkChildMetadata;
+    traceContext: TraceContext;
   },
 ): Promise<SessionId> {
   if (!runtime.sessionStore) {
@@ -902,6 +904,9 @@ export async function createForkedSession(
   await runtime.sessionStore.saveSessionEntry?.(
     buildExecutionStateEntry(forkedSessionId, readRuntimeExecutionState(runtime)),
   );
+  // 修复原因：legacy fork 原来只建 child、不复制 prompt 快照，child 第一个请求按当前代码重新
+  // 渲染并记录 system；父会话的快照来自旧版本时，child 用不上父会话的前缀缓存。
+  await copyPromptSnapshotToFork(runtime, forkedSessionId, options.traceContext);
   return forkedSessionId;
 }
 
@@ -968,6 +973,7 @@ export async function forkConversationFromMessage(
   const forkedSessionId = await createForkedSession(this, {
     forkedSessionId: options.forkedSessionId,
     parentSession,
+    traceContext: options.traceContext,
   });
   const { copiedMessageCount, messageIdMap } = await this.copySessionMessagesForFork({
     forkedSessionId,
