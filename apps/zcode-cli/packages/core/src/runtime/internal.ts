@@ -53,6 +53,7 @@ import type {
 import type { RuntimeCommandQueue } from "./command-queue.js";
 import type { RuntimeTaskRegistry } from "../runtime-task/registry.js";
 import type { WorkflowBlockedReminderClock } from "../runtime-task/workflow-blocked-reminder.js";
+import type { BackgroundSubagentStallClock } from "../subagent/background-stall.js";
 import type { DynamicWorkflowActivationSource } from "./methods/dynamic-workflow-activation.js";
 import type { AgentRuntimeCoreMethods } from "./internal-methods.js";
 import type { AgentRuntimeTurnMethods } from "./internal-turn-methods.js";
@@ -146,6 +147,8 @@ export interface AgentRuntimeInternal
    * 恒在场；可选只为让手写的局部 runtime 桩不必带它。
    */
   workflowBlockedReminder?: WorkflowBlockedReminderClock;
+  /** 后台 Agent 无进展提醒（subagent/background-stall.ts）。 */
+  subagentStallReminder?: BackgroundSubagentStallClock;
   branchGeneration: number;
   artifactStore?: ToolArtifactStorePort;
   executionPort?: ExecutionPort;

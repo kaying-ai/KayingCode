@@ -63,6 +63,7 @@ import { computeOfficialCuaServerNames } from "./mcp.js";
 import { persistRuntimeModelSelection, sameModelSelection } from "./turn-model.js";
 import { getOffPeakExecution, markTemporaryRuntimeSelection } from "../off-peak/runtime.js";
 import { getOffPeakModelBinding } from "../off-peak/model-binding.js";
+import { noteSubagentActivity } from "../../subagent/background-stall.js";
 
 export function createDefaultSubagentPort(
   this: AgentRuntimeInternal,
@@ -416,6 +417,12 @@ export function createDefaultSubagentPort(
             eventSink: {
               onSessionEvent: async (event) => {
                 request.reportActivity?.();
+                noteSubagentActivity(
+                  this.runtimeTaskRegistry,
+                  request.agentId,
+                  event,
+                  Date.now(),
+                );
                 // child runtime 的事件已经按 childSessionId 落库，但旧链路只把
                 // 少量工具事件镜像给 parent sink，导致 UI 订阅 child topic 后只能拿到打开时
                 // 的 hydration，后续流式内容不会更新。raw child event 只通知父 runtime 的

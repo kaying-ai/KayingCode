@@ -52,8 +52,8 @@
 | 状态 | 范围 | 内容 |
 | --- | --- | --- |
 | 已采纳 | core / contracts | prompt snapshot：新增 `SESSION_ENTRY_PROMPT_SNAPSHOT`（`runtime/prompt_snapshot`）；主会话首次请求记录 system 字节，恢复时读取，compaction 成功后清除并按当前代码重建前缀，legacy fork 复制父会话快照；模型 identity 只比较 provider 与 model id，写入失败只记 warning |
+| 已采纳 | core / contracts | 后台 Agent 无进展提醒：新增 `background-stall.ts` 与 `subagent-stall-reminder.ts`；registry 增加 activity 快照；子代理执行引入 `executionId` fencing 与终止/停止校验；无进展提醒不计入后台结果消费与 `message_source`；通知合批把标准 `<task-notification>` 排在提醒之前；出队时已失效的提醒结算为 discarded |
 | 延后 | core | `context-composition` 组成分类依赖新的 session row/协议字段与 UI 展示，随 blockIndex/session row 批次 |
-| 延后 | core | 后台 Agent 无进展提醒依赖 `executionId`、`originMeta.subagentStall` 与通知协议扩展，随后台任务协议批次 |
 | 延后 | core | 编辑锁协议依赖队列编辑命令与 UI，随后台输入批次 |
 
 ### C. Shared / Services 小范围修复
@@ -115,3 +115,12 @@
   - `post-compact-file-restore` / `tool-executor-read-deny-probe`：断言使用 `/tmp/...`，Windows 实际路径为 `D:\tmp\...`，相对路径比较不通过；相关实现与用例本轮未修改。
   - `subagent-explore-permission-mode`：子代理元数据目录名内嵌 JSON 的 `{`、`}`、`"`，Windows 不允许这些字符，`mkdir` 返回 ENOENT；相关 runner 本轮未修改。
 - 根 `pnpm run lint`、`source:check`、`architecture:check --changed` 再次通过。
+
+第三批（2026-11-15，后台 Agent 无进展提醒）：
+
+- 新增 `core/src/subagent/background-stall.ts`、`core/src/runtime/methods/subagent-stall-reminder.ts` 与上游回归 `core/tests/background-subagent-stall.test.ts`。
+- 改动 `runtime-task/registry.ts`（activity 快照）、`runtime/internal.ts`、`runtime/types.ts`（`backgroundStallNotifyMs` / `backgroundStallMaxIntervalMs`）、`agent-runtime.ts`（生命周期）、`runtime/methods/subagent.ts`（活动上报）、`background-notifications.ts`（入账等待、失效提醒结算、来源过滤、通知排序）、`runtime-command-active-loop.ts` / `runtime-command-queue.ts`（提醒不计入后台结果消费）。
+- 契约：`SubagentTaskSnapshot.executionId`、`SubagentStopOptions.expectedExecutionId`、`BackgroundResultOriginMeta.subagentStall`、`withAgentFailureHandback` / `readAgentFailureHandback`。
+- `subagent/runner.ts` 采用上游版本（executionId 生命周期、停止身份校验、失败交接与运行元数据读取），保留 `kayingcode-agents` 临时目录品牌。
+- 回归：`background-subagent-stall.test.ts` **22/22 通过**；core 全量 **223/229**，仍为前述 6 个 Windows 环境失败，无新增失败。
+- 包内 typecheck：contracts、core、adapters、bootstrap、cli 通过；根 typecheck、lint、source:check、architecture:check --changed 通过。
