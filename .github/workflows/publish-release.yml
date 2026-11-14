@@ -148,3 +148,31 @@ jobs:
             gh release create "$TAG" release/* --repo "$GITHUB_REPOSITORY" \
               --title "KayingCode $VERSION" --notes-file notes.md --verify-tag
           fi
+      - name: Trigger CNB site sync
+        if: success() && steps.runs.outputs.ids != ''
+        env:
+          CNB_TRIGGER_TOKEN: ${{ secrets.CNB_TRIGGER_TOKEN }}
+          CNB_RELEASE_TOKEN: ${{ secrets.CNB_RELEASE_TOKEN || secrets.CNB_TRIGGER_TOKEN }}
+          SITE_GITHUB_TOKEN: ${{ secrets.SITE_GITHUB_TOKEN || secrets.SITE_DISPATCH_TOKEN }}
+          CNB_SITE_REPO: kayingai/site-kayingai.com
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          test -n "$CNB_TRIGGER_TOKEN"
+          test -n "$CNB_RELEASE_TOKEN"
+          test -n "$SITE_GITHUB_TOKEN"
+          payload=$(mktemp)
+          trap 'rm -f "$payload"' EXIT
+          jq -n \
+            --arg tag "$RELEASE_TAG" \
+            --arg cnb "$CNB_RELEASE_TOKEN" \
+            --arg gh "$SITE_GITHUB_TOKEN" \
+            '{branch:"main",event:"api_trigger_release",env:{RELEASE_TAG:$tag,KAYING_RELEASE_CNB_TOKEN:$cnb,SITE_GITHUB_TOKEN:$gh},title:("Sync site for " + $tag)}' > "$payload"
+          response=$(curl --fail --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${CNB_TRIGGER_TOKEN}" \
+            --header "Accept: application/vnd.cnb.api+json" \
+            --header "Content-Type: application/json" \
+            --data @"$payload" \
+            "https://api.cnb.cool/${CNB_SITE_REPO}/-/build/start")
+          printf '%s\n' "$response"
