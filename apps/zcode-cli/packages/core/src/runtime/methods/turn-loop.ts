@@ -55,6 +55,7 @@ import {
   filterOutputTokenContinuationEntries,
 } from "./turn-output-token-continuation.js";
 import { recordSessionFeatureFromToolSearchExposure } from "../session-features/contract.js";
+import { recordPromptSnapshot } from "../helpers/prompt-snapshot.js";
 
 export async function runRegularTurnLoop(
   this: AgentRuntimeInternal,
@@ -175,6 +176,13 @@ export async function runRegularTurnLoop(
       registry: this.getToolRegistry(),
       entries: requestEntries,
       applyCacheControl: true,
+    });
+    // 主会话没有可用的 prompt 快照时，按本次请求的前缀记录 system。
+    await recordPromptSnapshot(this, {
+      model: state.model,
+      modelSelectionScope: state.modelSelectionScope,
+      entries: requestEntries,
+      traceContext: state.turnTraceContext,
     });
     this.logger?.debug("ToolSearch request exposure", {
       event: "tool.search.exposure",

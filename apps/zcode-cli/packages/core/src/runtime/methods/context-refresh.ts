@@ -28,6 +28,7 @@ import { buildContextHistoryEntries } from "./context-history-entries.js";
 import { throwIfTurnAborted } from "../helpers/turn-errors.js";
 import { buildProjectionAnchor } from "./projection-anchor.js";
 import { persistRuntimeReminderMessage } from "./runtime-reminder-persistence.js";
+import { promptSnapshotFor } from "../helpers/prompt-snapshot.js";
 
 export function rebuildContextPrefix(
   runtime: AgentRuntimeInternal,
@@ -60,7 +61,12 @@ export function rebuildContextPrefix(
     { memoryIndexContent: runtime.memoryIndexContent, model: options.model },
   );
   const effectiveContextResult = runtime.contextBuilder.build();
-  const contextEntries = buildContextHistoryEntries(effectiveContextResult);
+  // 主会话的 prompt 快照适用于这个模型时，system 用快照记录的字节，不用当前代码的渲染结果。
+  // 修复原因：system 原来每次按当前代码重建，升级或冷恢复后已发送的前缀字节改变，prompt cache 失效。
+  const snapshot = promptSnapshotFor(runtime, options.model);
+  const contextEntries: RuntimeMessageEntry[] = snapshot
+    ? snapshot.system.map((message) => ({ message: structuredClone(message) }))
+    : buildContextHistoryEntries(effectiveContextResult);
   const canonicalEntries = runtime.messageHistory.borrowReadOnlyRuntimeEntries();
   const canonicalConversationEntries = canonicalEntries.slice(
     countContextPrefixMessages(canonicalEntries),

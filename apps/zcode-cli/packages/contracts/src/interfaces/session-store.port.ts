@@ -838,6 +838,8 @@ export const SESSION_ENTRY_DYNAMIC_WORKFLOW_ACTIVATION =
   "runtime/dynamic_workflow_activation" as const;
 /** 本会话用过的能力标签（docs/design/v2/model/session-features-header.md）。 */
 export const SESSION_ENTRY_SESSION_FEATURES = "runtime/session_features" as const;
+/** 主会话 system 的字节快照（docs/design/v2/loop/prompt-snapshot.md）。 */
+export const SESSION_ENTRY_PROMPT_SNAPSHOT = "runtime/prompt_snapshot" as const;
 
 export const SESSION_ENTRY_TYPES = [
   SESSION_ENTRY_TARGET_COMPLETION_VERIFICATION,
@@ -849,6 +851,7 @@ export const SESSION_ENTRY_TYPES = [
   SESSION_ENTRY_WORKSPACE_FILE_REWIND,
   SESSION_ENTRY_DYNAMIC_WORKFLOW_ACTIVATION,
   SESSION_ENTRY_SESSION_FEATURES,
+  SESSION_ENTRY_PROMPT_SNAPSHOT,
 ] as const;
 
 export type SessionEntryType = (typeof SESSION_ENTRY_TYPES)[number];
