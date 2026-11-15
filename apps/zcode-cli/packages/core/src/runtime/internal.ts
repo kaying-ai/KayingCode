@@ -1,6 +1,7 @@
 import { PermissionService, ToolScheduler } from "./deps.js";
 import type { ModelRequestSessionFeature } from "@zcode/contracts";
 import type { PromptSnapshot } from "./helpers/prompt-snapshot.js";
+import type { InstructionRefreshReason } from "../context/types.js";
 import type {
   Logger,
   ModelSelection,
@@ -111,6 +112,10 @@ export interface AgentRuntimeInternal
   // 从存储恢复的 runtime 还没有自己读过是否仓库；第一次环境公告读一次后清除。
   repositoryRecheckPending?: boolean;
   latestContextBuildResult?: ContextBuildResult;
+  // 指令增量的 reason：未设置即 session_start；compaction 提交重读后改为 compaction，之后不再改回。
+  instructionRefreshReason?: InstructionRefreshReason;
+  // 最近一次读取时读不出来的指令文件与 Memory 索引路径（启动与 compaction 采用重读时写入）；不算删除。
+  unreadableInstructionPaths?: ReadonlySet<string>;
   // 主会话的 prompt 快照（helpers/prompt-snapshot.ts 是唯一写入方）；undefined 没有，null 已清掉。
   promptSnapshot?: PromptSnapshot | null;
   memoryRoot?: string;

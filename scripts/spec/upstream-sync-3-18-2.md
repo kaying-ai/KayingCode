@@ -81,7 +81,7 @@
 | 阶段 | 状态 | 内容 |
 | --- | --- | --- |
 | 1a | 已采纳 | instruction-files 基础：结构化文件模型、完整/增量渲染、旧公告解析；adapter 区分"文件不存在"与"读不出来"，读错误按 `user_instructions_read_failed` 诊断 |
-| 1b | 待做 | context_prefix 记录已公告文件、请求前增量公告、compaction 重读指令文件并在提交后应用 |
+| 1b | 已采纳 | context_prefix 记录已公告文件、请求前增量公告、compaction 重读指令文件并在提交后应用；冷恢复/rewind 不再原位改写指令公告 |
 | 2 | 待做 | total-tokens 预算：计数状态、上下文提醒、输入附件收集原因 |
 | 3 | 待做 | context-composition：组成分类、协议方法、查询与变更通知 |
 | 4 | 待做 | blockIndex：块到达序号、请求排序、持久化与工具历史 |
@@ -205,3 +205,14 @@
 - 新增 `core/tests/instruction-files.test.ts`（5 个用例）覆盖 trim/hash、完整/增量渲染、严格解析与旧公告解析。
 - 验证：contracts/adapters/core typecheck；instruction-files + runtime-context-announcements **52/52**；根 lint、source:check、architecture:check --changed 通过。
 - 未接线：context_prefix metadata、请求前增量公告、compaction 重读与应用（1b）。
+
+第十二批（2026-11-15，核心专项 1b：增量公告与 compaction 重读）：
+
+- `request-user-context` 改用结构化 instruction files 渲染；`builder` 把 `instructionFiles` 汇总到 `context_prefix` 附件。
+- `message-history` 与 `session-history-hydrator` 保存/恢复 `instructions` 元数据；旧公告无元数据时按标题行解析。
+- `context-refresh` 新增 `buildInstructionAnnouncement`/`announcedInstructionFiles`/`fullInstructionAttachment`：按已公告文件比较，变化或删除时追加增量；请求前公告与 compact 前公告共用同一规则。
+- 冷恢复/rewind 不再原位改写指令公告（`REFRESHED_ON_LOAD_SOURCES` 只保留 skills），避免改变已发送前缀字节导致 prompt cache 失效。
+- `context.ts` 新增 `rereadInstructionSources`/`buildRereadInstructionContext`/`applyRereadInstructionSources`，启动时记录读不出来的路径；`compact-active` 并行重读，summary 前用重读结果发完整公告，提交后再应用到 runtime 并把 reason 改为 compaction。
+- 回归：`instruction-files` + `runtime-context-announcements` **52/52**；core 全量 **228/234**，仍是既有 6 个 Windows 环境失败；更新了 3 个旧语义用例。
+- 验证：contracts/adapters/core typecheck；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
+- 简化：Memory 索引重读未同步 readFileStateEntry/unreadable 路径（本地 memory 读取接口尚无该返回），不影响指令文件增量判定。

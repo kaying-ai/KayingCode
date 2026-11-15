@@ -820,29 +820,30 @@ describe("runtime context announcements", () => {
       return files;
     };
 
-    it("updates the restored instructions in place to the Memory index read on resume", async () => {
+    it("appends a delta with the Memory index read on resume without rewriting the stored announcement", async () => {
       const files = await announceOldIndexThenChangeDisk();
       const { cold, coldStore } = await coldRuntimeWith(skillPort, memoryConfig, {
         fileSystemPort: files,
       });
-      const storedTexts = instructionRecordTexts(coldStore);
       await cold.executeTurn("resumed");
 
-      // 修复原因：恢复的旧公告原样发给模型，读文件状态却记录磁盘上的新索引；
-      // Write 的新鲜度检查因此放行，模型按看到的旧索引写入，会覆盖它没见过的新索引。
-      expect(instructionTexts(cold)).toEqual([expect.stringContaining(newIndex)]);
+      // 新语义：已发送的完整公告不改写，变化以增量追加；旧完整块仍留在历史里。
+      const texts = instructionTexts(cold);
+      expect(texts).toHaveLength(2);
+      expect(texts[0]).toContain(oldIndex);
+      expect(texts[1]).toContain(newIndex);
       const lastRequest = JSON.stringify(requests.at(-1)?.messages);
       expect(lastRequest).toContain(newIndex);
-      expect(lastRequest).not.toContain(oldIndex);
+      expect(lastRequest).toContain(oldIndex);
       const readState = (cold as unknown as AgentRuntimeInternal).readFileState.get(
         createReadFileStatePathKey(indexPath),
       );
       expect(readState?.content).toBe(newIndex);
-      // 只改内存：库里的记录保持第一次的内容，也没有新增指令公告。
-      expect(instructionRecordTexts(coldStore)).toEqual(storedTexts);
-      // 先确认确实存过一条，否则空数组上的 every 恒为真。
-      expect(storedTexts).toHaveLength(1);
-      expect(storedTexts.every((text) => text.includes(oldIndex))).toBe(true);
+      // 库里新增一条增量公告，第一次的完整公告保持原样。
+      const savedTexts = instructionRecordTexts(coldStore);
+      expect(savedTexts).toHaveLength(2);
+      expect(savedTexts[0]).toContain(oldIndex);
+      expect(savedTexts[1]).toContain(newIndex);
 
       // 模型看到的内容与读文件状态一致，Write 按这份内容检查。录制 store 没有项目权限规则。
       Object.assign(coldStore, { getProjectPermission: async () => null });
@@ -855,7 +856,7 @@ describe("runtime context announcements", () => {
       expect(files.files[indexPath]).toBe(`${newIndex}\n- [Added](added.md) — added`);
     });
 
-    it("keeps the current Memory index when a rewind reloads the old record from the store", async () => {
+    it("re-applies the current Memory index as a delta after a rewind reloads the old record", async () => {
       const files = await announceOldIndexThenChangeDisk();
       const { cold, coldStore } = await coldRuntimeWith(skillPort, memoryConfig, {
         fileSystemPort: files,
@@ -872,12 +873,11 @@ describe("runtime context announcements", () => {
         traceContext: createRootTraceContext({ sessionId }),
       });
       await cold.executeTurn("edited");
-      // rewind 从库重新加载历史，库里仍是旧索引；加载后同样原位换成当前内容。
-      expect(instructionTexts(cold)).toEqual([expect.stringContaining(newIndex)]);
-      expect(JSON.stringify(requests.at(-1)?.messages)).not.toContain(oldIndex);
+      // rewind 从库重新加载历史，旧完整公告仍在；下一次请求按当前内容再追加一条增量。
+      expect(JSON.stringify(requests.at(-1)?.messages)).toContain(newIndex);
     });
 
-    it("drops the restored instructions when the resumed runtime has none", async () => {
+    it("appends a removal delta when the resumed runtime has no instructions", async () => {
       await announceOldIndexThenChangeDisk();
       const { cold } = await coldRuntimeWith(skillPort, config, {
         contextSourcePort: {
@@ -888,9 +888,13 @@ describe("runtime context announcements", () => {
         },
       });
       await cold.executeTurn("resumed");
-      // 当前没有指令文件和 Memory 索引时没有新内容可宣告，旧公告必须从历史里去掉。
-      expect(instructionTexts(cold)).toEqual([]);
-      expect(JSON.stringify(requests.at(-1)?.messages)).not.toContain(oldIndex);
+      // 已发送的完整公告不改写；当前没有文件时追加一条删除增量。
+      const texts = instructionTexts(cold);
+      expect(texts).toHaveLength(2);
+      expect(texts[1]).toContain("Instructions no longer present");
+      expect(JSON.stringify(requests.at(-1)?.messages)).toContain(
+        "Instructions no longer present",
+      );
     });
   });
 
