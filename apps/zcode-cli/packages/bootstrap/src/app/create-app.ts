@@ -1,5 +1,10 @@
 import { createWorkspaceMcpTrust } from "../workspace-mcp-trust/index.js";
 import { subagentProfilesFromSnapshot } from "../runtime-subagents/index.js";
+import {
+  createCliSessionControlRuntime,
+  type CliSessionControlRuntime,
+} from "../cli-session-control/index.js";
+import type { SessionControlBinding } from "@zcode/core/session-control";
 import { CliDefaultSelection } from "./cli-default-selection.js";
 import { isAbsolute, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -41,6 +46,7 @@ import {
   SessionEventType,
   type ExecutionShellSelection,
   type MessageId,
+  type SessionId,
 } from "@zcode/contracts";
 import { isRemoteWorkspaceIdentity, resolveKayingCodeRuntimeEnv } from "@zcode/shared";
 import {
@@ -282,6 +288,71 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
     const ownsSessionStore = options.sessionStore === undefined;
     const sessionStore =
       options.sessionStore ?? (await openStartupSessionStore(configResult, startupTimer));
+    let standaloneSessionControl: CliSessionControlRuntime | undefined;
+    let sessionControl = options.sessionControl;
+    let standaloneRootProvenance: "new-independent-root" | "unverified-history" =
+      "unverified-history";
+    if (options.standaloneSessionControl) {
+      if (
+        sessionControl ||
+        options.runtimeConfig?.parentSessionId ||
+        options.runtimeConfig?.workspaceIdentity
+      ) {
+        throw new Error("Standalone session control requires an independent local CLI root");
+      }
+      if (options.resume !== true && !(await sessionStore.getSession(sessionId))) {
+        standaloneRootProvenance = "new-independent-root";
+      }
+      const workspace = { kind: "cli" as const, workspacePath: workingDirectory };
+      const bindRoot = (rootId: SessionId): SessionControlBinding => ({
+        kind: "cli",
+        control: standaloneSessionControl!.control,
+        context: () => ({
+          callerId: rootId,
+          rootSession: { ...workspace, sessionId: rootId },
+          allowedScopes: [workspace],
+          readAnyLocalSession: true,
+        }),
+      });
+      standaloneSessionControl = createCliSessionControlRuntime({
+        workspace,
+        sessionStore,
+        createRootApp: async (request) => {
+          const target = await createKayingCodeApp({
+            sessionId: request.sessionId,
+            resume: request.resume,
+            traceContext: request.traceContext,
+            sessionStore,
+            sessionControl: bindRoot(request.sessionId),
+            permissionBroker: options.permissionBroker,
+            providerRegistry: options.providerRegistry,
+            configuredDefaultModelSelection: options.configuredDefaultModelSelection,
+            providerEndpointRoutingPort: options.providerEndpointRoutingPort,
+            providerRuntimeHeadersPort: options.providerRuntimeHeadersPort,
+            modelAdapter: options.modelAdapter,
+            env: options.env,
+            skipUserConfig: options.skipUserConfig,
+            userConfigPath: options.userConfigPath,
+            version: options.version,
+            runtimeConfig: {
+              workingDirectory: request.cwd,
+              taskType: request.resume ? "fork" : "interactive",
+              mode: "build",
+            },
+          });
+          if (request.model) {
+            try {
+              await target.setModel(request.model);
+            } catch (error) {
+              await target.close?.();
+              throw error;
+            }
+          }
+          return target;
+        },
+      });
+      sessionControl = bindRoot(sessionId);
+    }
     const localSettingStore = asLocalSettingStore(sessionStore);
     const projectID = projectIdFromDirectory(workingDirectory);
     const persistedMode = options.runtimeConfig?.mode
@@ -950,6 +1021,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
           : workflowConcurrencyGovernor.sessionSubagents(parentSessionId),
       eventStore: options.eventStore ?? createInMemorySessionEventStore(),
       sessionStore,
+      sessionControl: options.sessionControl,
       sessionMailboxPort,
       logger,
       executionPort,
@@ -1192,7 +1264,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       }
       return { ref, mediaType, ...(artifactUri ? { artifactUri } : {}) };
     };
-    return {
+    const app: KayingCodeApp = {
       sessionId,
       traceId: traceContext.traceId,
       runtime,
@@ -1385,19 +1457,23 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       ...sessionFacade,
       close: async () => {
         try {
-          await closeSession?.();
+          await standaloneSessionControl?.close();
         } finally {
           try {
-            providerModelRuntime?.dispose();
+            await closeSession?.();
           } finally {
             try {
-              await modelTelemetry.shutdown();
-            } catch (error) {
-              // 遥测失败不表示 session 仍占用运行资源，也不能覆盖真正的关闭错误。
-              logger.warn("Session telemetry shutdown failed", {
-                event: "session.telemetry_shutdown.failed",
-                error: error instanceof Error ? error.message : String(error),
-              });
+              providerModelRuntime?.dispose();
+            } finally {
+              try {
+                await modelTelemetry.shutdown();
+              } catch (error) {
+                // 遥测失败不表示 session 仍占用运行资源，也不能覆盖真正的关闭错误。
+                logger.warn("Session telemetry shutdown failed", {
+                  event: "session.telemetry_shutdown.failed",
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
             }
           }
         }
@@ -1568,6 +1644,8 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       resume: resumeFromStore,
       ...inputFacade,
     };
+    standaloneSessionControl?.attachRoot(app, standaloneRootProvenance);
+    return app;
   } catch (error) {
     providerModelRuntime?.dispose();
     void modelTelemetry.shutdown().catch(() => undefined);

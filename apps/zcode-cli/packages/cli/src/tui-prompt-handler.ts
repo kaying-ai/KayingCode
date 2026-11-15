@@ -146,6 +146,7 @@ export function createTuiSubmitPrompt(
     try {
       createdApp = await createAppFactory({
         modelSelectionMode: "cli-default",
+        standaloneSessionControl: true,
         browserControlPort: browserRuntime?.browserControlPort,
         env: appEnv,
         projectConfigPath: deps.projectConfigPath,

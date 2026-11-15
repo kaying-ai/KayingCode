@@ -272,3 +272,16 @@
 - 品牌：扩展进程的 serviceName、MCP server/client info 与错误文案改为 KayingCode。
 - 回归：supervisor **3/3**（环境白名单/设置页代理、首次拉起与牵线、崩溃预算耗尽停止）；根 typecheck、lint、source:check、architecture:check --changed 通过。
 - 未接线：extension-slots UI 与 Renderer 频道（P4）；session-control adapter 与模型工具（P3）；内置插件替换（P5）。
+
+第十八批（2026-11-15，插件体系 P3：session-control 与模型会话工具）：
+
+- 新增 `core/src/tool/session-control`：8 个共有 + 4 个 App 专属模型工具，模型只见 `tool` 变体；请求身份由 toolCallId/retryOf 注入，超时/取消通过 `describeUnsettledCall` 回传同一 requestId。
+- `ToolEntry` 增加 `describeUnsettledCall`；executor 在 ToolTimeout/ToolCancelled 错误上追加对账说明。`AgentRuntimeDeps` / `ToolExecutionContext` / executor deps 增加 `sessionControl`。
+- `registerBuiltInTools` 增加 `sessionControlKind`，按可信装配选择同名变体；`ListModels` 在灰度关闭但会话控制在场时保留。
+- 新增 `bootstrap/src/session-control`：App 12 动作映射到 `appControl/*` 反向 RPC；`kayingcodeAgentService` 在 chat lane 上处理反向请求，用同一连接的 session/list 事实核对 caller 根会话与 workspace。
+- 新增 `bootstrap/src/cli-session-control` 与 `active-transcript`：独立 CLI/TUI 创建本进程会话控制 runtime，`standaloneSessionControl` 注入；后台根共用询问通道但固定 build。
+- 共享协议补充 App/extension 输入来源到 contracts 的 `TurnInputSourceMetadata`；core 包新增 `./session-control` 导出与依赖。
+- 规范：`core/spec/session-control-tools.md`、`bootstrap/spec/session-control-bindings.md`。
+- 回归：core session-control **24/24**、bootstrap contract **2/2**、session-control 包 **103/103**；core 全量 289/295，仍为既有 6 个 Windows 环境失败。
+- 验证：根 typecheck、lint（0 errors/128 既有 warnings）、source:check、architecture:check --changed 通过。
+- 未接线：扩展 slots UI（P4）与内置插件替换（P5）。

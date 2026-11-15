@@ -21,6 +21,10 @@
     "./create-workflow-graph-bounds": {
       "types": "./dist/tool/handlers/create-workflow-graph-bounds.d.ts",
       "import": "./dist/tool/handlers/create-workflow-graph-bounds.js"
+    },
+    "./session-control": {
+      "types": "./dist/tool/session-control/contract.d.ts",
+      "import": "./dist/tool/session-control/contract.js"
     }
   },
   "scripts": {
@@ -35,6 +39,7 @@
   "dependencies": {
     "@zcode/contracts": "workspace:*",
     "@zcode/dynamic-workflow": "workspace:*",
+    "@zcode/session-control": "workspace:*",
     "@zcode/shared": "workspace:*",
     "@zcode/shared-types": "workspace:*",
     "cheerio": "^1.0.0",

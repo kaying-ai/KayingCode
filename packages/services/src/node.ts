@@ -327,6 +327,7 @@ import { IKayingCodeAgentService } from "./kayingcode-agent/kayingcodeAgent.js";
 import {
   createAppControlService,
   type AppControlNavigationPort,
+  type AppControlService,
   type AppControlServiceHandle,
 } from "./app-control/index.js";
 import { getPluginUserOptionsReaderForAgent } from "./kayingcode-agent/kayingcodeAgentService.js";
@@ -1085,7 +1086,10 @@ export function createLocalServices(options: {
       await broadcastService.send({ channel: "state:task-groups", payload: {} });
     },
   });
+  let appControlServiceForAgent: AppControlService | undefined;
   const kayingcodeAgentService = createKayingCodeAgentService({
+    resolveAppControlService: () => appControlServiceForAgent,
+    appControlSourceServerId: options?.projectStorageHostId ?? "local",
     // 新会话创建前原子预留项目归属：Host 是唯一写库方，CLI 只拿到稳定 sessionId
     // 与固化目录；预留失败直接冒泡，不能把项目任务降级成无归属会话。
     prepareSessionCreation: async (target) =>
@@ -1276,6 +1280,7 @@ export function createLocalServices(options: {
     service: appControlService,
     sourceServerId: options?.projectStorageHostId ?? "local",
   });
+  appControlServiceForAgent = appControlService;
   const botsRepo = new BotsRepo();
   const botLog = createServiceLogger("bots");
   const botRemoteWorkspaceService = options.resolveBotProjectConnection

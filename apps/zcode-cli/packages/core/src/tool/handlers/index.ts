@@ -72,6 +72,8 @@ import { evalWorkflowSnippetToolEntry } from "./eval-workflow-snippet.js";
 import { listWorkflowRunsToolEntry } from "./list-workflow-runs.js";
 import { getWorkflowRunToolEntry } from "./get-workflow-run.js";
 import { resumeWorkflowRunToolEntry } from "./resume-workflow-run.js";
+import { sessionControlTools, sessionControlToolsByKind } from "../session-control/index.js";
+import { SESSION_CONTROL_TOOL_NAMES } from "../session-control/index.js";
 // import { workflowToolEntry } from "./workflow.js";
 import { createToolRuleNameSet } from "../tool-visibility.js";
 
@@ -79,6 +81,7 @@ import { createToolRuleNameSet } from "../tool-visibility.js";
 // 统一隐藏 Glob/Grep，并通过 Bash find/grep 接管搜索。
 
 export const builtInTools: ToolEntry[] = [
+  ...sessionControlTools,
   toolSearchToolEntry,
   deferredToolCallEntry,
   readToolEntry,
@@ -157,7 +160,7 @@ export const builtInTools: ToolEntry[] = [
  * （2026-09-28 起含 FillWorkflowHole：关闭态下没有 run 会到达留白）。
  * 灰度关的语义是「没有任何办法开始一条工作流」，所以创建、修订、保存、快照实验与四个
  * run 面工具一起下架；只读的 run 内省工具也在列，因为关闭态下它们只会指向用户无法再操作的历史。
- * `ListModels` 也在列：它唯一的用途是给一次 run 挑 `subagent_model`，没有 CreateWorkflow 可填时留着它只会把模型引向不存在的工具。
+ * `ListModels` 单独判定：它还有 CreateSession 这个消费者，会话控制在场时灰度关闭也保留。
  * 旧的 `Workflow` 工具（`/expert` 脚本通道）是另一个功能，**不在**这份名单里。
  */
 const DYNAMIC_WORKFLOW_TOOL_NAMES: ReadonlySet<string> = new Set([
@@ -165,7 +168,6 @@ const DYNAMIC_WORKFLOW_TOOL_NAMES: ReadonlySet<string> = new Set([
   AMEND_WORKFLOW_TOOL_NAME,
   SAVE_WORKFLOW_TOOL_NAME,
   LIST_SAVED_WORKFLOWS_TOOL_NAME,
-  LIST_MODELS_TOOL_NAME,
   EVAL_WORKFLOW_SNIPPET_TOOL_NAME,
   LIST_WORKFLOW_RUNS_TOOL_NAME,
   GET_WORKFLOW_RUN_TOOL_NAME,
@@ -204,6 +206,8 @@ interface RegisterBuiltInToolsOptions {
    * appRuntimePreferences，不在这一层。
    */
   includeDynamicWorkflow?: boolean;
+  /** 只由可信启动绑定指定：选择同名会话工具的变体；未指定时这些工具都不注册。 */
+  sessionControlKind?: "cli" | "app";
   /** node_repl（js）默认关闭，由官方 browser-use 插件启用。 */
   includeNodeRepl?: boolean;
   /** browser-use 说明和 agent.browsers 注入由官方 browser-use 插件 + 宿主 browser bridge 共同启用。 */
@@ -222,8 +226,23 @@ export function registerBuiltInTools(
 ): void {
   const allowedTools = options.allowedTools ? new Set(options.allowedTools) : undefined;
   const disallowedTools = createToolRuleNameSet(options.disallowedTools);
+  const sessionControlEntries = options.sessionControlKind
+    ? new Map(
+        sessionControlToolsByKind[options.sessionControlKind].map((entry) => [
+          entry.metadata.name,
+          entry,
+        ]),
+      )
+    : undefined;
 
-  for (const entry of builtInTools) {
+  for (const builtIn of builtInTools) {
+    // 会话工具同名两种实现：独立 CLI 只有共有 8 个，App 另有 4 个；缺席即不注册。
+    let entry = builtIn;
+    if (SESSION_CONTROL_TOOL_NAMES.has(builtIn.metadata.name)) {
+      const selected = sessionControlEntries?.get(builtIn.metadata.name);
+      if (!selected) continue;
+      entry = selected;
+    }
     if (
       options.embeddedSearchEnabled === true &&
       (entry.metadata.name === "Glob" || entry.metadata.name === "Grep")
@@ -279,6 +298,13 @@ export function registerBuiltInTools(
     if (
       options.includeDynamicWorkflow === false &&
       DYNAMIC_WORKFLOW_TOOL_NAMES.has(entry.metadata.name)
+    ) {
+      continue;
+    }
+    if (
+      entry.metadata.name === LIST_MODELS_TOOL_NAME &&
+      options.includeDynamicWorkflow === false &&
+      options.sessionControlKind === undefined
     ) {
       continue;
     }

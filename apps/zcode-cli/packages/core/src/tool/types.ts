@@ -1,4 +1,5 @@
 import type { ToolSearchExecutionContext, ModelCallWrapper } from "@zcode/contracts";
+import type { SessionControlBinding } from "./session-control/contract.js";
 import type { McpToolUiDescriptor } from "@zcode/shared/mcp-apps";
 // ============================================================
 // Tool Types - Core tool types for registry and executor
@@ -182,6 +183,8 @@ export interface ToolExecutionContext {
   offPeakPort?: OffPeakPort;
   topicResourcePort?: TopicResourcePort;
   sessionStore?: SessionStorePort;
+  /** 可信启动装配注入的会话控制绑定；模型工具只构造会话类调用方。 */
+  sessionControl?: SessionControlBinding;
   sessionModePort?: SessionModePort;
   workflowPort?: WorkflowPort;
   /** workflow run 提交端口；缺席则 CreateWorkflow 回占位诊断而不启动。 */
@@ -412,6 +415,10 @@ export interface ToolEntry extends ToolContractDeclaration {
   runtimeOutputSchema?: unknown;
   timeout: ToolTimeoutPolicy;
   cancellation: ToolCancellationPolicy;
+  /**
+   * 超时或执行中取消时追加给模型的请求身份说明（规格 0.15）；只有接受 retryOf 的写工具声明。
+   */
+  describeUnsettledCall?: (input: unknown, toolCallId: string) => string | undefined;
 }
 
 export type ToolApprovalGate =

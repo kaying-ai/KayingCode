@@ -1,4 +1,5 @@
 import type { ToolSearchExecutionContext } from "@zcode/contracts";
+import type { SessionControlBinding } from "../session-control/contract.js";
 import type {
   AgentExecutionTelemetryPort,
   AgentTelemetryActorKind,
@@ -112,6 +113,8 @@ export interface ToolExecutorOptions {
   offPeakPort?: OffPeakPort;
   topicResourcePort?: TopicResourcePort;
   sessionStore?: SessionStorePort;
+  /** 可信启动装配注入的会话控制绑定；模型工具只构造会话类调用方。 */
+  sessionControl?: SessionControlBinding;
   sessionModePort?: SessionModePort;
   workflowPort?: WorkflowPort;
   /** workflow run 端口；按工具名查表时 CreateWorkflow 的后台生命周期提供者。 */
@@ -239,6 +242,8 @@ export interface ToolExecutorDeps {
   offPeakPort?: OffPeakPort;
   topicResourcePort?: TopicResourcePort;
   sessionStore?: SessionStorePort;
+  /** 可信启动装配注入的会话控制绑定；模型工具只构造会话类调用方。 */
+  sessionControl?: SessionControlBinding;
   sessionModePort?: SessionModePort;
   workflowPort?: WorkflowPort;
   /** workflow run 端口；按工具名查表时 CreateWorkflow 的后台生命周期提供者。 */

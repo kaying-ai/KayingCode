@@ -343,7 +343,9 @@ export interface HighspeedMessageMetadata {
 /** 协议无关的输入 intent metadata；bootstrap v4 在事件边界组装为 ConversationInputIntent。 */
 export type TurnInputSourceMetadata =
   | { kind: "pluginUi"; pluginId: string; toolCallId: string }
-  | { kind: "genUi"; path: string; title?: string };
+  | { kind: "session"; sessionId: string; title?: string }
+  | { kind: "genUi"; path: string; title?: string }
+  | { kind: "extension"; pluginId: string };
 
 export interface TurnInputIntentMetadata {
   planEnabled?: boolean;

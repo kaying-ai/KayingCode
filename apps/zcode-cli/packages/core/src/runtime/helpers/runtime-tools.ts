@@ -13,6 +13,7 @@ import type { AgentRuntimeDeps } from "../types.js";
 import { resolveRuntimeEmbeddedSearchEnabled } from "../methods/embedded-search-branch.js";
 import { getSessionShellSelectionFromConfig } from "../methods/session-shell-environment.js";
 import { createRuntimeSessionModePort } from "../session-mode-port.js";
+import { sessionControlForRuntime } from "../../tool/session-control/contract.js";
 import { shouldSuppressSealedSubagentBashNotification } from "../../runtime-task/notification-policy.js";
 import {
   resolveBuiltInToolAllowlist,
@@ -57,6 +58,11 @@ function registerRuntimeBuiltInTools(runtime: AgentRuntimeInternal, deps: AgentR
     // submit_result 只在注入了 workflowSubmitPort 的 workflow actor 会话注册。以端口存在为门，
     // 与 taskType 无关：workflow actor 是 workflow_child，其 runtimeScope 目前是 "main"。
     includeSubmitResult: Boolean(deps.workflowSubmitPort),
+    sessionControlKind: sessionControlForRuntime(
+      deps.sessionControl,
+      runtime.config.taskType,
+      runtime.sessionId,
+    )?.kind,
     // mono 子代理：typed 声明。门仍是端口。
     ...(deps.workflowSubmitSchema === undefined
       ? {}
@@ -188,6 +194,11 @@ function createRuntimeToolExecutor(
     workflowSubmitPort: deps.workflowSubmitPort,
     workflowEscalatePort: deps.workflowEscalatePort,
     artifactStore: deps.artifactStore,
+    sessionControl: sessionControlForRuntime(
+      deps.sessionControl,
+      runtime.config.taskType,
+      runtime.sessionId,
+    ),
     automationPort: deps.automationPort,
     offPeakPort: deps.offPeakPort,
     topicResourcePort: deps.topicResourcePort,

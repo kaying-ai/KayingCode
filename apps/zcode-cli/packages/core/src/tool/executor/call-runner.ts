@@ -21,6 +21,7 @@ import type { ToolExecutionContext, ToolExecutionResult } from "../types.js";
 import type { ToolEntry } from "../types.js";
 import type { BackgroundTaskTracker } from "./background-tasks.js";
 import {
+  annotateUnsettledCall,
   createErrorResult,
   createPermissionErrorResult,
   createToolHandlerFailureError,
@@ -529,6 +530,7 @@ async function executeToolCallImpl(
         offPeakPort: deps.offPeakPort,
         topicResourcePort: deps.topicResourcePort,
         sessionStore: deps.sessionStore,
+        sessionControl: deps.sessionControl,
         sessionModePort: deps.sessionModePort,
         workflowPort: deps.workflowPort,
         dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort,
@@ -694,12 +696,16 @@ async function executeToolCallImpl(
       );
       // 修复原因：Hook 文本原来以 UI 摘要为底拼进失败结果，有 Hook 与没有 Hook 时模型看到的
       // 错误不同。现在 tool result 只放 createErrorResult 的原文，Hook 文本另成附件。
+      // 规格 0.15：超时与执行中取消会在「请求可能已被受理」之后打断 handler，回执送不回来；
+      // 让工具把对账身份追加进同一条错误，否则模型只能另起新请求、重复执行。
+      const failure = annotateUnsettledCall(
+        error instanceof Error ? error : new Error(String(error)),
+        entry ?? {},
+        executionInput,
+        canonicalToolCall.id,
+      );
       let result = withHookAdditionalContexts(
-        createErrorResult(
-          canonicalToolCall,
-          error instanceof Error ? error : new Error(String(error)),
-          durationMs,
-        ),
+        createErrorResult(canonicalToolCall, failure, durationMs),
         [
           // 修复原因：成功路径格式化之后再抛错（例如写结果事件失败）时，
           // 重新格式化会用未过滤的上下文，把被过滤的凭据送进附件，超长上下文还会再落盘一次。
