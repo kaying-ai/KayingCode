@@ -9,6 +9,10 @@ import type { RemoteAgentTarget } from "./remoteAgentTarget.js";
 import type { ServerRemoteInfo } from "./server-remote.js";
 import type { PluginSandboxPlatformPort } from "./mcp-apps/contract.js";
 import type {
+  ExtensionNotificationPayload,
+  NotificationsShowResult,
+} from "./extension-host/notifications.js";
+import type {
   LoadCliMcpFromUserDirectoryRequest,
   LoadCliMcpFromUserDirectoryResult,
   MigrateLegacyCommonMcpRequest,
@@ -943,6 +947,9 @@ export interface IPlatformService {
   /** 触发任务状态对应的系统通知，由宿主环境决定是否真正展示 */
   showTaskNotification(payload: TaskNotificationPayload): void;
 
+  /** 扩展 notifications.show 能力；Web/手机可不实现，缺失时返回 unsupported。 */
+  showExtensionNotification?(payload: ExtensionNotificationPayload): Promise<NotificationsShowResult>;
+
   /** 同步当前 UI 上下文，供宿主启动/日活事件使用；Web 可不实现。 */
   syncTelemetryContext?(context: TelemetryRendererContext): void;
 
@@ -1129,6 +1136,11 @@ export interface IPlatformService {
 
   /** 注册用户点击系统通知后跳转到对应任务的回调，返回 disposer */
   onTaskNotificationClick(handler: (taskId: string) => void): () => void;
+
+  /** 扩展通知点击：只允许打开该插件声明的视图。 */
+  onExtensionNotificationClick?(
+    handler: (click: { pluginId: string; viewId?: string }) => void,
+  ): () => void;
 
   /** 导出日志：打包 ~/.kayingcode/v2 及外部 agent 日志为 zip 并在系统文件浏览器中显示 */
   exportLogs(): Promise<{ success: boolean; path?: string; error?: string }>;

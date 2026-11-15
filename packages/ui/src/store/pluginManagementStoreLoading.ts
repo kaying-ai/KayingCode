@@ -1,5 +1,9 @@
 import type { IPluginManagementService } from "@zcode/services";
-import type { KayingCodePluginScope } from "@zcode/shared";
+import {
+  parseRemoteWorkspaceIdentity,
+  remoteHostIdFromWorkspaceIdentity,
+  type KayingCodePluginScope,
+} from "@zcode/shared";
 import { logger } from "@/logger.js";
 import type { PluginManagementState } from "@/store/pluginManagementStore.js";
 
@@ -9,6 +13,68 @@ function toMessage(error: unknown): string {
 
 function buildWorkspaceKey(workspacePath: string, workspaceIdentity: string | null): string {
   return workspaceIdentity?.trim() || workspacePath;
+}
+
+export interface PluginManagementChange {
+  workspacePath: string;
+  workspaceIdentity: string | null;
+  authorityKey: string | null;
+  scope: KayingCodePluginScope;
+}
+
+const changeListeners = new Set<(change: PluginManagementChange) => void | Promise<void>>();
+let revision = 0;
+export const getPluginManagementRevision = () => revision;
+
+export function subscribePluginManagementChanges(
+  listener: (change: PluginManagementChange) => void | Promise<void>,
+) {
+  changeListeners.add(listener);
+  return () => {
+    changeListeners.delete(listener);
+  };
+}
+
+export function notifyPluginManagementChange(change: PluginManagementChange): void {
+  revision += 1;
+  for (const listener of changeListeners) {
+    void Promise.resolve()
+      .then(() => listener(change))
+      .catch((error: unknown) => {
+        logger.warn("[plugins] background projection refresh failed", {
+          message: toMessage(error),
+        });
+      });
+  }
+}
+
+export function isPluginManagementChangeRelevant(
+  state: Pick<
+    PluginManagementState,
+    "workspacePath" | "workspaceIdentity" | "authorityKey" | "configScope"
+  >,
+  change: PluginManagementChange,
+): boolean {
+  if (!state.workspacePath) return false;
+  if (change.scope === "workspace") {
+    return (
+      state.configScope !== "user" &&
+      state.authorityKey === change.authorityKey &&
+      buildWorkspaceKey(state.workspacePath, state.workspaceIdentity) ===
+        buildWorkspaceKey(change.workspacePath, change.workspaceIdentity)
+    );
+  }
+  const hostKey = (target: { workspaceIdentity: string | null; authorityKey: string | null }) => {
+    const identity = target.workspaceIdentity ?? "";
+    const sourceServerId = parseRemoteWorkspaceIdentity(identity)?.sourceServerId;
+    return (
+      target.authorityKey ??
+      (sourceServerId
+        ? `source-settings:${sourceServerId}`
+        : (remoteHostIdFromWorkspaceIdentity(identity) ?? "local"))
+    );
+  };
+  return hostKey(state) === hostKey(change);
 }
 
 const inFlightLoads = new Map<string, Promise<void>>();
@@ -43,6 +109,12 @@ export async function runWorkspaceOperation(
     // operationId 只是共享的 UI 忙碌指示器。自动刷新可能在当前操作完成前覆盖它，
     // 但不能因此把已经成功落盘的添加/安装操作报告成失败，否则调用方会保留弹窗。
     if (!isCurrentContext()) return false;
+    notifyPluginManagementChange({
+      workspacePath,
+      workspaceIdentity,
+      authorityKey,
+      scope: configScope ?? "user",
+    });
     await loadInto(set, get, {
       workspacePath,
       workspaceIdentity,

@@ -333,6 +333,9 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutContent({
   handleSyncSubagentSessionTabs,
   handleOpenSelectionSideChat,
   handleOpenPlanDetail,
+  handleOpenExtensionView,
+  handleOpenExtensionLogs,
+  routeFileViewer,
   handleOpenWorkflowRun,
   handleOpenWorkflowRunDirectory,
   handleOpenWorkflowActorSession,
@@ -1534,6 +1537,8 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutContent({
       onOpenBackgroundBash={handleOpenBackgroundBash}
       onOpenSubagentSession={handleOpenSubagentSession}
       onOpenWorkflowActorSession={handleOpenWorkflowActorSession}
+      onOpenExtensionView={handleOpenExtensionView}
+      onOpenExtensionLogs={handleOpenExtensionLogs}
       onOpenWorkflowWorkspace={handleOpenWorkflowWorkspace}
       onOpenWorkflowArtifact={handleOpenWorkflowArtifact}
       onOpenWorkflowRun={handleOpenWorkflowRun}

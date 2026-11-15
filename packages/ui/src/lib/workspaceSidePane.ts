@@ -8,6 +8,11 @@ import {
 } from "@zcode/shared";
 import { inferMediaPreview, isPptxPreviewPath, type CodeViewerSource } from "@/lib/codeViewer.js";
 import { normalizeCodeViewerSource } from "@/lib/codeViewerSource.js";
+import type { PluginUiSidePaneTab } from "@/plugin-ui/contract.js";
+import type {
+  ExtensionLogsSidePaneTab,
+  ExtensionViewSidePaneTab,
+} from "@/extension-slots/contract.js";
 
 export interface BrowserSidePaneTab {
   id: string;
@@ -577,6 +582,9 @@ export type WorkspaceSidePaneTab =
   | SubagentDirectorySidePaneTab
   | SelectionSideChatPaneTab
   | PlanDetailSidePaneTab
+  | PluginUiSidePaneTab
+  | ExtensionViewSidePaneTab
+  | ExtensionLogsSidePaneTab
   | WorkflowRunSidePaneTab
   | WorkflowRunDirectorySidePaneTab
   | WorkflowActorSessionSidePaneTab
@@ -1063,7 +1071,7 @@ function findTabIndexById(tabs: WorkspaceSidePaneTab[], tabId: string): number {
   return tabs.findIndex((tab) => tab.id === tabId);
 }
 
-function activateSidePaneTab(
+export function activateSidePaneTab(
   current: WorkspaceSidePaneState | null,
   tab: WorkspaceSidePaneTab,
 ): WorkspaceSidePaneState {
@@ -2388,4 +2396,23 @@ export function openBackgroundBashSidePane(
       openedAt: Date.now(),
     },
   );
+}
+
+/** 打开或聚焦扩展日志标签：固定 id，每个侧栏一个。 */
+export function activateExtensionLogsSidePane(
+  current: WorkspaceSidePaneState | null,
+): WorkspaceSidePaneState {
+  return activateSidePaneTab(current, {
+    id: "extension-logs",
+    type: "extension-logs",
+    openedAt: Date.now(),
+  });
+}
+
+/** 打开或聚焦扩展视图标签：id 由视图全局 id 派生，同一视图只开一个。 */
+export function activateExtensionViewSidePane(
+  current: WorkspaceSidePaneState | null,
+  tab: ExtensionViewSidePaneTab,
+): WorkspaceSidePaneState {
+  return activateSidePaneTab(current, { ...tab, openedAt: tab.openedAt ?? Date.now() });
 }

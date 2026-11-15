@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { usePluginReferenceCatalog } from "@/hooks/usePluginReferenceCatalog.js";
 import { PluginReferenceIconProvider } from "@/v4/pluginReferenceIconContext.js";
-import { buildSessionPluginIconMap } from "@/v4/pluginReferenceIconProjection.js";
+import { buildSessionPluginIconMap, buildSessionPluginNameMap } from "@/v4/pluginReferenceIconProjection.js";
 
 interface SessionPluginReferenceIconProviderProps {
   children: ReactNode;
@@ -36,9 +36,13 @@ function ActiveSessionPluginReferenceIconProvider({
     () => buildSessionPluginIconMap(catalog.authority, catalog.entries),
     [catalog.authority, catalog.entries],
   );
+  const nameByPluginId = useMemo(
+    () => buildSessionPluginNameMap(catalog.authority, catalog.entries),
+    [catalog.authority, catalog.entries],
+  );
   const projection = useMemo(
-    () => (catalog.authority === "session" ? { sessionId, iconByPluginId } : null),
-    [catalog.authority, iconByPluginId, sessionId],
+    () => (catalog.authority === "session" ? { sessionId, iconByPluginId, nameByPluginId } : null),
+    [catalog.authority, iconByPluginId, nameByPluginId, sessionId],
   );
 
   return <PluginReferenceIconProvider value={projection}>{children}</PluginReferenceIconProvider>;

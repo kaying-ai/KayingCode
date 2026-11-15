@@ -10,6 +10,7 @@ import {
   parseConversationTopic,
   PROTOCOL_V4_LIMITS,
   type ConversationRow,
+  type ConversationDelta,
   type ConversationSnapshot,
   type ConversationOpenTiming,
   type ConversationTopicFrame,
@@ -281,6 +282,8 @@ export class ConversationProjectionStore {
   private readonly modelTransitionListeners = new Set<
     (transition: SessionModelTransition) => void
   >();
+  /** live-only 增量（插件资源通知）的旁路监听；只在 delta 帧应用后触发。 */
+  private readonly liveDeltaListeners = new Set<(deltas: readonly ConversationDelta[]) => void>();
   private observedModelTransitionEventId: string | null = null;
   // 订阅代际：并发 connect 只认最新一代，过期结果立即退订防服务端悬挂。
   private generation = 0;
@@ -373,6 +376,12 @@ export class ConversationProjectionStore {
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** live-only 增量（插件资源通知）的旁路订阅；快照帧不触发。 */
+  onLiveDeltas(listener: (deltas: readonly ConversationDelta[]) => void): () => void {
+    this.liveDeltaListeners.add(listener);
+    return () => this.liveDeltaListeners.delete(listener);
   }
 
   onOnlineModelTransition(listener: (transition: SessionModelTransition) => void): () => void {
@@ -716,6 +725,7 @@ export class ConversationProjectionStore {
       return;
     }
     const applied = applyConversationDeltas(current, frame.payload.deltas);
+    for (const listener of this.liveDeltaListeners) listener(frame.payload.deltas);
     // seq 是快照对齐水位，delta 帧应用完推进到帧右端点。
     const next = { ...applied, seq: frame.toSeq };
     logSubagentProjectionTransition(this.topic, current, next, "deltas");

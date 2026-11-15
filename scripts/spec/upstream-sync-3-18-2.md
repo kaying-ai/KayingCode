@@ -285,3 +285,15 @@
 - 回归：core session-control **24/24**、bootstrap contract **2/2**、session-control 包 **103/103**；core 全量 289/295，仍为既有 6 个 Windows 环境失败。
 - 验证：根 typecheck、lint（0 errors/128 既有 warnings）、source:check、architecture:check --changed 通过。
 - 未接线：扩展 slots UI（P4）与内置插件替换（P5）。
+
+第十九批（2026-11-15，插件体系 P4：扩展插槽与 MCP App 页面层）：
+
+- 恢复上游 `packages/ui/src/plugin-ui`（73 文件）与 `packages/ui/src/extension-slots`（32 文件）：MCP App/Gen UI/扩展视图共用页面宿主、沙箱传输、hostContext 与能力声明。
+- `ExtensionViewsProvider` 包裹 Shell，统一处理 views.open、workbench.startDraft、grants.request、notifications.show 与 env 报告；`useAppPanels` 新增扩展视图/日志打开与 file.viewer 路由。
+- 五插槽接入：composer.status（用量圆环左侧）、composer.mention（@ 面板分组）、sidePane.launcher（侧栏启动页）、nav.primary（主导航）、file.viewer（代码预览前接管）；扩展视图/日志侧栏标签可渲染。
+- 授权：启动页 needs-consent/activation 与插件详情权限区块接入 `IExtensionGrantsService`；通知点击与扩展通知开关接入 PlatformService 可选方法。
+- Client `RemoteServiceAccess` 增加 extensions 门面（仅桌面 base attachment 打开）与 plugin-ui 服务；`IServiceAccessor` 增加扩展/沙箱字段。
+- 恢复扩展 UI 依赖：MCP client/core/ext-apps；补齐 test ids、confirmDialog `intent`/`scrollableDescription`、MentionCategory、投影 onLiveDeltas、侧栏 tab 联合类型与 i18n 中英文 key。
+- 规范：`packages/ui/spec/plugin-extension-slots.md`。
+- 回归：`extensionSlotsDomain` **3/3**；根 typecheck、lint（0 errors/133 既有 warnings）、source:check、architecture:check --changed 通过。
+- 未执行：桌面 Electron E2E（真实扩展激活/视图 MCP/授权对话框/崩溃重启）需要浏览器与桌面运行环境；内置插件替换留 P5。

@@ -11,6 +11,8 @@ interface TaskSidePaneMemoryState {
   sidePaneCollapsedByOwner: Record<string, boolean>;
   activeGitSourceId: GitChangeSourceId;
   browserUrls: Record<string, string>;
+  /** 同一次插件 UI 结果只自动打开一次；与会话切换共享同一份内存 owner。 */
+  pluginUiAutoOpenKeys: Set<string>;
   /** @deprecated 旧版单浏览器 tab 的 URL，保留用于读取历史内存状态。 */
   browserUrl: string | null;
 }
@@ -21,6 +23,7 @@ const DEFAULT_TASK_SIDE_PANE_MEMORY_STATE: TaskSidePaneMemoryState = {
   sidePaneCollapsedByOwner: {},
   activeGitSourceId: "unstaged",
   browserUrls: {},
+  pluginUiAutoOpenKeys: new Set(),
   browserUrl: null,
 };
 
@@ -140,4 +143,18 @@ export function saveTaskSidePaneCollapsedPreference(
       [ownerKey]: isSidePaneCollapsed,
     },
   });
+}
+
+/** 同一次插件 UI 结果只自动打开一次；同步消费，保证同一调用的多个锚点不会重复打开。 */
+export function claimPluginUiSidePaneAutoOpen(
+  workspaceKey: string | null,
+  requestKey: string,
+): boolean {
+  if (!workspaceKey) return false;
+  const state = readTaskSidePaneMemoryState(workspaceKey);
+  if (state.pluginUiAutoOpenKeys.has(requestKey)) return false;
+  saveTaskSidePaneMemoryState(workspaceKey, {
+    pluginUiAutoOpenKeys: new Set([...state.pluginUiAutoOpenKeys, requestKey]),
+  });
+  return true;
 }

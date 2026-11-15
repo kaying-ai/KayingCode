@@ -31,6 +31,7 @@ import type {
 import { ModelConfigSelect, type ModelSelectGroup } from "@/ModelConfigSelect.js";
 import { Button } from "@/components/ui/button.js";
 import { ChatContextUsage } from "@/chat-input-toolbar/contextUsage.js";
+import { ComposerStatusSlot } from "@/extension-slots/index.js";
 import { resolveComposerContextTaskUsage } from "@/chat-input-toolbar/contextUsageMetrics.js";
 import type { ComposerModelOptions } from "@/chat-input-toolbar/ComposerModelMenu.js";
 import {
@@ -132,6 +133,7 @@ function V4ComposerModelControlsImpl({
   draftMode = false,
   draftConfig,
   usage,
+  sessionId,
   disabled,
   activeConfigPicker,
   onConfigPickerOpenChange,
@@ -478,6 +480,12 @@ function V4ComposerModelControlsImpl({
         className="hidden"
       />
       {/* 用量簇渲染在模型选择器左侧：环形图标显示上下文占用比例，悬停展开来源明细。 */}
+      {/* 扩展插槽 composer.status：紧挨用量圆环左边。 */}
+      <ComposerStatusSlot
+        workspacePath={workspacePath}
+        {...(workspaceIdentity ? { workspaceIdentity } : {})}
+        sessionId={sessionId}
+      />
       <ChatContextUsage
         taskUsage={taskUsage}
         selectedProvider={displayProvider}

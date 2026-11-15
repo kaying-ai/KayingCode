@@ -4,7 +4,11 @@ import { logger } from "@/logger.js";
 export interface ConfirmDialogRequest {
   title: string;
   testId?: string;
+  /** 调用方的稳定意图标识，供测试与日志区分同一视觉规范下的业务来源。 */
+  intent?: string;
   description?: string;
+  /** 长正文在弹框内独立滚动（扩展授权/启用确认）。 */
+  scrollableDescription?: boolean;
   /** 特定业务弹框的稳定视觉规范；默认确认框不受影响。 */
   presentation?: "automation-confirmation";
   confirmLabel?: string;

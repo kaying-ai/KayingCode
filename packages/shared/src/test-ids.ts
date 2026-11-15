@@ -834,3 +834,30 @@ export const TID_WORKSPACE_OPEN_BUTTON = "workspace-open-button";
 
 // 现有桌面 Hook 提示仍使用旧测试标识，和新增未读标记分别对应各自元素。
 export const TID_V4_WORKSPACE_HOOK_PENDING_BANNER = "v4-workspace-hook-pending-banner";
+
+// 扩展插槽 / 扩展视图 / 日志 / 授权（上游 3.18）
+export const TID_EXTENSION_COMPOSER_STATUS = "extension-composer-status";
+export const TID_SIDE_PANE_EXTENSIONS = "side-pane-extensions";
+export const TID_SIDE_PANE_EXTENSIONS_STOPPED = "side-pane-extensions-stopped";
+export const TID_SIDE_PANE_EXTENSION_PROBLEM = "side-pane-extension-problem";
+export const TID_SIDE_PANE_EXTENSION_VIEW_ITEM = "side-pane-extension-view-item";
+export const TID_EXTENSION_VIEW = "extension-view";
+export const TID_SIDE_PANE_EXTENSION_LOGS_ITEM = "side-pane-extension-logs-item";
+export const TID_EXTENSION_LOGS = "extension-logs";
+export const TID_EXTENSION_LOGS_ROW = "extension-logs-row";
+export const TID_EXTENSION_LOGS_SOURCE_FILTER = "extension-logs-source-filter";
+export const TID_EXTENSION_LOGS_LEVEL_FILTER = "extension-logs-level-filter";
+export const TID_EXTENSION_LOGS_AUTO_SCROLL = "extension-logs-auto-scroll";
+export const TID_EXTENSION_LOGS_COPY = "extension-logs-copy";
+export const TID_EXTENSION_LOGS_CLEAR = "extension-logs-clear";
+export const TID_SIDE_PANE_EXTENSION_GRANT = "side-pane-extension-grant";
+export const TID_EXTENSION_GRANT_DIALOG = "extension-grant-dialog";
+export const TID_EXTENSION_ENABLE_CONFIRM_DIALOG = "extension-enable-confirm-dialog";
+export const TID_EXTENSION_ACTIVATION_DIALOG = "extension-activation-dialog";
+export const TID_SIDE_PANE_EXTENSION_ACTIVATION = "side-pane-extension-activation";
+export const TID_EXTENSION_PERMISSIONS = "extension-permissions";
+export const TID_EXTENSION_PERMISSIONS_GRANT = "extension-permissions-grant";
+export const TID_EXTENSION_PERMISSIONS_REVOKE = "extension-permissions-revoke";
+export const TID_EXTENSION_PERMISSIONS_NOTIFICATIONS = "extension-permissions-notifications";
+export const TID_EXTENSION_PERMISSIONS_ACTION = "extension-permissions-action";
+export const TID_NAV_PRIMARY_ITEM = "nav-primary-slot-item";

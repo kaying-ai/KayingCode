@@ -3,6 +3,7 @@ import { useRef, type CSSProperties } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  BlocksIcon,
   BotIcon,
   BotMessageSquareIcon,
   BugIcon,
@@ -16,6 +17,7 @@ import {
   NotepadTextIcon,
   PackageIcon,
   PaletteIcon,
+  ScrollTextIcon,
   SquareTerminalIcon,
   TerminalIcon,
   WaypointsIcon,
@@ -350,6 +352,18 @@ export function SidePaneTabIcon({ tab }: { tab: WorkspaceSidePaneTab }) {
     return <Columns2Icon className="size-3.5" />;
   }
 
+  if (tab.type === "plugin-ui") {
+    return <PackageIcon className="size-3.5" />;
+  }
+
+  if (tab.type === "extension-view") {
+    return <BlocksIcon className="size-3.5" />;
+  }
+
+  if (tab.type === "extension-logs") {
+    return <ScrollTextIcon className="size-3.5" />;
+  }
+
   if (tab.source.type === "patch") {
     const fileDisplayTarget = getPatchFileDisplayTarget(tab.source);
     if (fileDisplayTarget) {
@@ -563,6 +577,20 @@ export function getSidePaneTabTitle(
 
   if (tab.type === "plugin-browser-compare") {
     return tab.title;
+  }
+
+  if (tab.type === "plugin-ui") {
+    return tab.title;
+  }
+
+  if (tab.type === "extension-view") {
+    return typeof tab.title === "string"
+      ? tab.title
+      : (Object.values(tab.title)[0] ?? formatMessage({ id: "extensions.title" }));
+  }
+
+  if (tab.type === "extension-logs") {
+    return formatMessage({ id: "extensions.logs.title" });
   }
 
   return tab.source.title || formatMessage({ id: "codeViewer.title" });

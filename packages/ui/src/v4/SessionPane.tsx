@@ -2,6 +2,7 @@ import { resolveSelectionSideInheritedModel } from "@/lib/selectionSideInherited
 import type { SessionCreateSource } from "@zcode/shared";
 import { reportSessionCreate } from "@/lib/sessionCreateTelemetry.js";
 import { getLocalTtftObserver } from "@/v4/telemetry/localTtftObserver.js";
+import { useExtensionWorkbenchPane } from "@/extension-slots/index.js";
 /* oxlint-disable eslint(max-lines) -- SessionPane 是单 pane 竖切的命令编排收口（订阅/发送/停止/fork/edit/retry/queue/slash 全集），与旧 ChatView 同粒度；HEAD 已超限（693 行计数），拆散命令组会打散 dispatchCommand/snapshotRef 的闭包纪律。 */
 import { useIsOfficeMode } from "@/hooks/useInterfaceMode.js";
 import {
@@ -22,6 +23,7 @@ import {
   TID_V4_SESSION_PANE,
   testId,
   KAYINGCODE_AGENT_PROVIDER,
+  isRemoteWorkspaceIdentity,
 } from "@zcode/shared";
 import type {
   GitChangeSourceId,
@@ -537,6 +539,24 @@ export function SessionPane({
   }, [conversationTelemetry, conversationTelemetryForegroundEnabled, sessionId, telemetryVisible]);
   const [lease, setLease] = useState<SessionLease | null>(null);
   const state = useConversationProjection(lease);
+  // 扩展的屏幕会话报告：只报本机工作区的主对话窗格，草稿多带所选模型。
+  useExtensionWorkbenchPane(
+    sessionId &&
+      !readOnly &&
+      !selectionSideChat &&
+      !rootSessionId &&
+      !remoteSessionId &&
+      !(workspaceIdentity && isRemoteWorkspaceIdentity(workspaceIdentity))
+      ? {
+          paneId,
+          sessionId,
+          workspacePath,
+          ...(workspaceIdentity ? { workspaceIdentity } : {}),
+          isDraft: false,
+          focused,
+        }
+      : null,
+  );
   const snapshot = state.snapshot;
   const newlyCreatedSessionIdRef = useRef<string | null>(null);
   const sessionLeaseReady = lease?.sessionId === sessionId;
