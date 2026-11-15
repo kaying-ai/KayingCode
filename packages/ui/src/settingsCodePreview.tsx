@@ -83,6 +83,9 @@ export function AppearanceSectionContent({
   setCodePreviewSettings,
   theme,
   setTheme,
+  isMacDesktop,
+  fontSmoothingEnabled,
+  setFontSmoothingEnabled,
   uiFontSizePx,
   setUiFontSizePx,
 }: {
@@ -90,6 +93,9 @@ export function AppearanceSectionContent({
   setCodePreviewSettings: (settings: Partial<CodePreviewSettings>) => void;
   theme: Theme;
   setTheme: (theme: Theme) => void;
+  isMacDesktop: boolean;
+  fontSmoothingEnabled: boolean;
+  setFontSmoothingEnabled: (enabled: boolean) => void;
   uiFontSizePx: number;
   setUiFontSizePx: (fontSizePx: number) => void;
 }) {
@@ -152,6 +158,20 @@ export function AppearanceSectionContent({
                 />
               }
             />
+            {isMacDesktop ? (
+              <SettingsRow
+                label={intl.formatMessage({ id: "settings.fontSmoothing" })}
+                description={intl.formatMessage({ id: "settings.fontSmoothingDescription" })}
+                control={
+                  <Switch
+                    data-testid="font-smoothing-switch"
+                    aria-label={intl.formatMessage({ id: "settings.fontSmoothing" })}
+                    checked={fontSmoothingEnabled}
+                    onCheckedChange={setFontSmoothingEnabled}
+                  />
+                }
+              />
+            ) : null}
           </CardContent>
         </Card>
       </div>

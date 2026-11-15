@@ -268,6 +268,8 @@ export function SettingsPage({
   const setTheme = useKayingCodeStore((state) => state.setTheme);
   const codePreviewSettings = useKayingCodeStore((state) => state.codePreviewSettings);
   const setCodePreviewSettings = useKayingCodeStore((state) => state.setCodePreviewSettings);
+  const fontSmoothingEnabled = useKayingCodeStore((state) => state.fontSmoothingEnabled);
+  const setFontSmoothingEnabled = useKayingCodeStore((state) => state.setFontSmoothingEnabled);
   const uiFontSizePx = useKayingCodeStore((state) => state.uiFontSizePx);
   const setUiFontSizePx = useKayingCodeStore((state) => state.setUiFontSizePx);
   const notificationEnabled = useKayingCodeStore((state) => state.notificationEnabled);
@@ -1543,6 +1545,9 @@ export function SettingsPage({
                             setCodePreviewSettings={handleCodePreviewSettingsChange}
                             theme={theme}
                             setTheme={(nextTheme) => handleFooterThemeChange(nextTheme)}
+                            isMacDesktop={Boolean(isMacDesktop)}
+                            fontSmoothingEnabled={fontSmoothingEnabled}
+                            setFontSmoothingEnabled={setFontSmoothingEnabled}
                             uiFontSizePx={uiFontSizePx}
                             setUiFontSizePx={(fontSizePx) =>
                               runUserAction({

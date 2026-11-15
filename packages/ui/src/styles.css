@@ -18,6 +18,11 @@
 /*  macOS desktop 使用 hidden 原生标题栏，右上角浮层操作必须避开其原生命中区域。 */
 @custom-variant platform-mac-desktop (&:where(.platform-mac-desktop, .platform-mac-desktop *));
 
+/* 本机 macOS 专属偏好：关闭时不覆盖系统默认，Web/远控不继承桌面渲染策略。 */
+:root.platform-mac-desktop.font-smoothing-enabled {
+  -webkit-font-smoothing: antialiased;
+}
+
 /*  Windows desktop 的原生 titleBarOverlay 占用右上角，图片 lightbox 等深层 overlay
  * 通过独立平台 variant 使用真实 Window Controls Overlay 安全区；普通 Web 不继承该规则。 */
 @custom-variant platform-windows-desktop (&:where(.platform-windows-desktop, .platform-windows-desktop *));
