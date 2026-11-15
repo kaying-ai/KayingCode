@@ -334,3 +334,28 @@ export type ConversationTelemetryFact =
 export const conversationTelemetryFactSchema = conversationTelemetryFactRuntimeSchema.transform(
   (fact): ConversationTelemetryFact => fact as ConversationTelemetryFact,
 );
+
+/**
+ * 模型请求指标：一次成功完成的模型请求的耗时与服务商 usage，供扩展进程算生成速率。
+ * 不进 `ConversationTelemetryFact` union，走独立通知；只带 id、模型身份、耗时与 token 数。
+ */
+export const modelRequestMetricsFactSchema = z
+  .object({
+    ...factBaseFields,
+    kind: z.literal("model.request.metrics"),
+    requestId: z.string().min(1),
+    providerId: z.string(),
+    modelId: z.string(),
+    querySource: z.string().optional(),
+    queryId: z.string().min(1).optional(),
+    durationMs: z.number().nonnegative(),
+    timeToFirstContentMs: z.number().nonnegative().optional(),
+    inputTokens: z.number().nonnegative().optional(),
+    outputTokens: z.number().nonnegative().optional(),
+    reasoningTokens: z.number().nonnegative().optional(),
+    cacheReadTokens: z.number().nonnegative().optional(),
+    cacheWriteTokens: z.number().nonnegative().optional(),
+    totalTokens: z.number().nonnegative().optional(),
+  })
+  .strict();
+export type ModelRequestMetricsFact = z.infer<typeof modelRequestMetricsFactSchema>;

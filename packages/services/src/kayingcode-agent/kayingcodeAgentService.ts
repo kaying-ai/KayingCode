@@ -1,5 +1,9 @@
 import { sessionLifecycleSnapshotSchema, type SessionLifecycleSnapshot } from "@zcode/shared";
 import { requestPluginReferenceCatalog } from "#src/kayingcode-agent/pluginReferenceCatalogRequest.js";
+import {
+  createPluginHostQueriesClient,
+  type PluginUserOptionsReader,
+} from "#src/kayingcode-agent/pluginHostQueriesClient.js";
 import { tapMakerProjectsRequestSchema, tapMakerProjectsResultSchema } from "@zcode/shared";
 import {
   localTtftFactsSchema,
@@ -186,6 +190,7 @@ import type {
   KayingCodeAgentSetModelParams,
   KayingCodeAgentSetPluginEnabledParams,
   KayingCodeAgentSetThoughtLevelParams,
+  KayingCodeAgentPluginMentionItemsParams,
   KayingCodeAgentPluginReferenceCatalogParams,
   KayingCodeAgentSkillReferenceCatalogParams,
   KayingCodeAgentDeleteSavedWorkflowParams,
@@ -3090,6 +3095,12 @@ export function createKayingCodeAgentService(
     return client;
   }
 
+  // 插件宿主查询：user 层设置走插件管理面进程；`@` 候选项走持有会话的工作区 CLI（existing-only）。
+  const pluginHostQueries = createPluginHostQueriesClient({
+    getPluginManagementClient: () => getPluginManagementClient(),
+    getExistingClient: (target) => getReadOnlyClient(target, "existing-only"),
+  });
+
   // 全局工作流的载体运行时选择：
   // 调用方只给 `{ scope: "global" }` 不带 workspace 时，先复用任一已活跃的**本地** runtime
   // （existing-only 语义：只看 activeClientsByWorkspaceKey，绝不为此拉起新进程），否则回落到
@@ -3370,7 +3381,7 @@ export function createKayingCodeAgentService(
     return envelope;
   }
 
-  return {
+  const service: IKayingCodeAgentService = {
     async prepareStorage(params) {
       const client = await processManager.getClient(params);
       wireClient(client, params, "chat");
@@ -3773,6 +3784,7 @@ export function createKayingCodeAgentService(
           deliveryKind: params.deliveryKind,
           messageLimit: params.messageLimit,
           afterSeq: params.afterSeq,
+          contentProfile: params.contentProfile,
         },
         kayingcodeSessionStateSnapshotSchema,
       );
@@ -3788,6 +3800,7 @@ export function createKayingCodeAgentService(
           sessionId: params.sessionId,
           afterMessageId: params.afterMessageId,
           limit: params.limit,
+          direction: params.direction,
         },
         kayingcodeSessionMessagesResultSchema,
       );
@@ -3826,7 +3839,7 @@ export function createKayingCodeAgentService(
     },
 
     async readSessionEvents(params: KayingCodeAgentReadSessionEventsParams) {
-      const client = await getReadOnlyClient(params);
+      const client = await getReadOnlyClient(params, params.runtimePolicy);
       const result = await client.request(
         kayingcodeProtocolMethods.sessionEvents,
         {
@@ -4018,6 +4031,10 @@ export function createKayingCodeAgentService(
         workspace: buildWorkspaceRef(params),
         ...(params.sessionId ? { sessionId: params.sessionId } : {}),
       });
+    },
+
+    async getPluginMentionItems(params: KayingCodeAgentPluginMentionItemsParams) {
+      return pluginHostQueries.getPluginMentionItems(params);
     },
 
     async getSkillReferenceCatalog(params: KayingCodeAgentSkillReferenceCatalogParams) {
@@ -5890,4 +5907,26 @@ export function createKayingCodeAgentService(
       disposeLocalState();
     },
   };
+
+  // 敏感设置读取不挂在 service 对象上：service 会整体登记进 ServiceCollection 并经 RPC 暴露，
+  // ProxyChannel 按属性名分派，所以只放进侧表，由 Window Host 进程内取用。
+  inProcessPluginUserOptionsReaders.set(service, {
+    readPluginUserOptions: (params) => pluginHostQueries.readPluginUserOptions(params),
+  });
+  return service;
+}
+
+/**
+ * Window Host 进程内的插件 user 层设置读取（含敏感值），键是 createKayingCodeAgentService 返回的对象。
+ * WeakMap 条目不是任何对象的属性，RPC 的 ProxyChannel 无法按名字触达。
+ */
+const inProcessPluginUserOptionsReaders = new WeakMap<
+  IKayingCodeAgentService,
+  PluginUserOptionsReader
+>();
+
+export function getPluginUserOptionsReaderForAgent(
+  service: IKayingCodeAgentService,
+): PluginUserOptionsReader | undefined {
+  return inProcessPluginUserOptionsReaders.get(service);
 }

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- 协议命令表与 payload 共享同一份类型推导，拆分会让命令面难以整体审阅。 */
 import { genUiModelContextSchema } from "../gen-ui/contract.js";
 import { createSessionRequestedConfigSchema } from "./create-session-config.js";
 import { localTtftContextSchema, localTtftClockSchema } from "../local-ttft/contract.js";
@@ -8,6 +9,7 @@ import { conversationQuotesSchema } from "../conversationSelection.js";
 import { z } from "zod";
 import { conversationRowTargetSchema, timestampSchema } from "./core.js";
 import { attachmentRefSchema } from "./attachment-ref.js";
+import { turnHeaderRowSchema } from "./rows.js";
 import { v4ConversationFileRewindPreviewResultSchema } from "./transport.js";
 import { modelSelectionSchema } from "../model-selection.js";
 import { modelExecutionSchema } from "../model-execution.js";
@@ -489,12 +491,24 @@ export const commandsQueryParamsSchema = z
   );
 export type CommandsQueryParams = z.infer<typeof commandsQueryParamsSchema>;
 
+// 命令对应回合的当前状态：owner 全量投影中 sourceCommandId 匹配的第一个 turnHeader。
+// 快照只下发尾窗，长回合的 header 会滚出窗口；由 owner 直接给出，不受尾窗限制。
+export const commandQueryTurnSchema = z
+  .object({
+    turnId: turnHeaderRowSchema.shape.turnId,
+    state: turnHeaderRowSchema.shape.state,
+  })
+  .strict();
+export type CommandQueryTurn = z.infer<typeof commandQueryTurnSchema>;
+
 export const commandQueryItemSchema = z
   .object({
     key: commandKeySchema,
     result: z.union([commandAckSchema, z.literal("unknown")]),
+    turn: commandQueryTurnSchema.optional(),
   })
-  .strict();
+  .strict()
+  .refine((item) => !item.turn || item.key.sessionId !== null, "global commands carry no turn");
 export type CommandQueryItem = z.infer<typeof commandQueryItemSchema>;
 
 export const commandsQueryResultSchema = z

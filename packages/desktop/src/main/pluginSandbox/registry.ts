@@ -133,11 +133,14 @@ export function createPluginSandboxRegistry(
 
   return {
     register(input: PluginSandboxRegisterInput): PluginSandboxHandle {
-      if (input.contentKind !== "gen-ui" && (!input.pluginId || !input.serverName))
+      if (input.contentKind === "extension") {
+        if (!input.pluginId || input.serverName || input.sessionId)
+          throw new Error("Invalid extension view provenance");
+      } else if (input.contentKind !== "gen-ui" && (!input.pluginId || !input.serverName))
         throw new Error("Missing MCP App provenance");
       if (
         input.contentKind === "gen-ui" &&
-        (input.pluginId || input.serverName || input.permissions?.length)
+        (!input.sessionId || input.pluginId || input.serverName || input.permissions?.length)
       )
         throw new Error("Invalid Gen UI capabilities");
       const observedAt = now();

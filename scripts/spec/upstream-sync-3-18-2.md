@@ -250,3 +250,15 @@
 - 回归：adapters `plugin-zcode-compat` 4/4、core `plugin-variable-compat` 3/3、shared `extension-host/contract` 6/6、session-control 103/103、plugin-api version 1/1、staging `.zcode-plugin` fail-closed 3/3（本机 Windows 运行）通过。
 - 验证：根 `pnpm run typecheck`（含 session-control 与 plugin-api）通过；根 `pnpm run lint` 0 errors / 128 个既有 warnings；`source:plugins`、`source:map`、`source:check`、`architecture:check --changed` 通过；`plugin-api` dts 构建通过。
 - 未接线：扩展进程、扩展网关、session-control 的 CLI/App adapter、extension-slots UI 与上游插件替换仍按 P1–P5 推进；`UPSTREAM_BASE` 保持 3.17.2。
+
+第十六批（2026-11-15，插件体系 P1：app-control 与扩展网关）：
+
+- 新增 `packages/services/src/app-control/`（contract、discovery、execution、observation、reverseRpc）与 `packages/services/src/extensions/`（门面、能力网关、grantsStore、静态表读取、会话读镜像、settings/context/generation/models/views 后端）。
+- 新增 `packages/shared/src/app-control` 协议（12 个 `appControl/*` 方法与 cancel）并接入 `kayingcodeProtocolMethods`；新增 `plugins/readUserOptions`、`plugins/mentionItems` 方法名与 `ServiceChannels.Extensions/ExtensionViews/ExtensionGrants`。
+- 共享协议补充 `ConversationInputSource` 的 session/extension 来源、`CommandQueryTurn`、`ModelRequestMetricsFact`、插件 `dataPath` 与沙箱 `contentKind: "extension"`  provenance 校验。
+- `createLocalServices` 创建 `AppControlService` 并经 `onAppControlServiceCreated` 交给进程内组件；插件 user 设置读取器放进 `WeakMap`，不暴露到 RPC；插件管理服务在成功变更后发 `onMutationSucceeded`。
+- `IKayingCodeAgentService` 增加 `getContextComposition`、`onDynamicContextCompositionChanged`、`onDynamicModelRequestMetrics`、`getPluginMentionItems`、`supportsExtensionInputSource` 兼容声明；新增 `pluginHostQueriesClient`，CLI 尚未实现查询方法时按 `supported: false` 降级。
+- CLI `session/messages` 增加 forward/cold 读取与 cursor 失效校验；`readSession`/`readSessionEvents` 透传 contentProfile/runtimePolicy；V4 CAS helper 支持可信客户端 `clientId`。
+- 规范：新增 `packages/services/spec/plugin-upstream-p1.md`；扩展进程、Main 监管器与桌面频道注册留给 P2/P4。
+- 回归：capability gateway **7/7**、grants store **3/3**、sessions backend **5/5**、app-control helpers **4/4**；根 typecheck、lint（0 errors/128 既有 warnings）、source:check、architecture:check --changed 通过。
+- 未接线：app-control discovery 目录、创建回执、fork 预留；session-control adapter 与模型会话工具（P3）；扩展宿主进程（P2）。

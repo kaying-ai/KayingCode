@@ -135,6 +135,8 @@ export async function sendHostCasCommandV4<T extends CommandType>(input: {
   payload: CommandPayloadMap[T];
   sessionId: string;
   contextMessage: string;
+  /** 扩展代发等可信客户端保留自己的 clientId；缺省用 host 进程稳定 id。 */
+  clientId?: string;
   maxAttempts?: number;
 }): Promise<CommandAck> {
   const maxAttempts = input.maxAttempts ?? 4;
@@ -147,6 +149,7 @@ export async function sendHostCasCommandV4<T extends CommandType>(input: {
         payload: input.payload,
         sessionId: input.sessionId,
         baseRevision,
+        ...(input.clientId ? { clientId: input.clientId } : {}),
       }),
     );
     if (ack.status === "stale") {

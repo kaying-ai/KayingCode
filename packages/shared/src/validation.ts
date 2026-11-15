@@ -1605,8 +1605,8 @@ export const hostPluginSandboxRegisterRequestResponseSchema = z
     workspacePath: z.string().optional(),
     workspaceIdentity: z.string().optional(),
     ownerWebContentsId: z.number().int().nonnegative(),
-    sessionId: nonEmptyStringSchema,
-    contentKind: z.literal("gen-ui").optional(),
+    sessionId: nonEmptyStringSchema.optional(),
+    contentKind: z.enum(["gen-ui", "extension"]).optional(),
     pluginId: nonEmptyStringSchema.optional(),
     // 资源所属 MCP server 运行时名：沙箱 partition 按它派生。
     serverName: nonEmptyStringSchema.optional(),
@@ -1643,8 +1643,13 @@ export const hostPluginSandboxRegisterRequestResponseSchema = z
   .refine(
     (value) =>
       value.contentKind === "gen-ui"
-        ? !value.pluginId && !value.serverName && !value.permissions?.length
-        : Boolean(value.pluginId && value.serverName),
+        ? Boolean(value.sessionId) && !value.pluginId && !value.serverName && !value.permissions?.length
+        : value.contentKind === "extension"
+          ? !value.sessionId &&
+            Boolean(value.pluginId) &&
+            !value.serverName &&
+            !value.permissions?.length
+          : Boolean(value.sessionId && value.pluginId && value.serverName),
     "Invalid sandbox provenance",
   );
 
