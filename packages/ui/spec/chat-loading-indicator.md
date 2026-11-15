@@ -25,6 +25,7 @@ runtime running ──► render unit.isRunning + workStatus.durationMs
 ## 视觉与降级
 
 - 图标是 105 个点的 SVG 球体（`ChatLoadingOrbs`）：球面持续旋转，每 8.24 秒做一次「球面 → KY 字」morph（5000–6296ms 变形、停留至 7160ms、7952ms 前变回），点的深度决定透明度，只有「KY」形点常亮。
+- 字形由 35 个目标点构成，整体约 15×9 单位，比上游 Z 更宽、更矮，笔画也更粗；变形时目标点半径从 0.5 增到 0.7，字母接近连续实线。
 - 文案使用 `animated-gradient-text animated-gradient-text-foreground` 做低对比流动；图标与文案都属于装饰，计时文本保持可读。
 - `prefers-reduced-motion: reduce` 下不启动逐帧动画，直接显示静态「KY」点阵；文案停止流动，保留「工作中」与计时。
 - 时长文本用 `tabular-nums` 等宽；按完整经过的秒显示，不显示小数；中文、俄语单位前留空格，英文/日/韩单位紧贴数字。
