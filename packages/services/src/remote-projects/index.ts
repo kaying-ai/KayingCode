@@ -17,6 +17,8 @@ export { IRemoteProjectService } from "#src/remote-projects/contract.js";
 export { projectWorkspaceSettings } from "#src/remote-projects/workspace-settings.js";
 export {
   createRemoteProjectConnectionAdmission,
+  findRemoteProjectHostIdForProfile,
+  releaseRemoteProjectProfileHost,
   remoteProjectHostIdForProfile,
   remoteProjectHostIdForTarget,
   prepareRemoteServerConnection,

@@ -67,6 +67,7 @@ import {
   createRemoteIdentityRegistrationCache,
   bindRemoteProjectIdentities,
   prepareRemoteServerConnection,
+  releaseRemoteProjectProfileHost,
   remoteProjectHostIdForProfile,
   remoteProjectHostIdForTarget,
   AutomationRepo,
@@ -3935,6 +3936,12 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
             await services.get(IRemoteProjectService).removeHost(hostId);
             windowHostAttachmentRegistry.detachSourceSettingsAttachments(sourceServerId);
           },
+          releaseUnboundProfileHost: async (profile, profiles) =>
+            await releaseRemoteProjectProfileHost(
+              services.get(IRemoteProjectService),
+              profile,
+              profiles,
+            ),
         });
         sourceSettingsStateSubscription = manager.onDidChangeState((state) => {
           notifyProjectChange();
