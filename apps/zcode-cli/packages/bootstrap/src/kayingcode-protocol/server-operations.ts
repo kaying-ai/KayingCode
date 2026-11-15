@@ -103,6 +103,7 @@ import {
   resolveSessionContextUsage,
   shouldExposeSessionEventToProtocol,
 } from "./mapper.js";
+import { createAppSessionControlBinding } from "../session-control/index.js";
 import { optionalModelSelectionFromString } from "./model-mapper.js";
 import {
   ProtocolRequestError,
@@ -3712,6 +3713,18 @@ async function createRecord(
     // core 遇到 permission / AskUserQuestion 只能走默认拒绝，UI 永远收不到阻塞请求。
     // 这里把阻塞交互转换成 server-to-client JSON-RPC request，由 app 通过 response 释放 runtime。
     permissionBroker: createProtocolInteractionBroker(context),
+    // fork 的 parentID 记录历史来源，仍是独立根会话；只有可写根与 fork 暴露 App 会话工具。
+    ...(taskType === "fork" ||
+    (!parentSessionId && (taskType === "interactive" || taskType === "workflow_parent"))
+      ? {
+          sessionControl: createAppSessionControlBinding({
+            requestClient: context.requestClient.bind(context),
+            sessionId,
+            workspacePath: workspace.workspacePath,
+            workspaceIdentity: workspace.workspaceIdentity,
+          }),
+        }
+      : {}),
     automationPort: createProtocolAutomationPort(context, () => ownSessionRecord),
     topicResourcePort: createProtocolTopicResourcePort(context),
     // 只接入 Host 已开放的工具面；缺省不注入。复用现行异步工厂，

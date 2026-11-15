@@ -1,5 +1,8 @@
 import { sessionLifecycleSnapshotSchema, type SessionLifecycleSnapshot } from "@zcode/shared";
 import { requestPluginReferenceCatalog } from "#src/kayingcode-agent/pluginReferenceCatalogRequest.js";
+import { createAppControlReverseRpc } from "#src/app-control/index.js";
+import type { AppControlService } from "#src/app-control/contract.js";
+import { SessionControlError } from "@zcode/session-control/contracts";
 import {
   createPluginHostQueriesClient,
   type PluginUserOptionsReader,
@@ -879,6 +882,10 @@ interface CreateKayingCodeAgentServiceOptions extends Omit<
 > {
   /** 仅供 MCP 状态探测进程使用，不能把空闲回收传给 chat。 */
   mcpStatusIdleTimeoutMs?: number;
+  /** Host 进程内的 App 会话控制 facade；CLI 反向 RPC 把 12 个动作转交给它。 */
+  resolveAppControlService?: () => AppControlService | undefined;
+  /** 本 Host 的稳定 source id，写进 App 控制的可信上下文。 */
+  appControlSourceServerId?: string;
   accountProviderConfigSource?: ProviderSource<AccountProviderConfigSnapshot>;
   accountRequestAuthService?: IAccountRequestAuthService;
   /** Desktop Host 请求 Main 登记 Agent 已授权的精确本地视频路径。 */
@@ -1886,7 +1893,78 @@ export function createKayingCodeAgentService(
       return;
     }
     wiredClients.add(client);
+    const appControl =
+      lane === "chat"
+        ? createAppControlReverseRpc({
+            client,
+            service: () => options?.resolveAppControlService?.(),
+            onResponseError: (error) =>
+              logger.warn(undefined, "App control response failed", { error: String(error) }),
+            bind: async ({ callerSessionId, callId, turnId, trace, signal }) => {
+              const active = [...activeClientsByWorkspaceKey.values()].find(
+                (entry) => entry.client === client,
+              );
+              if (!active) {
+                throw new SessionControlError(
+                  "forbidden",
+                  "App caller connection is no longer active",
+                );
+              }
+              const assertCurrent = () => {
+                const current = activeClientsByWorkspaceKey.get(
+                  resolveWorkspaceKey(active.workspace),
+                );
+                if (current?.client !== client || client.isDisposed || signal.aborted) {
+                  throw new SessionControlError(
+                    "forbidden",
+                    "App caller connection is no longer active",
+                  );
+                }
+              };
+              assertCurrent();
+              // callerSessionId 来自 CLI 工具运行上下文，仍须由同一连接的持久会话事实核对。
+              const { sessions } = await client.request(
+                kayingcodeProtocolMethods.sessionList,
+                {
+                  workspace: buildWorkspaceRef(active.workspace),
+                  sessionIds: [callerSessionId],
+                },
+                kayingcodeSessionListResultSchema,
+              );
+              const session = sessions.find((item) => item.sessionId === callerSessionId);
+              if (
+                !session ||
+                session.workspace.workspacePath !== active.workspace.workspacePath ||
+                resolveWorkspaceKey(session.workspace) !== resolveWorkspaceKey(active.workspace)
+              ) {
+                throw new SessionControlError(
+                  "forbidden",
+                  "App caller is not a bound product root session",
+                );
+              }
+              assertCurrent();
+              return {
+                workspacePath: active.workspace.workspacePath,
+                ...(active.workspace.workspaceIdentity
+                  ? { workspaceIdentity: active.workspace.workspaceIdentity }
+                  : {}),
+                ...(active.workspace.remoteSessionId
+                  ? { remoteSessionId: active.workspace.remoteSessionId }
+                  : {}),
+                callerSessionId,
+                callId,
+                ...(turnId ? { turnId } : {}),
+                ...(trace ? { trace } : {}),
+                signal,
+                assertCurrent,
+                sourceServerId: options?.appControlSourceServerId ?? "local",
+                connectionId: `app-control:${randomUUID()}`,
+              };
+            },
+          })
+        : null;
     const disposables = [
+      ...(appControl ? [appControl] : []),
       client.onNotification((message) => {
         if (message.method === kayingcodeProtocolNotifications.providerRuntimeHeadersCancelled) {
           const parsed = kayingcodeProviderRuntimeHeadersCancelledSchema.safeParse(message.params);
@@ -2090,6 +2168,7 @@ export function createKayingCodeAgentService(
         }
       }),
       client.onRequest((request) => {
+        if (appControl?.handle(request)) return;
         if (request.method === kayingcodeProtocolMethods.sessionRequestRuntimePreferences) {
           const reportResponseFailure = (error: unknown): void => {
             logger.debug(undefined, "运行时偏好响应发送失败", {

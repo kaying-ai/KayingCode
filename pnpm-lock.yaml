@@ -424,6 +424,9 @@ importers:
       '@zcode/provider-node':
         specifier: workspace:*
         version: link:../../../../packages/provider-node
+      '@zcode/session-control':
+        specifier: workspace:*
+        version: link:../../../../packages/session-control
       '@zcode/shared':
         specifier: workspace:*
         version: link:../../../../packages/shared
@@ -593,6 +596,9 @@ importers:
       '@zcode/dynamic-workflow':
         specifier: workspace:*
         version: link:../dynamic-workflow
+      '@zcode/session-control':
+        specifier: workspace:*
+        version: link:../../../../packages/session-control
       '@zcode/shared':
         specifier: workspace:*
         version: link:../../../../packages/shared

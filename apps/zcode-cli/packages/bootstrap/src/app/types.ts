@@ -1,4 +1,5 @@
 import type { AiSdkModelAdapter } from "@zcode/adapters/model";
+import type { SessionControlBinding } from "@zcode/core/session-control";
 import type {
   AgentTelemetryRuntimeOwner,
   AutomationPort,
@@ -157,6 +158,10 @@ export interface KayingCodeAppOptions {
     traceContext: TraceContext;
   }) => Promise<SubagentRuntimeConfig>;
   eventStore?: SessionEventStorePort;
+  /** 独立 CLI 的根会话控制绑定；App 运行时不传。 */
+  sessionControl?: SessionControlBinding;
+  /** 独立 CLI/TUI 启动时创建本进程的会话控制 runtime；需要独立的本地根会话。 */
+  standaloneSessionControl?: boolean;
   sessionStore?: SessionStorePort;
   sessionMailboxPort?: SessionMailboxPort;
   inputHistoryStore?: InputHistoryStorePort;
