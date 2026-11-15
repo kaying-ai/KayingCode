@@ -262,3 +262,13 @@
 - 规范：新增 `packages/services/spec/plugin-upstream-p1.md`；扩展进程、Main 监管器与桌面频道注册留给 P2/P4。
 - 回归：capability gateway **7/7**、grants store **3/3**、sessions backend **5/5**、app-control helpers **4/4**；根 typecheck、lint（0 errors/128 既有 warnings）、source:check、architecture:check --changed 通过。
 - 未接线：app-control discovery 目录、创建回执、fork 预留；session-control adapter 与模型会话工具（P3）；扩展宿主进程（P2）。
+
+第十七批（2026-11-15，插件体系 P2：扩展宿主进程与 Main 监管器）：
+
+- 新增 `packages/desktop/src/extension-host/`（L0/L1 通道、扩展注册表与激活事务、能力客户端、视图 MCP 服务器/宿主、窗口连接）与 `main/extensionHostSupervisor.ts`（单进程、代际、崩溃预算、探活、日志环形缓冲、Window Host 配对）。
+- Main 启动时创建监管器，首个 Window Host 就绪后拉起扩展进程，并在 App 退出屏障中 dispose；`desktopRuntimeEnv` 增加扩展宿主模块路径。
+- Window Host 注册 `IExtensionsService`/`IExtensionViewsService`/`IExtensionGrantsService`，把 AppControl facade、插件管理变更信号、user 选项读取器、任务投影与沙箱登记交给扩展网关；服务就绪后 announceReady。
+- 构建：新增 extension-host tsup 入口、`tsconfig.extension-host.json` 与 desktop 的 MCP client/core/server 依赖；扩展进程环境使用产品进程标签与白名单。
+- 品牌：扩展进程的 serviceName、MCP server/client info 与错误文案改为 KayingCode。
+- 回归：supervisor **3/3**（环境白名单/设置页代理、首次拉起与牵线、崩溃预算耗尽停止）；根 typecheck、lint、source:check、architecture:check --changed 通过。
+- 未接线：extension-slots UI 与 Renderer 频道（P4）；session-control adapter 与模型工具（P3）；内置插件替换（P5）。

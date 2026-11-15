@@ -15,6 +15,7 @@
  */
 import { createHostDatabaseStartup } from "./database-startup/hostDatabaseStartup.js";
 import { randomUUID } from "node:crypto";
+import { join } from "node:path";
 import {
   MessagePortProtocol,
   ChannelServer,
@@ -50,6 +51,10 @@ import {
   IRemoteProjectService,
   ISourceServerManagementService,
   ISourceServerWorkspaceService,
+  IExtensionsService,
+  IExtensionViewsService,
+  IExtensionGrantsService,
+  IPluginManagementService,
   createKayingCodeAgentConnectionScope,
   createWebRemoteProjectTreeActivityBridge,
   type BotProjectConnection,
@@ -77,6 +82,11 @@ import {
   buildTaskChangeSummary,
   createHostApiNetworkTransport,
   createSettingServiceWithMigrations,
+  createWindowHostExtensions,
+  getPluginUserOptionsReader,
+  getAppConfigDir,
+  type AppControlServiceHandle,
+  type WindowHostExtensions,
   OffPeakModelUnavailableError,
   OffPeakPermanentDispatchError,
   type HostApiNetworkTransport,
@@ -129,6 +139,10 @@ import {
 // 静态 import 会导致 local 模式的 host process 也崩溃。
 // 改为动态 import，仅 remote 模式时才加载。
 import type { IRemoteBackend } from "@zcode/server/remote";
+import {
+  mainToExtensionWindowMessageSchema,
+  type ExtensionWindowToMainMessage,
+} from "@zcode/shared/extension-host";
 import { wrapElectronPort } from "./electronPort.js";
 import { createTaskRealtimeBridgeForHostInit } from "./taskRealtimeBridge.js";
 import { resolveRpcLogLevel } from "./rpcLogLevel.js";
@@ -1870,6 +1884,10 @@ let databaseStartup: ReturnType<typeof createHostDatabaseStartup> | undefined;
 const pendingStartupAttachments = new Map<string, () => void>();
 let activeServices: ServiceCollection | null = null;
 let activeHostApiNetworkTransport: HostApiNetworkTransport | null = null;
+/** 桌面本机 Host 的扩展门面；只在本机 Host 注册，不进远程合同与手机白名单。 */
+let windowHostExtensions: WindowHostExtensions | null = null;
+/** createLocalServices 交出的 App 会话控制 facade，只在进程内交给扩展网关。 */
+let appControlForExtensions: AppControlServiceHandle | undefined;
 /** 本地 host services 的资源遥测订阅；远端连接的订阅由各自的 connection handle 持有。 */
 let activeLocalResourceTelemetry: IDisposable | null = null;
 // 资源管理器采样只在 main 请求时执行一次，Host 不维护任何周期定时器。
@@ -2942,6 +2960,8 @@ async function disposeHostResources(reason: string): Promise<HostShutdownResult>
       activeSessionRealtimePort = null;
     }
 
+    windowHostExtensions?.dispose();
+    windowHostExtensions = null;
     const servicesToDispose = activeServices;
     activeServices = null;
     // Registry 是全部远端 connection 的唯一 owner；释放失败不能阻塞本地服务继续收口。
@@ -3010,6 +3030,9 @@ function disposeHostResourcesBestEffort(reason: string): void {
   offPeakTaskRepo.close();
   void windowRemoteConnectionRegistry.dispose();
 
+  windowHostExtensions?.dispose();
+  windowHostExtensions = null;
+  appControlForExtensions = undefined;
   if (activeServices) {
     try {
       disposeServiceResources(activeServices);
@@ -3077,6 +3100,21 @@ process.on(
 );
 
 parentPort.on("message", async (e: Electron.MessageEvent) => {
+  // 扩展进程的 L0 控制消息（牵线、状态）走独立 schema，不进入 Host 消息联合类型。
+  const extensionControl = mainToExtensionWindowMessageSchema.safeParse(e.data);
+  if (extensionControl.success) {
+    const extensionPort = e.ports[0];
+    windowHostExtensions?.receiveControl(
+      extensionControl.data,
+      extensionPort
+        ? {
+            port: wrapElectronPort(extensionPort),
+            onClose: (listener) => extensionPort.once("close", listener),
+          }
+        : undefined,
+    );
+    return;
+  }
   const result = parseHostIncomingMessageEvent(e);
   if (!result.success) {
     logger.error("invalid parentPort message:", formatZodError(result.error));
@@ -3832,6 +3870,9 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
                 runtimeSurface: "desktop_local_host",
               },
               serviceAuthorityMode: "desktop-local",
+              onAppControlServiceCreated: (handle) => {
+                appControlForExtensions = handle;
+              },
               // 官方 Web 窗口目录按 hostId 读取远端项目树；解析器只认当前在线连接。
               resolveProjectHostService,
               remoteProjectConnection: {
@@ -3951,6 +3992,27 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
           }
         });
         services.register(ISourceServerManagementService, sourceServerManagementService);
+        // 扩展门面只在桌面本机 Host 注册：不进远程 workspace 合同、source-settings 与手机白名单。
+        windowHostExtensions?.dispose();
+        windowHostExtensions = createWindowHostExtensions({
+          pluginManagement: services.get(IPluginManagementService),
+          agent: services.get(IKayingCodeAgentService),
+          taskRows: {
+            read: () => windowHostControllerRuntime.readTaskRows(),
+            subscribe: (onChange) => windowHostControllerRuntime.subscribeTaskRows(onChange),
+          },
+          registerSandbox: (input) => pluginSandboxRegistrationBridge.register(input),
+          inventoryWorkspacePath: msg.agentSpawnFallbackCwd ?? process.cwd(),
+          userOptionsReader: getPluginUserOptionsReader(services),
+          appControl: appControlForExtensions,
+          projects: services.get(IProjectService),
+          modelSelection: services.get(IModelSelectionService),
+          dataDir: join(getAppConfigDir(), "extensions"),
+          postToMain: (message: ExtensionWindowToMainMessage) => parentPort?.postMessage(message),
+        });
+        services.register(IExtensionsService, windowHostExtensions.service);
+        services.register(IExtensionViewsService, windowHostExtensions.viewsService);
+        services.register(IExtensionGrantsService, windowHostExtensions.grantsService);
         wireLocalResourceTelemetry(services);
         hasDisposedHostResources = false;
         disposeHostResourcesInFlight = null;
@@ -3985,6 +4047,8 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
           });
         logWindowHostTopology("base-attachment-ready");
         logger.info("local services ready, all channels registered");
+        // 服务就绪后请 Main 牵线扩展进程（首个就绪的 Window Host 会拉起它）。
+        windowHostExtensions.announceReady();
         // 冷启动重连与本地 base attachment 解耦：本地服务已就绪即可后台执行，
         // 不能让远程探测拖慢首帧。URL Host 复用同一启动开关与 Registry。
         void runStartupReconnectBatch({
