@@ -9,7 +9,7 @@ export function scaffoldFiles(name, components) {
   const files = new Map();
   files.set(
     "README.md",
-    `# ${name}\n\nDescribe this plugin's workflow and required configuration here.\n\nValidate before installation: \`kayingcode plugins validate .\`.\n`,
+    `# ${name}\n\nDescribe this plugin's workflow and required configuration here.\n\nValidate before installation: \`zcode plugins validate .\`.\n`,
   );
   if (components.includes("skills")) {
     manifest.skills = "./skills";
@@ -37,7 +37,7 @@ export function scaffoldFiles(name, components) {
                 hooks: [
                   {
                     type: "command",
-                    command: 'node "${KAYINGCODE_PLUGIN_ROOT}/scripts/session-start.mjs"',
+                    command: 'node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs"',
                   },
                 ],
               },
@@ -54,13 +54,13 @@ export function scaffoldFiles(name, components) {
     );
   }
   if (components.includes("mcp")) {
-    manifest.mcpServers = ".mcp.json";
+    manifest.mcpServers = "./.mcp.json";
     files.set(
       ".mcp.json",
       JSON.stringify(
         {
           mcpServers: {
-            [name]: { command: "node", args: ["${KAYINGCODE_PLUGIN_ROOT}/scripts/mcp-server.mjs"] },
+            [name]: { command: "node", args: ["${CLAUDE_PLUGIN_ROOT}/scripts/mcp-server.mjs"] },
           },
         },
         null,
@@ -74,6 +74,6 @@ export function scaffoldFiles(name, components) {
   }
   for (const directory of ["scripts", "assets"])
     if (components.includes(directory)) files.set(`${directory}/.gitkeep`, "");
-  files.set(".kayingcode-plugin/plugin.json", JSON.stringify(manifest, null, 2) + "\n");
+  files.set(".zcode-plugin/plugin.json", JSON.stringify(manifest, null, 2) + "\n");
   return files;
 }

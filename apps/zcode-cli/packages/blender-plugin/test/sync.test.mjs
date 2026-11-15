@@ -23,13 +23,10 @@ test("upstream sync imports a clean commit without touching adapters; invalid im
   await git("config", "user.email", "plugin-test@example.invalid");
   await git("add", ".");
   await git("commit", "--quiet", "-m", "fixture");
-  await mkdir(join(root, ".kayingcode-plugin"), { recursive: true });
+  await mkdir(join(root, ".zcode-plugin"), { recursive: true });
   await mkdir(join(root, "scripts"), { recursive: true });
   await cp(join(pluginRoot, "package.json"), join(root, "package.json"));
-  await cp(
-    join(pluginRoot, ".kayingcode-plugin/plugin.json"),
-    join(root, ".kayingcode-plugin/plugin.json"),
-  );
+  await cp(join(pluginRoot, ".zcode-plugin/plugin.json"), join(root, ".zcode-plugin/plugin.json"));
   await writeFile(join(root, "scripts/adapter.mjs"), "local adapter");
   const lock = await syncUpstream({ source, root, ref: "HEAD", pluginVersion: "0.2.0" });
   assert.equal((await verifyUpstream(root)).commit, lock.commit);

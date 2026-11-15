@@ -29,6 +29,7 @@ export const AGENT_BUNDLE_SOURCE_RELATIVE = "apps/zcode-cli/packages/cli/dist/ka
  */
 const STAGED_NODE_REPL_HOST_ENTRIES = [
   "dist",
+  ".zcode-plugin",
   ".kayingcode-plugin",
   "package.json",
   "README.md",

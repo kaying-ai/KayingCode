@@ -10,25 +10,25 @@
 
 ## 差异规模
 
-| 类别 | 文件数 | 说明 |
-| --- | --- | --- |
-| 纯新增（产品无同名文件） | 1527 | 其中 918 个为上游 desktop 测试、375 个为 design-plugin 资源 |
-| 上游新增但产品已有同名文件 | — | 见各模块审阅；不得覆盖产品实现 |
-| 上游修改、产品未改 | 432 | 可机械取用，但需检查跨模块引用 |
-| 双方都改（源码类） | 657 | UI 293、CLI 146、services 65、desktop 44、shared 31 |
-| 上游修改、产品已删除 | 1738 | 多为已退役测试/文档/账号链路；不恢复 |
-| 上游删除 | 31 | 逐项判断是否已由产品删除 |
+| 类别                       | 文件数 | 说明                                                        |
+| -------------------------- | ------ | ----------------------------------------------------------- |
+| 纯新增（产品无同名文件）   | 1527   | 其中 918 个为上游 desktop 测试、375 个为 design-plugin 资源 |
+| 上游新增但产品已有同名文件 | —      | 见各模块审阅；不得覆盖产品实现                              |
+| 上游修改、产品未改         | 432    | 可机械取用，但需检查跨模块引用                              |
+| 双方都改（源码类）         | 657    | UI 293、CLI 146、services 65、desktop 44、shared 31         |
+| 上游修改、产品已删除       | 1738   | 多为已退役测试/文档/账号链路；不恢复                        |
+| 上游删除                   | 31     | 逐项判断是否已由产品删除                                    |
 
 3.18.0 是功能主体；3.18.1 主要是语音输入与内存诊断；3.18.2 集中在凭据安全（`enc:v2` 系统密钥）、OAuth 凭据与模型提供方族。
 
 ## 规则与所有者
 
 - 协议唯一入口是 `packages/shared/src/kayingcode-protocol(-v4)`；上游 `zcode-protocol*` 增量必须手工迁入，不恢复上游原树。
-- Host/session/Controller、owner/lease、SSH/Relay、桌面 continuous 与手机 replayable 链路保持现状；不引入上游 app-control、extension-host、session-control 的第二套会话入口。
+- Host/session/Controller、owner/lease、SSH/Relay、桌面 continuous 与手机 replayable 链路保持现状；P1–P4 已对齐的 app-control、extension-host、session-control 必须复用这些入口，不得另建平行会话路径。
 - KayingCode.localrun 的 ApiMock、模型配置、鉴权与本地默认路径保持唯一写入路径；上游账号/OAuth/套餐/云目录/官方 MCP 不接入。
-- 已退役模块（CUA package、relay-core、plugin-ui、data-sync、highspeed、gen-ui、settings-scope、conversation-share-interaction、App 业务单测）不随上游文件回流。
+- 已退役模块（旧 `@kayingcode/cua`/Helper/Broker、relay-core、data-sync、highspeed、gen-ui、settings-scope、conversation-share-interaction、App 业务单测）不随上游文件回流。P4 恢复的 plugin-ui/MCP App 页面层与 P5 的 `.zcode-plugin` 清单不再是退役项。
 - 新协议字段必须在接收侧按 capability 位门控；发送侧未装配的能力不宣告。
-- 品牌、版本、插件目录（`.kayingcode-plugin`、`KAYINGCODE_PLUGIN_ROOT`）、官方插件清单、发布 CI 保留本地约定。
+- 品牌、版本与发布 CI 保留本地约定；内置插件清单自 P5 起统一使用上游 `.zcode-plugin`，`.kayingcode-plugin` 仅作旧缓存与第三方插件回退，`${ZCODE_*}` 优先、`${KAYINGCODE_*}` 兼容。
 
 ## 本轮采纳（第一批：安全与稳定性）
 
@@ -36,55 +36,55 @@
 
 ### A. Agent / runtime 自包含修复
 
-| 状态 | 范围 | 内容 |
-| --- | --- | --- |
-| 已采纳 | dynamic-workflow | `child-source.ts` 的 vm realm 逃逸修复：沙箱改 null 原型、传输函数收进闭包并从全局删除、入口函数预取、收尾改由 cell 主动通知；保留 `.kayingcode/workflow-runs` 与 `__kayingcode-dwf-child` 品牌命名 |
-| 已采纳 | adapters | `network/proxy-fetch.ts`：取消信号不再取自可被 GC 的临时 Request，代理连接错误监听随请求对象回收，CONNECT 阶段可取消 |
-| 已采纳 | node-repl-host | 工具契约如实声明 `js` 非沙箱执行且不经过 Bash 危险命令确认；保留产品“仅 Browser Use”边界，不恢复 Computer Use 文案 |
-| 延后 | adapters | 推理历史/runner 归一化依赖 `blockIndex`、`signedReasoningReset` 协议批次，与 blockIndex 改造同批 |
-| 已采纳 | adapters | session-data：新增 `listSessionFiles` 与 `SessionDataFile`；存储类别父目录被换成符号链接时拒绝删除；保留式删除只保留被引用的 artifact，其余正文/日志/独占附件照常清理；`removeSession` 返回删除前字节数，重复删除幂等 |
-| 已采纳（部分） | adapters | 插件文件写读可靠性：新增 `writePluginTextIfChanged`（同内容跳过、临时文件 + 原子 rename、Windows 占用有界重试）；`atomic-directory` 采用上游事务解析与 `readStandaloneAtomicFile`/`resolveAtomicReadPath`；marketplace 的 JSON 写入改用 write-if-changed，新增 `listInstalledPluginRecordsAsync` 与 `resolveInstalledPluginRootAsync`，已安装插件根读取改走事务安全路径 |
-| 延后 | adapters | 插件 discovery/query 的异步化、material-change 中断与并发限制，以及 zip source、安装流程整体重写 |
-| 已采纳 | memory-diagnostics | 3.18.1 内存分配诊断：新增 `adapters/src/memory-diagnostics`（recorder/storage/contract）；资源采样器以 15s 节拍采集 inspector 分配样本，落盘到 `~/.kayingcode/cli/memory-diagnostics`；协议 server 的 `collectMemoryDiagnostics` 支持跳过事件统计扫描；v4 gateway 补充 hydration/history/binary cache 计数 |
-| 延后 | android-emulator-plugin | 产品已删除该包，不恢复 |
+| 状态           | 范围                    | 内容                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 已采纳         | dynamic-workflow        | `child-source.ts` 的 vm realm 逃逸修复：沙箱改 null 原型、传输函数收进闭包并从全局删除、入口函数预取、收尾改由 cell 主动通知；保留 `.kayingcode/workflow-runs` 与 `__kayingcode-dwf-child` 品牌命名                                                                                                                                                                     |
+| 已采纳         | adapters                | `network/proxy-fetch.ts`：取消信号不再取自可被 GC 的临时 Request，代理连接错误监听随请求对象回收，CONNECT 阶段可取消                                                                                                                                                                                                                                                    |
+| 已采纳         | node-repl-host          | 工具契约如实声明 `js` 非沙箱执行且不经过 Bash 危险命令确认；保留产品“仅 Browser Use”边界，不恢复 Computer Use 文案                                                                                                                                                                                                                                                      |
+| 延后           | adapters                | 推理历史/runner 归一化依赖 `blockIndex`、`signedReasoningReset` 协议批次，与 blockIndex 改造同批                                                                                                                                                                                                                                                                        |
+| 已采纳         | adapters                | session-data：新增 `listSessionFiles` 与 `SessionDataFile`；存储类别父目录被换成符号链接时拒绝删除；保留式删除只保留被引用的 artifact，其余正文/日志/独占附件照常清理；`removeSession` 返回删除前字节数，重复删除幂等                                                                                                                                                   |
+| 已采纳（部分） | adapters                | 插件文件写读可靠性：新增 `writePluginTextIfChanged`（同内容跳过、临时文件 + 原子 rename、Windows 占用有界重试）；`atomic-directory` 采用上游事务解析与 `readStandaloneAtomicFile`/`resolveAtomicReadPath`；marketplace 的 JSON 写入改用 write-if-changed，新增 `listInstalledPluginRecordsAsync` 与 `resolveInstalledPluginRootAsync`，已安装插件根读取改走事务安全路径 |
+| 延后           | adapters                | 插件 discovery/query 的异步化、material-change 中断与并发限制，以及 zip source、安装流程整体重写                                                                                                                                                                                                                                                                        |
+| 已采纳         | memory-diagnostics      | 3.18.1 内存分配诊断：新增 `adapters/src/memory-diagnostics`（recorder/storage/contract）；资源采样器以 15s 节拍采集 inspector 分配样本，落盘到 `~/.kayingcode/cli/memory-diagnostics`；协议 server 的 `collectMemoryDiagnostics` 支持跳过事件统计扫描；v4 gateway 补充 hydration/history/binary cache 计数                                                              |
+| 延后           | android-emulator-plugin | 产品已删除该包，不恢复                                                                                                                                                                                                                                                                                                                                                  |
 
 ### B. 上下文与会话能力
 
-| 状态 | 范围 | 内容 |
-| --- | --- | --- |
-| 已采纳 | core / contracts | prompt snapshot：新增 `SESSION_ENTRY_PROMPT_SNAPSHOT`（`runtime/prompt_snapshot`）；主会话首次请求记录 system 字节，恢复时读取，compaction 成功后清除并按当前代码重建前缀，legacy fork 复制父会话快照；模型 identity 只比较 provider 与 model id，写入失败只记 warning |
+| 状态   | 范围             | 内容                                                                                                                                                                                                                                                                                                         |
+| ------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 已采纳 | core / contracts | prompt snapshot：新增 `SESSION_ENTRY_PROMPT_SNAPSHOT`（`runtime/prompt_snapshot`）；主会话首次请求记录 system 字节，恢复时读取，compaction 成功后清除并按当前代码重建前缀，legacy fork 复制父会话快照；模型 identity 只比较 provider 与 model id，写入失败只记 warning                                       |
 | 已采纳 | core / contracts | 后台 Agent 无进展提醒：新增 `background-stall.ts` 与 `subagent-stall-reminder.ts`；registry 增加 activity 快照；子代理执行引入 `executionId` fencing 与终止/停止校验；无进展提醒不计入后台结果消费与 `message_source`；通知合批把标准 `<task-notification>` 排在提醒之前；出队时已失效的提醒结算为 discarded |
-| 延后 | core | `context-composition` 组成分类依赖新的 session row/协议字段与 UI 展示，随 blockIndex/session row 批次 |
-| 延后 | core | 编辑锁协议依赖队列编辑命令与 UI，随后台输入批次 |
+| 延后   | core             | `context-composition` 组成分类依赖新的 session row/协议字段与 UI 展示，随 blockIndex/session row 批次                                                                                                                                                                                                        |
+| 延后   | core             | 编辑锁协议依赖队列编辑命令与 UI，随后台输入批次                                                                                                                                                                                                                                                              |
 
 ### C. Shared / Services 小范围修复
 
-| 状态 | 范围 | 内容 |
-| --- | --- | --- |
-| 已采纳 | web-remote-relay | `domain/retry.ts` 连接建立后首次重连在 1.5 秒窗口内打散，`acknowledged()` 设置打散、新增 `reset()`；`heartbeatTiming.ts` 删除无消费方的旧重连 jitter 导出 |
-| 已采纳 | remote-projects | `releaseRemoteProjectProfileHost`：未识别线路删除/改址后归还按地址预留的成员行；`findRemoteProjectHostIdForProfile` 枚举时对无效身份返回 null；Host 在 `removeProfile`/`updateProfile` 后调用释放端口；新增 `CONTRACT.md` 记录对称释放语义 |
+| 状态   | 范围             | 内容                                                                                                                                                                                                                                       |
+| ------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 已采纳 | web-remote-relay | `domain/retry.ts` 连接建立后首次重连在 1.5 秒窗口内打散，`acknowledged()` 设置打散、新增 `reset()`；`heartbeatTiming.ts` 删除无消费方的旧重连 jitter 导出                                                                                  |
+| 已采纳 | remote-projects  | `releaseRemoteProjectProfileHost`：未识别线路删除/改址后归还按地址预留的成员行；`findRemoteProjectHostIdForProfile` 枚举时对无效身份返回 null；Host 在 `removeProfile`/`updateProfile` 后调用释放端口；新增 `CONTRACT.md` 记录对称释放语义 |
 
 ### D. UI 独立增量
 
-| 状态 | 范围 | 内容 |
-| --- | --- | --- |
-| 已采纳 | 会话渲染 | `ToolCallBlocks/QueuedSummaryContent` 的 React #185 修复：禁用动画走静态渲染，动画拆到子组件，同一摘要不再逐 token `setState`；保留产品已收窄的导出面 |
-| 已采纳 | 轮尾加载 | `ChatLoadingOrbs` 105 点球体动画；morph 目标由上游「Z」改为 KayingCode 的「KY」品牌点阵（35 点、约 15×9、变形时点半径 0.5→0.8 加粗），常量改为 `ORB_BRAND_*`；计时改为整秒；`workDuration` 补齐俄语空格并去掉十分之一秒 |
+| 状态   | 范围     | 内容                                                                                                                                                                                                                                                                                                                           |
+| ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 已采纳 | 会话渲染 | `ToolCallBlocks/QueuedSummaryContent` 的 React #185 修复：禁用动画走静态渲染，动画拆到子组件，同一摘要不再逐 token `setState`；保留产品已收窄的导出面                                                                                                                                                                          |
+| 已采纳 | 轮尾加载 | `ChatLoadingOrbs` 105 点球体动画；morph 目标由上游「Z」改为 KayingCode 的「KY」品牌点阵（35 点、约 15×9、变形时点半径 0.5→0.8 加粗），常量改为 `ORB_BRAND_*`；计时改为整秒；`workDuration` 补齐俄语空格并去掉十分之一秒                                                                                                        |
 | 已采纳 | 图片预览 | 新增 `ImagePreviewActions`：复制、下载、保存并打开、保存副本并选择应用、在文件管理器中显示、添加到聊天；新增 `useImageFilePreview`/`ConversationImageFileMention`，文件 mention 保留 `href` 以打开原图；未保存标注在关闭/切图前确认，导出期间拒绝离开；下载与复制逻辑下沉到 `lib/imagePreviewDownload`、`lib/copyPreviewImage` |
-| 已采纳 | 外观 | 本机 macOS 字体平滑偏好：store 增加 `fontSmoothingEnabled`（默认开启、本地持久化、跨窗口广播），设置「外观」页新增开关（仅 macOS desktop 显示）；CSS 以 `:root.platform-mac-desktop.font-smoothing-enabled` 启用灰度抗锯齿，Web 与远控不继承 |
-| 延后 | 来源徽标 | 产品已主动简化 `InteractionRequestOriginBadge`（不再展示描述），与上游整行换行方案语义不同，单独评估 |
+| 已采纳 | 外观     | 本机 macOS 字体平滑偏好：store 增加 `fontSmoothingEnabled`（默认开启、本地持久化、跨窗口广播），设置「外观」页新增开关（仅 macOS desktop 显示）；CSS 以 `:root.platform-mac-desktop.font-smoothing-enabled` 启用灰度抗锯齿，Web 与远控不继承                                                                                   |
+| 延后   | 来源徽标 | 产品已主动简化 `InteractionRequestOriginBadge`（不再展示描述），与上游整行换行方案语义不同，单独评估                                                                                                                                                                                                                           |
 
 ### E. 3.18 核心 model/context 专项（分阶段）
 
 该专项与 `context.ts`、`context-refresh.ts`、`compact-active.ts` 共用改动面，不能按单文件拆散；按以下阶段推进，每阶段独立分支与验收。
 
-| 阶段 | 状态 | 内容 |
-| --- | --- | --- |
-| 1a | 已采纳 | instruction-files 基础：结构化文件模型、完整/增量渲染、旧公告解析；adapter 区分"文件不存在"与"读不出来"，读错误按 `user_instructions_read_failed` 诊断 |
-| 1b | 已采纳 | context_prefix 记录已公告文件、请求前增量公告、compaction 重读指令文件并在提交后应用；冷恢复/rewind 不再原位改写指令公告 |
-| 2 | 已采纳 | total-tokens 预算：主/子 agent system 末尾固定预算行；runtime 计数状态、轮首/工具批次/文本续接的提醒与用户输入重锚；compaction rollover，resume 重置 |
-| 3 | 部分延后 | context-composition：开源树内只有闭源 App 客户端消费，当前接入无产品入口；本轮只保留 blockIndex 所需的类型占位，完整分类/协议/查询待 App 侧接入后再排期 |
-| 4 | 已采纳 | blockIndex：块到达序号贯穿流式/非流式、持久化、冷恢复与请求排序；服务端工具轮次、文字块不合并、旧消息保持旧布局；工具历史与读文件状态按序号排序 |
+| 阶段 | 状态     | 内容                                                                                                                                                    |
+| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1a   | 已采纳   | instruction-files 基础：结构化文件模型、完整/增量渲染、旧公告解析；adapter 区分"文件不存在"与"读不出来"，读错误按 `user_instructions_read_failed` 诊断  |
+| 1b   | 已采纳   | context_prefix 记录已公告文件、请求前增量公告、compaction 重读指令文件并在提交后应用；冷恢复/rewind 不再原位改写指令公告                                |
+| 2    | 已采纳   | total-tokens 预算：主/子 agent system 末尾固定预算行；runtime 计数状态、轮首/工具批次/文本续接的提醒与用户输入重锚；compaction rollover，resume 重置    |
+| 3    | 部分延后 | context-composition：开源树内只有闭源 App 客户端消费，当前接入无产品入口；本轮只保留 blockIndex 所需的类型占位，完整分类/协议/查询待 App 侧接入后再排期 |
+| 4    | 已采纳   | blockIndex：块到达序号贯穿流式/非流式、持久化、冷恢复与请求排序；服务端工具轮次、文字块不合并、旧消息保持旧布局；工具历史与读文件状态按序号排序         |
 
 ### F. 本轮明确不采纳
 
@@ -255,7 +255,7 @@
 
 - 新增 `packages/services/src/app-control/`（contract、discovery、execution、observation、reverseRpc）与 `packages/services/src/extensions/`（门面、能力网关、grantsStore、静态表读取、会话读镜像、settings/context/generation/models/views 后端）。
 - 新增 `packages/shared/src/app-control` 协议（12 个 `appControl/*` 方法与 cancel）并接入 `kayingcodeProtocolMethods`；新增 `plugins/readUserOptions`、`plugins/mentionItems` 方法名与 `ServiceChannels.Extensions/ExtensionViews/ExtensionGrants`。
-- 共享协议补充 `ConversationInputSource` 的 session/extension 来源、`CommandQueryTurn`、`ModelRequestMetricsFact`、插件 `dataPath` 与沙箱 `contentKind: "extension"`  provenance 校验。
+- 共享协议补充 `ConversationInputSource` 的 session/extension 来源、`CommandQueryTurn`、`ModelRequestMetricsFact`、插件 `dataPath` 与沙箱 `contentKind: "extension"` provenance 校验。
 - `createLocalServices` 创建 `AppControlService` 并经 `onAppControlServiceCreated` 交给进程内组件；插件 user 设置读取器放进 `WeakMap`，不暴露到 RPC；插件管理服务在成功变更后发 `onMutationSucceeded`。
 - `IKayingCodeAgentService` 增加 `getContextComposition`、`onDynamicContextCompositionChanged`、`onDynamicModelRequestMetrics`、`getPluginMentionItems`、`supportsExtensionInputSource` 兼容声明；新增 `pluginHostQueriesClient`，CLI 尚未实现查询方法时按 `supported: false` 降级。
 - CLI `session/messages` 增加 forward/cold 读取与 cursor 失效校验；`readSession`/`readSessionEvents` 透传 contentProfile/runtimePolicy；V4 CAS helper 支持可信客户端 `clientId`。
@@ -297,3 +297,25 @@
 - 规范：`packages/ui/spec/plugin-extension-slots.md`。
 - 回归：`extensionSlotsDomain` **3/3**；根 typecheck、lint（0 errors/133 既有 warnings）、source:check、architecture:check --changed 通过。
 - 未执行：桌面 Electron E2E（真实扩展激活/视图 MCP/授权对话框/崩溃重启）需要浏览器与桌面运行环境；内置插件替换留 P5。
+
+第二十批（2026-11-15，插件体系 P5：上游插件替换与内置清单迁移）：
+
+- 上游源码整体替换：`android-emulator`、`browser-use`、`documents`、`ios-simulator`、`pdf`、`presentations`、`plugin-creator`、`skill-creator`、`spreadsheets`、`zcode-guide`、`visualize`、`restore-legacy-sessions` 与 `office-runtime`；新增上游 `design`。本地精简镜像、旧 skill 名与旧命令不再保留。
+- 清单统一：所有内置插件改用 `.zcode-plugin/plugin.json`；catalog、SEA、desktop staging、server-cli staging、bootstrap seed 与运行时读取按 `.zcode-plugin` 优先、`.kayingcode-plugin` 回退。产品插件（taptap/blender/game-playtest/computer-use）同步迁移清单，并把 MCP 占位符改为 `${ZCODE_*}`；原 `KAYINGCODE_*` 环境仍由 adapter 双写，产品原生代码无需改环境名。
+- 官方开发者字段按 CLI 规范统一为 `kayingai.com`；上游插件正文、skills、MCP 实现与版本保持上游内容。
+- `config/official-plugins.json` 更新为 19 个发行条目：office 四件套改为 build，声明 viewer skill、`dist/server.mjs`、`dist/ui/assets.json`、`dist/ui/panel.html` 与 `componentTypes: ["ui"]`；android/ios 改为 build 并更新 skill/seed 路径；`zcode-guide` 取代 `kayingcode-guide`，移除插件内重复的 `/workflow` 命令与 dynamic-workflows 技能（CLI 内置命令与 bundled skill 已承担）；`visualize`、`design`、`restore-legacy-sessions` 进入发行集合，默认关闭策略与上游一致。
+- 构建：每个 office 插件增加只复用 `office-runtime` 的 `scripts/build.mjs`，满足 bootstrap 脚本必须位于插件根内的约束；bootstrap/desktop 仅在存在 tsconfig 时执行 tsc，避免纯资源面板构建被空 tsc 阻断。
+- 官方服务边界（本条为产品例外，后续接入官方端点时再移除）：
+  - `computer-use` 继续使用 `kaying-computer-use-plugin` 原生 stdio MCP，不接入上游 `zcode-cua-plugin`/`node_repl` CUA bridge；`node-repl-host` 继续保留 Browser Use 与 JS 执行，不恢复旧 CUA helper/broker。依据：`AGENTS.md` 与 CLI AGENTS 明确旧 CUA 运行时退役且 Computer Use 只走原生插件。
+  - `image-search` 保留本地 Openverse stdio server 作为 localrun 回退；上游 HTTP MCP 依赖 `zcode_official` 鉴权与 `${ZCODE_BASE_URL}`，本产品尚无该端点与解析，直接替换会静默失败。
+  - `zcode-site` 暂不纳入发行：其 MCP/UI 依赖官方 Sites 服务与官方鉴权，localrun 无对应服务；待端点与面板接线完成后再补。
+- `node-repl-host` 兼容上游 request-context：同时接受 `com.zcode/request-context` 与 `com.kayingcode/request-context`，顶层 `_meta` 仍不能作为会话凭据。
+- 规范修复：bootstrap source discovery 接受 `packages/desktop` 入口；catalog 生成器输出 `componentTypes`；source-discovery E2E 的仓库根、用户配置隔离与 desktop 路径修正。
+- 回归与验证：
+  - `source:plugins`（19 条）与 `source:plugins --runtime` 通过；`source:map`/`source:check` 通过。
+  - 根 `pnpm run typecheck`、`pnpm run lint`（0 errors / 133 既有 warnings）、`architecture:check --changed` 通过。
+  - android **20/20**、iOS **5/5**、browser-use **3/3**（含真实 headless Chromium 全链路）、plugin-creator **8/8**、office-runtime **83/83**、server-cli packaging **33/33（1 skipped）**、bootstrap seed/source **7/7**、catalog generator **9/9**、listing/UI contribution **3/3**、source-discovery E2E **2/2** 通过。
+  - `prepare:agent-bundle` 在 win32-x64 完成全部 19 个内置插件与 bundled-skills 的构建/暂存，Computer Use 原生 runtime、taptap、game-playtest 均通过各自校验。
+  - SEA `collectSeaOfficialPluginAssets`（win32-x64、requireRuntime）收集 **19** 个插件、**1329** 个文件，全部含 `.zcode-plugin/plugin.json`。
+  - 未执行/受限：design 的 SessionStart hook 用例依赖 POSIX `sh`，本机 Windows 原生 Node 无法在 `/usr/bin:/bin` 下找到 sh（6 个环境失败）；node-repl broker 单测在 Windows 命名 socket 上 `EACCES`，browser-use 真实 Chromium E2E 已覆盖同一 bridge。两者均非 P5 代码回归。
+- `UPSTREAM_BASE` 保持 3.17.2；P5 验收完成后另行评估基线更新。

@@ -124,7 +124,7 @@ try {
   await rm(join(packageRoot, "native"), { recursive: true, force: true });
 
   const packagePath = join(packageRoot, "package.json");
-  const manifestPath = join(packageRoot, ".kayingcode-plugin", "plugin.json");
+  const manifestPath = join(packageRoot, ".zcode-plugin", "plugin.json");
   const pluginPackage = JSON.parse(await readFile(packagePath, "utf8"));
   const pluginManifest = JSON.parse(await readFile(manifestPath, "utf8"));
   pluginPackage.version = options.pluginVersion;

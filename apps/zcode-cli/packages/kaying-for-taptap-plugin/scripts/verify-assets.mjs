@@ -20,7 +20,7 @@ for (const packageLock of lock.packages) {
 }
 
 for (const relativePath of [
-  ".kayingcode-plugin/plugin.json",
+  ".zcode-plugin/plugin.json",
   "THIRD_PARTY_NOTICES.md",
   "dist/mcp/server.js",
   "vendor/instant-games-open-mcp/LICENSE",

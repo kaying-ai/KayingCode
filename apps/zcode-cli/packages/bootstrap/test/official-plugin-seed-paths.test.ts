@@ -34,10 +34,10 @@ test("官方内置插件的开发者统一为 kayingai.com", async () => {
 
   const [browserUseManifest, computerUseManifest, nodeReplHostManifest, taptapMakerManifest] =
     await Promise.all([
-      readPluginManifest("../../../apps/zcode-cli/packages/browser-use-plugin/.kayingcode-plugin/plugin.json"),
-      readPluginManifest("../../../apps/zcode-cli/packages/kaying-computer-use-plugin/.kayingcode-plugin/plugin.json"),
-      readPluginManifest("../../node-repl-host/.kayingcode-plugin/plugin.json"),
-      readPluginManifest("../../../apps/zcode-cli/packages/kaying-for-taptap-plugin/.kayingcode-plugin/plugin.json"),
+      readPluginManifest("../../browser-use-plugin/.zcode-plugin/plugin.json"),
+      readPluginManifest("../../kaying-computer-use-plugin/.zcode-plugin/plugin.json"),
+      readPluginManifest("../../node-repl-host/.zcode-plugin/plugin.json"),
+      readPluginManifest("../../kaying-for-taptap-plugin/.zcode-plugin/plugin.json"),
     ]);
   assert.equal(browserUseManifest.author?.name, OFFICIAL_DEVELOPER);
   assert.equal(computerUseManifest.author?.name, OFFICIAL_DEVELOPER);
@@ -124,8 +124,10 @@ test("definition 与源码包机械对照：manifest 名称/版本、requiredSee
     }
     existingPackages += 1;
 
-    const manifestPath = join(packageRoot, ".kayingcode-plugin", "plugin.json");
-    assert.ok(existsSync(manifestPath), `${definition.name}: 缺少 .kayingcode-plugin/plugin.json`);
+    const manifestPath = [".zcode-plugin", ".kayingcode-plugin"]
+      .map((directory) => join(packageRoot, directory, "plugin.json"))
+      .find((candidate) => existsSync(candidate));
+    assert.ok(manifestPath, `${definition.name}: 缺少 .zcode-plugin/plugin.json`);
     const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as {
       name?: unknown;
       version?: unknown;

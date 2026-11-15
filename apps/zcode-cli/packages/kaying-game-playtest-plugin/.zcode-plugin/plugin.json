@@ -1,0 +1,23 @@
+{
+  "name": "kaying-game-playtest",
+  "version": "0.1.0",
+  "description": "Play Android and H5 games through visual feedback, preserve evidence, and generate offline HTML, Markdown and JSON experience reports.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "Apache-2.0",
+  "skills": "skills",
+  "commands": "commands",
+  "mcpServers": {
+    "kaying_game_playtest": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/dist/mcp/server.js"],
+      "timeoutMs": 180000
+    }
+  },
+  "description_i18n": {
+    "zh-CN": "通过视觉反馈试玩 Android 与 H5 游戏，保留证据并生成离线 HTML、Markdown 和 JSON 体验报告。"
+  }
+}

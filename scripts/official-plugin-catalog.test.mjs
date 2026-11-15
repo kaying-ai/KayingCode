@@ -140,10 +140,10 @@ test("generation detects manifest upgrades; compatibility entries never enter re
 test("repository catalog includes all current shipped plugins and hidden node host", async () => {
   const root = fileURLToPath(new URL("..", import.meta.url));
   const catalog = await loadOfficialPluginCatalog(root);
-  assert.equal(catalog.plugins.length, 16);
+  assert.equal(catalog.plugins.length, 19);
   assert.equal(
     catalog.plugins.filter(({ sourceRoot }) => sourceRoot.startsWith("plugins/")).length,
-    15,
+    0,
   );
   assert.equal(
     catalog.plugins.find(({ name }) => name === "kaying-game-playtest").defaultEnabled,
@@ -158,7 +158,12 @@ test("repository catalog includes all current shipped plugins and hidden node ho
     false,
   );
   assert.equal(catalog.plugins.find(({ name }) => name === "node-repl-host").listing, undefined);
-  assert.equal(catalog.compatibilityDefinitions[0].name, "restore-legacy-sessions");
+  assert.equal(catalog.compatibilityDefinitions.length, 0);
+  for (const name of ["visualize", "design", "restore-legacy-sessions", "zcode-guide"])
+    assert.ok(
+      catalog.plugins.some(({ name: candidate }) => candidate === name),
+      `${name} should ship`,
+    );
   assert.deepEqual(
     selectOfficialPluginProfile(catalog, "remotePrebuild").map(({ name }) => name),
     ["browser-use", "node-repl-host"],

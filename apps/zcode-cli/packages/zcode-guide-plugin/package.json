@@ -1,8 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@kayingcode/kayingcode-guide-plugin",
-  "version": "0.1.0",
+  "name": "@zcode/zcode-guide-plugin",
+  "version": "0.3.0",
   "private": true,
-  "description": "KayingCode usage and self-diagnosis guide: configuration for MCP servers, commands, skills, hooks, and plugins, dynamic workflow authoring, and how to locate and fix configuration problems for each.",
-  "license": "MIT"
+  "license": "MIT",
+  "description": "作为官方 ZCode 内置插件发布的使用与自诊断指南技能集。"
 }

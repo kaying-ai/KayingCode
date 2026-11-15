@@ -9,7 +9,7 @@ const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 test("the built-in manifest owns transcription content, MCP and comparison contribution", async () => {
   const manifest = JSON.parse(
-    await readFile(path.join(packageRoot, ".kayingcode-plugin", "plugin.json"), "utf8"),
+    await readFile(path.join(packageRoot, ".zcode-plugin", "plugin.json"), "utf8"),
   ) as {
     name: string;
     version: string;

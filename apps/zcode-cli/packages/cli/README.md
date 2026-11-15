@@ -73,7 +73,7 @@ kayingcode plugins disable ios-simulator
 
 ### 插件清单
 
-MCP 配置可通过 `mcpServers` 直接写在 `.kayingcode-plugin/plugin.json`。插件可以同时提供 `.mcp.json` 和清单中的 `mcpServers`；同名 server 冲突时，以选中清单的 `mcpServers` 为准。
+MCP 配置可通过 `mcpServers` 直接写在 `.zcode-plugin/plugin.json`。插件可以同时提供 `.mcp.json` 和清单中的 `mcpServers`；同名 server 冲突时，以选中清单的 `mcpServers` 为准。
 
 当前 kayingcode 插件面支持字段：
 
@@ -116,7 +116,7 @@ MCP 配置可使用以下变量：`${KAYINGCODE_PLUGIN_ROOT}`、`${KAYINGCODE_PL
 
 ```txt
 my-plugin/
-  .kayingcode-plugin/plugin.json
+  .zcode-plugin/plugin.json
   .mcp.json
   skills/my-skill/SKILL.md
   commands/my-command.md

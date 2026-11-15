@@ -14,7 +14,7 @@ const dataRoot = join(temporaryRoot, "data");
 try {
   await Promise.all([mkdir(stagedRoot), mkdir(workspaceRoot), mkdir(dataRoot)]);
   for (const sourceName of [
-    ".kayingcode-plugin",
+    ".zcode-plugin",
     "bin",
     "commands",
     "dist",

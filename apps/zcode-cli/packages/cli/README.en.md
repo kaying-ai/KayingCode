@@ -73,7 +73,7 @@ For local plugin development, put the plugin in any directory, then add it to th
 
 ### Plugin Manifest
 
-MCP config can live directly in `.kayingcode-plugin/plugin.json` through `mcpServers`. A plugin may provide both `.mcp.json` and manifest `mcpServers`; when the same server name appears in both places, `mcpServers` from the selected manifest wins.
+MCP config can live directly in `.zcode-plugin/plugin.json` through `mcpServers`. A plugin may provide both `.mcp.json` and manifest `mcpServers`; when the same server name appears in both places, `mcpServers` from the selected manifest wins.
 
 Supported fields in the current kayingcode plugin surface:
 
@@ -83,7 +83,7 @@ Supported fields in the current kayingcode plugin surface:
 - `mcpServers`: inline MCP server config, or a relative path to one
 - `userConfig`: option defaults used by `${user_config.key}` expansion
 
-Example `.kayingcode-plugin/plugin.json` with inline MCP config:
+Example `.zcode-plugin/plugin.json` with inline MCP config:
 
 ```json
 {
@@ -127,7 +127,7 @@ Only environment variables with the `KAYINGCODE_` prefix are expanded. Missing v
 
 ```txt
 my-plugin/
-  .kayingcode-plugin/plugin.json
+  .zcode-plugin/plugin.json
   .mcp.json
   skills/
     my-skill/SKILL.md

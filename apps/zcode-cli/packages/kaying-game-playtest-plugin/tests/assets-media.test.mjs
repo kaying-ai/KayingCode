@@ -3,12 +3,13 @@ import { mkdtemp, mkdir, readFile, writeFile, rm, symlink, copyFile } from "node
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import test from "node:test";
-import { collectSeaOfficialPluginAssets } from "../../../apps/zcode-cli/packages/cli/scripts/sea-official-plugin-assets.mjs";
+import { collectSeaOfficialPluginAssets } from "../../cli/scripts/sea-official-plugin-assets.mjs";
 import { PlaytestRuntime } from "../runtime/playtest.mjs";
 import { run, locked } from "../runtime/io.mjs";
 
 test("release catalog includes runnable bundle, skill, command and references in SEA assets", async (t) => {
-  const repository = resolve(import.meta.dirname, "../../..");
+  // tests/ → 插件 → packages → zcode-cli → apps → 仓库根。
+  const repository = resolve(import.meta.dirname, "../../../../..");
   const root = await mkdtemp(join(tmpdir(), "playtest-assets-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const catalog = JSON.parse(
@@ -18,6 +19,7 @@ test("release catalog includes runnable bundle, skill, command and references in
   assert.equal(plugin.defaultEnabled, true);
   await mkdir(join(root, "config"));
   await mkdir(join(root, "plugins"));
+  await mkdir(dirname(join(root, plugin.sourceRoot)), { recursive: true });
   await symlink(
     join(repository, plugin.sourceRoot),
     join(root, plugin.sourceRoot),
@@ -44,12 +46,10 @@ test("release catalog includes runnable bundle, skill, command and references in
     await mkdir(dirname(target), { recursive: true });
     await copyFile(join(repository, plugin.sourceRoot, file.path), target);
   }
-  const manifest = JSON.parse(
-    await readFile(join(installed, ".kayingcode-plugin/plugin.json"), "utf8"),
-  );
+  const manifest = JSON.parse(await readFile(join(installed, ".zcode-plugin/plugin.json"), "utf8"));
   assert.equal(
     manifest.mcpServers.kaying_game_playtest.args[0],
-    "${KAYINGCODE_PLUGIN_ROOT}/dist/mcp/server.js",
+    "${ZCODE_PLUGIN_ROOT}/dist/mcp/server.js",
   );
   assert.ok(!packaged.files.some((file) => file.path.startsWith("runtime/")));
 });

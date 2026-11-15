@@ -43,7 +43,7 @@ export async function syncUpstream({ source, ref, pluginVersion, root = pluginRo
       await writeFile(path, await git("cat-file", "blob", match[2]));
     }
     const snapshot = await inspectSnapshot(stage);
-    const manifestPath = join(root, ".kayingcode-plugin/plugin.json");
+    const manifestPath = join(root, ".zcode-plugin/plugin.json");
     const packagePath = join(root, "package.json");
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     const pkg = JSON.parse(await readFile(packagePath, "utf8"));

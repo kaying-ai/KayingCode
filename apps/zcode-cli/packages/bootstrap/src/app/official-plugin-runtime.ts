@@ -11,6 +11,7 @@ import {
   type OfficialPluginCacheRetryBudget,
   writeTextFileAtomicallyWithRetry,
 } from "./official-plugin-cache-fs.js";
+import { resolvePluginManifestPath } from "./plugin-manifest-path.js";
 
 type SeaModule = typeof import("node:sea");
 
@@ -50,7 +51,7 @@ interface OfficialRuntimeManifestInput {
 }
 
 export function writeOfficialPluginRuntimeManifest(input: OfficialRuntimeManifestInput): void {
-  const manifestPath = join(input.rootPath, ".kayingcode-plugin", "plugin.json");
+  const manifestPath = resolvePluginManifestPath(input.rootPath);
   const currentContents = readFileSync(manifestPath, "utf8");
   // 缓存里的入口可能已被旧客户端覆盖，必须从内置原始 manifest 重新生成。
   const manifest = JSON.parse(input.sourceManifestContents ?? currentContents) as Record<

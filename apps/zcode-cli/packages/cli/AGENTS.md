@@ -50,7 +50,7 @@
 
 ## 内置插件元数据
 
-- 新增或扩展 KayingCode 官方内置插件时，Store Listing 与 `.kayingcode-plugin/plugin.json` 的开发者默认统一为 `{ "name": "kayingai.com", "url": "https://kayingai.com" }`；只有对应 spec 明确记录第三方归属要求时才可使用其他作者。
+- 新增或扩展 KayingCode 官方内置插件时，Store Listing 与 `.zcode-plugin/plugin.json` 的开发者默认统一为 `{ "name": "kayingai.com", "url": "https://kayingai.com" }`；只有对应 spec 明确记录第三方归属要求时才可使用其他作者。
 - 官方 Store Listing 在 `config/official-plugins.json` 维护，与 Manifest 作者保持一致；运行时定义由 `pnpm run source:plugins` 生成，禁止手改 `official-plugin-catalog.generated.ts` 或另建发行版本清单。详情页优先读取 Listing 作者，缺失 Listing 时回退 Manifest 作者。
 - 新增内置插件或修改其作者元数据时，同步扩展官方插件元数据回归测试，覆盖 Listing 与 Manifest 两条读取链路。
 

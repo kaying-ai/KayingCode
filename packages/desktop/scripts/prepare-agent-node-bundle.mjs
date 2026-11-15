@@ -155,8 +155,16 @@ const officialPluginPackages = releasePlugins.map((plugin) => ({
 const BROWSER_USE_PLUGIN_PACKAGE_NAME = releasePlugins.find(
   ({ name }) => name === "browser-use",
 ).packageName;
+const PLUGIN_MANIFEST_DIRECTORIES = [".zcode-plugin", ".kayingcode-plugin"];
+
+function resolvePluginManifest(sourceRoot) {
+  return PLUGIN_MANIFEST_DIRECTORIES.map((directory) =>
+    resolve(sourceRoot, directory, "plugin.json"),
+  ).find((candidate) => existsSync(candidate));
+}
 const includedOfficialPluginTopLevelPaths = new Set([
   ".mcp.json",
+  ".zcode-plugin",
   ".kayingcode-plugin",
   "LICENSE",
   "README.md",
@@ -272,10 +280,13 @@ function buildOfficialPluginRuntimeForBootstrap(plugin) {
   // 这里仅在 bootstrap 开关下用当前 Node 直接执行等价 tsc + build-mcp，不改变插件自身 build 脚本。
   // browser-use 的 server 与 browser-client 是同一发布对；即使旧 server.js 存在也必须重建，
   // 否则会把旧 server 与当前 client（或缺失 client）一起 stage 到桌面安装包。
-  runCommand(process.execPath, [resolve(repoRoot, "node_modules/typescript/bin/tsc")], {
-    cwd: pluginRoot,
-    env: process.env,
-  });
+  // 纯资源型 runtime（文档面板、站点面板）没有 tsconfig，直接执行自己的构建脚本。
+  if (existsSync(resolve(pluginRoot, "tsconfig.json"))) {
+    runCommand(process.execPath, [resolve(repoRoot, "node_modules/typescript/bin/tsc")], {
+      cwd: pluginRoot,
+      env: process.env,
+    });
+  }
   runCommand(process.execPath, [plugin.runtimeBuildScript], {
     cwd: pluginRoot,
     env: process.env,
@@ -301,9 +312,11 @@ function stageBundle() {
 function stageOfficialPlugins() {
   for (const plugin of officialPluginPackages) {
     const sourceRoot = resolve(repoRoot, plugin.relativePath);
-    const manifestPath = resolve(sourceRoot, ".kayingcode-plugin", "plugin.json");
-    if (!existsSync(manifestPath)) {
-      throw new Error(`[prepare:agent-bundle] missing official plugin manifest: ${manifestPath}`);
+    const manifestPath = resolvePluginManifest(sourceRoot);
+    if (!manifestPath) {
+      throw new Error(
+        `[prepare:agent-bundle] missing official plugin manifest under: ${sourceRoot}`,
+      );
     }
 
     const targetRoot = resolve(glmDir, plugin.stagedPath);
@@ -380,7 +393,7 @@ function stageSharpForNodeReplPlugin() {
     [CUA_PLUGIN_PACKAGE_NAME, resolve(glmDir, "packages", "kayingcode-cua-plugin")],
   ];
   for (const [packageName, pluginStagedDir] of pluginStagedDirs) {
-    if (!existsSync(resolve(pluginStagedDir, ".kayingcode-plugin", "plugin.json"))) {
+    if (!resolvePluginManifest(pluginStagedDir)) {
       console.log(`[prepare:agent-bundle] ${packageName} not staged, skip sharp staging`);
       continue;
     }
@@ -397,7 +410,7 @@ function stageSharpForNodeReplPlugin() {
 
 function stageKoffiForCuaPlugin() {
   const cuaPluginStagedDir = resolve(glmDir, "packages", "kayingcode-cua-plugin");
-  if (!existsSync(resolve(cuaPluginStagedDir, ".kayingcode-plugin", "plugin.json"))) {
+  if (!resolvePluginManifest(cuaPluginStagedDir)) {
     console.log("[prepare:agent-bundle] kayingcode-cua-plugin not staged, skip koffi staging");
     return;
   }

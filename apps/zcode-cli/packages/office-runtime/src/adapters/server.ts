@@ -504,7 +504,7 @@ export function createOfficeServer({
   );
 
   // Resources: the panel, its assets and file chunks.
-  const panelMeta = { "kayingcode/csp": { wasmUnsafeEval: true } };
+  const panelMeta = { "zcode/csp": { wasmUnsafeEval: true } };
   server.registerResource(
     "panel",
     PANEL_URI,
