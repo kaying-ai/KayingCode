@@ -24,6 +24,7 @@ import { ACTIVE_PROJECT_MEMORY_RETRIEVAL_BRANCH } from "../memory/project-memory
 import { buildDesktopContextSection } from "./sections/desktop.js";
 import {
   buildContextManagementSection,
+  buildTotalTokensSection,
   buildDynamicBehaviorSection,
   buildSessionGuidanceSection,
 } from "./dynamic-sections.js";
@@ -169,6 +170,7 @@ export class ContextBuilder {
 
       // Context Management
       sections.push(buildContextManagementSection());
+      sections.push(buildTotalTokensSection());
 
       const gitSystemContextSection = buildGitSystemContextSection(this.config.envInfo);
       if (gitSystemContextSection) {

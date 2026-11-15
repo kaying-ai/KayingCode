@@ -46,6 +46,7 @@ export type ContextSource =
   | "dynamic_behavior" // 动态行为边界
   | "session_guidance" // 当前可用内置能力指导
   | "context_management" // 长上下文管理提示
+  | "total_tokens" // 固定的 token 预算行
   | "desktop_context"; // KayingCode Desktop 渲染与交互协议
 
 export type ContextInjectionTarget = "system" | "meta_user";

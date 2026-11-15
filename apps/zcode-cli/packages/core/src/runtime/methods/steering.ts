@@ -1355,6 +1355,7 @@ async function drainPendingInputUnlocked(
     queryIds,
     runtimeEntries,
     ...(toolDisallowlist.length > 0 ? { toolDisallowlist } : {}),
+    userSteered: pendingInputs.some((pendingInput) => pendingInput.inputPresentation === "user_steer"),
   };
 }
 

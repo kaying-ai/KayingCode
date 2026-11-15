@@ -70,6 +70,12 @@ export function findLatestCommittedAssistantUsage(
   return undefined;
 }
 
+/** 当前窗口的上下文量：最近一条带 usage 的 assistant 的 input + output；没有时为 0。 */
+export function latestContextTokens(entries: readonly (RuntimeMessageEntry | undefined)[]): number {
+  const baseline = findLatestCommittedAssistantUsage(entries)?.baseline;
+  return baseline ? (baseline.contextUsageTokens ?? baseline.inputTokens) : 0;
+}
+
 export function mainTurnCacheHitAggregateFromMessages(input: {
   activeMessages: readonly MessageWithParts[];
   persistedMessages: readonly MessageWithParts[];

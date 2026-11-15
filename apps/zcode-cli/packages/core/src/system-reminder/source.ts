@@ -28,6 +28,7 @@ export const SYSTEM_REMINDER_PERSISTED_SOURCES = [
   "agent_listing_delta",
   "todo_reminder",
   "silent_turn_reminder",
+  "total_tokens_reminder",
   "read_truncation_notice",
   "tool_hook_context",
   "task_status",
@@ -143,6 +144,13 @@ const SYSTEM_REMINDER_DESCRIPTORS: Record<SystemReminderSource, DescriptorShape>
     "resume_history",
     true,
     "sr.silent_turn_reminder",
+  ),
+  // token 预算倒数：收集时写库再提交，后续请求只追加；冷恢复按原文回放。
+  total_tokens_reminder: descriptor(
+    "current_turn",
+    "resume_history",
+    true,
+    "sr.total_tokens_reminder",
   ),
   // Read 部分视图提示：紧跟在该批 tool result 之后，和工具批次之后的其他附件一样投影。
   read_truncation_notice: descriptor(

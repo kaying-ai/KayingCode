@@ -869,6 +869,8 @@ export interface DrainedPendingInputDiagnostics {
   runtimeEntries: readonly RuntimeMessageEntry[];
   /** 本次 drain 注入的输入附带的工具隐藏列表，下一次 provider 请求必须继续生效。 */
   toolDisallowlist?: readonly string[];
+  /** 本次取出的输入里至少一条是用户亲手 steer 的（`user_steer`）；信箱、工具跟进、协调者都不算。 */
+  userSteered: boolean;
 }
 
 export interface ProviderContextUsageSnapshot {
