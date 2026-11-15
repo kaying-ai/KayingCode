@@ -42,7 +42,7 @@
 | 已采纳 | adapters | `network/proxy-fetch.ts`：取消信号不再取自可被 GC 的临时 Request，代理连接错误监听随请求对象回收，CONNECT 阶段可取消 |
 | 已采纳 | node-repl-host | 工具契约如实声明 `js` 非沙箱执行且不经过 Bash 危险命令确认；保留产品“仅 Browser Use”边界，不恢复 Computer Use 文案 |
 | 延后 | adapters | 推理历史/runner 归一化依赖 `blockIndex`、`signedReasoningReset` 协议批次，与 blockIndex 改造同批 |
-| 延后 | adapters | session-data 符号链接越界与 `listSessionFiles`/保留式删除，属会话永久删除特性，需协议与 Host 同批 |
+| 已采纳 | adapters | session-data：新增 `listSessionFiles` 与 `SessionDataFile`；存储类别父目录被换成符号链接时拒绝删除；保留式删除只保留被引用的 artifact，其余正文/日志/独占附件照常清理；`removeSession` 返回删除前字节数，重复删除幂等 |
 | 延后 | adapters | 插件目录原子写入、zip source 与插件安装流程整体改造 |
 | 已采纳 | memory-diagnostics | 3.18.1 内存分配诊断：新增 `adapters/src/memory-diagnostics`（recorder/storage/contract）；资源采样器以 15s 节拍采集 inspector 分配样本，落盘到 `~/.kayingcode/cli/memory-diagnostics`；协议 server 的 `collectMemoryDiagnostics` 支持跳过事件统计扫描；v4 gateway 补充 hydration/history/binary cache 计数 |
 | 延后 | android-emulator-plugin | 产品已删除该包，不恢复 |
@@ -142,3 +142,10 @@
 - 资源采样器在既有 60s 节拍之外启动 15s 分配诊断，`stop()` 同时停止诊断；inspector 不可用时静默降级。
 - `collectMemoryDiagnostics({ includeEventStats: false })` 跳过历史事件扫描；v4 gateway 增加 hydration/history/binary cache 计数。
 - 回归：`memory-diagnostics/recorder.test.ts` **10/10 通过**；shared/contracts/adapters/bootstrap/cli 与根 typecheck 通过；根 lint、source:check、architecture:check --changed 通过。
+
+第六批（2026-11-15，session-data 文件安全）：
+
+- `session-data-files` 增加 `SessionDataFile` 与可选 `listSessionFiles`；删除前逐类别检查父目录，顶层被换成符号链接时返回 `session-data.symlink-root`，不沿链接清理用户文件。
+- `removeSession` 支持 `retainedArtifactIds`：只保留被 URI 引用的 artifact 附件，正文、执行日志与其他独占附件仍删除；无保留参数时保持原有整段删除语义与返回字节数。
+- 采用上游行为测试，覆盖符号链接根、清单排序与保留式删除；`session-data-files` 与 contract 测试共 **7/7 通过**（与 memory-diagnostics 合计 17/17）。
+- 类型检查 adapters 通过；后续统一执行根 lint、source:check、architecture:check。
