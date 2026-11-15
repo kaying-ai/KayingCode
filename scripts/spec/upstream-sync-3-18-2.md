@@ -74,7 +74,19 @@
 | 已采纳 | 外观 | 本机 macOS 字体平滑偏好：store 增加 `fontSmoothingEnabled`（默认开启、本地持久化、跨窗口广播），设置「外观」页新增开关（仅 macOS desktop 显示）；CSS 以 `:root.platform-mac-desktop.font-smoothing-enabled` 启用灰度抗锯齿，Web 与远控不继承 |
 | 延后 | 来源徽标 | 产品已主动简化 `InteractionRequestOriginBadge`（不再展示描述），与上游整行换行方案语义不同，单独评估 |
 
-### E. 本轮明确不采纳
+### E. 3.18 核心 model/context 专项（分阶段）
+
+该专项与 `context.ts`、`context-refresh.ts`、`compact-active.ts` 共用改动面，不能按单文件拆散；按以下阶段推进，每阶段独立分支与验收。
+
+| 阶段 | 状态 | 内容 |
+| --- | --- | --- |
+| 1a | 已采纳 | instruction-files 基础：结构化文件模型、完整/增量渲染、旧公告解析；adapter 区分"文件不存在"与"读不出来"，读错误按 `user_instructions_read_failed` 诊断 |
+| 1b | 待做 | context_prefix 记录已公告文件、请求前增量公告、compaction 重读指令文件并在提交后应用 |
+| 2 | 待做 | total-tokens 预算：计数状态、上下文提醒、输入附件收集原因 |
+| 3 | 待做 | context-composition：组成分类、协议方法、查询与变更通知 |
+| 4 | 待做 | blockIndex：块到达序号、请求排序、持久化与工具历史 |
+
+### F. 本轮明确不采纳
 
 - 凭据体系重写（`systemCredentialCipher`、`enc:v2`、`@napi-rs/keyring`）与 OAuth/账号/套餐链路。
 - `packages/plugin-api`、`packages/session-control`、desktop `extension-host`、`app-control`、`app-control-navigation`。
@@ -184,3 +196,12 @@
 - `services` 的 `remote-projects/index.ts` 与 `node.ts` 导出新入口；新增 `packages/services/src/remote-projects/CONTRACT.md`。
 - 新增回归 `packages/services/test/remoteProjectMembership.test.ts`：删除释放、同地址活跃线路保留、retired 线路不阻止释放、有入口旧行保留、设备线路不释放、IPv6 地址正常释放，**6/6 通过**。
 - 验证：shared/services/desktop typecheck 通过；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
+
+第十一批（2026-11-15，核心专项 1a：instruction-files 基础）：
+
+- 新增 `core/src/context/sections/instruction-files.ts`：文件块/完整公告/增量公告渲染，`createInstructionFile` 计算 sha256，`parseInstructionAnnouncement` 严格解析，`parseLegacyInstructionFiles` 按标题行兼容旧公告。
+- `context/types.ts` 增加 `InstructionFile`、`InstructionRefreshReason`、`InstructionAnnouncement`，`ContextSection`/`ContextMetaUserAttachment` 增加 `instructionFiles`/`files`。
+- 契约增加 `CONTEXT_SOURCE_INSTRUCTIONS_READ_FAILED`；adapter 只在 ENOENT/EISDIR/ENOTDIR 时视为文件不存在，其他读取错误产生诊断；指令候选检查遇到权限等错误时停在该候选，不再向上换用父目录文件。
+- 新增 `core/tests/instruction-files.test.ts`（5 个用例）覆盖 trim/hash、完整/增量渲染、严格解析与旧公告解析。
+- 验证：contracts/adapters/core typecheck；instruction-files + runtime-context-announcements **52/52**；根 lint、source:check、architecture:check --changed 通过。
+- 未接线：context_prefix metadata、请求前增量公告、compaction 重读与应用（1b）。
