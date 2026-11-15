@@ -68,6 +68,7 @@
 | 状态 | 范围 | 内容 |
 | --- | --- | --- |
 | 已采纳 | 会话渲染 | `ToolCallBlocks/QueuedSummaryContent` 的 React #185 修复：禁用动画走静态渲染，动画拆到子组件，同一摘要不再逐 token `setState`；保留产品已收窄的导出面 |
+| 已采纳 | 轮尾加载 | `ChatLoadingOrbs` 105 点球体动画；morph 目标由上游「Z」改为 KayingCode 的「KY」品牌点阵，常量改为 `ORB_BRAND_*`；计时改为整秒；`workDuration` 补齐俄语空格并去掉十分之一秒 |
 | 延后 | 来源徽标 | 产品已主动简化 `InteractionRequestOriginBadge`（不再展示描述），与上游整行换行方案语义不同，单独评估 |
 | 延后 | 外观 | 字体平滑依赖设置页与 store 结构，随设置批次 |
 
@@ -124,3 +125,12 @@
 - `subagent/runner.ts` 采用上游版本（executionId 生命周期、停止身份校验、失败交接与运行元数据读取），保留 `kayingcode-agents` 临时目录品牌。
 - 回归：`background-subagent-stall.test.ts` **22/22 通过**；core 全量 **223/229**，仍为前述 6 个 Windows 环境失败，无新增失败。
 - 包内 typecheck：contracts、core、adapters、bootstrap、cli 通过；根 typecheck、lint、source:check、architecture:check --changed 通过。
+
+第四批（2026-11-15，轮尾「工作中」球体动画）：
+
+- 采用上游 `ChatLoadingOrbs`（105 点 SVG 球体，8.24 秒一个循环：球面 → 字形 → 球面），替换原 3×3 像素动画；图标槽保持 16px，`prefers-reduced-motion` 下显示静态字形。
+- morph 目标由上游「Z」改为 KayingCode 的「KY」双字母点阵，常量改为 `ORB_BRAND_POINTS` / `ORB_BRAND_TARGETS`，避免沿用上游品牌造型。
+- 计时改为整秒（`formatRunningWorkDuration`）；`workDurationUnitSeparator` 按上游补齐俄语空格。
+- 样式新增 `.animated-gradient-text-foreground`，删除已无引用的像素/ shimmer 规则。
+- 同步更新 `packages/ui/spec/chat-loading-indicator.md`、`packages/ui/spec/upstream-3-17-2.md` 与 `packages/ui/test/modelRetryProgress.e2e.mjs`（`0 秒`、整秒断言）。
+- 验证：`tsc -b packages/ui`、根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过；KY 点阵用 20px 实际尺寸渲染核对，字形可读。E2E 需要桌面浏览器环境，本轮未在 CI 中执行。
