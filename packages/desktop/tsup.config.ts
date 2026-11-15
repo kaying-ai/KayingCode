@@ -225,6 +225,8 @@ const desktopNodeRuntimeExternals = [
   "undici",
   "@larksuiteoapi/node-sdk",
   "yaml",
+  // NAPI 原生模块必须保留动态加载，不能把各平台 .node 变体内联进 main/host bundle。
+  "@napi-rs/keyring",
   // node-forge 内部用动态 require("crypto")，内联进 ESM main/host bundle 后 Electron 会报
   // Dynamic require of "crypto" is not supported。和 undici 同样保留为运行时外部依赖。
   "node-forge",

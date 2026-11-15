@@ -99,6 +99,7 @@ import {
   resolveOffPeakDispatchKind,
 } from "./offPeakDispatchPlan.js";
 import {
+  CREDENTIAL_KEY_SHARE_UNAVAILABLE_ERROR_CODE,
   HostMessageTypes,
   HostResponseTypes,
   formatLogPrefix,
@@ -131,6 +132,7 @@ import {
   REMOTE_BIND_CANCELED_ERROR_CODE,
   REMOTE_WORKSPACE_BIND_SESSION_MISSING_ERROR_CODE,
 } from "@zcode/shared";
+import { createCredentialCipherBridge } from "@zcode/shared/credential-security";
 import {
   parseHostIncomingMessageEvent,
   rejectUnavailableAttachedServicePort,
@@ -243,6 +245,10 @@ const remoteMediaRangePreviewEnabled =
   process.env["KAYINGCODE_REMOTE_MEDIA_RANGE_PREVIEW_ENABLED"] !== "0";
 
 const { parentPort } = process;
+const credentialCipherBridge = createCredentialCipherBridge((request) => {
+  if (!parentPort) throw new Error("parentPort unavailable");
+  parentPort.postMessage({ type: HostResponseTypes.CredentialCipherRequest, ...request });
+});
 
 /** 插件 UI 沙箱登记：Host 只持有 pending 关联，真实沙箱由 main 的 WebContentsView 创建。 */
 const pluginSandboxRegistrationBridge = createPluginSandboxRegistrationBridge({
@@ -550,6 +556,37 @@ function authorizeLocalMediaPreviewPath(path: string): Promise<string> {
 
 // browser-use host↔main 桥：把 agent 的 browser 命令经 parentPort 转给 main（WebContentsView+CDP）。
 // parentPort 为空（不应发生于 host 进程）时 postToMain 抛错，bridge 自身返回 backend_unavailable。
+interface PendingCredentialKeyShare {
+  resolve: () => void;
+  reject: (error: Error) => void;
+}
+
+const pendingCredentialKeyShares = new Map<string, PendingCredentialKeyShare>();
+
+/**
+ * 数据存储路径切换复制完成后，请求 Main 把当前系统密钥登记到目标数据根。
+ * 只有 Main 访问系统库；失败时 reject，由设置服务中止切换。
+ */
+function shareCredentialKeyWithDataRoot(targetBaseDir: string): Promise<void> {
+  if (!parentPort) {
+    return Promise.reject(new Error("parentPort unavailable"));
+  }
+  const requestId = randomUUID();
+  return new Promise<void>((resolve, reject) => {
+    pendingCredentialKeyShares.set(requestId, { resolve, reject });
+    try {
+      parentPort.postMessage({
+        type: HostResponseTypes.CredentialKeyShareRequest,
+        requestId,
+        targetBaseDir,
+      });
+    } catch (error) {
+      pendingCredentialKeyShares.delete(requestId);
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
+}
+
 const browserControlMainBridge = createBrowserControlMainBridge({
   postToMain: (message) => {
     if (!parentPort) {
@@ -3051,6 +3088,7 @@ function disposeHostResourcesBestEffort(reason: string): void {
 }
 
 process.once("SIGTERM", () => {
+  credentialCipherBridge.dispose();
   void disposeHostResources("SIGTERM").then(
     (result) => process.exit(result.exitCode),
     () => process.exit(1),
@@ -3058,6 +3096,7 @@ process.once("SIGTERM", () => {
 });
 
 process.once("SIGINT", () => {
+  credentialCipherBridge.dispose();
   void disposeHostResources("SIGINT").then(
     (result) => process.exit(result.exitCode),
     () => process.exit(1),
@@ -3065,11 +3104,13 @@ process.once("SIGINT", () => {
 });
 
 process.once("disconnect", () => {
+  credentialCipherBridge.dispose();
   // parent IPC 消失后不会再有人发送 Dispose；有界清理结束后必须明确退出，避免 Host 常驻。
   void disposeHostResources("disconnect").finally(() => process.exit(1));
 });
 
 process.once("exit", () => {
+  credentialCipherBridge.dispose();
   disposeHostResourcesBestEffort("exit");
 });
 
@@ -3123,6 +3164,27 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
 
   const msg = result.data;
   const port = e.ports[0];
+  // 私有凭据回复先结束等待；其余消息继续走原 port 守卫。
+  if (msg.type === HostMessageTypes.CredentialCipherResult) {
+    const { type: _type, ...reply } = msg;
+    credentialCipherBridge.receive(reply);
+    return;
+  }
+  if (msg.type === HostMessageTypes.CredentialKeyShareResult) {
+    const pending = pendingCredentialKeyShares.get(msg.requestId);
+    if (!pending) return;
+    pendingCredentialKeyShares.delete(msg.requestId);
+    if (msg.ok) {
+      pending.resolve();
+    } else {
+      pending.reject(
+        Object.assign(new Error("System credential storage is unavailable"), {
+          code: msg.errorCode ?? CREDENTIAL_KEY_SHARE_UNAVAILABLE_ERROR_CODE,
+        }),
+      );
+    }
+    return;
+  }
   // 采集开关与沙箱登记结果都不携带 MessagePort，必须在 port 守卫之前消费。
   if (msg.type === HostMessageTypes.NetworkCapture) {
     hostNetworkCapture.setCaptureId(msg.control.captureId);
@@ -3845,7 +3907,7 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
         // 旧 Team 补组织必须与网络代理读取共用同一个 Setting 实例及写队列。
         // 只注入 service 会跳过默认装配分支，导致缺组织的升级用户永远无法恢复连接。
         const { service: settingService, prepareLegacyAccountConnections } =
-          createSettingServiceWithMigrations();
+          createSettingServiceWithMigrations({ shareCredentialKeyWithDataRoot });
         const hostApiNetworkTransport = createHostApiNetworkTransport(async () => {
           const settings = await settingService.get();
           return {
@@ -3860,6 +3922,7 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
           establishOwner: () => {
             const initializedServices = createLocalServices({
               parentPort,
+              credentialCipherProvider: credentialCipherBridge.cipher,
               settingService,
               prepareLegacyAccountConnections,
               hostApiNetworkTransport,

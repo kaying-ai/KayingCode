@@ -58,6 +58,51 @@ import {
 import { wslUserSchema } from "./wslUserValidation.js";
 import { legacyKayingCodeProviderSchema } from "./kayingcode-agent-policy.js";
 
+export const CREDENTIAL_PLAINTEXT_MAX_BYTES = 1_048_576;
+// UTF-8 明文经过 Base64 后会膨胀；保留 IV、tag、版本和指纹的固定开销。
+export const CREDENTIAL_CIPHERTEXT_MAX_CHARS =
+  Math.ceil(CREDENTIAL_PLAINTEXT_MAX_BYTES / 3) * 4 + 128;
+export const credentialPlaintextSchema = z
+  .string()
+  .max(CREDENTIAL_PLAINTEXT_MAX_BYTES)
+  .refine(
+    (value) => new TextEncoder().encode(value).byteLength <= CREDENTIAL_PLAINTEXT_MAX_BYTES,
+    "Credential plaintext exceeds the UTF-8 byte limit",
+  );
+export const credentialCiphertextSchema = z.string().max(CREDENTIAL_CIPHERTEXT_MAX_CHARS);
+export const credentialCipherRequestSchema = z
+  .object({
+    requestId: z.string().uuid(),
+    operation: z.enum(["encrypt", "decrypt"]),
+    value: credentialCiphertextSchema,
+  })
+  .strict()
+  .superRefine((request, ctx) => {
+    if (
+      request.operation === "encrypt" &&
+      !credentialPlaintextSchema.safeParse(request.value).success
+    )
+      ctx.addIssue({
+        code: "custom",
+        path: ["value"],
+        message: "Credential plaintext exceeds the UTF-8 byte limit",
+      });
+  });
+export const credentialCipherResultSchema = z.discriminatedUnion("ok", [
+  z.object({ ok: z.literal(true), value: credentialCiphertextSchema }).strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      error: z.object({ code: z.string(), message: z.string() }).strict(),
+    })
+    .strict(),
+]);
+export const credentialCipherReplySchema = z
+  .object({ requestId: z.string().uuid(), result: credentialCipherResultSchema })
+  .strict();
+export type CredentialCipherRequest = z.infer<typeof credentialCipherRequestSchema>;
+export type CredentialCipherReply = z.infer<typeof credentialCipherReplySchema>;
+
 export {
   appSettingsOccupationEnum,
   appSettingsPatchSchema,
@@ -962,6 +1007,41 @@ export const hostBrowserExecuteResultMessageSchema = z.object({
   result: browserCommandResultSchema,
 });
 
+export const hostCredentialCipherResultMessageSchema = credentialCipherReplySchema
+  .extend({
+    type: z.literal("credential-cipher-result"),
+  })
+  .strict();
+
+export const hostCredentialCipherRequestResponseSchema = credentialCipherRequestSchema
+  .safeExtend({
+    type: z.literal("credential-cipher-request"),
+  })
+  .strict();
+
+/** 目标数据根路径上限：覆盖 Windows 长路径，同时限制私有通道载荷。 */
+const CREDENTIAL_KEY_SHARE_TARGET_MAX_CHARS = 32_767;
+export const CREDENTIAL_KEY_SHARE_UNAVAILABLE_ERROR_CODE = "CREDENTIAL_SECURE_STORAGE_UNAVAILABLE";
+
+// Host → Main：数据存储路径切换后请求登记系统密钥。路径保持原值，不做 trim 等改写。
+export const hostCredentialKeyShareRequestResponseSchema = z
+  .object({
+    type: z.literal("credential-key-share-request"),
+    requestId: z.string().uuid(),
+    targetBaseDir: z.string().min(1).max(CREDENTIAL_KEY_SHARE_TARGET_MAX_CHARS),
+  })
+  .strict();
+
+// Main → Host：登记结果。失败只返回受控错误码，原生异常不穿过通道。
+export const hostCredentialKeyShareResultMessageSchema = z
+  .object({
+    type: z.literal("credential-key-share-result"),
+    requestId: z.string().uuid(),
+    ok: z.boolean(),
+    errorCode: z.literal(CREDENTIAL_KEY_SHARE_UNAVAILABLE_ERROR_CODE).optional(),
+  })
+  .strict();
+
 export const hostLocalMediaPreviewPathAuthorizeResultMessageSchema = z
   .object({
     type: z.literal("local-media-preview-path-authorize-result"),
@@ -1140,6 +1220,8 @@ export const hostIncomingMessageSchema = z.discriminatedUnion("type", [
   hostCronRunMessageSchema,
   hostOffPeakRunMessageSchema,
   hostBrowserExecuteResultMessageSchema,
+  hostCredentialCipherResultMessageSchema,
+  hostCredentialKeyShareResultMessageSchema,
   hostLocalMediaPreviewPathAuthorizeResultMessageSchema,
   hostPluginSandboxRegisterResultMessageSchema,
   hostCuaPipFocusChangedMessageSchema,
@@ -1643,7 +1725,10 @@ export const hostPluginSandboxRegisterRequestResponseSchema = z
   .refine(
     (value) =>
       value.contentKind === "gen-ui"
-        ? Boolean(value.sessionId) && !value.pluginId && !value.serverName && !value.permissions?.length
+        ? Boolean(value.sessionId) &&
+          !value.pluginId &&
+          !value.serverName &&
+          !value.permissions?.length
         : value.contentKind === "extension"
           ? !value.sessionId &&
             Boolean(value.pluginId) &&
@@ -1773,6 +1858,8 @@ export const hostResponseMessageSchema = z.discriminatedUnion("type", [
   hostSessionMessageDeliverResultResponseSchema,
   hostFeedbackLogArchiveRequestResponseSchema,
   hostBrowserExecuteRequestResponseSchema,
+  hostCredentialCipherRequestResponseSchema,
+  hostCredentialKeyShareRequestResponseSchema,
   hostLocalMediaPreviewPathAuthorizeRequestResponseSchema,
   hostPluginSandboxRegisterRequestResponseSchema,
   hostNetworkTelemetryBatchResponseSchema,

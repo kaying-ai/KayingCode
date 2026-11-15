@@ -19,6 +19,7 @@ import {
   type AppSettings,
   type ProviderProvisioningSourceTrigger,
 } from "@zcode/shared";
+import type { CredentialCipher } from "@zcode/shared/credential-security";
 
 export {
   materializeKayingCodeBuiltinProviderConfig,
@@ -664,6 +665,8 @@ export function createLocalServices(options: {
   onProviderProvisioningSourceChanged?: (trigger: ProviderProvisioningSourceTrigger) => void;
   serviceAuthorityMode?: ServiceAuthorityMode;
   projectStorageHostId?: string;
+  /** Desktop Main / Host 注入的系统凭据 cipher；缺省时按当前凭据路径惰性创建。 */
+  credentialCipherProvider?: CredentialCipher;
   /** Host 进程内把 App 会话控制 facade 交给扩展网关；不注册进 ServiceCollection。 */
   onAppControlServiceCreated?: (handle: AppControlServiceHandle) => void;
   /** 会话导航 owner 注入；缺席时会话控制明确返回 unavailable。 */
@@ -756,6 +759,7 @@ export function createLocalServices(options: {
     });
   const provisioningOAuthKeys = new Set<string>(PROVIDER_PROVISIONING_OAUTH_CREDENTIAL_KEYS);
   const credentialService = createCredentialService({
+    cipherProvider: options.credentialCipherProvider,
     onDidMutate: ({ key }) => {
       if (provisioningOAuthKeys.has(key) || isProviderProvisioningAccountCredentialKey(key)) {
         options.onProviderProvisioningSourceChanged?.("credential");
@@ -927,6 +931,7 @@ export function createLocalServices(options: {
     settingService,
     credentialFilePath: resolveCredentialFilePath(resolveAppConfigDir()),
     personalConfigFilePath: join(resolveAppConfigDir(), PERSONAL_PROVIDER_CONFIG_FILE_NAME),
+    cipherProvider: options.credentialCipherProvider,
   });
   const providerProvisioningDisposers = [
     providerConfigRuntime.configService.onDidChange((reason) => {
@@ -1089,6 +1094,7 @@ export function createLocalServices(options: {
   let appControlServiceForAgent: AppControlService | undefined;
   const kayingcodeAgentService = createKayingCodeAgentService({
     resolveAppControlService: () => appControlServiceForAgent,
+    credentialCipherProvider: options?.credentialCipherProvider,
     appControlSourceServerId: options?.projectStorageHostId ?? "local",
     // 新会话创建前原子预留项目归属：Host 是唯一写库方，CLI 只拿到稳定 sessionId
     // 与固化目录；预留失败直接冒泡，不能把项目任务降级成无归属会话。

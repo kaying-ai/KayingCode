@@ -1,16 +1,13 @@
-import { existsSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { atomicWritePrivateTextFile, backupCorruptFile, withFileLock } from "@zcode/shared/node";
-import { createKayingCodeCredentialCipher, type KayingCodeCredentialCipher } from "./credential-cipher.js";
+import { createSystemCredentialCipher } from "@zcode/shared/credential-security";
+import type { KayingCodeCredentialCipher } from "./credential-cipher.js";
 
 const KAYINGCODE_DATA_BASE_DIR_ENV_KEY = "KAYINGCODE_DATA_BASE_DIR";
 const ZAI_PROVIDER_ID = "zai";
-const credentialChangeListeners = new Map<
-  string,
-  Set<() => void | Promise<void>>
->();
+const credentialChangeListeners = new Map<string, Set<() => void | Promise<void>>>();
 
 export const SHARED_KAYINGCODE_CREDENTIAL_KEYS = {
   activeProvider: "oauth:active_provider",
@@ -70,7 +67,7 @@ export function createSharedKayingCodeCredentialStore(
 ): SharedKayingCodeCredentialStore {
   const env = options.env ?? process.env;
   const filePath = resolveSharedKayingCodeCredentialsPath(options);
-  const cipher = options.cipher ?? createKayingCodeCredentialCipher({ env });
+  const cipher = options.cipher ?? createSystemCredentialCipher({ env, filePath });
 
   return {
     filePath,
@@ -78,7 +75,7 @@ export function createSharedKayingCodeCredentialStore(
     async clearZaiLoginCredentials(): Promise<void> {
       await mutateRawCredentialRecord(filePath, async (rawCredentials) => {
         const activeProviderRaw = rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.activeProvider];
-        const activeProvider = activeProviderRaw ? cipher.decrypt(activeProviderRaw) : null;
+        const activeProvider = activeProviderRaw ? await cipher.decrypt(activeProviderRaw) : null;
         delete rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.zaiAccessToken];
         delete rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.zaiRefreshToken];
         delete rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.zaiUserInfo];
@@ -100,11 +97,11 @@ export function createSharedKayingCodeCredentialStore(
       const validatedKey = validateCredentialKey(key);
       const validatedExpectedValue = validateCredentialValue(expectedValue);
       let deleted = false;
-      await mutateRawCredentialRecord(filePath, (rawCredentials) => {
+      await mutateRawCredentialRecord(filePath, async (rawCredentials) => {
         const encryptedValue = rawCredentials[validatedKey];
         if (
           encryptedValue === undefined ||
-          cipher.decrypt(encryptedValue) !== validatedExpectedValue
+          (await cipher.decrypt(encryptedValue)) !== validatedExpectedValue
         ) {
           return;
         }
@@ -122,11 +119,12 @@ export function createSharedKayingCodeCredentialStore(
       );
       if (validatedEntries.length === 0) return {};
       const deleted: Record<string, boolean> = {};
-      await mutateRawCredentialRecord(filePath, (rawCredentials) => {
+      await mutateRawCredentialRecord(filePath, async (rawCredentials) => {
         for (const [key, expectedValue] of validatedEntries) {
           const encryptedValue = rawCredentials[key];
           const matches =
-            encryptedValue !== undefined && cipher.decrypt(encryptedValue) === expectedValue;
+            encryptedValue !== undefined &&
+            (await cipher.decrypt(encryptedValue)) === expectedValue;
           deleted[key] = matches;
           if (matches) delete rawCredentials[key];
         }
@@ -150,11 +148,11 @@ export function createSharedKayingCodeCredentialStore(
       const validatedExpectedValue = validateCredentialValue(expectedGuardValue);
       const validatedKeys = keysToDelete.map(validateCredentialKey);
       let deleted = false;
-      await mutateRawCredentialRecord(filePath, (rawCredentials) => {
+      await mutateRawCredentialRecord(filePath, async (rawCredentials) => {
         const encryptedGuard = rawCredentials[validatedGuardKey];
         if (
           encryptedGuard === undefined ||
-          cipher.decrypt(encryptedGuard) !== validatedExpectedValue
+          (await cipher.decrypt(encryptedGuard)) !== validatedExpectedValue
         ) {
           return;
         }
@@ -170,17 +168,19 @@ export function createSharedKayingCodeCredentialStore(
       if (rawValue === undefined) {
         return null;
       }
-      return cipher.decrypt(rawValue);
+      return await cipher.decrypt(rawValue);
     },
 
     async loadMany(keys: readonly string[]): Promise<Record<string, string | null>> {
       const validatedKeys = keys.map(validateCredentialKey);
       const rawCredentials = await readRawCredentialRecord(filePath);
       return Object.fromEntries(
-        validatedKeys.map((key) => {
-          const rawValue = rawCredentials[key];
-          return [key, rawValue === undefined ? null : cipher.decrypt(rawValue)];
-        }),
+        await Promise.all(
+          validatedKeys.map(async (key) => {
+            const rawValue = rawCredentials[key];
+            return [key, rawValue === undefined ? null : await cipher.decrypt(rawValue)] as const;
+          }),
+        ),
       );
     },
 
@@ -199,16 +199,21 @@ export function createSharedKayingCodeCredentialStore(
 
     async save(key: string, value: string): Promise<void> {
       const validatedKey = validateCredentialKey(key);
-      const encryptedValue = cipher.encrypt(validateCredentialValue(value));
+      const encryptedValue = await cipher.encrypt(validateCredentialValue(value));
       await mutateRawCredentialRecord(filePath, (rawCredentials) => {
         rawCredentials[validatedKey] = encryptedValue;
       });
     },
 
     async saveMany(entries: Readonly<Record<string, string>>): Promise<void> {
-      const encryptedEntries = Object.entries(entries).map(
-        ([key, value]) =>
-          [validateCredentialKey(key), cipher.encrypt(validateCredentialValue(value))] as const,
+      const encryptedEntries = await Promise.all(
+        Object.entries(entries).map(
+          async ([key, value]) =>
+            [
+              validateCredentialKey(key),
+              await cipher.encrypt(validateCredentialValue(value)),
+            ] as const,
+        ),
       );
       await mutateRawCredentialRecord(filePath, (rawCredentials) => {
         for (const [key, encryptedValue] of encryptedEntries) {
@@ -223,7 +228,7 @@ export function createSharedKayingCodeCredentialStore(
       replacedKeys: readonly string[],
     ): Promise<void> {
       const validatedKey = validateCredentialKey(key);
-      const encryptedValue = cipher.encrypt(validateCredentialValue(value));
+      const encryptedValue = await cipher.encrypt(validateCredentialValue(value));
       const validatedReplacedKeys = replacedKeys.map(validateCredentialKey);
       await mutateRawCredentialRecord(filePath, (rawCredentials) => {
         rawCredentials[validatedKey] = encryptedValue;
@@ -234,47 +239,25 @@ export function createSharedKayingCodeCredentialStore(
     },
 
     async saveZaiLoginCredentials(payload: ZaiLoginCredentialPayload): Promise<void> {
-      const encryptedCredentials = {
-        activeProvider: cipher.encrypt(ZAI_PROVIDER_ID),
-        accessToken: cipher.encrypt(validateCredentialValue(payload.accessToken)),
-        jwtToken: cipher.encrypt(validateCredentialValue(payload.jwtToken)),
-        userInfo: cipher.encrypt(JSON.stringify(payload.user)),
-      };
+      const [activeProvider, accessToken, jwtToken, userInfo] = await Promise.all([
+        cipher.encrypt(ZAI_PROVIDER_ID),
+        cipher.encrypt(validateCredentialValue(payload.accessToken)),
+        cipher.encrypt(validateCredentialValue(payload.jwtToken)),
+        cipher.encrypt(JSON.stringify(payload.user)),
+      ]);
+      const encryptedCredentials = { activeProvider, accessToken, jwtToken, userInfo };
       await mutateRawCredentialRecord(filePath, (rawCredentials) => {
         rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.activeProvider] =
           encryptedCredentials.activeProvider;
         rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.zaiAccessToken] =
           encryptedCredentials.accessToken;
-        rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.kayingcodeJwtToken] = encryptedCredentials.jwtToken;
-        rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.zaiUserInfo] = encryptedCredentials.userInfo;
+        rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.kayingcodeJwtToken] =
+          encryptedCredentials.jwtToken;
+        rawCredentials[SHARED_KAYINGCODE_CREDENTIAL_KEYS.zaiUserInfo] =
+          encryptedCredentials.userInfo;
       });
     },
   };
-}
-
-export function loadSharedKayingCodeCredentialSync(
-  key: string,
-  options: SharedKayingCodeCredentialStoreOptions = {},
-): string | undefined {
-  const filePath = resolveSharedKayingCodeCredentialsPath(options);
-  if (!existsSync(filePath)) {
-    return undefined;
-  }
-
-  try {
-    const raw = readFileSync(filePath, "utf-8");
-    const parsed = JSON.parse(raw);
-    const record = parseCredentialRecord(parsed);
-    const rawValue = record[validateCredentialKey(key)];
-    if (rawValue === undefined) {
-      return undefined;
-    }
-    const cipher = options.cipher ?? createKayingCodeCredentialCipher({ env: options.env });
-    const decrypted = cipher.decrypt(rawValue);
-    return decrypted.trim().length > 0 ? decrypted : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 export function resolveSharedKayingCodeCredentialsPath(

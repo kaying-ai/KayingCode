@@ -62,7 +62,7 @@ describe("项目位置缓存局部恢复", () => {
       key.startsWith("project-key-location:v1:"),
     );
     expect(locationKey).toBeDefined();
-    expect(healthy[locationKey!]).toMatch(/^enc:v1:/);
+    expect(healthy[locationKey!]).toMatch(/^enc:v[12]:/);
     expect(healthy[locationKey!]).not.toBe("enc:v1:broken-project-location");
     expect((await status()).loginCompletions).toBe(0);
 

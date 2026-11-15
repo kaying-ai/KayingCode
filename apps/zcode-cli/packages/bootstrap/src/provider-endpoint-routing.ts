@@ -2,6 +2,7 @@ import { createConfig, type ConfigResult } from "@zcode/adapters/config";
 import {
   createSharedKayingCodeCredentialStore,
   SHARED_KAYINGCODE_CREDENTIAL_KEYS,
+  type SharedKayingCodeCredentialStore,
 } from "@zcode/adapters/auth";
 import { createNodeHttpClientAdapter } from "@zcode/adapters/http";
 import { createProviderEndpointRoutingPort } from "@zcode/adapters/model";
@@ -17,6 +18,8 @@ type NetworkConfig = ConfigResult["config"]["network"];
 
 export interface ResolveProcessProviderEndpointRoutingPortOptions {
   appVersion?: string;
+  /** 内置 CLI 注入委托 Host 的凭据存储；缺省时独立 CLI/Server 使用本机系统存储。 */
+  credentialStore?: SharedKayingCodeCredentialStore;
   env?: NodeJS.ProcessEnv;
   logger: Logger;
   network: NetworkConfig;
@@ -45,7 +48,7 @@ export function resolveProcessProviderEndpointRoutingPort(
     return existing;
   }
 
-  const credentialStore = createSharedKayingCodeCredentialStore({ env });
+  const credentialStore = options.credentialStore ?? createSharedKayingCodeCredentialStore({ env });
 
   const port = createProviderEndpointRoutingPort({
     appVersion: options.appVersion,
@@ -59,7 +62,8 @@ export function resolveProcessProviderEndpointRoutingPort(
     logger: options.logger.child({
       module: "adapters.model.provider_endpoint_routing",
     }),
-    readKayingCodeJwt: () => credentialStore.load(SHARED_KAYINGCODE_CREDENTIAL_KEYS.kayingcodeJwtToken),
+    readKayingCodeJwt: () =>
+      credentialStore.load(SHARED_KAYINGCODE_CREDENTIAL_KEYS.kayingcodeJwtToken),
     sourceHeaders: () =>
       createProviderEndpointRoutingSourceHeaders({
         appVersion: options.appVersion,

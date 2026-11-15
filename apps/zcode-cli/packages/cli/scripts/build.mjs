@@ -14,7 +14,13 @@ const executableFileMode = 0o755;
 const packageJsonFile = "package.json";
 const rootPackageVersionError = "Root package.json must define a non-empty string version.";
 const desktopAgentBuildFlag = "--desktop-agent";
-export const resolveBuildExternal = () => ["@zcode/tui", "playwright-core", "koffi"];
+export const resolveBuildExternal = () => [
+  "@zcode/tui",
+  "playwright-core",
+  "koffi",
+  // NAPI 系统凭据库必须保留动态加载；SEA 无原生模块时由显式环境/私有密钥文件兜底。
+  "@napi-rs/keyring",
+];
 
 export const readZodBuildVersion = async () => {
   const sharedPackage = JSON.parse(
@@ -233,6 +239,10 @@ export const resolveBuildAliases = ({
   ),
   "@zcode/shared/test-ids": resolve(rootDirectory, "packages/shared/src/test-ids.ts"),
   "@zcode/shared/node": resolve(rootDirectory, "packages/shared/src/node.ts"),
+  "@zcode/shared/credential-security": resolve(
+    rootDirectory,
+    "packages/shared/src/credential-security/module.ts",
+  ),
   "@zcode/shared": resolve(rootDirectory, "packages/shared/src/index.ts"),
   "@zcode/core": resolve(rootDirectory, "apps/zcode-cli/packages/core/dist/index.js"),
 });

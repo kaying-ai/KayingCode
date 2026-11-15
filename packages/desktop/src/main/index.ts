@@ -194,6 +194,7 @@ import {
   shouldUseElectronDefaultUserDataPath,
 } from "./desktopRuntimeEnv.js";
 import {
+  credentialCipher,
   disposeHostProcess,
   disposeHostProcessAndWait,
   listDisposingHostProcesses,
@@ -279,6 +280,7 @@ import {
   setActiveEmbeddedBrowserPermissionUiBridge,
 } from "./embeddedBrowserPermissionUiBridge.js";
 import { mapKayingCodeEnvToArmsRumEnv } from "@zcode/shared";
+import { enablePrivateFileKeyFallback } from "@zcode/shared/credential-security";
 import {
   findWindowsProcessesReferencingResourceMarkers,
   probeWindowsPackagedResourceWritable,
@@ -293,6 +295,17 @@ import {
   getPluginSandboxHost,
   installPluginSandboxHost,
 } from "./pluginSandbox/index.js";
+
+// Linux Desktop 没有 Secret Service 时允许凭据目录落到同目录 0600 私有密钥；
+// 该决策必须早于任何凭据访问，开启失败说明已有密钥加载结果，本进程保持系统库规则。
+if (process.platform === "linux") {
+  const fallbackEnabled = enablePrivateFileKeyFallback({
+    onFallback: () => logger.warn("[credential] Linux 系统凭据库不可用，已改用私有文件密钥"),
+  });
+  if (!fallbackEnabled) {
+    logger.warn("[credential] 凭据已在回退开启前被访问，本次进程保持系统凭据库规则");
+  }
+}
 
 registerLocalMediaPreviewScheme(protocol, [
   PLUGIN_SANDBOX_PRIVILEGED_SCHEME,
@@ -733,10 +746,14 @@ let extensionHostSupervisor: ReturnType<typeof createExtensionHostSupervisor> | 
       };
     },
   });
-const webRemoteControlCredentialService = createCredentialService();
+const webRemoteControlCredentialService = createCredentialService({
+  cipherProvider: credentialCipher,
+});
 const appLaunchGate = createAppLaunchGate();
 const appLaunchCoordinator = createAppLaunchCoordinator(appLaunchGate);
-const appTelemetryCredentialService = createCredentialService();
+const appTelemetryCredentialService = createCredentialService({
+  cipherProvider: credentialCipher,
+});
 async function resolveCurrentKayingCodeEndpointOrigin() {
   return resolveKayingCodeEndpointOrigin({
     env: KAYINGCODE_ENV,

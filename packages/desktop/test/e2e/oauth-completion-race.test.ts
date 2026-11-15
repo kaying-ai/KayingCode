@@ -1,7 +1,7 @@
-import { createDecipheriv, createHash } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { PlatformChannels } from "@zcode/shared";
+import { createSystemCredentialCipher } from "@zcode/shared/credential-security";
 import {
   TID_OAUTH_LOGIN_BUTTON,
   TID_OAUTH_ERROR,
@@ -192,25 +192,15 @@ describe("OAuth 双路径完成竞态", () => {
 });
 
 async function readCredentials(): Promise<Record<string, string>> {
-  const stored = JSON.parse(await readFile(getE2EAppDataPaths().credentialsFile, "utf8")) as Record<
-    string,
-    string
-  >;
-  // Host 正常加密落盘；这里只用 case 专属合成密钥读取隔离目录，不能把密文当登录值断言。
-  const key = createHash("sha256").update("oauth-completion-race-fixture").digest();
+  const credentialsFile = getE2EAppDataPaths().credentialsFile;
+  const stored = JSON.parse(await readFile(credentialsFile, "utf8")) as Record<string, string>;
+  // 产品写入可能来自 OS 钥匙串或显式测试密钥；测试只读取隔离数据根，不把密文当登录值断言。
+  const cipher = createSystemCredentialCipher({ filePath: credentialsFile });
   return Object.fromEntries(
-    Object.entries(stored).map(([name, value]) => {
-      if (!value.startsWith("enc:v1:")) return [name, value];
-      const [iv, tag, data] = value.slice("enc:v1:".length).split(".");
-      const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(iv!, "base64url"));
-      decipher.setAuthTag(Buffer.from(tag!, "base64url"));
-      return [
-        name,
-        Buffer.concat([
-          decipher.update(Buffer.from(data!, "base64url")),
-          decipher.final(),
-        ]).toString("utf8"),
-      ];
-    }),
+    await Promise.all(
+      Object.entries(stored).map(
+        async ([name, value]) => [name, await cipher.decrypt(value)] as const,
+      ),
+    ),
   );
 }

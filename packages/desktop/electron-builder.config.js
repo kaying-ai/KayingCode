@@ -531,6 +531,8 @@ export default {
     // node-pty 的 target prebuild 还包含 spawn-helper / winpty-agent.exe 等辅助可执行文件，
     // 整个目标目录必须 unpack；其他平台目录已由 files 规则裁剪。
     `node_modules/node-pty/prebuilds/${targetPlatform.key}/**`,
+    // 系统凭据库是 NAPI 原生模块，必须从 asar 解包后才能加载；非目标平台变体由 native policy 裁剪。
+    "node_modules/@napi-rs/keyring-*/**/*.node",
   ],
   beforePack: async (context) => {
     runTimedSync("beforePack:restoreTargetNodePtyPrebuild", () =>

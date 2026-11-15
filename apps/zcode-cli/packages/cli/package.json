@@ -38,6 +38,7 @@
     "format:check": "oxfmt --check package.json \"src/**/*.ts\" \"scripts/**/*.mjs\""
   },
   "dependencies": {
+    "@napi-rs/keyring": "2.1.2",
     "@zcode/adapters": "workspace:*",
     "@zcode/bootstrap": "workspace:*",
     "@zcode/contracts": "workspace:*",

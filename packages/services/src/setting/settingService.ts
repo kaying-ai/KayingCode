@@ -237,7 +237,12 @@ export function createSettingService(): ISettingService {
 }
 
 /** Host 私有迁移入口，不加入 Setting RPC；普通 get/update 从不等待 OAuth 查询。 */
-export function createSettingServiceWithMigrations(): {
+export function createSettingServiceWithMigrations(
+  options: {
+    /** Desktop Host 请求 Main 把当前系统凭据密钥登记到目标数据根；失败会中止切换。 */
+    shareCredentialKeyWithDataRoot?: (targetBaseDir: string) => Promise<void>;
+  } = {},
+): {
   service: ISettingService;
   prepareLegacyAccountConnections: (
     resolveOrganization: (connection: LegacyTeamConnection) => Promise<string | null>,
@@ -356,6 +361,9 @@ export function createSettingServiceWithMigrations(): {
       if (currentBaseDir !== targetBaseDir) {
         log("copying data directory from", currentBaseDir, "to", targetBaseDir);
         await copyDataDirectory(currentBaseDir, targetBaseDir);
+        // 系统钥匙串条目按凭据文件路径区分；复制完成后必须先把旧密钥登记到新路径，
+        // 否则切换后既有密文既解不开、也无法重新登录。
+        await options.shareCredentialKeyWithDataRoot?.(targetBaseDir);
         log("data directory copy done");
       }
 
