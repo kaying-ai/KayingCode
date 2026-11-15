@@ -360,4 +360,4 @@ In maintainer clones, `origin` points to GitHub and `upstream` points to officia
 
 The `zcode-main` mirror contains the original ZCode source and docs. To review upstream changes, add the official remote once with `git remote add --no-tags -t main upstream https://github.com/zai-org/ZCode.git` and run `git fetch --no-tags upstream`. [Original ZCode docs](https://github.com/kaying-ai/KayingCode/tree/zcode-main/docs)
 
-Start an adoption branch from the synced product `main`, such as `adopt-zcode-3-17-2`. Compare `UPSTREAM_BASE.json.commit` with `upstream/main`, adapt and test changes by module, and open a PR against product `main`. Advance the recorded base after all target changes have been reviewed and validated. KayingCode manages its product version independently.
+Start an adoption branch from the synced product `main`, such as `adopt-zcode-3-18-2`. Compare `UPSTREAM_BASE.json.commit` with `upstream/main`, adapt and test changes by module, and open a PR against product `main`. Advance the recorded base after all target changes have been reviewed and validated. KayingCode manages its product version independently.

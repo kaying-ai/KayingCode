@@ -343,3 +343,10 @@
 - 回归：serverCore **5/5**、rollback guard **2/2**、server packaging **41/41（1 skipped）**；shared prepare **1/1**（合计 cipher/bridge 13/13）。
 - 验证：根 typecheck、lint（0 errors/133 既有 warnings）、source:check、architecture:check --changed 通过。
 - 未执行：真实 Linux 无 Secret Service 远端部署与 daemon 换代需要远端/容器环境；`UPSTREAM_BASE` 仍保持 3.17.2。
+
+第二十三批（2026-11-15，mobile web 3.18.2 pin 与采纳基线）：
+
+- `packages/web/upstream-web.json` 从 `a9fe401e`（3.17.2）切到 `fec97590`（3.18.2）；`stage-upstream-web` 重新导出并应用既有 auth 覆盖、品牌、mobile webview 与 workspace identity 补丁。
+- `pnpm --filter @zcode/web run build:upstream` 通过，产出 manifest 的 upstream 为 3.18.2；`@zcode/web` 测试 **15/15**。
+- `UPSTREAM_BASE.json` 更新为 `fec97590` / 3.18.2 / `syncedAt=2026-11-15`；P0–P5、凭据 enc:v2 与本轮 mobile web pin 均已验收，明确不采纳项继续记录在 F 节。
+- 后续上游差异从 3.18.2 基线开始比较；context-composition 完整接线、voice-input 等仍按 F 节边界单独评估。
