@@ -123,6 +123,8 @@ export interface RegularTurnLoopState {
   /** 工具批次结算时本轮已被停止；决定中断标记用工具阶段的文字。 */
   interruptedDuringToolBatch?: boolean;
   reactiveCompactAttemptedInCurrentModelStep: boolean;
+  /** 本轮输入是否来自插件发现 UI；只在插件发现入口为 true。 */
+  pluginDiscoveryUi?: boolean;
   repeatedToolCallSignature?: string;
   repeatedToolCallStreakCount: number;
   pendingStreamRecoveryRequest?: PendingStreamRecoveryRequest;

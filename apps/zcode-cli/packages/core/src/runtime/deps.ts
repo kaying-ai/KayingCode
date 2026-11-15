@@ -158,6 +158,7 @@ export type {
   ModelInputMessage,
   ModelInputFormat,
   ModelReasoningContentBlock,
+  ModelTextContentBlock,
   ModelToolCall,
   ModelToolContract,
   ModelUsage,

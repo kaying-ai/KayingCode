@@ -83,8 +83,8 @@
 | 1a | 已采纳 | instruction-files 基础：结构化文件模型、完整/增量渲染、旧公告解析；adapter 区分"文件不存在"与"读不出来"，读错误按 `user_instructions_read_failed` 诊断 |
 | 1b | 已采纳 | context_prefix 记录已公告文件、请求前增量公告、compaction 重读指令文件并在提交后应用；冷恢复/rewind 不再原位改写指令公告 |
 | 2 | 已采纳 | total-tokens 预算：主/子 agent system 末尾固定预算行；runtime 计数状态、轮首/工具批次/文本续接的提醒与用户输入重锚；compaction rollover，resume 重置 |
-| 3 | 待做 | context-composition：组成分类、协议方法、查询与变更通知 |
-| 4 | 待做 | blockIndex：块到达序号、请求排序、持久化与工具历史 |
+| 3 | 部分延后 | context-composition：开源树内只有闭源 App 客户端消费，当前接入无产品入口；本轮只保留 blockIndex 所需的类型占位，完整分类/协议/查询待 App 侧接入后再排期 |
+| 4 | 已采纳 | blockIndex：块到达序号贯穿流式/非流式、持久化、冷恢复与请求排序；服务端工具轮次、文字块不合并、旧消息保持旧布局；工具历史与读文件状态按序号排序 |
 
 ### F. 本轮明确不采纳
 
@@ -226,3 +226,14 @@
 - `steering` 的 drain 诊断增加 `userSteered`；system reminder 增加持久化来源 `total_tokens_reminder`。
 - 回归：`total-tokens-budget` 4/4；`runtime-context-announcements` 47/47；`runtime-tool-hook-context` 2/2；core 全量 **232/238**，仍为既有 6 个 Windows 环境失败。
 - 验证：contracts/adapters/core/bootstrap typecheck；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
+
+第十四批（2026-11-15，核心专项 4：blockIndex / assistant 块顺序）：
+
+- contracts：文本/思考/工具 part 增加 `blockIndex`，`SignedReasoningReset`、`isBlockIndex`、`sortByCompleteIndex` 与 `hasOrderedAssistantBlocks` 等契约辅助；工具 part 的旧 `declarationIndex` 只用于旧数据。
+- adapters：`orderedAssistantItems` 按 blockIndex 稳定排序并在请求中剥离序号；`orderGeneratedContent` 给非流式结果编号；推理历史归一化按签名拒绝与恢复标记重写；session-store 读取按 blockIndex 排序。
+- core：流式/非流式分配序号并落库；`message-history` 与冷恢复共用 `buildAssistantEntries`（文字块不合并、服务端工具切轮、usage 只在末轮）；请求投影按序输出；工具历史、读文件状态、provider 工具轮次按序号排序。
+- 冷恢复与 live 走同一构造入口；旧消息无序号时保持原有 layout。
+- 为类型对齐新增 `pluginDiscoveryUi` 占位字段（未接线，默认 false）；`model-status` 增加 Disposable 适配 `using`。
+- 明确未采纳：`recordRequestContextComposition*`（phase 3 延后），model.ts 不记录组成预演数据。
+- 回归：core `tool-history-order` 21 + `message-history` 9 新增通过；adapters `model-transform` 32 + `reasoning-history-normalization` 65 通过；core 全量 **262/268**，仍是既有 6 个 Windows 环境失败。
+- 验证：contracts/adapters/core/bootstrap/cli typecheck；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
