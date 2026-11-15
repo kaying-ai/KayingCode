@@ -13,7 +13,10 @@ import {
   resolveProductionPackageClosure,
   stageRelease,
 } from "../src/packaging/stage.js";
-import { assertNodePtyNativeMatchesJs } from "../src/packaging/stageDependencies.js";
+import {
+  assertNodePtyNativeMatchesJs,
+  isTargetSpecificPackage,
+} from "../src/packaging/stageDependencies.js";
 import { resolveHostTarCommand } from "../src/packaging/tarCommand.js";
 
 const execFileAsync = promisify(execFile);
@@ -126,6 +129,16 @@ describe("resolveProductionPackageClosure", () => {
       nodeModulesDir,
     );
     expect([...closure.keys()]).toEqual(["pkg-a"]);
+  });
+});
+
+describe("isTargetSpecificPackage", () => {
+  it("keeps only the target keyring native variant", () => {
+    expect(isTargetSpecificPackage("@napi-rs/keyring-linux-x64-gnu", "linux-x64")).toBe(true);
+    expect(isTargetSpecificPackage("@napi-rs/keyring-darwin-arm64", "linux-x64")).toBe(false);
+    expect(isTargetSpecificPackage("@napi-rs/keyring-win32-x64-msvc", "win32-x64")).toBe(true);
+    expect(isTargetSpecificPackage("@napi-rs/keyring-win32-arm64-msvc", "win32-x64")).toBe(false);
+    expect(isTargetSpecificPackage("@napi-rs/keyring", "linux-x64")).toBe(true);
   });
 });
 
@@ -287,8 +300,9 @@ describe("stageRelease", () => {
 
     const runtimePackageJson = JSON.parse(
       await readFile(join(releaseDir, "runtime", "package.json"), "utf8"),
-    ) as { type?: string };
+    ) as { type?: string; kayingcodeCredentialFormat?: number };
     expect(runtimePackageJson.type).toBe("module");
+    expect(runtimePackageJson.kayingcodeCredentialFormat).toBe(2);
 
     for (const relativePath of [
       "runtime/server-cli.js",

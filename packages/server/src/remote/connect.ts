@@ -388,5 +388,5 @@ function buildRemoteServerCommand(
       );
     }
   }
-  return `${envParts.join(" ")} ~/.kayingcode/server/node ~/.kayingcode/server/kayingcode-server.cjs`;
+  return `${envParts.join(" ")} ~/.kayingcode/server/node ~/.kayingcode/server/kayingcode-server.cjs --prepare-credentials`;
 }

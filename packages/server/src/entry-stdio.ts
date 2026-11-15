@@ -1,4 +1,6 @@
 import { disposeServiceResourcesAndWait, getAppConfigDir } from "@zcode/services/node";
+import { prepareServerCredentialStorage } from "@zcode/shared/credential-security";
+import { join } from "node:path";
 import {
   KAYINGCODE_VERSION,
   SERVICE_AUTHORITY_MODE_ENV,
@@ -57,11 +59,18 @@ async function main() {
   await ensureRemoteServerDeviceMid({ log });
 
   // Phase 3: Initialize services and start stdio RPC server
-  const kayingcodeBuiltinProviderConfigFilePath = await materializeBundledKayingCodeBuiltinProviderConfig({
-    environmentConfigRoot: getAppConfigDir(),
-    content: readBundledKayingCodeBuiltinProviderConfig(),
-  });
-  const { authorityModeParseResult, services } = createStdioServices({
+  const kayingcodeBuiltinProviderConfigFilePath =
+    await materializeBundledKayingCodeBuiltinProviderConfig({
+      environmentConfigRoot: getAppConfigDir(),
+      content: readBundledKayingCodeBuiltinProviderConfig(),
+    });
+  if (process.argv.includes("--prepare-credentials")) {
+    await prepareServerCredentialStorage({
+      filePath: join(getAppConfigDir(), "credentials.json"),
+      env: process.env,
+    });
+  }
+  const { authorityModeParseResult, services } = await createStdioServices({
     env: process.env,
     kayingcodeBuiltinProviderConfigFilePath,
   });

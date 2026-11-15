@@ -33,6 +33,7 @@ const ENV_KEYS = [
   "KAYINGCODE_SERVER_RUNTIME_ROOT",
   "KAYINGCODE_SERVER_RELEASE_ID",
   "KAYINGCODE_BUILTIN_PROVIDER_CONFIG_FILE",
+  "KAYINGCODE_SERVER_CREDENTIAL_FORMAT",
 ] as const;
 const PROCESS_EVENTS = ["message", "SIGTERM", "SIGINT"] as const;
 // 以通用 EventEmitter 视角操作 process，绕开 process.on/listeners 针对具体事件名的重载。
@@ -60,6 +61,7 @@ describe("runServerCore startup wiring", () => {
       listenersBefore.set(event, processEmitter.listeners(event));
     }
     process.env.KAYINGCODE_SERVER_ROOT = layout.serverRoot;
+    process.env.KAYINGCODE_SERVER_CREDENTIAL_FORMAT = "2";
     vi.stubGlobal("__KAYINGCODE_BUILTIN_PROVIDER_CONFIG_JSON__", '{"providers":{}}');
     materializeKayingCodeBuiltinProviderConfig.mockResolvedValue(materializedPath);
     createServerHostServices.mockResolvedValue({

@@ -20,6 +20,7 @@ import {
   type ProviderProvisioningSourceTrigger,
 } from "@zcode/shared";
 import type { CredentialCipher } from "@zcode/shared/credential-security";
+import { createServerCredentialCipher } from "@zcode/shared/credential-security";
 
 export {
   materializeKayingCodeBuiltinProviderConfig,
@@ -1790,6 +1791,8 @@ export async function createServerHostServices(options: {
   sourceServerId: string;
   kayingcodeBuiltinProviderConfigFilePath: string;
   providerProvisioningTargetEnabled?: boolean;
+  /** 旧 Supervisor 托管的候选 Core 注入 v1-only cipher；正常 Server 缺省使用系统/文件密钥。 */
+  credentialCipherProvider?: CredentialCipher;
 }) {
   const projectStorageHostId = remoteHostIdFromWorkspaceIdentity(
     buildServerRemoteWorkspaceIdentity({ serverId: options.sourceServerId, workspacePath: "/" }),
@@ -1823,7 +1826,13 @@ export async function createServerHostServices(options: {
     },
   });
   const migrationFailedPathCount = await workspaceAliasRepo.getFailedPathCount();
+  const credentialCipherProvider =
+    options.credentialCipherProvider ??
+    (await createServerCredentialCipher({
+      filePath: join(resolveAppConfigDir(), "credentials.json"),
+    }));
   const services = createLocalServices({
+    credentialCipherProvider,
     kayingcodeBuiltinProviderConfigFilePath: options.kayingcodeBuiltinProviderConfigFilePath,
     providerProvisioningTargetEnabled: options.providerProvisioningTargetEnabled,
     serviceAuthorityMode: "standalone-server",

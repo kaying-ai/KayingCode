@@ -96,7 +96,7 @@
 - 仍不采纳：voice-input、selection-comment、composer-edit-mode、managed-worktrees、settings-search、data-sync。
 - 仍不采纳：i18n 的 ja/ko/ru 与 locale 五值改造；`toolGrouping*` 移除。
 - 仍不采纳：上游 desktop/CLI 测试与文档整批回流。
-- 待后续：远端 Server/Server CLI 的 v2 格式门禁、`--prepare-credentials` 与 release 回滚保护（PR2）。
+- 已采纳（PR2）：远端 Server/Server CLI 的 v2 格式门禁、`--prepare-credentials`、release 回滚保护与目标平台 keyring staging。
 
 ## 验收
 
@@ -332,3 +332,14 @@
 - 回归：cipher/bridge **10/10**、services 迁移与数据根 **6/6**、keyring staging/native policy **5/5**、CLI async store **2/2**；真实 keyring smoke 通过。
 - 验证：根 typecheck、lint（0 errors/133 既有 warnings）、source:check、architecture:check --changed、CLI desktop-agent bundle 构建通过。
 - 未完成：远端 Server/Server CLI 的格式门禁、`--prepare-credentials` 与 release 回滚保护（PR2）；`UPSTREAM_BASE` 仍保持 3.17.2。
+
+第二十二批（2026-11-15，凭据体系 PR2：远端 Server 格式门禁）：
+
+- `createServerHostServices` 在未注入 cipher 时 await `createServerCredentialCipher`；HTTP 入口改用该装配，stdio 入口在发布 ready 前初始化。
+- 新增 `SERVER_CREDENTIAL_FORMAT=2` 与 `KAYINGCODE_SERVER_CREDENTIAL_FORMAT`；新 Supervisor fork Core 时写入格式，旧 Supervisor 下的候选 Core 使用 `createLegacyServerCredentialCipher`，已有 v2 时拒绝启动。
+- `serve` / `update` 支持 `--prepare-credentials`，在启动前幂等准备 `credential-secret`；远端 connect、Source Server update/serve 命令自动携带该参数。
+- release `runtime/package.json` 写 `kayingcodeCredentialFormat: 2`；`applyPending` / `restoreCurrent` 在存在 v2 密文而目标 release 不支持时以 `CREDENTIAL_ROLLBACK_INCOMPATIBLE` 拒绝。
+- server-cli 与 server bundle external `@napi-rs/keyring`；staging 只保留目标平台 `@napi-rs/keyring-*`，单文件远端 server 不携带 keyring，使用私有文件/显式环境密钥。
+- 回归：serverCore **5/5**、rollback guard **2/2**、server packaging **41/41（1 skipped）**；shared prepare **1/1**（合计 cipher/bridge 13/13）。
+- 验证：根 typecheck、lint（0 errors/133 既有 warnings）、source:check、architecture:check --changed 通过。
+- 未执行：真实 Linux 无 Secret Service 远端部署与 daemon 换代需要远端/容器环境；`UPSTREAM_BASE` 仍保持 3.17.2。

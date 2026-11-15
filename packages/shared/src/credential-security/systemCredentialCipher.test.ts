@@ -1,11 +1,13 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createLegacyCredentialCipher,
+  createServerCredentialCipher,
   createSystemCredentialCipher,
   migrateCredentialRecord,
+  prepareServerCredentialStorage,
   type CredentialKeyStore,
 } from "./module.js";
 
@@ -147,5 +149,21 @@ describe("system credential cipher", () => {
     await expect(targetCipher.decrypt(encrypted)).resolves.toBe("copied");
     expect(targetStore.value).toBe(sourceStore.value);
     expect(await readFile(target.filePath, "utf8")).toContain(encrypted);
+  });
+
+  it("prepares one private server key and reuses it across reopen", async () => {
+    const { filePath } = await fixture();
+    await prepareServerCredentialStorage({ filePath, env: {} });
+    const secretPath = join(dirname(filePath), "credential-secret");
+    const secret = await readFile(secretPath, "utf8");
+    expect(secret).toMatch(/^[A-Za-z0-9_-]{43}$/u);
+
+    await prepareServerCredentialStorage({ filePath, env: {} });
+    await expect(readFile(secretPath, "utf8")).resolves.toBe(secret);
+
+    const cipher = await createServerCredentialCipher({ filePath, env: {} });
+    const encrypted = await cipher.encrypt("server-secret");
+    expect(encrypted).toMatch(/^enc:v2:env:/u);
+    await expect(cipher.decrypt(encrypted)).resolves.toBe("server-secret");
   });
 });

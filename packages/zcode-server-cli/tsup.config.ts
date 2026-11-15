@@ -58,5 +58,7 @@ export default defineConfig({
     "@lydell/node-pty-darwin-x64",
     "@lydell/node-pty-linux-arm64",
     "@lydell/node-pty-linux-x64",
+    // NAPI 系统凭据库保留动态加载；staging 只收集目标平台变体。
+    "@napi-rs/keyring",
   ],
 });
