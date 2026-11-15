@@ -31,9 +31,9 @@ try {
     await page.clock.pauseAt(new Date("2026-10-21T10:00:01Z"));
     await page.goto(server.resolvedUrls.local[0]);
     const area = page.getByTestId("loading-area");
-    // 普通 loading 与重试共用同一插槽：首屏中文显示「工作中」和十分之一秒计时。
+    // 普通 loading 与重试共用同一插槽：首屏中文显示「工作中」和整秒计时。
     await area.getByText("工作中", { exact: true }).waitFor();
-    await area.getByText("0.0 秒", { exact: true }).waitFor();
+    await area.getByText("0 秒", { exact: true }).waitFor();
     await page.getByRole("button", { name: "Retry 60", exact: true }).click();
     await area.getByText("模型请求重试 · 60 秒后继续 · 1/10", { exact: true }).waitFor();
     await page.clock.runFor(2000);

@@ -845,6 +845,10 @@ body {
     --animated-gradient-text-strong: var(--color-foreground-subtle);
   }
 
+  .animated-gradient-text-foreground {
+    --animated-gradient-text-strong: var(--color-foreground);
+  }
+
   .cua-group-gradient-text {
     display: inline-block;
     background: linear-gradient(
@@ -987,57 +991,8 @@ body {
   will-change: opacity;
 }
 
-/* 轮尾「工作中」加载：3×3 像素点按轨道错峰点亮，文案做低对比 shimmer。
-   两者都是装饰，计时文本仍由组件以 tabular-nums 渲染。 */
-@keyframes kayingcode-loading-pixel-on {
-  0%,
-  100% {
-    opacity: 0.15;
-    transform: scale(1);
-  }
-
-  35% {
-    opacity: var(--loading-pixel-peak, 0.75);
-    transform: scale(1.08);
-  }
-}
-
-.dark .kayingcode-loading-pixel,
-.theme-zai-dark .kayingcode-loading-pixel {
-  --loading-pixel-peak: 1;
-}
-
-.kayingcode-loading-pixel {
-  animation: kayingcode-loading-pixel-on 650ms ease-in-out infinite;
-}
-
-@keyframes kayingcode-loading-shimmer {
-  from {
-    background-position: 200% 0;
-  }
-
-  to {
-    background-position: -200% 0;
-  }
-}
-
-.kayingcode-loading-label {
-  display: inline-block;
-  font-weight: 500;
-  background-image: linear-gradient(
-    90deg,
-    var(--color-foreground-subtle) 35%,
-    var(--color-foreground) 50%,
-    var(--color-foreground-subtle) 65%
-  );
-  background-position: 200% 0;
-  background-size: 200% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: kayingcode-loading-shimmer 1.4s linear infinite;
-}
+/* 轮尾「工作中」加载：SVG 点阵球体由组件逐帧驱动（球面 → Z 字 morph），
+   文案用 animated-gradient-text 做低对比流动，计时文本由 tabular-nums 保持可读。 */
 
 /*  Radix Collapsible 在测量 closed 高度时会写入 inline animation-name:none。
    assistant 历史区自动结束收起需要在延迟卸载期间继续播放高度动画，
