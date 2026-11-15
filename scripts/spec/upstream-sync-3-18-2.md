@@ -43,7 +43,8 @@
 | 已采纳 | node-repl-host | 工具契约如实声明 `js` 非沙箱执行且不经过 Bash 危险命令确认；保留产品“仅 Browser Use”边界，不恢复 Computer Use 文案 |
 | 延后 | adapters | 推理历史/runner 归一化依赖 `blockIndex`、`signedReasoningReset` 协议批次，与 blockIndex 改造同批 |
 | 已采纳 | adapters | session-data：新增 `listSessionFiles` 与 `SessionDataFile`；存储类别父目录被换成符号链接时拒绝删除；保留式删除只保留被引用的 artifact，其余正文/日志/独占附件照常清理；`removeSession` 返回删除前字节数，重复删除幂等 |
-| 延后 | adapters | 插件目录原子写入、zip source 与插件安装流程整体改造 |
+| 已采纳（部分） | adapters | 插件文件写读可靠性：新增 `writePluginTextIfChanged`（同内容跳过、临时文件 + 原子 rename、Windows 占用有界重试）；`atomic-directory` 采用上游事务解析与 `readStandaloneAtomicFile`/`resolveAtomicReadPath`；marketplace 的 JSON 写入改用 write-if-changed，新增 `listInstalledPluginRecordsAsync` 与 `resolveInstalledPluginRootAsync`，已安装插件根读取改走事务安全路径 |
+| 延后 | adapters | 插件 discovery/query 的异步化、material-change 中断与并发限制，以及 zip source、安装流程整体重写 |
 | 已采纳 | memory-diagnostics | 3.18.1 内存分配诊断：新增 `adapters/src/memory-diagnostics`（recorder/storage/contract）；资源采样器以 15s 节拍采集 inspector 分配样本，落盘到 `~/.kayingcode/cli/memory-diagnostics`；协议 server 的 `collectMemoryDiagnostics` 支持跳过事件统计扫描；v4 gateway 补充 hydration/history/binary cache 计数 |
 | 延后 | android-emulator-plugin | 产品已删除该包，不恢复 |
 
@@ -166,3 +167,12 @@
 - 初始化时按偏好给根节点加 `font-smoothing-enabled`；CSS 只在 `.platform-mac-desktop` 下启用 `-webkit-font-smoothing: antialiased`，Web/远控不受影响。
 - 「外观」页仅在 macOS desktop 显示「字体平滑」开关；本地 `SettingsRow` 尚无 settings-search 的 `searchId`，本轮不引入该参数。
 - 补齐中英文文案；验证 `tsc -b packages/ui`、根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。设置页视觉未单独截图验证。
+
+第九批（2026-11-15，插件文件写读可靠性）：
+
+- `plugins/helpers.ts` 新增 `writePluginTextIfChanged`：内容相同时不写盘；变化时先写临时文件再原子 rename，Windows 占用错误有界重试，失败保留旧文件。
+- `plugins/atomic-directory.ts` 采用上游版本：统一事务解析，新增 `readStandaloneAtomicFile` 与 `resolveAtomicReadPath`，读取时避开活跃安装事务、恢复已死亡事务的残留。
+- `plugins/marketplace.ts`：JSON 写入改用 write-if-changed；新增 `listInstalledPluginRecordsAsync`、`resolveInstalledPluginRootAsync`，`describeMarketplacePlugin` 的已安装根改走事务安全异步读取。
+- 新增回归 `tests/plugins-atomic-write.test.ts`：创建父目录、内容更新、同内容不触碰文件、并发写只留完整文档。
+- 验证：adapters/bootstrap typecheck 通过；atomic-write + plugin-mcp-isolation **5/5 通过**；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
+- 未采纳：插件 discovery/query 全量异步化、material-change 中断、并发上限、zip source 与安装流程重写。
