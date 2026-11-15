@@ -20,6 +20,7 @@
     "@zcode/provider": "workspace:*",
     "@zcode/provider-node": "workspace:*",
     "@zcode/rpc": "workspace:*",
+    "@zcode/session-control": "workspace:*",
     "@zcode/shared": "workspace:*",
     "croner": "^10.0.1",
     "ignore": "^5.3.2",

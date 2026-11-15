@@ -124,6 +124,8 @@ import type {
   KayingCodeAgentInstallLocalPluginParams,
   KayingCodeAgentInstallPluginParams,
   KayingCodeAgentListMcpServerStatusesParams,
+  KayingCodeAgentPluginMentionItemsParams,
+  KayingCodeAgentPluginMentionItemsResult,
   KayingCodeAgentPluginViewParams,
   KayingCodeAgentPluginReferenceCatalogParams,
   KayingCodeAgentSkillReferenceCatalogParams,
@@ -241,16 +243,21 @@ export interface KayingCodeAgentReadSessionParams extends KayingCodeAgentSession
   afterSeq?: number;
   /** 被动索引/观察者只能读取现有 runtime，禁止为了读快照拉起 session。 */
   runtimePolicy?: KayingCodeAgentRuntimePolicy;
+  /** "index" 仅供 task index：返回剥离大载荷的同结构 snapshot，禁止回写 UI 状态。 */
+  contentProfile?: import("@zcode/shared").ZCodeSessionContentProfile;
 }
 
 export interface KayingCodeAgentReadSessionMessagesParams extends KayingCodeAgentSessionTarget {
   afterMessageId?: string;
   limit?: number;
+  direction?: "forward" | "backward";
 }
 
 export interface KayingCodeAgentReadSessionEventsParams extends KayingCodeAgentSessionTarget {
   afterSeq?: number;
   limit?: number;
+  /** App 后台状态读取只观察现有 CLI，不因 runtime 消失重启。 */
+  runtimePolicy?: KayingCodeAgentRuntimePolicy;
 }
 
 export type KayingCodeAgentReadWorkspacePresentationParams = KayingCodeAgentWorkspaceTarget;
@@ -653,6 +660,14 @@ export interface IKayingCodeAgentService {
   getPluginReferenceCatalog(
     params: KayingCodeAgentPluginReferenceCatalogParams,
   ): Promise<KayingCodePluginsReferenceCatalogResult>;
+  /**
+   * 输入框 `@` 面板 `tool` target 的候选项。existing-only；旧 CLI method-not-found 时 supported: false。
+   */
+  getPluginMentionItems?(
+    params: KayingCodeAgentPluginMentionItemsParams,
+  ): Promise<KayingCodeAgentPluginMentionItemsResult>;
+  /** 扩展经 ctx.sessions.* 代发消息前确认 runtime 支持 extension 来源。 */
+  supportsExtensionInputSource?(target: KayingCodeAgentWorkspaceTarget): Promise<boolean>;
   /** Composer Skill 引用 catalog；带 sessionId 时读取该 runtime 的冻结快照。 */
   getSkillReferenceCatalog(
     params: KayingCodeAgentSkillReferenceCatalogParams,
@@ -914,6 +929,21 @@ export interface IKayingCodeAgentService {
   onDynamicConversationTelemetryFact(
     params: KayingCodeAgentWorkspaceTarget,
   ): Event<ConversationTelemetryFact>;
+  /** context 组成；existing-only。旧 CLI 或缺 runtime 时返回 null，不启动 CLI。 */
+  getContextComposition?(
+    params: KayingCodeAgentWorkspaceTarget & {
+      sessionId: string;
+      modelSelection?: ModelSelection;
+    },
+  ): Promise<import("@zcode/shared/kayingcode-protocol-v4").ContextComposition | null>;
+  /** context 组成变更：只带修订号，live-only。 */
+  onDynamicContextCompositionChanged?(
+    target: KayingCodeAgentWorkspaceTarget,
+  ): Event<import("@zcode/shared/kayingcode-protocol-v4").ContextCompositionChangedEvent>;
+  /** 模型请求指标：每个完成的请求一条，供扩展进程算生成速率；旧 CLI 不发。 */
+  onDynamicModelRequestMetrics?(
+    target: KayingCodeAgentWorkspaceTarget,
+  ): Event<import("@zcode/shared/kayingcode-protocol-v4").ModelRequestMetricsFact>;
   // ── sessions-index 通道（列表活性）──
   subscribeSessionsIndexV4(
     params: KayingCodeAgentSessionsIndexSubscribeParams,
@@ -953,6 +983,7 @@ export interface IKayingCodeAgentService {
   ) => IDisposable;
   disposeWorkspace(params: KayingCodeAgentWorkspaceTarget): Promise<void>;
   disposeAll(): void;
+  disposeAllAndWait(): Promise<void>;
 }
 
 export const IKayingCodeAgentService = createServiceDescriptor<IKayingCodeAgentService>(

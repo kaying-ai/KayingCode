@@ -168,6 +168,12 @@ export const ServiceChannels = {
   PluginUiBridge: "plugin-ui-bridge",
   PluginUiSampling: "plugin-ui-sampling",
   PluginUiAppTools: "plugin-ui-app-tools",
+  /** 桌面 Host 的扩展门面：贡献表、扩展进程状态、命令、重新加载（仅本机注册） */
+  Extensions: "extensions",
+  /** 桌面 Host 的扩展视图门面：视图实例、页面请求与通知、views.open（仅本机注册） */
+  ExtensionViews: "extension-views",
+  /** 桌面 Host 的扩展授权门面：授予、撤销、授权状态、启用确认、最近操作（仅本机注册） */
+  ExtensionGrants: "extension-grants",
   /** Subagents 管理服务 */
   Subagents: "subagents",
   /** Commands 管理服务 */

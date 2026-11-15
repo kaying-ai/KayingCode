@@ -246,6 +246,7 @@ export { createMcpSyncService } from "./mcp-sync/mcpSyncService.js";
 export { createPluginSyncService } from "./plugin-sync/pluginSyncService.js";
 export { createPluginsService } from "./plugins/pluginsService.js";
 export { createPluginManagementService } from "./plugins/pluginManagementService.js";
+export { createWindowHostExtensions, type WindowHostExtensions } from "./extensions/node.js";
 export { createSubagentsService } from "./subagents/subagentsService.js";
 export { createCommandsService } from "./commands/commandsService.js";
 export { createHooksService } from "./hooks/hooksService.js";
@@ -322,6 +323,14 @@ import { ICredentialService } from "./credential/credential.js";
 import { IBroadcastService } from "./broadcast/broadcast.js";
 import { IKayingCodeTaskService } from "./session/kayingcodeTaskService.js";
 import { IKayingCodeAgentService } from "./kayingcode-agent/kayingcodeAgent.js";
+import {
+  createAppControlService,
+  type AppControlNavigationPort,
+  type AppControlServiceHandle,
+} from "./app-control/index.js";
+import { getPluginUserOptionsReaderForAgent } from "./kayingcode-agent/kayingcodeAgentService.js";
+import type { PluginUserOptionsReader } from "./kayingcode-agent/pluginHostQueriesClient.js";
+import type { PluginMutationSucceededEvent } from "./plugins/pluginManagementService.js";
 import { IKayingCodeSessionService } from "./kayingcode-session/kayingcodeSession.js";
 import {
   createUnsupportedConversationShareService,
@@ -579,6 +588,17 @@ export function getOffPeakRequestAuthBuilder(
   return offPeakRequestAuthBuilders.get(services);
 }
 const managedHostApiNetworkTransports = new WeakMap<ServiceCollection, HostApiNetworkTransport>();
+const pluginUserOptionsReaders = new WeakMap<ServiceCollection, PluginUserOptionsReader>();
+
+/**
+ * Local Host 进程内：扩展 settings 能力读本插件 user 层有效值（含敏感值）。
+ * 不登记为服务、不挂在任何服务对象上，所以不会随 ServiceCollection 暴露到 RPC 频道。
+ */
+export function getPluginUserOptionsReader(
+  services: ServiceCollection,
+): PluginUserOptionsReader | undefined {
+  return pluginUserOptionsReaders.get(services);
+}
 
 export function registerHostApiNetworkTransportForDispose(
   services: ServiceCollection,
@@ -642,6 +662,12 @@ export function createLocalServices(options: {
   onProviderProvisioningSourceChanged?: (trigger: ProviderProvisioningSourceTrigger) => void;
   serviceAuthorityMode?: ServiceAuthorityMode;
   projectStorageHostId?: string;
+  /** Host 进程内把 App 会话控制 facade 交给扩展网关；不注册进 ServiceCollection。 */
+  onAppControlServiceCreated?: (handle: AppControlServiceHandle) => void;
+  /** 会话导航 owner 注入；缺席时会话控制明确返回 unavailable。 */
+  appControlNavigation?: AppControlNavigationPort;
+  /** 插件管理变更成功信号；扩展网关据此重读静态表并通知设置订阅者。 */
+  onPluginManagementMutated?: (event: PluginMutationSucceededEvent) => void;
   sourceServerWorkspaceService?: ISourceServerWorkspaceService;
   /** 按 hostId 解析当前在线 Host 的项目服务；缺失时非本 Host 的读取一律 project.host-offline。 */
   resolveProjectHostService?: (hostId: string) => Promise<IProjectService>;
@@ -1235,6 +1261,20 @@ export function createLocalServices(options: {
     taskIndexSyncer: kayingcodeTaskIndexSyncer,
     settingService,
   });
+  // App 会话控制 facade：由 Host 在进程内交给扩展网关，不注册进 ServiceCollection，不出现在 RPC 上。
+  const appControlService = createAppControlService({
+    sourceServerId: options?.projectStorageHostId ?? "local",
+    projects: projectService,
+    tasks: kayingcodeTaskService,
+    agent: kayingcodeAgentService,
+    models: providerRuntime.modelSelection,
+    ...(options?.appControlNavigation ? { navigation: options.appControlNavigation } : {}),
+    prepareCreation: ({ projectId }) => projectService.prepareSession({ projectId }),
+  });
+  options?.onAppControlServiceCreated?.({
+    service: appControlService,
+    sourceServerId: options?.projectStorageHostId ?? "local",
+  });
   const botsRepo = new BotsRepo();
   const botLog = createServiceLogger("bots");
   const botRemoteWorkspaceService = options.resolveBotProjectConnection
@@ -1469,7 +1509,15 @@ export function createLocalServices(options: {
     .register(IPluginSyncService, pluginSyncService)
     .register(IPluginsService, createPluginsService({ isDesktopRuntime: true }))
     // 设置页插件管理薄服务——plugins/* 旧协议词的 host 侧唯一消费点。
-    .register(IPluginManagementService, createPluginManagementService({ kayingcodeAgentService }))
+    .register(
+      IPluginManagementService,
+      createPluginManagementService({
+        kayingcodeAgentService,
+        ...(options?.onPluginManagementMutated
+          ? { onMutationSucceeded: options.onPluginManagementMutated }
+          : {}),
+      }),
+    )
     .register(ISubagentsService, subagentsService)
     .register(ICommandsService, createCommandsService({ isDesktopRuntime: true }))
     .register(
@@ -1544,6 +1592,8 @@ export function createLocalServices(options: {
   // 见 sharedSqliteRepos 声明处注释：登记全部 tasks-index sqlite 句柄，dispose 链统一关闭
   sqliteReposToClose.push(taskIndexRepo);
   sharedSqliteRepos.set(services, sqliteReposToClose);
+  const pluginUserOptionsReader = getPluginUserOptionsReaderForAgent(kayingcodeAgentService);
+  if (pluginUserOptionsReader) pluginUserOptionsReaders.set(services, pluginUserOptionsReader);
   return services;
 }
 

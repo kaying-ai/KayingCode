@@ -26,9 +26,23 @@ export const conversationInputSourceSchema = z.discriminatedUnion("kind", [
   pluginUiInputSourceSchema,
   z
     .object({
+      kind: z.literal("session"),
+      sessionId: z.string().min(1),
+      /** 只读字段，仅服务改动前已持久化的数据；新数据不再写入标题快照。 */
+      title: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
       kind: z.literal("genUi"),
       path: z.string().min(1).max(4096),
       title: z.string().max(250).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("extension"),
+      pluginId: z.string().min(1),
     })
     .strict(),
 ]);

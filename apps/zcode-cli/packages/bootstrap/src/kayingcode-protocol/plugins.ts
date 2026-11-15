@@ -104,6 +104,7 @@ function toPluginInfo(plugin: PluginMetadata, configResult?: ConfigResult): Kayi
     ...(hostMcpServerNames.length > 0 ? { hostMcpServerNames } : {}),
     hookDetails: plugin.hookDetails,
     rootPath: plugin.rootPath,
+    ...(plugin.dataPath ? { dataPath: plugin.dataPath } : {}),
     ...(plugin.userConfig ? { userConfig: plugin.userConfig } : {}),
     ...(Object.keys(configuredOptions).length > 0 ? { configuredOptions } : {}),
     ...(rootSource ? { rootSource } : {}),

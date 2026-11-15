@@ -9,5 +9,6 @@ export {
 export {
   PluginUiBridgeError,
   createPluginUiBridgeService,
+  pickHtmlResource,
   type PluginUiBridgeServiceDependencies,
 } from "./pluginUiBridgeService.js";

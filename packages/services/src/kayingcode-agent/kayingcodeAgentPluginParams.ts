@@ -3,6 +3,7 @@ import type {
   KayingCodeAutomationScheduleRule,
   KayingCodeMcpListMode,
   ModelSelection,
+  ZCodePluginMentionItem,
 } from "@zcode/shared";
 
 export interface KayingCodeAgentWorkspaceTarget {
@@ -20,6 +21,19 @@ export interface KayingCodeAgentListMcpServerStatusesParams extends KayingCodeAg
   mcpServers?: KayingCodeAgentMcpServer[];
   mode?: KayingCodeMcpListMode;
 }
+
+export interface KayingCodeAgentPluginMentionItemsParams extends KayingCodeAgentWorkspaceTarget {
+  sessionId: string;
+  pluginId: string;
+  /** 插件 MCP server 上的原始工具名（清单 `target.tool`）。 */
+  tool: string;
+  query: string;
+}
+
+/** `supported: false`：旧 CLI 没有 plugins/mentionItems，`@` 面板不显示这一组。 */
+export type KayingCodeAgentPluginMentionItemsResult =
+  | { supported: true; items: ZCodePluginMentionItem[] }
+  | { supported: false };
 
 export interface KayingCodeAgentAddPluginMarketplaceParams extends KayingCodeAgentWorkspaceTarget {
   dryRun?: boolean;

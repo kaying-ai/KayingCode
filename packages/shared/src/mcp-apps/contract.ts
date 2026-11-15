@@ -231,9 +231,10 @@ export interface PluginSandboxRegisterRequestPayload {
   workspacePath?: string;
   workspaceIdentity?: string;
   ownerWebContentsId: number;
-  sessionId: string;
-  /** Gen UI has Host provenance and never impersonates an MCP plugin. */
-  contentKind?: "gen-ui";
+  /** 扩展视图不属于会话；MCP App 与 Gen UI 仍必须带会话。运行时校验见 validation.ts。 */
+  sessionId?: string;
+  /** Gen UI 与扩展视图都带 Host provenance；扩展视图按插件派生 appIdentity。 */
+  contentKind?: "gen-ui" | "extension";
   pluginId?: string;
   /** 资源所属的 MCP server 运行时名；沙箱 partition 按它派生（同一 server 的页面共享一份持久存储）。 */
   serverName?: string;

@@ -119,6 +119,7 @@ export * from "./remote-workspace-identity.js";
 export * from "./kayingcode-api-retry-status.js";
 export * from "./kayingcode-network-debug-status.js";
 export * from "./kayingcode-session-visible-content.js";
+export * from "./zcode-session-content-profile.js";
 export * from "./official-mcp-auth.js";
 export * from "./official-mcp-tool-error.js";
 export * from "./conversation-message-projection-policy.js";

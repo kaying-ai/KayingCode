@@ -99,6 +99,7 @@ import {
   formatProtocolModelSelection,
   mapSessionEventForProtocol,
   mapSessionInfo,
+  mapSnapshotMessages,
   resolveSessionContextUsage,
   shouldExposeSessionEventToProtocol,
 } from "./mapper.js";
@@ -2054,15 +2055,69 @@ export async function readMessages(
   rawParams: unknown,
 ) {
   const params = parseParams(kayingcodeSessionMessagesParamsSchema, rawParams);
-  const record = requireSession(context, params.sessionId);
-  const allMessages = await readActiveSessionMessages(context, record);
+  // forward 只服务会话控制的 ReadSession：冷会话没有活跃 record 时从会话库冷读；
+  // backward（桌面分页历史）保持原行为，仍要求活跃 record。
+  const record =
+    params.direction === "forward"
+      ? context.sessions.get(params.sessionId)
+      : requireSession(context, params.sessionId);
+  const allMessages = record
+    ? await readForwardVisibleMessages(context, record, params.direction)
+    : await readColdVisibleMessages(context, params.sessionId);
   const afterMessageIndex = params.afterMessageId
     ? allMessages.findIndex((message) => String(message.info.id) === params.afterMessageId)
     : -1;
+  // forward 的 cursor 必须命中；找不到（例如两页之间发生 rewind）时报错，不能从头重读造成重复页。
+  if (params.direction === "forward" && params.afterMessageId && afterMessageIndex < 0) {
+    throw createCoreError(CoreErrorType.InvalidInput, "Message cursor is no longer available", {
+      recoverable: true,
+    });
+  }
   const messages = afterMessageIndex >= 0 ? allMessages.slice(afterMessageIndex + 1) : allMessages;
+  const page =
+    params.direction === "forward"
+      ? messages.slice(0, params.limit)
+      : limitMessages(messages, params.limit);
   return {
-    messages: params.limit ? messages.slice(-params.limit) : messages,
+    messages: await mapSnapshotMessages(
+      record?.app ?? {
+        readToolResultArtifact: () => {
+          throw new Error("Cold session read does not hydrate artifacts");
+        },
+      },
+      page,
+    ),
   };
+}
+
+async function readForwardVisibleMessages(
+  context: KayingCodeProtocolAgentServerContext,
+  record: KayingCodeProtocolSessionRecord,
+  direction: "forward" | "backward" | undefined,
+): Promise<MessageWithParts[]> {
+  const activeMessages = await readActiveSessionMessages(context, record);
+  // forward 只服务会话控制的 ReadSession；运行时提醒、环境信息与中断标记以隐藏 user 消息落库，
+  // 不先过滤会把它们当成用户原话返回，并让分页 limit 与 cursor 落在隐藏消息上。
+  return direction === "forward"
+    ? activeMessages.filter(isUserVisibleSessionMessage)
+    : activeMessages;
+}
+
+/** 冷会话：没有活跃 runtime 就没有内存 rewind 事件，只按 session.revert 投影。 */
+async function readColdVisibleMessages(
+  context: KayingCodeProtocolAgentServerContext,
+  sessionId: string,
+): Promise<MessageWithParts[]> {
+  const sessionStore = context.deps.sessionStore;
+  const session = sessionStore ? await getPersistedSession(context, sessionId) : null;
+  if (!sessionStore || !session || session.time.deleted !== undefined) {
+    throw new ProtocolRequestError(
+      kayingcodeProtocolErrorCodes.sessionUnavailable,
+      `Session is not available: ${sessionId}`,
+    );
+  }
+  const messages = await sessionStore.messages({ sessionID: sessionId as SessionId });
+  return projectActiveSessionMessages(messages, session, []).filter(isUserVisibleSessionMessage);
 }
 
 export async function readEvents(

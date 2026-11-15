@@ -5,6 +5,9 @@ import { kayingcodeProtocolTraceSchema } from "./trace.js";
 // Bot 反向回复的名字解析/待澄清结果与 App、CLI 使用同一严格 schema。
 export { channelReplyRequestSchema, channelReplyResultSchema } from "../channel-mention.js";
 export { kayingcodeProtocolTraceSchema, type KayingCodeProtocolTrace } from "./trace.js";
+export * from "../app-control/contract.js";
+export * from "../zcode-protocol/plugin-host-queries/contract.js";
+import { appControlCancelMethod, appControlProtocol } from "../app-control/contract.js";
 import {
   databaseMigrationFactsSchema,
   databaseStartupErrorCodeSchema,
@@ -2182,6 +2185,8 @@ export const kayingcodeSessionMessagesParamsSchema = z
     sessionId: nonEmptyString,
     afterMessageId: nonEmptyString.optional(),
     limit: z.number().int().positive().optional(),
+    // 缺省保留最近历史窗口；forward 从 cursor 后最早消息开始分页。
+    direction: z.enum(["forward", "backward"]).optional(),
   })
   .strict();
 export type KayingCodeSessionMessagesParams = z.infer<typeof kayingcodeSessionMessagesParamsSchema>;
@@ -3237,6 +3242,9 @@ export const kayingcodePluginInfoSchema = z
     mcpServerNames: z.array(z.string()),
     hookDetails: z.array(kayingcodePluginHookDetailSchema).optional(),
     rootPath: z.string(),
+    // 插件的持久数据目录（CLI 的 PluginMetadata.dataPath，与 ${KAYINGCODE_PLUGIN_DATA} 同值）。
+    // 扩展的 ctx.extension.dataPath 只取它；旧 CLI 不报告时缺省。
+    dataPath: z.string().optional(),
     userConfig: z.record(z.string(), kayingcodePluginUserConfigOptionSchema).optional(),
     configuredOptions: z.record(z.string(), kayingcodePluginOptionValueSchema).optional(),
     // 缺省表示 package 可用；missing 用于保留已声明但目标 Host 尚未物化的配置行。
@@ -4490,6 +4498,19 @@ export type SessionLifecycleFailure = z.infer<typeof sessionLifecycleFailureSche
 export type SessionLifecycleSnapshot = z.infer<typeof sessionLifecycleSnapshotSchema>;
 
 export const kayingcodeProtocolMethods = {
+  appControlListProjects: appControlProtocol.listProjects.method,
+  appControlListSessions: appControlProtocol.listSessions.method,
+  appControlReadSession: appControlProtocol.readSession.method,
+  appControlCreateSession: appControlProtocol.createSession.method,
+  appControlForkSession: appControlProtocol.forkSession.method,
+  appControlSendToSession: appControlProtocol.sendToSession.method,
+  appControlWaitSessions: appControlProtocol.waitSessions.method,
+  appControlInterruptSession: appControlProtocol.interruptSession.method,
+  appControlRenameSession: appControlProtocol.renameSession.method,
+  appControlOpenSession: appControlProtocol.openSession.method,
+  appControlSetSessionArchived: appControlProtocol.setSessionArchived.method,
+  appControlSetSessionPinned: appControlProtocol.setSessionPinned.method,
+  appControlCancel: appControlCancelMethod,
   sessionLifecycleChanged: "session/lifecycle/changed",
   sessionLifecycleGetState: "session/lifecycle/getState",
   sessionLifecycleEnsureReady: "session/lifecycle/ensureReady",
@@ -4602,6 +4623,10 @@ export const kayingcodeProtocolMethods = {
   pluginsResetConfig: "plugins/resetConfig",
   pluginsValidate: "plugins/validate",
   pluginsDescribe: "plugins/describe",
+  // 扩展 settings 能力读本插件 user 层有效值（含敏感值）；旧 CLI method-not-found → App 当作不支持。
+  pluginsReadUserOptions: "plugins/readUserOptions",
+  // 输入框 `@` 面板的 MCP 工具候选项：只在内存里的会话上调插件工具；旧 CLI method-not-found → 不显示这一组。
+  pluginsMentionItems: "plugins/mentionItems",
   tapMakerProjects: "tapmaker/projects",
   automationCreate: "automation/create",
   topicResourceRead: "topic/resource/read",
