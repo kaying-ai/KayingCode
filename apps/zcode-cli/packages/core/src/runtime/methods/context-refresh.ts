@@ -1,6 +1,17 @@
 import { formatLocalIsoDate, type TraceContext } from "@zcode/contracts";
 import { buildCurrentDateSection } from "../../context/sections/current-date.js";
 import {
+  instructionFileRecord,
+  parseLegacyInstructionFiles,
+  renderInstructionDelta,
+} from "../../context/sections/instruction-files.js";
+import type {
+  ContextBuildResult,
+  ContextMetaUserAttachment,
+  InstructionAnnouncement,
+  InstructionRefreshReason,
+} from "../../context/types.js";
+import {
   buildEnvironmentAnnouncement,
   buildGitSystemContextSection,
   buildModelSection,
@@ -184,19 +195,13 @@ export function collectSkillsListing(
 }
 
 // 只在 runtime 启动时读取、加载历史后按当前内容原位更新的公告来源。
-const REFRESHED_ON_LOAD_SOURCES: ReadonlySet<string> = new Set([
-  "skills_listing",
-  "context_prefix",
-]);
+const REFRESHED_ON_LOAD_SOURCES: ReadonlySet<string> = new Set(["skills_listing"]);
 
 /**
- * 从库加载历史后（冷恢复、rewind），已恢复的 skill 列表与指令公告（含 Memory 索引）按
- * runtime 当前内容原位更新：内容不同就在原位置改成当前内容，当前为空就删除。
- * 历史里的公告随加载带回；当前为空时没有新内容可宣告，只靠插入新公告撤回不了旧内容。
- * 只改内存，库里的记录只决定位置，每次加载都重新套用。两者都只在 runtime 启动时读取，
- * 运行中不变；内容变化时之前的请求字节变一次，prompt cache 失效一次。
- * 修复原因：指令公告原来恢复后原样保留，模型看到旧的 MEMORY.md，读文件状态却记录磁盘上的
- * 当前内容；Write 的新鲜度检查放行，模型按旧内容写入，会覆盖它没见过的新内容。
+ * 从库加载历史后（冷恢复、rewind），已恢复的 skill 列表按 runtime 当前目录原位更新：
+ * 内容不同就在原位置改成当前内容，当前为空就删除。只改内存，库里的记录只决定位置，每次加载都重新套用。
+ * 目录只在 runtime 启动时读取，运行中不变；内容变化时之前的请求字节变一次，prompt cache 失效一次。
+ * 指令公告（含 Memory 索引）不在这里处理：发出后不改写，变化由请求前公告追加增量。
  */
 export function refreshRestoredAnnouncements(runtime: AgentRuntimeInternal): void {
   const attachments = runtime.latestContextBuildResult?.metaUserAttachments;
@@ -259,26 +264,36 @@ export async function appendRequestAnnouncements(
 }
 
 /**
- * 按给定历史去重后需要宣告的请求前公告；compaction 也用它放置 summary 之前的公告。
- * 指令文件（含 Memory 索引）在 runtime 运行中不变：历史中没有才宣告，不比对内容；
- * 从库加载历史后由 refreshRestoredAnnouncements 原位更新。
+ * 按给定历史去重后需要宣告的请求前公告。
+ * 指令文件（含 Memory 索引）按已公告的文件比较，见 buildInstructionAnnouncement；增量的 reason
+ * 取 runtime 状态（启动时 session_start，compaction 提交重读后 compaction）。
  * compact 移除旧公告后按剩余历史重新宣告一次。Git 会话上下文由调用方按同一规则先读好传入。
  */
 export function buildRequestAnnouncements(
   runtime: AgentRuntimeInternal,
   entries: readonly RuntimeMessageEntry[],
   sessionContext?: RuntimeAttachmentEntry,
+  contextResult: ContextBuildResult | undefined = runtime.latestContextBuildResult,
 ): RuntimeAttachmentEntry[] {
-  const last = lastAnnouncedAttachments(entries);
-  const instructions = runtime.latestContextBuildResult?.metaUserAttachments.find(
-    (item) => item.source === "context_prefix",
+  const instructions = buildInstructionAnnouncement(
+    currentInstructions(contextResult),
+    entries,
+    runtime.instructionRefreshReason ?? "session_start",
+    runtime.unreadableInstructionPaths,
   );
-  const attachments =
-    instructions && !last.has("context_prefix")
-      ? [systemReminderAttachmentEntry("context_prefix", instructions.content)]
-      : [];
-  if (sessionContext) attachments.push(sessionContext);
-  const previousDate = last.get("date");
+  return [
+    ...(instructions ? [instructions] : []),
+    ...buildSessionContextAndDate(runtime, entries, sessionContext),
+  ];
+}
+
+function buildSessionContextAndDate(
+  runtime: AgentRuntimeInternal,
+  entries: readonly RuntimeMessageEntry[],
+  sessionContext?: RuntimeAttachmentEntry,
+): RuntimeAttachmentEntry[] {
+  const attachments = sessionContext ? [sessionContext] : [];
+  const previousDate = lastAnnouncedAttachments(entries).get("date");
   // 日期一律取运行时时钟：context snapshot 的日期在会话起点冻结，跨天 compact 后
   // 剩余历史没有日期公告时，回退到它会先宣告一次过期日期。
   const date = formatLocalIsoDate(runtime.now());
@@ -296,16 +311,104 @@ export function buildRequestAnnouncements(
  * compaction 放在 summary 之前的请求前公告：保留段已有的来源不重复，date 也按来源判断。
  * date 不比较内容：保留段里是过期日期时，summary 前若再加一条日期变化，
  * 下一次请求又以保留段里的旧日期为基准追加一条，同一请求出现两次。
+ * 指令公告只认完整块：保留段有完整块时不放，内容变化由下一次请求追加增量；保留段没有完整块时
+ * （只有增量也算没有）放完整块，内容取 instructionSource（compaction 重读的结果，提交前不交给 runtime）。
+ * 修复原因：原来指令公告例外，保留段有完整块且内容变化时在 summary 之前放增量；增量落在保留段之前，
+ * 与保留段里的旧公告顺序颠倒，下一次请求以保留段的旧公告为最新，又追加一次同样的增量。
  */
 export function buildCompactLeadingAnnouncements(
   runtime: AgentRuntimeInternal,
   keptEntries: readonly RuntimeMessageEntry[],
   sessionContext?: RuntimeAttachmentEntry,
+  instructionSource: ContextBuildResult | undefined = runtime.latestContextBuildResult,
 ): RuntimeAttachmentEntry[] {
   const kept = lastAnnouncedAttachments(keptEntries);
-  return buildRequestAnnouncements(runtime, keptEntries, sessionContext).filter(
-    (entry) => !kept.has(entry.metadata.source),
+  const current = announcedInstructionFiles(keptEntries)
+    ? undefined
+    : currentInstructions(instructionSource);
+  return [
+    ...(current ? [fullInstructionAttachment(current)] : []),
+    ...buildSessionContextAndDate(runtime, keptEntries, sessionContext).filter(
+      (entry) => !kept.has(entry.metadata.source),
+    ),
+  ];
+}
+
+function currentInstructions(
+  result: ContextBuildResult | undefined,
+): ContextMetaUserAttachment | undefined {
+  return result?.metaUserAttachments.find((item) => item.source === "context_prefix");
+}
+
+/**
+ * 指令公告（指令文件与 Memory 索引）发出后不改写，变化在末尾追加增量。
+ * 已公告的文件只从历史推出：最后一条完整公告，再按顺序套用之后的增量（files 覆盖同路径，removed 删除）。
+ * 当前文件来自 runtime 最近一次构建（启动时与 compaction 提交后读取）。历史里没有完整公告时发完整公告；
+ * 有变化或新增的文件、或已公告的文件不再存在时，追加一条增量；全部相同时不发。
+ * 修复原因：原来冷恢复与 rewind 时把历史里的指令公告原位改成当前内容，已发送的前缀字节改变，
+ * prompt cache 失效，也会让 provider 对已绑定前缀的 thinking 签名校验失败。
+ */
+function buildInstructionAnnouncement(
+  current: ContextMetaUserAttachment | undefined,
+  entries: readonly RuntimeMessageEntry[],
+  reason: InstructionRefreshReason,
+  unreadable: ReadonlySet<string> = new Set(),
+): RuntimeAttachmentEntry | undefined {
+  const announced = announcedInstructionFiles(entries);
+  if (!announced) return current ? fullInstructionAttachment(current) : undefined;
+  const currentFiles = current?.files ?? [];
+  const changed = currentFiles.filter((file) => {
+    const previous = announced.get(file.path);
+    const record = instructionFileRecord(file);
+    return !previous || previous.hash !== record.hash || previous.type !== record.type;
+  });
+  // 读不出来的文件不算删除，模型保留已宣告的副本。
+  const removed = [...announced.keys()].filter(
+    (path) => !unreadable.has(path) && !currentFiles.some((file) => file.path === path),
   );
+  if (changed.length === 0 && removed.length === 0) return undefined;
+  return instructionAttachment(renderInstructionDelta(changed, removed, reason), {
+    files: changed.map(instructionFileRecord),
+    ...(removed.length > 0 ? { removed } : {}),
+    reason,
+  });
+}
+
+function fullInstructionAttachment(current: ContextMetaUserAttachment): RuntimeAttachmentEntry {
+  return instructionAttachment(current.content, {
+    files: (current.files ?? []).map(instructionFileRecord),
+  });
+}
+
+function announcedInstructionFiles(
+  entries: readonly RuntimeMessageEntry[],
+): Map<string, InstructionAnnouncement["files"][number]> | undefined {
+  const records = entries.filter(
+    (entry): entry is RuntimeAttachmentEntry =>
+      entry.kind === "attachment" && entry.metadata.source === "context_prefix",
+  );
+  const fullIndex = records.findLastIndex((record) => !record.metadata.instructions?.reason);
+  if (fullIndex === -1) return undefined;
+  const files = new Map<string, InstructionAnnouncement["files"][number]>();
+  for (const record of records.slice(fullIndex)) {
+    // 旧记录没有 metadata，只可能是完整公告；按标题行拆出文件。
+    const announcement = record.metadata.instructions ?? {
+      files: parseLegacyInstructionFiles(record.content),
+    };
+    for (const file of announcement.files) files.set(file.path, file);
+    for (const path of announcement.removed ?? []) files.delete(path);
+  }
+  return files;
+}
+
+function instructionAttachment(
+  content: string,
+  instructions: InstructionAnnouncement,
+): RuntimeAttachmentEntry {
+  return {
+    ...systemReminderAttachmentEntry("context_prefix", content),
+    metadata: { source: "context_prefix", instructions },
+  };
 }
 
 /**

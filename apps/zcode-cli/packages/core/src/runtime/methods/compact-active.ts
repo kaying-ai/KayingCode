@@ -61,6 +61,11 @@ import {
   resolveSessionContextAnnouncement,
   restateContextAfterCompact,
 } from "./context-refresh.js";
+import {
+  applyRereadInstructionSources,
+  buildRereadInstructionContext,
+  rereadInstructionSources,
+} from "./context.js";
 import { clearPromptSnapshot } from "../helpers/prompt-snapshot.js";
 import type { CompactTimelineContext, RuntimeModelTextResult } from "../types.js";
 import type { Model } from "../deps.js";
@@ -514,8 +519,8 @@ async function compactActiveConversationImpl(
       const summary = formatCompactSummaryOrThrow(this, result);
       const persistedSummary = summary;
       // 修复原因：文件恢复曾用读取状态里缓存的视图，补回的可能是旧内容或片段；现在重读当前文件。
-      // plan 文件和补回文件互不依赖，并行读取。
-      const [planFileReferenceEntry, fileRestore] = await Promise.all([
+      // plan 文件、补回文件和指令文件互不依赖，并行读取。
+      const [planFileReferenceEntry, fileRestore, instructionReread] = await Promise.all([
         this.fileSystemPort
           ? readApprovedPlanFileReferenceEntry({
               abortSignal: options.abortSignal,
@@ -530,10 +535,15 @@ async function compactActiveConversationImpl(
           preservedEntries,
           traceContext: modelTraceContext,
         }),
+        rereadInstructionSources(this, modelTraceContext, options.abortSignal),
       ]);
       // Bug 根因：compact 丢弃旧公告后曾依赖下一次请求补齐，纯 Continue 无正常收集机会。
       // 在取消检查后按保留历史重建，使用继续执行的作用域，不使用摘要候选工具。
       throwIfTurnAborted(options.abortSignal);
+      // 重读的指令内容只用于 summary 之前的完整公告；compact 落库后才交给 runtime。
+      const rereadInstructionContext = instructionReread
+        ? buildRereadInstructionContext(this, instructionReread, compactModel)
+        : undefined;
       const preCompactDiscoveredTools = collectDiscoveredTools(activeEntries);
       const discovery = compactDiscoveryMetadata({
         boundaryId: createCompactBoundaryId(),
@@ -570,6 +580,7 @@ async function compactActiveConversationImpl(
                 modelTraceContext,
                 options.abortSignal,
               ),
+              rereadInstructionContext,
             )
           : [];
       // 计划模式下 compaction 重发完整的 plan 提醒。
@@ -722,6 +733,7 @@ async function compactActiveConversationImpl(
           : recordablePostCompactEntries,
       );
       replaceReadFileStateAfterCompact(this.readFileState, fileRestore.readFileStateEntries);
+      if (instructionReread) applyRereadInstructionSources(this, instructionReread, compactModel);
       resetProjectMemoryRecall(this);
       // compaction 之后的窗口按当前代码重新组装 system：清掉 prompt 快照，并重建历史和
       // 本轮请求的前缀，下一次主循环请求重新记录。不重建时旧 system 会被当成新快照记下来。

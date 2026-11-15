@@ -299,15 +299,20 @@ export function buildMetaUserAttachments(sections: ContextSection[]): ContextMet
     };
   const attachments: ContextMetaUserAttachment[] = [];
   for (const attachmentSource of Object.values(sourceMap)) {
-    const content = buildSectionContent(
-      sections.filter(
-        (section) =>
-          section.injectionTarget === "meta_user" &&
-          !RUNTIME_ANNOUNCED_SOURCES.has(section.source) &&
-          (sourceMap[section.source] ?? "context_prefix") === attachmentSource,
-      ),
+    const grouped = sections.filter(
+      (section) =>
+        section.injectionTarget === "meta_user" &&
+        !RUNTIME_ANNOUNCED_SOURCES.has(section.source) &&
+        (sourceMap[section.source] ?? "context_prefix") === attachmentSource,
     );
-    if (content) attachments.push({ source: attachmentSource, content });
+    const content = buildSectionContent(grouped);
+    if (!content) continue;
+    const files = grouped.flatMap((section) => section.instructionFiles ?? []);
+    attachments.push({
+      source: attachmentSource,
+      content,
+      ...(files.length > 0 ? { files } : {}),
+    });
   }
   return attachments;
 }

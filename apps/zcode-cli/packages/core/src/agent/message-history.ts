@@ -25,6 +25,8 @@ import {
   parseEnvironmentAnnouncement,
   type EnvironmentAnnouncement,
 } from "../context/sections/env-info.js";
+import { parseInstructionAnnouncement } from "../context/sections/instruction-files.js";
+import type { InstructionAnnouncement } from "../context/types.js";
 import { SYSTEM_REMINDER_SOURCES, type SystemReminderSource } from "../system-reminder/source.js";
 
 // Tool call from model (simple type, no brand)
@@ -90,6 +92,8 @@ export interface RuntimeMessageMetadata {
   source: RuntimeMessageSource;
   agentListingDelta?: AgentListingDelta;
   environment?: EnvironmentAnnouncement;
+  /** context_prefix 公告了哪些指令文件；之后的请求据此判断是否追加增量。 */
+  instructions?: InstructionAnnouncement;
   inputPresentation?: RuntimeInputPresentation;
   /** 这条输入的页面状态 reminder 正文；provider 投影排序结束后才在输入旁派生 reminder。 */
   genUiState?: string;
@@ -496,14 +500,17 @@ export function cloneRuntimeMessageMetadata(
   metadata: RuntimeMessageMetadata | undefined,
 ): RuntimeMessageMetadata | undefined {
   if (!metadata) return undefined;
-  const { agentListingDelta, environment, ...rest } = metadata;
+  const { agentListingDelta, environment, instructions, ...rest } = metadata;
   const delta = parseAgentListingDelta(agentListingDelta);
   const announcement =
     metadata.source === "environment" ? parseEnvironmentAnnouncement(environment) : undefined;
+  const instructionAnnouncement =
+    metadata.source === "context_prefix" ? parseInstructionAnnouncement(instructions) : undefined;
   return {
     ...rest,
     ...(delta ? { agentListingDelta: delta } : {}),
     ...(announcement ? { environment: announcement } : {}),
+    ...(instructionAnnouncement ? { instructions: instructionAnnouncement } : {}),
     ...(metadata.compactBoundary
       ? {
           compactBoundary: {

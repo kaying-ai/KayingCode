@@ -9,6 +9,7 @@ import {
 import { parseToolSearchHiddenNames } from "../tool/search/history.js";
 import { parseAgentListingDelta } from "./agent-listing-metadata.js";
 import { parseEnvironmentAnnouncement } from "../context/sections/env-info.js";
+import { parseInstructionAnnouncement } from "../context/sections/instruction-files.js";
 import { runtimeInputMetadata } from "./runtime-input-presentation.js";
 // ============================================================
 // Session History Hydration - rebuild provider-visible context
@@ -622,6 +623,10 @@ function runtimeMessageMetadataFromPartMetadata(
   if (source === "agent_listing_delta") {
     const delta = parseAgentListingDelta(runtimeMessage.agentListingDelta);
     return { source, ...(delta ? { agentListingDelta: delta } : {}) };
+  }
+  if (source === "context_prefix") {
+    const instructions = parseInstructionAnnouncement(runtimeMessage.instructions);
+    return { source, ...(instructions ? { instructions } : {}) };
   }
   if (source === "real_user") {
     return realUserRuntimeMetadata();
