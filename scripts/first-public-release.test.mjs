@@ -35,7 +35,9 @@ test("official plugin manifests retain matching independent release versions", a
     const sourceRoot = plugin.sourceRoot;
     const [pkg, definition] = await Promise.all([
       manifest(`${sourceRoot}/package.json`),
-      manifest(`${sourceRoot}/.kayingcode-plugin/plugin.json`),
+      manifest(`${sourceRoot}/.zcode-plugin/plugin.json`).catch(() =>
+        manifest(`${sourceRoot}/.kayingcode-plugin/plugin.json`),
+      ),
     ]);
     assert.match(pkg.version, /^\d+\.\d+\.\d+$/, `${sourceRoot}/package.json`);
     assert.equal(definition.version, pkg.version, `${sourceRoot}/plugin.json`);

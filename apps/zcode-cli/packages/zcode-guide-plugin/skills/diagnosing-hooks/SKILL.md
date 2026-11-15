@@ -1,6 +1,6 @@
 ---
 name: diagnosing-hooks
-description: Use to diagnose and fix KayingCode hook configuration problems in the KayingCode client. Applies when a hook does not trigger, an event name is wrong, a matcher does not match a tool name, a script is not executable, template variables are not expanded, a timeout unit is mistaken (seconds versus milliseconds), the command and process field styles are mixed, a hook's JSON output fails validation, a hook blocks the session unexpectedly, or configuration-file hooks are not enabled. Provides configuration sources, the hooks.json schema, how to inspect hooks in the client, and a step-by-step localization and repair workflow.
+description: Use to diagnose and fix ZCode hook configuration problems in the ZCode client. Applies when a hook does not trigger, an event name is wrong, a matcher does not match a tool name, a script is not executable, template variables are not expanded, a timeout unit is mistaken (seconds versus milliseconds), the command and process field styles are mixed, a hook's JSON output fails validation, a hook blocks the session unexpectedly, or configuration-file hooks are not enabled. Provides configuration sources, the hooks.json schema, how to inspect hooks in the client, and a step-by-step localization and repair workflow.
 ---
 
 # Diagnosing Hook Configuration
@@ -11,7 +11,7 @@ Goal: reduce any hook problem to a single concrete fix.
 
 ## 1. Configuration sources and merging
 
-- **Configuration-file hooks**: the top-level `hooks` key in `~/.kayingcode/cli/config.json` (or the workspace `<repo>/.kayingcode/config.json` / `kayingcode.json`), shaped as `{ enabled?, timeoutMs?, maxOutputBytes?, events: { <Event>: [ { matcher?, hooks: [...] } ] } }`. **These are disabled by default — configuration-file hooks must set `hooks.enabled: true` to run.**
+- **Configuration-file hooks**: the top-level `hooks` key in `~/.zcode/cli/config.json` (or the workspace `<repo>/.zcode/config.json` / `zcode.json`), shaped as `{ enabled?, timeoutMs?, maxOutputBytes?, events: { <Event>: [ { matcher?, hooks: [...] } ] } }`. **These are disabled by default — configuration-file hooks must set `hooks.enabled: true` to run.**
 - **Plugin hooks**: each plugin's `hooks/hooks.json` (or its manifest `hooks` field). Plugin matchers are appended after configuration matchers. **When any plugin contributes a hook, the hook runner is enabled automatically.**
 - Non-plugin (user or workspace) configuration hooks have no trust gate; with `enabled: true` they run unconditionally.
 
@@ -25,29 +25,29 @@ Goal: reduce any hook problem to a single concrete fix.
 
 - **Event names (exactly seven)**: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PermissionRequest`, `PostToolUse`, `PostToolUseFailure`, `Stop`. Any other name is an unsupported event. (Events such as `Notification`, `SubagentStop`, and `PreCompact` are **not** supported.)
 - **The matcher is a case-sensitive regular expression**, tested against the event's match value:
-  - `SessionStart` → one of `startup`, `resume`, `clear`, `compact`
+  - `SessionStart` → one of `startup`, `resume`, `fork` (opening a forked session before its first input), `clear`, `compact`
   - Tool events (`PreToolUse`, `PostToolUse`, `PermissionRequest`, `PostToolUseFailure`) → the **tool name** (`Bash`, `Read`, `Write`, `Edit`, `Agent`, …), with aliases `Task` ↔ `Agent` and `Write`/`Edit` ← `ApplyPatch`
   - `UserPromptSubmit` → the prompt text; `Stop` → the response preview
   - An omitted matcher matches everything; an invalid regular expression never matches (silently)
 - **`type: "command"`**: `command` (a shell string); optional `shell`, `timeout` (in **seconds**), `timeoutMs` (in milliseconds, takes precedence), and `statusMessage`. Note that `async` currently has no runtime effect.
 - **`type: "process"`**: `command` (an executable) plus `args[]` (an argument vector run without a shell, the most portable choice), `timeoutMs` (in **milliseconds**), and `statusMessage`.
 - Timeout resolution: `timeoutMs` → `timeout × 1000` → the configuration's `timeoutMs` → a default of 60000 ms.
-- Template variables (expanded in the command and each argument, and also injected as environment variables): `${CLAUDE_PROJECT_DIR}` / `${KAYINGCODE_PROJECT_DIR}`, `${CLAUDE_SESSION_ID}`; and, for plugin hooks only, `${KAYINGCODE_PLUGIN_ROOT}` / `${KAYINGCODE_PLUGIN_ROOT}` and the plugin data directory. Note that a skill-directory variable is not valid in a hook and raises an error.
+- Template variables (expanded in the command and each argument, and also injected as environment variables): `${CLAUDE_PROJECT_DIR}` / `${ZCODE_PROJECT_DIR}`, `${CLAUDE_SESSION_ID}`; and, for plugin hooks only, `${CLAUDE_PLUGIN_ROOT}` / `${ZCODE_PLUGIN_ROOT}` and the plugin data directory. Note that a skill-directory variable is not valid in a hook and raises an error.
 - **Hook output**: standard output is parsed as JSON (a strict schema — any extra key fails validation), or you may use exit codes: `0` passes, `2` blocks (a deny for `PreToolUse`/`PermissionRequest`), and any other non-zero raises an error. `additionalContext` is injected into the conversation; `PreToolUse` may return a permission decision of `allow`/`ask`/`deny`; `Stop` may request continuation (up to three times).
 
 ## 3. How to inspect hooks
 
 - **In the client**: **Settings → Plugin Management** → open a plugin's detail view to see the hooks it registers and whether each is runnable.
-- **As an agent**: read the `hooks/hooks.json` (or the manifest `hooks` field) for a plugin, and the `hooks` block of `~/.kayingcode/cli/config.json` / the workspace config for configuration hooks.
-- **Execution** (fired, timed out, blocked) is recorded in the KayingCode log, with the hook's source, matcher, outcome, duration, and a preview of its error stream — enough to distinguish a timeout from a failure from a block.
+- **As an agent**: read the `hooks/hooks.json` (or the manifest `hooks` field) for a plugin, and the `hooks` block of `~/.zcode/cli/config.json` / the workspace config for configuration hooks.
+- **Execution** (fired, timed out, blocked) is recorded in the ZCode log, with the hook's source, matcher, outcome, duration, and a preview of its error stream — enough to distinguish a timeout from a failure from a block.
 
 ## 4. Common pitfalls (symptom → cause → fix)
 
 1. **Configuration-file hooks do not run** — you added `hooks.events.*` but nothing fires. They are disabled by default and are enabled automatically only when a plugin hook is present. → Set `"hooks": { "enabled": true, ... }` in the configuration.
 2. **Wrong event name** — the hook never triggers. → Use exactly one of the seven supported events.
 3. **Matcher does not match (tool name, case, or regex)** — it is registered but never fires for the tool you expect. The matcher is a case-sensitive regular expression; `"bash"` will not match `Bash`, and an invalid expression never matches. → Use the exact tool name or a correct expression (for example `"Edit|Write"`), or omit the matcher to match all. Remember the aliases `Task` → `Agent` and `Write`/`Edit` → `ApplyPatch`.
-4. **Script is not executable** — `permission denied`, with a failed outcome. The script was installed without the executable bit. → Run `chmod +x` on it, or invoke it through an interpreter, e.g. `{"type":"command","command":"bash \"${KAYINGCODE_PLUGIN_ROOT}/hooks/x.sh\""}`, so the executable bit is irrelevant.
-5. **Template variable not expanded** — a literal `${...}` or an empty path. Only recognized variables are expanded; a skill-directory variable raises an error inside a hook, and `${KAYINGCODE_PLUGIN_ROOT}` is available only for plugin hooks. → Use only supported variables, and `${KAYINGCODE_PLUGIN_ROOT}` for plugin-relative paths.
+4. **Script is not executable** — `permission denied`, with a failed outcome. The script was installed without the executable bit. → Run `chmod +x` on it, or invoke it through an interpreter, e.g. `{"type":"command","command":"bash \"${CLAUDE_PLUGIN_ROOT}/hooks/x.sh\""}`, so the executable bit is irrelevant.
+5. **Template variable not expanded** — a literal `${...}` or an empty path. Only recognized variables are expanded; a skill-directory variable raises an error inside a hook, and `${CLAUDE_PLUGIN_ROOT}` is available only for plugin hooks. → Use only supported variables, and `${CLAUDE_PLUGIN_ROOT}` for plugin-relative paths.
 6. **Timeout unit mistaken** — the hook is killed with a timed-out outcome. `command`'s `timeout` is in **seconds**; `process`'s `timeoutMs` is in **milliseconds**. `timeout: 500` means 500 seconds; `timeoutMs: 5` means 5 milliseconds. → Use `"timeout": <seconds>` for a command hook and `"timeoutMs": <milliseconds>` for a process hook.
 7. **Command and process fields mixed** — the hook is dropped. A `process` hook accepts only `command`, `args`, and `timeoutMs`; a `command` hook accepts `command`, `shell`, `timeout`, and `timeoutMs`. → Match the fields to the `type`.
 8. **JSON output fails validation** — the hook ran but its effect was discarded and the run marked failed. The output was not valid JSON, contained an extra key (the schema is strict), or its event-specific output named the wrong event. → Emit only the recognized keys with the correct event name, or emit nothing (empty output is fine) and rely on exit codes.

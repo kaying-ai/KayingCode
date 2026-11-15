@@ -57,7 +57,7 @@ _Avoid_: 远程 hero 图、远程 icon
 _Avoid_: 统一 Blocks 占位、彩色/随机色、仅按分类上色
 
 **Plugin Manifest（插件清单）**:
-插件包内 `.kayingcode-plugin/plugin.json`（兼容读取 `.claude-plugin`、`.codex-plugin`）的功能性定义。
+插件包内 `.zcode-plugin/plugin.json`（兼容读取 `.kayingcode-plugin`、`.claude-plugin`、`.codex-plugin`）的功能性定义。
 _Avoid_: marketplace.json（那是目录，不是清单）
 
 **Official Developer（官方开发者）**:
@@ -79,7 +79,7 @@ _Avoid_: 安装损坏、manifest 缺失、已卸载插件
 
 ## 本地安装入口（产品要求）
 
-1. **本地目录**：包含 `plugin.json` 或 `.kayingcode-plugin/plugin.json` 的文件夹
+1. **本地目录**：包含 `plugin.json` 或 `.zcode-plugin/plugin.json`（兼容 `.kayingcode-plugin/plugin.json`）的文件夹
 2. **本地清单**：单个 `plugin.json` / 本地 `marketplace.json`
 3. **本地 ZIP**：打包上述结构的归档
 4. **配置挂载**：`plugins.dirs` 指向本地插件根目录

@@ -33,7 +33,8 @@ const MAX_SYNC_TIMEOUT_MS = 120_000;
 const UNTRUSTED_SESSION_KEY = "__unscoped__";
 const WORKER_KIND = "kayingcode-node-repl-call";
 export const NODE_REPL_MCP_PROCESS_TITLE = "kayingcode-node-repl-mcp";
-const pluginRoot = process.env.KAYINGCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
+const pluginRoot =
+  process.env.KAYINGCODE_PLUGIN_ROOT ?? process.env.CLAUDE_PLUGIN_ROOT ?? process.cwd();
 // Browser Use 文档由独立插件提供。
 const browserDocumentationRoot = resolve(pluginRoot, "docs");
 const jsInputSchema = z
@@ -261,10 +262,15 @@ function invalidParams(message: string): never {
 }
 
 function buildRequestMeta(meta: Record<string, unknown> | undefined): NodeReplRequestMeta {
-  const parsed = requestContextSchema.safeParse(meta?.["com.kayingcode/request-context"]);
+  // 上游 3.18 的 browser-use 与测试使用 `com.zcode/request-context`；本产品宿主写入
+  // `com.kayingcode/request-context`。两者都只来自命名空间键，顶层 _meta 仍不可作为会话凭据。
+  const upstream = requestContextSchema.safeParse(meta?.["com.zcode/request-context"]);
+  const requestContext = upstream.success
+    ? upstream
+    : requestContextSchema.safeParse(meta?.["com.kayingcode/request-context"]);
   // 安全边界：顶层 MCP _meta 是第三方可扩展字段，不能成为 KayingCode session 路由凭据。
   // 只有 host client 写入的命名空间会进入 Browser bridge；旧 client 的普通 JS 仍可执行。
-  return parsed.success ? parsed.data : {};
+  return requestContext.success ? requestContext.data : {};
 }
 
 function requestSessionKey(meta: NodeReplRequestMeta): string {

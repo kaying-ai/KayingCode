@@ -35,6 +35,24 @@ async function requirePath(root, path, label) {
   }
 }
 
+/** 清单目录优先级与 CLI/extension-host 的发现顺序一致：上游 `.zcode-plugin` 优先。 */
+const PLUGIN_MANIFEST_DIRS = [".zcode-plugin", ".kayingcode-plugin"];
+
+async function readPluginManifest(pluginRoot) {
+  for (const directory of PLUGIN_MANIFEST_DIRS) {
+    const path = join(pluginRoot, directory, "plugin.json");
+    try {
+      return JSON.parse(await readFile(path, "utf8"));
+    } catch (error) {
+      if (error.code === "ENOENT") continue;
+      throw error;
+    }
+  }
+  throw new Error(
+    `Missing plugin manifest under ${pluginRoot} (${PLUGIN_MANIFEST_DIRS.join(", ")})`,
+  );
+}
+
 /** 构建工具读取唯一发行清单；运行时只消费生成后的 contracts 数据，不访问仓库配置。 */
 export async function loadOfficialPluginCatalog(root, { target, requireRuntime = false } = {}) {
   const configuration = JSON.parse(
@@ -69,9 +87,7 @@ export async function loadOfficialPluginCatalog(root, { target, requireRuntime =
     destinations.add(stagedPath);
     const pluginRoot = join(root, sourceRoot);
     const packageManifest = JSON.parse(await readFile(join(pluginRoot, "package.json"), "utf8"));
-    const manifest = JSON.parse(
-      await readFile(join(pluginRoot, ".kayingcode-plugin/plugin.json"), "utf8"),
-    );
+    const manifest = await readPluginManifest(pluginRoot);
     if (manifest.name !== name || !manifest.version || manifest.version !== packageManifest.version)
       throw new Error(`${name}: plugin/package manifest identity or version mismatch`);
     const pluginScope = packageManifest.name?.split("/")[0];
@@ -182,6 +198,7 @@ export function runtimePluginDefinitions(catalog) {
         rootCandidates,
         defaultEnabled,
         listing,
+        componentTypes,
         hostMcpServerNames,
         requiredSeedPaths,
         runtimeTopLevelPaths,
@@ -190,6 +207,7 @@ export function runtimePluginDefinitions(catalog) {
         version,
         rootCandidates,
         ...(defaultEnabled === undefined ? {} : { defaultEnabled }),
+        ...(componentTypes ? { componentTypes } : {}),
         ...(listing ? { listing } : {}),
         ...(hostMcpServerNames ? { hostMcpServerNames } : {}),
         ...(requiredSeedPaths ? { requiredSeedPaths } : {}),

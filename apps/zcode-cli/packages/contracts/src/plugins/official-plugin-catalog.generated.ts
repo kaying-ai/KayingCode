@@ -17,7 +17,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
   },
   {
     name: "android-emulator",
-    version: "0.1.0",
+    version: "0.1.1",
     rootCandidates: [
       "packages/android-emulator-plugin",
       "../android-emulator-plugin",
@@ -41,7 +41,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       },
       skillDetails: [
         {
-          name: "android-emulator",
+          name: "android-dev",
           title: {
             "en-US": "Android emulator automation",
             "zh-CN": "Android 模拟器自动化",
@@ -105,11 +105,11 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
         },
       ],
     },
-    requiredSeedPaths: ["skills/android-emulator/SKILL.md"],
+    requiredSeedPaths: [".mcp.json", "dist/mcp/server.js", "skills/android-dev/SKILL.md"],
   },
   {
     name: "browser-use",
-    version: "0.1.0",
+    version: "0.5.1",
     rootCandidates: [
       "packages/browser-use-plugin",
       "../browser-use-plugin",
@@ -408,7 +408,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
   },
   {
     name: "documents",
-    version: "0.1.0",
+    version: "0.2.2",
     rootCandidates: [
       "packages/documents-plugin",
       "../documents-plugin",
@@ -417,6 +417,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       "apps/zcode-cli/packages/documents-plugin",
     ],
     defaultEnabled: true,
+    componentTypes: ["ui"],
     listing: {
       author: {
         name: "kayingai.com",
@@ -505,13 +506,32 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
             },
           ],
         },
+        {
+          name: "docx-viewer",
+          title: {
+            "en-US": "Word document viewer",
+            "zh-CN": "Word 文档预览",
+          },
+          description: {
+            "en-US":
+              "Open DOCX files in the workspace panel with layout, comments and page navigation.",
+            "zh-CN": "在工作区面板中打开 DOCX，查看版式、批注并浏览分页。",
+          },
+        },
       ],
     },
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/docx/SKILL.md"],
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/docx/SKILL.md",
+      "skills/docx-viewer/SKILL.md",
+      "dist/server.mjs",
+      "dist/ui/assets.json",
+      "dist/ui/panel.html",
+    ],
   },
   {
     name: "pdf",
-    version: "0.1.0",
+    version: "0.2.3",
     rootCandidates: [
       "packages/pdf-plugin",
       "../pdf-plugin",
@@ -520,6 +540,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       "apps/zcode-cli/packages/pdf-plugin",
     ],
     defaultEnabled: true,
+    componentTypes: ["ui"],
     listing: {
       author: {
         name: "kayingai.com",
@@ -594,13 +615,32 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
             },
           ],
         },
+        {
+          name: "pdf-viewer",
+          title: {
+            "en-US": "PDF viewer",
+            "zh-CN": "PDF 预览",
+          },
+          description: {
+            "en-US":
+              "Open PDF files in the workspace panel with page navigation, text search and CJK fallback fonts.",
+            "zh-CN": "在工作区面板中打开 PDF，支持翻页、文本检索与中日韩字体回退。",
+          },
+        },
       ],
     },
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/pdf/SKILL.md"],
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/pdf/SKILL.md",
+      "skills/pdf-viewer/SKILL.md",
+      "dist/server.mjs",
+      "dist/ui/assets.json",
+      "dist/ui/panel.html",
+    ],
   },
   {
     name: "presentations",
-    version: "0.1.0",
+    version: "0.2.2",
     rootCandidates: [
       "packages/presentations-plugin",
       "../presentations-plugin",
@@ -609,6 +649,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       "apps/zcode-cli/packages/presentations-plugin",
     ],
     defaultEnabled: true,
+    componentTypes: ["ui"],
     listing: {
       author: {
         name: "kayingai.com",
@@ -683,13 +724,32 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
             },
           ],
         },
+        {
+          name: "pptx-viewer",
+          title: {
+            "en-US": "Presentation viewer",
+            "zh-CN": "演示文稿预览",
+          },
+          description: {
+            "en-US":
+              "Open PPTX decks in the workspace panel with slide navigation and speaker notes.",
+            "zh-CN": "在工作区面板中打开 PPTX，浏览幻灯片与演讲备注。",
+          },
+        },
       ],
     },
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/pptx/SKILL.md"],
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/pptx/SKILL.md",
+      "skills/pptx-viewer/SKILL.md",
+      "dist/server.mjs",
+      "dist/ui/assets.json",
+      "dist/ui/panel.html",
+    ],
   },
   {
     name: "spreadsheets",
-    version: "0.1.0",
+    version: "0.2.2",
     rootCandidates: [
       "packages/spreadsheets-plugin",
       "../spreadsheets-plugin",
@@ -698,6 +758,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       "apps/zcode-cli/packages/spreadsheets-plugin",
     ],
     defaultEnabled: true,
+    componentTypes: ["ui"],
     listing: {
       author: {
         name: "kayingai.com",
@@ -785,9 +846,28 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
             },
           ],
         },
+        {
+          name: "xlsx-viewer",
+          title: {
+            "en-US": "Spreadsheet viewer",
+            "zh-CN": "电子表格预览",
+          },
+          description: {
+            "en-US":
+              "Open XLSX workbooks in the workspace panel with sheet tabs, formulas and cell values.",
+            "zh-CN": "在工作区面板中打开 XLSX，切换工作表并查看公式与单元格值。",
+          },
+        },
       ],
     },
-    requiredSeedPaths: ["agents/visual-judge.md", "skills/xlsx/SKILL.md"],
+    requiredSeedPaths: [
+      "agents/visual-judge.md",
+      "skills/xlsx/SKILL.md",
+      "skills/xlsx-viewer/SKILL.md",
+      "dist/server.mjs",
+      "dist/ui/assets.json",
+      "dist/ui/panel.html",
+    ],
   },
   {
     name: "image-search",
@@ -842,7 +922,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       },
       skillDetails: [
         {
-          name: "ios-simulator",
+          name: "ios-dev",
           title: {
             "en-US": "iOS simulator automation",
             "zh-CN": "iOS 模拟器自动化",
@@ -906,11 +986,11 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
         },
       ],
     },
-    requiredSeedPaths: ["skills/ios-simulator/SKILL.md"],
+    requiredSeedPaths: [".mcp.json", "dist/mcp/server.js", "skills/ios-dev/SKILL.md"],
   },
   {
     name: "plugin-creator",
-    version: "0.1.0",
+    version: "0.1.1",
     rootCandidates: [
       "packages/plugin-creator-plugin",
       "../plugin-creator-plugin",
@@ -1076,14 +1156,14 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
     requiredSeedPaths: ["skills/skill-creator/SKILL.md"],
   },
   {
-    name: "kayingcode-guide",
-    version: "0.1.0",
+    name: "zcode-guide",
+    version: "0.3.0",
     rootCandidates: [
-      "packages/kayingcode-guide-plugin",
-      "../kayingcode-guide-plugin",
-      "../../kayingcode-guide-plugin",
+      "packages/zcode-guide-plugin",
+      "../zcode-guide-plugin",
+      "../../zcode-guide-plugin",
       "apps/zcode-cli/packages/zcode-guide-plugin",
-      "apps/zcode-cli/packages/zcode-guide-plugin",
+      "../../../zcode-guide-plugin",
     ],
     defaultEnabled: true,
     listing: {
@@ -1092,20 +1172,20 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
         url: "https://kayingai.com",
       },
       category: "utilities",
-      displayName: "KayingCode Guide",
+      displayName: "ZCode Guide",
       displayName_i18n: {
-        "zh-CN": "KayingCode 使用指南",
+        "zh-CN": "ZCode 使用指南",
       },
-      icon: "/kayingcode-guide/icon.png",
+      icon: "/zcode-guide/icon.png",
       description_i18n: {
-        "zh-CN": "提供 KayingCode 配置指南与插件、技能、MCP、命令和钩子诊断。",
+        "zh-CN": "提供 ZCode 配置指南与插件、技能、MCP、命令和钩子诊断。",
       },
       examplePrompts: [
-        "How do I configure MCP servers in KayingCode?",
-        "Diagnose my current KayingCode setup",
+        "How do I configure MCP servers in ZCode?",
+        "Diagnose my current ZCode setup",
       ],
       examplePrompts_i18n: {
-        "zh-CN": ["KayingCode 里怎么配置 MCP 服务器？", "帮我诊断当前的 KayingCode 配置"],
+        "zh-CN": ["ZCode 里怎么配置 MCP 服务器？", "帮我诊断当前的 ZCode 配置"],
       },
       skillDetails: [
         {
@@ -1284,58 +1364,10 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
           ],
         },
         {
-          name: "dynamic-workflows",
+          name: "zcode-configuration-guide",
           title: {
-            "en-US": "Dynamic workflows",
-            "zh-CN": "动态工作流",
-          },
-          description: {
-            "en-US":
-              "Write and verify CreateWorkflow scripts using typed results, explicit commands and bounded loops.",
-            "zh-CN": "编写并验证 CreateWorkflow 脚本，组织有类型结果、显式命令与有界循环。",
-          },
-          subskills: [
-            {
-              id: "design",
-              title: {
-                "en-US": "Workflow design",
-                "zh-CN": "工作流设计",
-              },
-              description: {
-                "en-US": "Choose topology, dependencies and typed subagent results.",
-                "zh-CN": "设计拓扑、依赖与子智能体结果类型。",
-              },
-            },
-            {
-              id: "test",
-              title: {
-                "en-US": "Snippet testing and debugging",
-                "zh-CN": "片段测试与调试",
-              },
-              description: {
-                "en-US":
-                  "Test pieces with EvalWorkflowSnippet and diagnose compiler/runtime failures.",
-                "zh-CN": "使用 EvalWorkflowSnippet 测试片段，定位编译与运行问题。",
-              },
-            },
-            {
-              id: "delivery",
-              title: {
-                "en-US": "Reports and artifacts",
-                "zh-CN": "报告与制品交付",
-              },
-              description: {
-                "en-US": "Publish traceable reports and artifacts and handle backgrounded runs.",
-                "zh-CN": "交付可追溯报告与制品，处理后台运行结果。",
-              },
-            },
-          ],
-        },
-        {
-          name: "kayingcode-configuration-guide",
-          title: {
-            "en-US": "Configuration guide",
-            "zh-CN": "KayingCode 配置指南",
+            "en-US": "ZCode configuration guide",
+            "zh-CN": "ZCode 配置指南",
           },
           description: {
             "en-US":
@@ -1369,12 +1401,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
         },
       ],
     },
-    requiredSeedPaths: [
-      "commands/workflow.md",
-      "skills/dynamic-workflows/SKILL.md",
-      "skills/dynamic-workflows/examples.md",
-      "skills/dynamic-workflows/patterns.md",
-    ],
+    requiredSeedPaths: ["skills/zcode-configuration-guide/SKILL.md"],
   },
   {
     name: "computer-use",
@@ -1781,6 +1808,139 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
     ],
   },
   {
+    name: "visualize",
+    version: "0.1.2",
+    rootCandidates: [
+      "packages/visualize-plugin",
+      "../visualize-plugin",
+      "../../visualize-plugin",
+      "apps/zcode-cli/packages/visualize-plugin",
+    ],
+    defaultEnabled: false,
+    listing: {
+      author: {
+        name: "kayingai.com",
+        url: "https://kayingai.com",
+      },
+      category: "productivity",
+      displayName: "Visualize",
+      displayName_i18n: {
+        "zh-CN": "交互视图",
+      },
+      description_i18n: {
+        "zh-CN": "在对话中创建交互图表、解释和设计预览。",
+      },
+      skillDetails: [
+        {
+          name: "visualize",
+          title: {
+            "en-US": "Interactive views",
+            "zh-CN": "交互视图",
+          },
+          description: {
+            "en-US":
+              "Create interactive charts, explanations and design previews inside the conversation.",
+            "zh-CN": "在对话中创建交互图表、解释与设计预览。",
+          },
+        },
+      ],
+    },
+    requiredSeedPaths: [
+      "skills/visualize/SKILL.md",
+      "skills/visualize/references/api.md",
+      "skills/visualize/references/styles.md",
+      "skills/visualize/tweak.md",
+      "skills/visualize/LICENSE.md",
+      "skills/visualize/scripts/render.py",
+      "skills/visualize/assets/visualize.css",
+      "skills/visualize/assets/visualize.html",
+      "skills/visualize/assets/calendar.js",
+      "skills/visualize/assets/runtime-manifest.json",
+      "skills/visualize/scripts/vendor.py",
+      "skills/visualize/assets/vendor/manifest.json",
+      "skills/visualize/assets/vendor/floating-ui-core-1.7.3.min.js",
+      "skills/visualize/assets/vendor/floating-ui-core-1.7.3.min.js.LICENSE",
+      "skills/visualize/assets/vendor/floating-ui-dom-1.7.4.min.js",
+      "skills/visualize/assets/vendor/floating-ui-dom-1.7.4.min.js.LICENSE",
+      "skills/visualize/assets/vendor/lucide-1.17.0.js",
+      "skills/visualize/assets/vendor/lucide-1.17.0.js.LICENSE",
+      "skills/visualize/assets/vendor/d3-7.9.0.min.js",
+      "skills/visualize/assets/vendor/d3-7.9.0.min.js.LICENSE",
+      "skills/visualize/widgets/calendar.md",
+      "skills/visualize/examples/calendar.html",
+      "skills/visualize/assets/standalone-host-bridge.js",
+      "skills/visualize/assets/standalone-shell.js",
+    ],
+  },
+  {
+    name: "design",
+    version: "0.7.2",
+    rootCandidates: [
+      "packages/design-plugin",
+      "../design-plugin",
+      "../../design-plugin",
+      "apps/zcode-cli/packages/design-plugin",
+    ],
+    defaultEnabled: false,
+    listing: {
+      author: {
+        name: "kayingai.com",
+        url: "https://kayingai.com",
+      },
+      category: "productivity",
+      displayName: "Design",
+      displayName_i18n: {
+        "zh-CN": "设计",
+      },
+      description_i18n: {
+        "zh-CN": "做网页设计稿、原型和演示稿；桌面端本地工作区可在内置浏览器里点选修改。",
+      },
+      examplePrompts: ["Design a landing page for a budgeting app", "Build an 8-page HTML deck"],
+      examplePrompts_i18n: {
+        "zh-CN": ["给记账 App 设计一个落地页", "做一份 8 页的 HTML 演示稿"],
+      },
+      skillDetails: [
+        {
+          name: "design",
+          title: {
+            "en-US": "Design workflow",
+            "zh-CN": "设计工作流",
+          },
+          description: {
+            "en-US":
+              "Produce HTML design drafts, interactive prototypes and HTML decks as workspace deliverables.",
+            "zh-CN": "以工作区文件交付 HTML 设计稿、交互原型与 HTML 演示稿。",
+          },
+        },
+      ],
+    },
+    requiredSeedPaths: [
+      "skills/design/SKILL.md",
+      "skills/design/references/catalog.md",
+      "skills/design/references/check.md",
+      "skills/design/references/create.md",
+      "skills/design/references/design-system.md",
+      "skills/design/references/interact.md",
+      "skills/design/references/output.md",
+      "skills/design/references/redesign.md",
+      "skills/design/scripts/adapt-canvas.mjs",
+      "skills/design/scripts/design-lint.mjs",
+      "skills/design/scripts/design-tokens.mjs",
+      "skills/design/scripts/import-design-system.mjs",
+      "hooks/hooks.json",
+      "hooks/run-hook.cmd",
+      "hooks/design-rules",
+    ],
+  },
+  {
+    name: "restore-legacy-sessions",
+    version: "0.1.0",
+    rootCandidates: [
+      "packages/restore-legacy-sessions-plugin",
+      "../restore-legacy-sessions-plugin",
+      "../../restore-legacy-sessions-plugin",
+      "apps/zcode-cli/packages/restore-legacy-sessions-plugin",
+    ],
     listing: {
       author: {
         name: "kayingai.com",
@@ -1795,15 +1955,19 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       description_i18n: {
         "zh-CN": "将旧版会话恢复为 KayingCode 任务与会话记录。",
       },
+      skillDetails: [
+        {
+          name: "restore-legacy-sessions",
+          title: {
+            "en-US": "Legacy session restore",
+            "zh-CN": "恢复旧版会话",
+          },
+          description: {
+            "en-US": "Restore legacy ACP-era sessions into the current task and session store.",
+            "zh-CN": "将旧版 ACP 会话恢复为当前任务与会话记录。",
+          },
+        },
+      ],
     },
-    name: "restore-legacy-sessions",
-    rootCandidates: [
-      "plugins/restore-legacy-sessions",
-      "packages/restore-legacy-sessions-plugin",
-      "../restore-legacy-sessions-plugin",
-      "../../restore-legacy-sessions-plugin",
-      "../../../../plugins/restore-legacy-sessions",
-    ],
-    version: "0.1.0",
   },
 ];

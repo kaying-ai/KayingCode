@@ -19,6 +19,7 @@ export interface OfficialPluginListingSeed {
 }
 
 export interface OfficialPluginReleaseDefinition {
+  componentTypes?: readonly string[];
   defaultEnabled?: boolean;
   listing?: OfficialPluginListingSeed;
   hostMcpServerNames?: readonly string[];

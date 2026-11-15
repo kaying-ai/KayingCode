@@ -91,6 +91,7 @@ const BROWSER_USE_PLUGIN_PACKAGE_NAME = releaseCatalog.plugins.find(
 ).packageName;
 const remoteOfficialPluginTopLevelPaths = new Set([
   ".mcp.json",
+  ".zcode-plugin",
   ".kayingcode-plugin",
   "README.md",
   // 生产远程预构建有独立顶层白名单，遗漏 agents 会在上传前永久裁掉子代理。
@@ -116,9 +117,10 @@ function shouldCopyOfficialPluginAsset(sourcePath) {
   const name = basename(sourcePath);
   return !excludedOfficialPluginAssetNames.has(name) && !name.endsWith(".pyc");
 }
-const remoteOfficialPluginRequiredPaths = remoteOfficialPluginPackages.map(
-  ({ stagedPath }) => `${stagedPath}/.kayingcode-plugin/plugin.json`,
-);
+const remoteOfficialPluginRequiredPaths = remoteOfficialPluginPackages.map(({ stagedPath }) => [
+  `${stagedPath}/.zcode-plugin/plugin.json`,
+  `${stagedPath}/.kayingcode-plugin/plugin.json`,
+]);
 
 function readKayingCodeAgentRuntimeVersion() {
   const runtimeSourcePath = join(rootDir, "packages/shared/src/kayingcode-agent-runtime.ts");
@@ -411,10 +413,13 @@ function buildRemoteOfficialPluginRuntimeForBootstrap(plugin) {
   // bootstrap:with-remote 会串行准备远端资源和工作区构建。
   // 官方插件 runtime 只在 stage 资源时需要，用当前 Node 执行等价构建，避免再嵌套包管理器与 tsc shim。
   // Browser Use 的 client 与 API 文档必须匹配，因此 bootstrap 模式下对该插件无条件重建。
-  runCommand(process.execPath, ["../../node_modules/typescript/bin/tsc"], {
-    cwd: pluginRoot,
-    env: process.env,
-  });
+  // 纯资源型 runtime（文档面板、站点面板）没有 tsconfig，直接执行自己的构建脚本。
+  if (existsSync(join(pluginRoot, "tsconfig.json"))) {
+    runCommand(process.execPath, ["../../node_modules/typescript/bin/tsc"], {
+      cwd: pluginRoot,
+      env: process.env,
+    });
+  }
   runCommand(process.execPath, [plugin.runtimeBuildScript], {
     cwd: pluginRoot,
     env: process.env,
@@ -432,12 +437,15 @@ function assertRemoteOfficialPluginRuntime(plugin) {
 }
 
 function stageRemoteOfficialPlugins(glmDir) {
+  const manifestDirectories = [".zcode-plugin", ".kayingcode-plugin"];
   for (const plugin of remoteOfficialPluginPackages) {
     const sourceRoot = join(rootDir, plugin.relativePath);
-    const manifestPath = join(sourceRoot, ".kayingcode-plugin", "plugin.json");
-    if (!existsSync(manifestPath)) {
+    const manifestPath = manifestDirectories
+      .map((directory) => join(sourceRoot, directory, "plugin.json"))
+      .find((candidate) => existsSync(candidate));
+    if (!manifestPath) {
       throw new Error(
-        `[prepare-prebuilds] missing remote official plugin manifest: ${manifestPath}`,
+        `[prepare-prebuilds] missing remote official plugin manifest under: ${sourceRoot}`,
       );
     }
 
@@ -451,14 +459,15 @@ function stageRemoteOfficialPlugins(glmDir) {
         filter: shouldCopyOfficialPluginAsset,
       });
     }
-    for (const relativePath of remoteOfficialPluginRequiredPaths) {
-      if (!relativePath.startsWith(`${plugin.stagedPath}/`)) continue;
-      const stagedAssetPath = join(glmDir, ...relativePath.split("/"));
-      if (!existsSync(stagedAssetPath)) {
-        throw new Error(
-          `[prepare-prebuilds] missing staged remote official plugin seed asset: ${stagedAssetPath}`,
-        );
-      }
+    const stagedManifest = remoteOfficialPluginRequiredPaths
+      .flat()
+      .filter((relativePath) => relativePath.startsWith(`${plugin.stagedPath}/`))
+      .map((relativePath) => join(glmDir, ...relativePath.split("/")))
+      .find((candidate) => existsSync(candidate));
+    if (!stagedManifest) {
+      throw new Error(
+        `[prepare-prebuilds] missing staged remote official plugin manifest: ${plugin.stagedPath}`,
+      );
     }
     console.log(`  [ok] mock-cdn glm official plugin ${plugin.stagedPath}`);
   }

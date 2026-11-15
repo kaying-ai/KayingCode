@@ -38,7 +38,7 @@ export async function upsertDevMarketplace({
   const errors = await preflightPlugin(pluginRoot);
   if (errors.length) throw new Error(errors.join("\n"));
   const manifest = JSON.parse(
-    await readFile(join(pluginRoot, ".kayingcode-plugin", "plugin.json"), "utf8"),
+    await readFile(join(pluginRoot, ".zcode-plugin", "plugin.json"), "utf8"),
   );
   const name = normalizePluginName(manifest.name);
   if (name !== manifest.name || name !== basename(pluginRoot))

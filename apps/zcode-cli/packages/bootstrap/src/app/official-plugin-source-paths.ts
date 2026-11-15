@@ -13,8 +13,8 @@ export function resolveDevelopmentPluginBase(
     const cli = parts.join("/") === "apps/zcode-cli/packages/cli/dist";
     const staged =
       parts.length === 5 &&
-      parts[0] === "apps" &&
-      parts[1] === "kayingcode-desktop" &&
+      ((parts[0] === "apps" && parts[1] === "kayingcode-desktop") ||
+        (parts[0] === "packages" && parts[1] === "desktop")) &&
       parts[2] === "bundled-agents" &&
       /^(?:darwin|win32|linux)-(?:arm64|x64)$/.test(parts[3]!) &&
       parts[4] === "glm";

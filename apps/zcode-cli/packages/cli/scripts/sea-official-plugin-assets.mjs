@@ -95,7 +95,10 @@ export const collectSeaOfficialPluginAssets = async ({
 };
 
 function assertPluginRoot(pluginRoot, plugin) {
-  if (!existsSync(join(pluginRoot, ".kayingcode-plugin", "plugin.json"))) {
+  if (
+    !existsSync(join(pluginRoot, ".zcode-plugin", "plugin.json")) &&
+    !existsSync(join(pluginRoot, ".kayingcode-plugin", "plugin.json"))
+  ) {
     throw new Error(`Missing ${plugin.name} plugin manifest at ${pluginRoot}`);
   }
 }
@@ -151,6 +154,7 @@ const shouldSkipDirectory = (name) =>
 
 const includedTopLevelPaths = new Set([
   ".mcp.json",
+  ".zcode-plugin",
   ".kayingcode-plugin",
   "LICENSE",
   "README.md",

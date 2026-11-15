@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 const execute = promisify(execFile);
-const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+// 文件位于 apps/zcode-cli/packages/bootstrap/test/，回到仓库根需要五级。
+const repoRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
 const entries = [
   "apps/zcode-cli/packages/cli/dist/kayingcode.cjs",
   `packages/desktop/bundled-agents/${process.platform}-${process.arch}/glm/kayingcode.cjs`,
@@ -24,7 +25,14 @@ for (const entry of entries) {
       [join(repoRoot, entry), "plugins", "list", "--available", "--json"],
       {
         cwd: root,
-        env: { ...process.env, KAYINGCODE_STORAGE_DIR: storage },
+        // 用户配置与插件缓存都必须落在临时目录，避免开发机已启用的插件改变 enabled 断言。
+        env: {
+          ...process.env,
+          HOME: root,
+          USERPROFILE: root,
+          KAYINGCODE_DATA_BASE_DIR: root,
+          KAYINGCODE_STORAGE_DIR: storage,
+        },
         maxBuffer: 4 * 1024 * 1024,
       },
     );

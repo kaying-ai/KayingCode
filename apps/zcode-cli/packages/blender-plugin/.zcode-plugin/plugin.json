@@ -1,0 +1,15 @@
+{
+  "name": "blender",
+  "version": "0.1.0",
+  "description": "Control Blender with guided scene workflows and diagnose setup or connection failures.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "description_i18n": {
+    "zh-CN": "通过引导式场景工作流控制 Blender，并诊断安装或连接故障。"
+  },
+  "skills": "skills",
+  "commands": "commands"
+}

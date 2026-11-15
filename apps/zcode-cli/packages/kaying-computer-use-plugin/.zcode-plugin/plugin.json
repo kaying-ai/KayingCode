@@ -1,0 +1,23 @@
+{
+  "name": "computer-use",
+  "version": "0.1.0",
+  "description": "Built-in desktop automation for macOS, Windows, and Linux with a native runtime bundled in KayingCode.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "./skills",
+  "mcpServers": {
+    "computer-use": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${ZCODE_PLUGIN_ROOT}/dist/mcp/server.js"],
+      "cwd": "${ZCODE_PROJECT_DIR}",
+      "timeoutMs": 600000
+    }
+  },
+  "description_i18n": {
+    "zh-CN": "内置桌面自动化：智能体驱动鼠标、键盘与界面元素，原生运行时随 KayingCode 分发。"
+  }
+}

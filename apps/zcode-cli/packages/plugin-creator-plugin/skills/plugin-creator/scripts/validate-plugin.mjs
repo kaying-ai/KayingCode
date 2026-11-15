@@ -4,17 +4,17 @@ import { spawn } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 
-const ROOT_TOKEN = "${KAYINGCODE_PLUGIN_ROOT}/";
+const ROOT_TOKEN = "${CLAUDE_PLUGIN_ROOT}/";
 const PLACEHOLDER = /\bTODO\b|\bFIXME\b|<your[-_ ][^>]+>|YOUR_API_KEY/u;
 function outside(root, path) {
   const value = relative(root, path);
   return value === ".." || value.startsWith(`..${sep}`) || isAbsolute(value);
 }
-/** 附加完整性检查，不复制 KayingCode 的 manifest schema。 */
+/** 附加完整性检查，不复制 ZCode 的 manifest schema。 */
 export async function preflightPlugin(path) {
   const root = await realpath(path);
   const errors = [];
-  const manifestPath = await realpath(join(root, ".kayingcode-plugin", "plugin.json"));
+  const manifestPath = await realpath(join(root, ".zcode-plugin", "plugin.json"));
   if (outside(root, manifestPath)) return ["Manifest symlink escapes outside plugin"];
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
   const resources = [];
@@ -67,12 +67,12 @@ export async function preflightPlugin(path) {
   }
   return errors;
 }
-export async function validatePlugin(path, cli = "kayingcode") {
+export async function validatePlugin(path, cli = "zcode") {
   const errors = await preflightPlugin(path);
   if (errors.length) throw new Error(errors.join("\n"));
   const nodeEntry = /\.[cm]?js$/u.test(cli);
   if (process.platform === "win32" && /\.cmd$/iu.test(cli))
-    throw new Error("Use --cli with kayingcode.exe or the CLI JavaScript entrypoint on Windows");
+    throw new Error("Use --cli with zcode.exe or the CLI JavaScript entrypoint on Windows");
   const args = [...(nodeEntry ? [cli] : []), "plugins", "validate", resolve(path)];
   const code = await new Promise((accept, reject) => {
     const child = spawn(nodeEntry ? process.execPath : cli, args, {
@@ -82,7 +82,7 @@ export async function validatePlugin(path, cli = "kayingcode") {
     child.once("error", reject);
     child.once("close", (exitCode) => accept(exitCode ?? 1));
   });
-  if (code !== 0) throw new Error(`KayingCode plugin validation failed (${code})`);
+  if (code !== 0) throw new Error(`ZCode plugin validation failed (${code})`);
 }
 async function main() {
   const { values, positionals } = parseArgs({
@@ -91,7 +91,7 @@ async function main() {
   });
   if (positionals.length !== 1)
     throw new Error(
-      "Usage: node validate-plugin.mjs <plugin-path> [--cli kayingcode-executable-or-js-entry]",
+      "Usage: node validate-plugin.mjs <plugin-path> [--cli zcode-executable-or-js-entry]",
     );
   await validatePlugin(positionals[0], values.cli);
 }

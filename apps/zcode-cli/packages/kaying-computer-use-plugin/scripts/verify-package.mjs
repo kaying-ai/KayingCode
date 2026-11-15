@@ -13,7 +13,7 @@ async function readJson(relativePath) {
 
 const [packageJson, manifest, upstreamLock, upstreamPackage] = await Promise.all([
   readJson("package.json"),
-  readJson(join(".kayingcode-plugin", "plugin.json")),
+  readJson(join(".zcode-plugin", "plugin.json")),
   readJson("upstream-lock.json"),
   readJson(join("vendor", "kaying-computer-use", "package.json")),
 ]);

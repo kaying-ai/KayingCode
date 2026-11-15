@@ -1,6 +1,6 @@
 # Manual test marketplace: add, install, try and update
 
-Use the existing KayingCode UI for the user handoff. The agent prepares source and the catalog; the user performs registration, installation, updates and trial. These steps require no global CLI or Node command.
+Use the existing ZCode UI for the user handoff. The agent prepares source and the catalog; the user performs registration, installation, updates and trial. These steps require no global CLI or Node command.
 
 ## Source, catalog and installation
 
@@ -21,8 +21,8 @@ The source, marketplace copy and installed copy are different locations. Registr
 
 ## First addition and installation
 
-1. In the workspace/host where the files were created, open **设置 → 插件 / Settings → Plugins**.
-2. Click the **添加 / Add** menu → **添加本地来源 / Add Local Source**.
+1. In the workspace/host where the files were created, open **插件市场 / Plugin Marketplace**.
+2. Click **添加 / Add → 添加插件市场 / Add Plugin Marketplace**.
 3. Paste the actual market root directory provided in the handoff, then click **添加 / Add**. Desktop local users can also choose the directory. For remote work or phone control, paste the directory on the target Host, not a path on the phone or an unrelated local computer.
 4. After success, open **个人 / Personal** and find the actual market name and plugin. Check the displayed name, description and expected version in the plugin details.
 5. Click **安装 / Install**. After installation, the plugin can also be managed under **设置 → 插件 / Settings → Plugins**. If it is disabled or needs configuration, explain the relevant manual enable/configuration action; preserve the user's choice.
@@ -59,7 +59,7 @@ Example Chinese handoff:
 
 > 源码：〈实际源码目录〉；测试市场清单：〈实际清单文件〉。
 >
-> 请在“设置 → 插件 → 添加 → 添加本地来源”粘贴：〈实际市场根目录〉。
+> 请在“插件市场 → 添加 → 添加插件市场”粘贴：〈实际市场根目录〉。
 >
 > 添加后在“个人 → 〈实际市场名〉”找到“〈插件展示名〉”，点击安装。
 >

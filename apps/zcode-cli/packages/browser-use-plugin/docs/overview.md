@@ -1,8 +1,8 @@
 # Built-in Browser Automation API
 
-The browser registry understands backend types `iab`, `extension`, and `cdp`. Playwright is a `Tab` API surface, not a backend. The desktop host normally advertises `iab`, while KayingCode CLI can explicitly advertise a managed headless Chromium as `cdp`. Never treat an unadvertised backend as available.
+The browser registry understands backend types `iab`, `extension`, and `cdp`. Playwright is a `Tab` API surface, not a backend. The desktop host normally advertises `iab`, while ZCode CLI can explicitly advertise a managed headless Chromium as `cdp`. Never treat an unadvertised backend as available.
 
-Start by selecting a browser and a tab. Every Browser Use JS call runs in a fresh kernel, so run the Skill bootstrap and recreate the selected browser wrapper in each call. Read its complete effective documentation once:
+Start from the browser object model. Every Browser Use JS call runs in a fresh kernel, so run the Skill bootstrap and recreate the selected browser wrapper in each call. Read its complete effective documentation once:
 
 ```js
 const browser = await agent.browsers.getDefault();
@@ -79,7 +79,7 @@ Available entry points:
   renderer shows it only if that scope is currently foreground; background sessions never steal the user's current UI.
 - `browser.tabs.new()` creates a real IAB tab and returns only after its guest ready acknowledgement.
 - `browser.user.openTabs()` lists user tabs without granting control; call `browser.user.claimTab(tab)` explicitly before using one.
-- Browser tabs persist across turns for the lifetime of the current KayingCode process. `tabs.finalize({ keep })` marks
+- Browser tabs persist across turns for the lifetime of the current ZCode process. `tabs.finalize({ keep })` marks
   only listed tabs as `handoff` or `deliverable`; unlisted tabs remain open. Only `tab.close()`, a user close, window
   close, or process exit removes a tab.
 - Creating an IAB tab automatically opens the right pane and activates that tab so the user can see browser use in progress.
@@ -91,18 +91,10 @@ Core `Tab` methods:
 - `id`, `url()`, `title()`
 - `goto(url)`
 - `back()`, `forward()`, `reload()`, `close()`
-- `screenshot(opts?)`, `screenshotWithObservation(opts?)` — the observed form binds a viewport image to one
-  subsequent `cua.clickScreenshot(...)` mouse action or `cua.tapScreenshot(...)` touch action and rejects stale coordinates.
+- `screenshot(opts?)`
 - `setViewportSize({ width, height })`, `viewportSize()` — Playwright-compatible responsive viewport control. IAB
   automatically opens the target tab in free-size mode. Width must be 320–3840 and height 320–2160; invalid input
   fails instead of being clamped.
-- `resetViewportSize()` — clears the fixed viewport on the same tab and restores the panel's natural
-  dimensions without reloading. Use this for editing workbenches and after temporary screenshot sizing.
-
-To close a tab by an observed id, use `await browser.tabs.close(id)`. This does not activate or restore
-the tab first, so it also works for a tab whose guest cannot be restored. The backend still checks
-ownership and durably removes the tab. Keep `browser.tabs.get(id)` for operations that require activation.
-
 - `getJsDialog()`
 - `markDeliverable()`, `markHandoff()`
 - `capabilities`, `cua`, `dom_cua`, `playwright`
@@ -117,11 +109,12 @@ keypress? })` scrolls from the supplied viewport anchor. `dom_cua.scroll({ node_
 - CUA and DOM CUA `keypress({ keys })` treat keys as one combination, not a sequence of independent presses.
   IAB does not expose CUA/DOM CUA `downloadMedia`; use a snapshot-proven Playwright locator's
   `downloadMedia()` when the selected element exposes a downloadable media/link URL.
-- `tab.playwright` exposes the supported Playwright surface: `locator/getBy*/frameLocator`, locator actions and
+- `tab.playwright` exposes the common Playwright surface: `locator/getBy*/frameLocator`, locator actions and
   queries, `evaluate`, `domSnapshot`, `waitForURL`, `waitForLoadState`,
   `waitForTimeout`, `expectNavigation`, and download events.
 - Fixed waiting is `tab.playwright.waitForTimeout(timeoutMs)`, never `tab.waitForTimeout`. Prefer
   `locator.waitFor(...)`, `waitForURL(...)`, `waitForLoadState(...)`, or a fresh semantic observation.
-- Routine locator, URL/load-state wait, and evaluate operations default to and are capped at 3000ms. A timeout is a signal to refresh the snapshot and rebuild the locator, not to retry it unchanged.
-- IAB does not support file uploads: `waitForEvent("filechooser")` / `fileChooser.setFiles(...)` fail with
+- Routine locator, URL/load-state wait, and evaluate operations default to and are capped at 3000ms.
+  A timeout is a signal to refresh the snapshot and rebuild the locator, not to retry it unchanged.
+- IAB does not support file upload: `waitForEvent("filechooser")` / `fileChooser.setFiles(...)` fail with
   `capability_unsupported`; no fake upload success is exposed.

@@ -394,7 +394,27 @@ importers:
         specifier: ^4.1.5
         version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.107.0)(stylus@0.64.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
-  apps/zcode-cli/packages/android-emulator-plugin: {}
+  apps/zcode-cli/packages/android-emulator-plugin:
+    dependencies:
+      '@modelcontextprotocol/server':
+        specifier: 2.0.0
+        version: 2.0.0
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.15.0(@types/node@24.19.2)(typescript@5.9.3))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.25.12)(jiti@2.7.0)(sass@1.107.0)(stylus@0.64.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/zcode-cli/packages/blender-plugin: {}
 
@@ -495,6 +515,9 @@ importers:
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.15.0(@types/node@24.19.2)(typescript@5.9.3))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.25.12)(jiti@2.7.0)(sass@1.107.0)(stylus@0.64.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/zcode-cli/packages/cli:
     dependencies:
@@ -680,7 +703,20 @@ importers:
         specifier: ^7.2.6
         version: 7.3.7(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.33.0)(sass@1.107.0)(stylus@0.64.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
 
-  apps/zcode-cli/packages/documents-plugin: {}
+  apps/zcode-cli/packages/design-plugin:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.15.0(@types/node@24.19.2)(typescript@6.0.3))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.107.0)(stylus@0.64.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  apps/zcode-cli/packages/documents-plugin:
+    devDependencies:
+      '@zcode/office-runtime':
+        specifier: workspace:*
+        version: link:../office-runtime
 
   apps/zcode-cli/packages/dynamic-workflow:
     dependencies:
@@ -716,7 +752,27 @@ importers:
 
   apps/zcode-cli/packages/image-search-plugin: {}
 
-  apps/zcode-cli/packages/ios-simulator-plugin: {}
+  apps/zcode-cli/packages/ios-simulator-plugin:
+    dependencies:
+      '@modelcontextprotocol/server':
+        specifier: 2.0.0
+        version: 2.0.0
+      zod:
+        specifier: 4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.2
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.12(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(jsdom@29.1.1(@noble/hashes@1.8.0))(msw@2.15.0(@types/node@24.19.2)(typescript@5.9.3))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.25.12)(jiti@2.7.0)(sass@1.107.0)(stylus@0.64.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1))
 
   apps/zcode-cli/packages/kaying-computer-use-plugin:
     devDependencies:
@@ -864,11 +920,19 @@ importers:
         specifier: 4.6.5
         version: 4.6.5
 
-  apps/zcode-cli/packages/pdf-plugin: {}
+  apps/zcode-cli/packages/pdf-plugin:
+    devDependencies:
+      '@zcode/office-runtime':
+        specifier: workspace:*
+        version: link:../office-runtime
 
   apps/zcode-cli/packages/plugin-creator-plugin: {}
 
-  apps/zcode-cli/packages/presentations-plugin: {}
+  apps/zcode-cli/packages/presentations-plugin:
+    devDependencies:
+      '@zcode/office-runtime':
+        specifier: workspace:*
+        version: link:../office-runtime
 
   apps/zcode-cli/packages/restore-legacy-sessions-plugin: {}
 
@@ -880,7 +944,11 @@ importers:
 
   apps/zcode-cli/packages/skill-creator-plugin: {}
 
-  apps/zcode-cli/packages/spreadsheets-plugin: {}
+  apps/zcode-cli/packages/spreadsheets-plugin:
+    devDependencies:
+      '@zcode/office-runtime':
+        specifier: workspace:*
+        version: link:../office-runtime
 
   apps/zcode-cli/packages/superpowers-plugin: {}
 

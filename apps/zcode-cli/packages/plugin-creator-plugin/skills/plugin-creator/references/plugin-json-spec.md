@@ -1,6 +1,6 @@
-# KayingCode plugin and marketplace reference
+# ZCode plugin and marketplace reference
 
-A plugin uses `.kayingcode-plugin/plugin.json`. Its `name` is its stable identifier; this scaffold uses lower-case hyphenated names, at most 64 characters, and initial version `0.1.0`.
+A plugin uses `.zcode-plugin/plugin.json`. Its `name` is its stable identifier; this scaffold uses lower-case hyphenated names, at most 64 characters, and initial version `0.1.0`.
 
 ```json
 {
@@ -12,13 +12,13 @@ A plugin uses `.kayingcode-plugin/plugin.json`. Its `name` is its stable identif
 }
 ```
 
-Optional components: `skills` and `commands` point to directories; `hooks` points to `hooks/hooks.json`; `mcpServers` can point to `.mcp.json` or contain the server configuration. Only declare real resources. Paths stay within the plugin root. Use `${KAYINGCODE_PLUGIN_ROOT}` in MCP arguments and hook commands for the runtime plugin location. The loader handles the token; shell scripts must not guess the install cache path.
+Optional components: `skills` and `commands` point to directories; `hooks` points to `hooks/hooks.json`; `mcpServers` can point to `.mcp.json` or contain the server configuration. Only declare real resources. Paths stay within the plugin root. Use `${CLAUDE_PLUGIN_ROOT}` in MCP arguments and hook commands for the runtime plugin location. The loader handles the token; shell scripts must not guess the install cache path.
 
 Skills contain `<name>/SKILL.md` with `name` and `description` YAML frontmatter. Commands are Markdown documents. The generator provides minimal examples for skills, commands, MCP and SessionStart hooks. Implement the actual requested behavior before reporting success.
 
 ## Marketplace
 
-For a local marketplace, use `.claude-plugin/marketplace.json` at its root. The root-level `marketplace.json` is also supported by KayingCode. Sources are resolved against that root, not the `.claude-plugin` directory.
+For a local marketplace, use `.claude-plugin/marketplace.json` at its root. The root-level `marketplace.json` is also supported by ZCode. Sources are resolved against that root, not the `.claude-plugin` directory.
 
 ```json
 {
@@ -46,7 +46,7 @@ Use this development layout. When Node is already available, `upsert-dev-marketp
 <workspace>/plugins/
   marketplace.json       name: dev-<workspace>-<canonical-path-hash>
   my-plugin/
-    .kayingcode-plugin/plugin.json
+    .zcode-plugin/plugin.json
     skills/my-plugin/SKILL.md
 ```
 
@@ -65,4 +65,4 @@ Scaffold components are selected with `--with-skills`, `--with-mcp`, `--with-hoo
 
 These helpers prepare files only. Their use does not authorize registration or installation. If Node is unavailable, use file tools and the manifest/catalog examples above; asking the user to install Node is not part of this handoff.
 
-Codex's `interface`, availability/authentication `policy`, `.app.json`, implicit `~/.agents/plugins/marketplace.json` discovery and `codex://` handoff links are not this workflow's contract. Use KayingCode's format, and distinguish source inspection from any schema/runtime validation actually performed.
+Fields and conventions from other plugin formats, such as `interface`, availability/authentication `policy`, `.app.json`, implicit `~/.agents/plugins/marketplace.json` discovery and custom-scheme handoff links, are not this workflow's contract. Use ZCode's format, and distinguish source inspection from any schema/runtime validation actually performed.

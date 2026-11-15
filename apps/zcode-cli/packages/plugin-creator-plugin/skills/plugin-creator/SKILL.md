@@ -1,13 +1,13 @@
 ---
 name: plugin-creator
-description: Create or update KayingCode plugin source and a local test marketplace, then guide the user to add, install, update and try it in the app. Use for new plugins or changes to an existing plugin's capabilities, manifest or local distribution.
+description: Create or update ZCode plugin source and a local test marketplace, then guide the user to add, install, update and try it in the app. Use for new plugins or changes to an existing plugin's capabilities, manifest or local distribution.
 ---
 
 # Plugin Creator
 
-Deliver implemented plugin source, a local dev marketplace catalog, and precise UI instructions for the user to add the market, install/update the plugin and try it. Use KayingCode manifests; the authoring workflow is adapted from Codex's plugin-creator.
+Deliver implemented plugin source, a local dev marketplace catalog, and precise UI instructions for the user to add the market, install/update the plugin and try it. Use ZCode manifests.
 
-The current handoff is manual. Do not register markets, install/update/enable plugins, or publish as part of this skill. Ordinary Desktop users are not expected to have a global `kayingcode` CLI or `node` command. Use existing file tools when helper runtimes are unavailable; do not ask users to install development tooling to complete the UI steps. A skill reference alone has no plugin requirements: ask what the plugin should do before generating files.
+The current handoff is manual. Do not register markets, install/update/enable plugins, or publish as part of this skill. Ordinary Desktop users are not expected to have a global `zcode` CLI or `node` command. Use existing file tools when helper runtimes are unavailable; do not ask users to install development tooling to complete the UI steps. A skill reference alone has no plugin requirements: ask what the plugin should do before generating files.
 
 ## 1. Define the outcome and source
 
@@ -15,11 +15,11 @@ Read the target workspace's instructions. Reuse the user's choices for purpose, 
 
 Default source location: `<workspace>/plugins/<slug>/`. An explicit directory wins. Work on the target host for remote work. For an existing plugin, inspect its manifest and edit the original source while retaining its identity.
 
-Read [the KayingCode manifest reference](references/plugin-json-spec.md) before choosing components. This step is complete when the source location and acceptance example are concrete.
+Read [the ZCode manifest reference](references/plugin-json-spec.md) before choosing components. This step is complete when the source location and acceptance example are concrete.
 
 ## 2. Create and implement
 
-Create `.kayingcode-plugin/plugin.json` and only the components the plugin needs. The directory name and manifest name must match. Use the available file tools, or the optional bundled `scripts/create-basic-plugin.mjs` helper when Node is already runnable. Helper options and examples are in the manifest reference.
+Create `.zcode-plugin/plugin.json` and only the components the plugin needs. The directory name and manifest name must match. Use the available file tools, or the optional bundled `scripts/create-basic-plugin.mjs` helper when Node is already runnable. Helper options and examples are in the manifest reference.
 
 Implement the requested capability and replace generic scaffold descriptions with its purpose. The generated MCP server only implements a handshake and an empty tool list; implement real tools before reporting a working integration. Keep secrets in user-config/environment/credential mechanisms.
 
@@ -29,7 +29,7 @@ Preserve existing source. Ordinary iteration edits implemented files and increme
 
 Check manifest JSON, declared resource existence, directory/name consistency, path containment and unresolved placeholders. Run the representative capability smoke test with available tools. Report unavailable runtime or credential-dependent checks explicitly.
 
-In an existing developer environment, `scripts/validate-plugin.mjs` can additionally invoke `kayingcode plugins validate`; use its `--cli` override only when an actual working entry is already known. This is optional developer verification, not a prerequisite or a command to give ordinary Desktop users. File inspection alone does not prove KayingCode schema validation or runtime execution.
+In an existing developer environment, `scripts/validate-plugin.mjs` can additionally invoke `zcode plugins validate`; use its `--cli` override only when an actual working entry is already known. This is optional developer verification, not a prerequisite or a command to give ordinary Desktop users. File inspection alone does not prove ZCode schema validation or runtime execution.
 
 ## 4. Prepare the local test marketplace
 
@@ -41,7 +41,7 @@ Read [manual installation, updates and trial](references/installing-and-updating
 
 ## 5. Guide the user's UI actions
 
-Provide the actual market root directory and instruct the user to open **Settings → Plugins → Add → Add Local Source**, paste that directory, and add it. Then use the **Personal** segment → the actual market name → plugin → **Install**. Follow the reference for updates and failures.
+Provide the actual market root directory and instruct the user to open **Plugin Marketplace → Add → Add Plugin Marketplace**, paste that directory, and add it. Then use **Personal → the actual market name → plugin → Install**. Follow the reference for updates and failures.
 
 Give a concrete new-task trial prompt with its expected result. For a skill, tell the user to select the installed plugin/skill from the composer picker after installation. Only provide an installed `SKILL.md` reference if its actual path has been observed; a source path is not an installed reference. Preserve the user's disabled choices and explain any needed manual enable/configuration step.
 

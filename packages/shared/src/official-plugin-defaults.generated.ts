@@ -10,6 +10,6 @@ export const GENERATED_DEFAULT_OFFICIAL_PLUGIN_IDS: readonly string[] = [
   "image-search@kayingcode-plugins-official",
   "plugin-creator@kayingcode-plugins-official",
   "skill-creator@kayingcode-plugins-official",
-  "kayingcode-guide@kayingcode-plugins-official",
+  "zcode-guide@kayingcode-plugins-official",
   "kaying-game-playtest@kayingcode-plugins-official",
 ];

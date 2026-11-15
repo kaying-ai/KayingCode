@@ -22,7 +22,7 @@ it("imports ordered chunks and keeps identical filenames independent", async () 
     await expect(importer.finish(first)).rejects.toThrow();
     await importer.chunk(first, 2, new Uint8Array([3, 4]));
     const path = await importer.finish(first);
-    expect(path).toMatch(/^\.kayingcode\/document-imports\/[^/]+\/sample\.pdf$/);
+    expect(path).toMatch(/^\.zcode\/document-imports\/[^/]+\/sample\.pdf$/);
     expect([...(await readFile(join(root, path)))]).toEqual([1, 2, 3, 4]);
     const second = await importer.begin("sample.pdf", 1);
     await importer.chunk(second, 0, new Uint8Array([5]));
@@ -37,7 +37,7 @@ it("rejects traversal and removes canceled partial imports", async () => {
   await expect(importer.begin("sample.pdf", 0)).rejects.toThrow();
   const id = await importer.begin("sample.pdf", 1);
   await importer.cancel(id);
-  expect(await readdir(join(root, ".kayingcode/document-imports"))).toEqual([]);
+  expect(await readdir(join(root, ".zcode/document-imports"))).toEqual([]);
   await expect(importer.finish(id)).rejects.toThrow();
   await importer.close();
 });
@@ -52,7 +52,7 @@ it("serializes concurrent admission and reclaims expired slots", async () => {
   expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(4);
   now += 10 * 60 * 1000 + 1;
   const next = await importer.begin("b.pdf", 1);
-  expect(await readdir(join(root, ".kayingcode/document-imports"))).toHaveLength(1);
+  expect(await readdir(join(root, ".zcode/document-imports"))).toHaveLength(1);
   await importer.chunk(next, 0, new Uint8Array([1]));
   const path = await importer.finish(next);
   await importer.close();
@@ -71,7 +71,7 @@ it("counts import slots per session", async () => {
 
 it("startup cleans only expired partials, preserves completed and recent imports", async () => {
   const { root, importer } = await fixture();
-  const parent = join(root, ".kayingcode/document-imports");
+  const parent = join(root, ".zcode/document-imports");
   for (const [name, file] of [
     ["old", ".partial"],
     ["recent", ".partial"],

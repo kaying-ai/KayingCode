@@ -50,10 +50,7 @@ import type {
   PluginMetadata,
   PluginStoreListing,
 } from "@zcode/contracts";
-import {
-  KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE,
-  isOfficialMarketplaceId,
-} from "@zcode/contracts";
+import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE, isOfficialMarketplaceId } from "@zcode/contracts";
 import {
   resolveOfficialPluginRoots,
   resolveOfficialPluginFilesystemRootByName,
@@ -421,7 +418,9 @@ export function enrichCachedClaudeMarketplaceIconsForOverview(
   );
 }
 
-export function listKayingCodePlugins(options: ListKayingCodePluginsOptions = {}): PluginLoadOutcome {
+export function listKayingCodePlugins(
+  options: ListKayingCodePluginsOptions = {},
+): PluginLoadOutcome {
   const outcome = resolveKayingCodePlugins(options);
   const { pluginStorageRoot } = resolvePluginContext(options);
   return {
@@ -987,7 +986,7 @@ export async function installKayingCodeLocalPlugin(
       // 此时用目录名作为 pluginName 走标准 install。
       const fallbackName =
         source.source === "directory"
-          ? basename(source.path).replace(/\.kayingcode-plugin$/u, "")
+          ? basename(source.path).replace(/\.(?:zcode|kayingcode)-plugin$/u, "")
           : "";
       if (!fallbackName) {
         return {

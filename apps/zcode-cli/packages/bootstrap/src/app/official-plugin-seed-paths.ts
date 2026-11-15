@@ -12,6 +12,7 @@
 /** 允许 seed 收集的顶层文件/目录名。 */
 export const includedTopLevelPaths: ReadonlySet<string> = new Set([
   ".mcp.json",
+  ".zcode-plugin",
   ".kayingcode-plugin",
   "README.md",
   // 官方内容插件新增 agents 后，filesystem seed 的顶层白名单未同步，目录被静默裁掉。

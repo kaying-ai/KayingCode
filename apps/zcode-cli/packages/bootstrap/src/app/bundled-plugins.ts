@@ -24,6 +24,7 @@ import {
   type OfficialPluginDefinition,
 } from "./official-plugin-definitions.js";
 import { writeOfficialPluginRuntimeManifest } from "./official-plugin-runtime.js";
+import { isPluginManifestRelativePath, resolvePluginManifestPath } from "./plugin-manifest-path.js";
 import { resolveDevelopmentPluginBase } from "./official-plugin-source-paths.js";
 import {
   isOfficialPluginSeedLockTimeoutError,
@@ -116,9 +117,7 @@ function seedBundledOfficialPlugins(input: {
       withOfficialPluginSeedLock(
         targetRoot,
         () => {
-          const manifestFile = plugin.files.find(
-            (file) => file.path === ".kayingcode-plugin/plugin.json",
-          );
+          const manifestFile = plugin.files.find((file) => isPluginManifestRelativePath(file.path));
           if (!manifestFile)
             throw new Error(`Bundled plugin manifest is missing: ${plugin.definition.name}`);
           const sourceManifestContents = readSeedFileBytes(source, plugin, manifestFile).toString(
@@ -311,7 +310,7 @@ function resolveFilesystemPluginRoot(definition: OfficialPluginDefinition): stri
   for (const baseDir of candidateBaseDirs()) {
     for (const relativePath of definition.rootCandidates) {
       const rootPath = resolve(baseDir, relativePath);
-      if (existsSync(join(rootPath, ".kayingcode-plugin", "plugin.json"))) return rootPath;
+      if (existsSync(resolvePluginManifestPath(rootPath))) return rootPath;
     }
   }
   return undefined;
@@ -428,7 +427,7 @@ function readSeedPluginDescription(
   source: OfficialPluginSeedSource,
   plugin: OfficialPluginSeedPluginSource,
 ): string | undefined {
-  const manifestFile = plugin.files.find((file) => file.path === ".kayingcode-plugin/plugin.json");
+  const manifestFile = plugin.files.find((file) => isPluginManifestRelativePath(file.path));
   if (!manifestFile) return undefined;
   try {
     const parsed = JSON.parse(readSeedFileBytes(source, plugin, manifestFile).toString("utf8")) as {
@@ -459,9 +458,9 @@ function isSeedCurrent(targetRoot: string, plugin: OfficialPluginSeedPluginSourc
  */
 function isSeedUsable(targetRoot: string, definition: OfficialPluginDefinition): boolean {
   try {
-    const manifest = JSON.parse(
-      readFileSync(join(targetRoot, ".kayingcode-plugin", "plugin.json"), "utf8"),
-    ) as { name?: unknown };
+    const manifest = JSON.parse(readFileSync(resolvePluginManifestPath(targetRoot), "utf8")) as {
+      name?: unknown;
+    };
     if (manifest.name !== definition.name) return false;
   } catch {
     return false;

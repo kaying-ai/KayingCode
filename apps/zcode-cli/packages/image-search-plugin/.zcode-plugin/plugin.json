@@ -1,0 +1,14 @@
+{
+  "name": "image-search",
+  "version": "0.1.0",
+  "description": "Find open-licensed illustration and reference images through a local MCP server backed by the Openverse API.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "description_i18n": {
+    "en": "Find open-licensed illustration and reference images through a local MCP server backed by the Openverse API.",
+    "zh-CN": "通过基于 Openverse API 的本地 MCP 服务查找开放许可的插图与参考配图。"
+  }
+}

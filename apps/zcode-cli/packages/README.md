@@ -2,7 +2,8 @@
 
 > 文档性质：调查报告，不是行为规范，也不是发行许可验收结论。
 > 评估基准：2026-11-08 当前检出源码；实测命令与输出见第 5 节。
-> 事实来源：`config/official-plugins.json`（唯一发行登记）、各插件 `.kayingcode-plugin/plugin.json` 与 `package.json`、`LICENSE`、`THIRD_PARTY_NOTICES.md`、`upstream-lock.json`、`third-party/inventory.json`。本文不另建版本清单；版本与 npm 包名以发行登记及生成的 `SOURCE_PACKAGES.md` 为准。
+> **2026-11-15 更新**：P5 已把内置插件替换为上游版本并统一 `.zcode-plugin` 清单，发行项增至 19 个（新增 `design`/`visualize`/`restore-legacy-sessions`，`kayingcode-guide` 更名 `zcode-guide`）。本文第 2–4 节保留 11-08 调查快照；当前版本、源码目录、交付形态与包名以 `config/official-plugins.json` 和根 `SOURCE_PACKAGES.md` 为准，迁移说明见 `scripts/spec/upstream-sync-3-18-2.md` 第二十批。
+> 事实来源：`config/official-plugins.json`（唯一发行登记）、各插件 `.zcode-plugin/plugin.json` 与 `package.json`、`LICENSE`、`THIRD_PARTY_NOTICES.md`、`upstream-lock.json`、`third-party/inventory.json`。本文不另建版本清单；版本与 npm 包名以发行登记及生成的 `SOURCE_PACKAGES.md` 为准。
 
 ## 1. 维护位置
 

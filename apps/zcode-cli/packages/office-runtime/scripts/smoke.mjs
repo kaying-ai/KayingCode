@@ -43,7 +43,7 @@ try {
       command: process.execPath,
       args: [join(root, "dist/server.mjs")],
       cwd: workspace,
-      env: { PATH: process.env.PATH ?? "", KAYINGCODE_WORKSPACE_ROOT: workspace },
+      env: { PATH: process.env.PATH ?? "", ZCODE_WORKSPACE_ROOT: workspace },
       stderr: "pipe",
     }),
   );
@@ -93,7 +93,7 @@ try {
   // Panel resource and assets.
   const panel = await client.readResource({ uri: ui("panel.html") });
   assert.equal(panel.contents[0].mimeType, "text/html;profile=mcp-app");
-  assert.deepEqual(panel.contents[0]._meta, { "kayingcode/csp": { wasmUnsafeEval: true } });
+  assert.deepEqual(panel.contents[0]._meta, { "zcode/csp": { wasmUnsafeEval: true } });
   const html = panel.contents[0].text;
   assert.ok(html.includes('<div id="root">') && !html.includes("__BOOTSTRAP__"));
   assert.ok(!html.includes("__TITLE__"));
