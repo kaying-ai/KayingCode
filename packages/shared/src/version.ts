@@ -16,3 +16,5 @@ export const KAYINGCODE_BUILD_TIME: string =
 export const ZCODE_UPSTREAM_VERSION: string =
   typeof __ZCODE_UPSTREAM_VERSION__ !== "undefined" ? __ZCODE_UPSTREAM_VERSION__ : "unknown";
 export const ZCODE_VERSION = KAYINGCODE_VERSION;
+/** 上游诊断/遥测格式沿用 ZCODE_* 字段名；产品侧填入同一个构建提交。 */
+export const ZCODE_COMMIT = KAYINGCODE_COMMIT;
