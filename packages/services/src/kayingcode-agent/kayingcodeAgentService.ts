@@ -1,4 +1,9 @@
 import { sessionLifecycleSnapshotSchema, type SessionLifecycleSnapshot } from "@zcode/shared";
+import { credentialCipherRequestSchema } from "@zcode/shared";
+import {
+  executeCredentialCipherRequest,
+  type CredentialCipher,
+} from "@zcode/shared/credential-security";
 import { requestPluginReferenceCatalog } from "#src/kayingcode-agent/pluginReferenceCatalogRequest.js";
 import { createAppControlReverseRpc } from "#src/app-control/index.js";
 import type { AppControlService } from "#src/app-control/contract.js";
@@ -939,6 +944,8 @@ interface CreateKayingCodeAgentServiceOptions extends Omit<
    * browser 命令返回 backend_unavailable，不影响其它功能。
    */
   browserControlExecutor?: BrowserAmbientContextExecutor;
+  /** Host 注入的凭据 cipher；缺省时内置 CLI 的凭据请求 fail closed。 */
+  credentialCipherProvider?: CredentialCipher;
   /**
    * 官方 Server MCP 身份头解析器。Agent 进程不持有用户身份权威，
    * 经 interaction/requestOfficialMcpAuthHeaders 向 host 索取本次请求的身份头。
@@ -2349,6 +2356,25 @@ export function createKayingCodeAgentService(
             headersApplied: false,
             errorMessage: "Provider request auth is unavailable",
           });
+          return;
+        }
+
+        // 内置 CLI / 桌面 agent 的凭据加解密：只转发单次请求，主密钥不进入协议载荷。
+        if (request.method === kayingcodeProtocolMethods.interactionRequestCredentialCipher) {
+          const parsed = credentialCipherRequestSchema.safeParse(request.params);
+          const cipher = options?.credentialCipherProvider;
+          if (!parsed.success || !cipher) {
+            void client
+              .respondError(request.id, {
+                code: -32602,
+                message: "Credential cipher is unavailable",
+              })
+              .catch(() => {});
+            return;
+          }
+          void executeCredentialCipherRequest(cipher, parsed.data)
+            .then((reply) => client.respond(request.id, reply))
+            .catch(() => {});
           return;
         }
 

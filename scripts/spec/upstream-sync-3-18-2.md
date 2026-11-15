@@ -86,15 +86,17 @@
 | 3    | 部分延后 | context-composition：开源树内只有闭源 App 客户端消费，当前接入无产品入口；本轮只保留 blockIndex 所需的类型占位，完整分类/协议/查询待 App 侧接入后再排期 |
 | 4    | 已采纳   | blockIndex：块到达序号贯穿流式/非流式、持久化、冷恢复与请求排序；服务端工具轮次、文字块不合并、旧消息保持旧布局；工具历史与读文件状态按序号排序         |
 
-### F. 本轮明确不采纳
+### F. 不采纳与已调整范围（P5 后）
 
-- 凭据体系重写（`systemCredentialCipher`、`enc:v2`、`@napi-rs/keyring`）与 OAuth/账号/套餐链路。
-- `packages/plugin-api`、`packages/session-control`、desktop `extension-host`、`app-control`、`app-control-navigation`。
-- `design-runtime`、`design-plugin`、browser-use 设计模式与 `embeddedBrowserDesignBridge`。
-- `windows-runtime-host` 与上游 Windows 签名/NSIS/electron-builder 全量补丁。
-- voice-input、selection-comment、composer-edit-mode、managed-worktrees、extension-slots、settings-search、data-sync、plugin-ui。
-- i18n 的 ja/ko/ru 与 locale 五值改造；`toolGrouping*` 移除。
-- 上游 desktop/CLI 测试与文档整批回流。
+- 已采纳：`packages/plugin-api`、`packages/session-control`、desktop `extension-host`、`app-control`、`app-control-navigation`、`extension-slots`、plugin-ui/MCP App 页面层、`design-plugin`（P0–P5）。
+- 已采纳（PR1）：`enc:v2` 系统凭据 cipher、`@napi-rs/keyring`、Desktop Main 单一 keyring 所有权、Host/CLI cipher 桥、数据根 key share。
+- 仍不采纳：上游 OAuth/账号/套餐/登录凭据链路与 `shared-credentials` 的 OAuth 恢复/CAS 机制。
+- 仍不采纳：`design-runtime`、browser-use 设计模式与 `embeddedBrowserDesignBridge`。
+- 仍不采纳：`windows-runtime-host` 与上游 Windows 签名/NSIS/electron-builder 全量补丁。
+- 仍不采纳：voice-input、selection-comment、composer-edit-mode、managed-worktrees、settings-search、data-sync。
+- 仍不采纳：i18n 的 ja/ko/ru 与 locale 五值改造；`toolGrouping*` 移除。
+- 仍不采纳：上游 desktop/CLI 测试与文档整批回流。
+- 待后续：远端 Server/Server CLI 的 v2 格式门禁、`--prepare-credentials` 与 release 回滚保护（PR2）。
 
 ## 验收
 
@@ -319,3 +321,14 @@
   - SEA `collectSeaOfficialPluginAssets`（win32-x64、requireRuntime）收集 **19** 个插件、**1329** 个文件，全部含 `.zcode-plugin/plugin.json`。
   - 未执行/受限：design 的 SessionStart hook 用例依赖 POSIX `sh`，本机 Windows 原生 Node 无法在 `/usr/bin:/bin` 下找到 sh（6 个环境失败）；node-repl broker 单测在 Windows 命名 socket 上 `EACCES`，browser-use 真实 Chromium E2E 已覆盖同一 bridge。两者均非 P5 代码回归。
 - `UPSTREAM_BASE` 保持 3.17.2；P5 验收完成后另行评估基线更新。
+
+第二十一批（2026-11-15，凭据体系 PR1：本机 enc:v2 与 OS 钥匙串）：
+
+- 新增 `packages/shared/src/credential-security/`：上游 v2 cipher、v1 解码、来源固定、Linux 私有文件回退、密钥共享、server prepare/handoff 与 bridge；品牌化为 KayingCode 环境变量、服务名和错误码。
+- `@napi-rs/keyring@2.1.2` 进入 shared/desktop/cli 依赖；Desktop main/host 与 CLI bundle 将其保留为运行时 external，Desktop `asarUnpack` 解包目标平台 `.node`，native policy 裁剪非目标变体并 fail-closed。
+- `credentialService` 改为异步 cipher，读取/保存时整库迁移 v1→v2；不可解密旧值保留；provisioning 与 Host 注入同一 cipher。未注入的独立 Server 继续使用 v1 兼容路径，避免在 PR2 前依赖 Secret Service。
+- Desktop Main 持有 keyring，Host 通过 `credential-cipher-request/result` 委托；内置 CLI 通过 `interaction/requestCredentialCipher` 委托 Host；数据根切换由 Host 请求 Main 执行 `credential-key-share-request`，失败中止切换。
+- Linux Main 在首次凭据访问前启用私有文件 key fallback；真实 Windows 钥匙串 roundtrip smoke 通过并清理了测试条目。
+- 回归：cipher/bridge **10/10**、services 迁移与数据根 **6/6**、keyring staging/native policy **5/5**、CLI async store **2/2**；真实 keyring smoke 通过。
+- 验证：根 typecheck、lint（0 errors/133 既有 warnings）、source:check、architecture:check --changed、CLI desktop-agent bundle 构建通过。
+- 未完成：远端 Server/Server CLI 的格式门禁、`--prepare-credentials` 与 release 回滚保护（PR2）；`UPSTREAM_BASE` 仍保持 3.17.2。

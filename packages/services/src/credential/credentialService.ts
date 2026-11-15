@@ -7,6 +7,7 @@ import {
   credentialValueSchema,
   formatZodError,
 } from "@zcode/shared";
+import { migrateCredentialRecord, type CredentialCipher } from "@zcode/shared/credential-security";
 import type { ICredentialService } from "./credential.js";
 import {
   createCredentialCipherProvider,
@@ -18,9 +19,9 @@ import { getAppConfigDir } from "../paths.js";
 /**
  * 凭据存储路径
  *
- * 当前持久化格式仍是 JSON，但 value 会在写入前加密，读取时自动解密。
- * 后续可切换到 Electron safeStorage（钥匙串）托管密钥，
- * 届时 host process 需要向 main 进程请求 encrypt/decrypt。
+ * 当前持久化格式仍是 JSON；v2 密文由 OS 钥匙串托管的随机密钥保护，
+ * 读取旧 enc:v1 值时在文件锁内整库迁移。路径按每次操作解析，数据根切换后
+ * 新路径会使用自己的 cipher / keyring 条目。
  */
 const logger = createServiceLogger("credentialService");
 
@@ -79,7 +80,7 @@ async function writeAll(credentialsFile: string, data: Record<string, string>): 
 }
 
 interface CredentialServiceDependencies {
-  cipherProvider?: CredentialCipherProvider;
+  cipherProvider?: CredentialCipher;
   /** Host 私有的持久化成功通知；不进入 Renderer/RPC 凭据接口。 */
   onDidMutate?: (event: { operation: "save" | "delete"; key: string }) => void;
 }
@@ -87,31 +88,55 @@ interface CredentialServiceDependencies {
 export function createCredentialService(
   dependencies: CredentialServiceDependencies = {},
 ): ICredentialService {
-  const cipherProvider = dependencies.cipherProvider ?? createCredentialCipherProvider();
+  // Desktop Main/Host 会注入系统 cipher；未注入的独立 Server 在 PR2 前保持 v1 兼容，
+  // 避免无 Secret Service 的远端因为本机 PR1 改动而无法启动。
+  const fallbackCipher: CredentialCipherProvider = createCredentialCipherProvider();
+  const cipherFor = (_credentialsFile: string): CredentialCipher =>
+    dependencies.cipherProvider ?? fallbackCipher;
+
+  const migrateIfNeeded = async (
+    credentialsFile: string,
+    raw: Record<string, string>,
+    cipher: CredentialCipher,
+  ): Promise<Record<string, string>> => {
+    if (!Object.values(raw).some((value) => cipher.needsMigration?.(value))) return raw;
+    return withFileLock(credentialsFile, async () => {
+      const locked = await readAll(credentialsFile);
+      const currentCipher = cipherFor(credentialsFile);
+      const migrated = await migrateCredentialRecord(locked, currentCipher);
+      if (migrated) await writeAll(credentialsFile, migrated);
+      return migrated ?? locked;
+    });
+  };
 
   return {
     async load(key: string): Promise<string | null> {
       const validatedKey = credentialKeySchema.parse(key);
-      const creds = await readAll();
+      const credentialsFile = getCredentialsFile();
+      const cipher = cipherFor(credentialsFile);
+      const creds = await migrateIfNeeded(credentialsFile, await readAll(credentialsFile), cipher);
       const rawValue = creds[validatedKey];
       if (rawValue === undefined) {
         return null;
       }
 
-      return cipherProvider.decrypt(rawValue);
+      return cipher.decrypt(rawValue);
     },
 
     async save(key: string, value: string): Promise<void> {
       const validatedKey = credentialKeySchema.parse(key);
       const validatedValue = credentialValueSchema.parse(value);
-      const encryptedValue = cipherProvider.encrypt(validatedValue);
       const credentialsFile = getCredentialsFile();
+      const cipher = cipherFor(credentialsFile);
+      const encryptedValue = await cipher.encrypt(validatedValue);
       // desktop host 与 CLI adapter 是独立进程，进程内排队不能阻止 whole-file
       // read-modify-write 丢更新；共享目录锁必须覆盖读取、变更和原子替换全过程。
       await withFileLock(credentialsFile, async () => {
         const creds = await readAll(credentialsFile);
-        creds[validatedKey] = encryptedValue;
-        await writeAll(credentialsFile, creds);
+        const migrated = await migrateCredentialRecord(creds, cipher);
+        const next = migrated ?? creds;
+        next[validatedKey] = encryptedValue;
+        await writeAll(credentialsFile, next);
       });
       dependencies.onDidMutate?.({ operation: "save", key: validatedKey });
     },

@@ -1,4 +1,14 @@
-import type { HostRemoteConversationTelemetryResponse } from "@zcode/shared";
+import {
+  CREDENTIAL_KEY_SHARE_UNAVAILABLE_ERROR_CODE,
+  type HostRemoteConversationTelemetryResponse,
+} from "@zcode/shared";
+import {
+  createSystemCredentialCipher,
+  executeCredentialCipherRequest,
+  type CredentialCipher,
+  type SystemCredentialCipher,
+} from "@zcode/shared/credential-security";
+import { getAppConfigDir } from "@zcode/services/node";
 import { ingestToolExecResource } from "./desktopResourceTelemetry.js";
 import { ingestMcpResourceSamples } from "./processResourceMcpTelemetrySource.js";
 /* eslint-disable max-lines -- host process 统一处理 main↔host 生命周期、日志、KayingCode Agent，拆分前先保持跨进程消息收口。 */
@@ -38,7 +48,7 @@ import {
   MessageChannelMain,
 } from "electron";
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { BroadcastHub } from "./broadcastHub.js";
 import { bindDatabaseStartupRelay } from "./databaseStartupRelay.js";
 import { getMainLaunchPartialMarks } from "./desktopLaunchMarks.js";
@@ -158,6 +168,25 @@ export function loadWindow(
     });
   }
 }
+
+const credentialCiphers = new Map<string, SystemCredentialCipher>();
+
+/** 凭据路径随数据根切换；按规范化文件路径缓存系统 cipher，Main 始终是 keyring 的唯一持有者。 */
+function currentCredentialCipher(): SystemCredentialCipher {
+  const filePath = join(getAppConfigDir(), "credentials.json");
+  let cipher = credentialCiphers.get(filePath);
+  if (!cipher) {
+    cipher = createSystemCredentialCipher({ filePath });
+    credentialCiphers.set(filePath, cipher);
+  }
+  return cipher;
+}
+
+export const credentialCipher: CredentialCipher = {
+  needsMigration: (value) => currentCredentialCipher().needsMigration?.(value) ?? false,
+  encrypt: (value) => currentCredentialCipher().encrypt(value),
+  decrypt: (value) => currentCredentialCipher().decrypt(value),
+};
 
 export function spawnHostProcess(
   win: BrowserWindow,
@@ -298,6 +327,43 @@ export function spawnHostProcess(
   child.on("message", (message: unknown) => {
     const result = hostResponseMessageSchema.safeParse(message);
     if (!result.success) {
+      return;
+    }
+
+    if (result.data.type === HostResponseTypes.CredentialCipherRequest) {
+      const { type: _type, ...request } = result.data;
+      void executeCredentialCipherRequest(credentialCipher, request)
+        .then((reply) => {
+          if (!exitedHostProcesses.has(child)) {
+            child.postMessage({ type: HostMessageTypes.CredentialCipherResult, ...reply });
+          }
+        })
+        .catch(() => {
+          // 原生异常可能含系统细节，不能写入日志或通道。
+        });
+      return;
+    }
+
+    if (result.data.type === HostResponseTypes.CredentialKeyShareRequest) {
+      const { requestId, targetBaseDir } = result.data;
+      const reply = (ok: boolean) => {
+        if (!exitedHostProcesses.has(child)) {
+          child.postMessage({
+            type: HostMessageTypes.CredentialKeyShareResult,
+            requestId,
+            ok,
+            ...(ok ? {} : { errorCode: CREDENTIAL_KEY_SHARE_UNAVAILABLE_ERROR_CODE }),
+          });
+        }
+      };
+      if (!isAbsolute(targetBaseDir)) {
+        reply(false);
+        return;
+      }
+      void currentCredentialCipher()
+        .shareKeyWithCopiedCredentials(join(targetBaseDir, ".kayingcode", "v2", "credentials.json"))
+        .then(() => reply(true))
+        .catch(() => reply(false));
       return;
     }
 

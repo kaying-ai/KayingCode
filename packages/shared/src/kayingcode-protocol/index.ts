@@ -4653,6 +4653,8 @@ export const kayingcodeProtocolMethods = {
   interactionRequestUserInput: "interaction/requestUserInput",
   interactionRequestProviderRuntimeHeaders: "interaction/requestProviderRuntimeHeaders",
   interactionRequestOfficialMcpAuthHeaders: "interaction/requestOfficialMcpAuthHeaders",
+  // 内置 CLI / 桌面 agent 的凭据加解密委托；系统主密钥始终留在 Host/Main owner。
+  interactionRequestCredentialCipher: "interaction/requestCredentialCipher",
   // browser-use 反向请求由 agent 发起，host 转给 main 中的 CDP executor。
   interactionBrowserList: "interaction/browserList",
   interactionBrowserExecute: "interaction/browserExecute",

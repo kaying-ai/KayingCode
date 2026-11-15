@@ -1,3 +1,5 @@
+import { keyringPlatformPackage } from "../../../scripts/stage-credential-keyring.mjs";
+
 const SUPPORTED_DESKTOP_PLATFORM_KEYS = [
   "darwin-arm64",
   "darwin-x64",
@@ -64,6 +66,10 @@ export function createDesktopNativePackagePrunePatterns(targetPlatformKey) {
     ...SHARP_VARIANT_PACKAGES.filter(
       (name) => !SHARP_VARIANTS_BY_PLATFORM[targetPlatformKey].includes(name),
     ).map((name) => `!node_modules/@img/${name}/**`),
+    // 系统凭据库同样按 optionalDependencies 分发全平台 .node；只保留目标平台变体。
+    ...SUPPORTED_DESKTOP_PLATFORM_KEYS.map((key) => keyringPlatformPackage(key))
+      .filter((name) => name !== keyringPlatformPackage(targetPlatformKey))
+      .map((name) => `!node_modules/${name}/**`),
   ];
 }
 
@@ -104,6 +110,18 @@ export function findDesktopNativePackageViolations(entries, targetPlatformKey) {
       path.startsWith("/node_modules/@napi-rs/canvas-")
     ) {
       violations.push(`不应打包 renderer 无需的 Canvas native: ${path}`);
+      continue;
+    }
+
+    // 裁剪规则漏网或收集器行为回退时，非目标平台的 keyring 变体必须在这里 fail-closed。
+    const keyringVariantMatch = /^\/node_modules\/(@napi-rs\/keyring-[a-z0-9-]+)(?:\/|$)/.exec(
+      path,
+    );
+    if (
+      keyringVariantMatch &&
+      keyringVariantMatch[1] !== keyringPlatformPackage(targetPlatformKey)
+    ) {
+      violations.push(`keyring 包含非目标平台变体: ${keyringVariantMatch[1]} ${path}`);
       continue;
     }
 
