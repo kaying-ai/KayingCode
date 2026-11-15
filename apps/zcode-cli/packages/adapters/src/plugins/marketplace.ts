@@ -29,14 +29,16 @@ import {
   isRecord,
   resolveInside,
   sanitizePluginId,
+  writePluginTextIfChanged,
 } from "./helpers.js";
 import { enumeratePluginComponents, type PluginComponentGroup } from "./plugin-components.js";
 import { applyNetworkEgressEnv } from "../network/subprocess-env.js";
 import { writeCdnOfficialMarketplacePartitionSync } from "./official-marketplace.js";
 import {
   activateDirectoryAtomically,
+  readStandaloneAtomicFile,
   recoverAtomicTargetSync,
-  writeFileAtomically,
+  resolveAtomicReadPath,
   type AtomicDirectoryActivation,
 } from "./atomic-directory.js";
 import {
@@ -698,6 +700,18 @@ export function listInstalledPluginRecords(storageRoot: string): InstalledPlugin
   return loadInstalledPluginsSync(storageRoot).plugins;
 }
 
+export async function listInstalledPluginRecordsAsync(
+  storageRoot: string,
+): Promise<InstalledPluginRecord[]> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await readStandaloneAtomicFile(join(storageRoot, INSTALLED_PLUGINS_FILE)));
+  } catch {
+    parsed = undefined;
+  }
+  return normalizeInstalledPluginsState(parsed).plugins;
+}
+
 export function resolveInstalledPluginRoot(
   storageRoot: string,
   record: InstalledPluginRecord,
@@ -706,6 +720,16 @@ export function resolveInstalledPluginRoot(
     record.installPath ||
     getPluginCacheDir(storageRoot, record.marketplace, record.name, record.version);
   return recoverAtomicTargetSync(root);
+}
+
+export async function resolveInstalledPluginRootAsync(
+  storageRoot: string,
+  record: InstalledPluginRecord,
+): Promise<string> {
+  const root =
+    record.installPath ||
+    getPluginCacheDir(storageRoot, record.marketplace, record.name, record.version);
+  return resolveAtomicReadPath(root);
 }
 
 export async function installMarketplacePlugin(input: {
@@ -889,7 +913,7 @@ export async function describeMarketplacePlugin(input: {
     (record) => record.marketplace === input.marketplace && record.name === input.name,
   );
   if (installedRecord) {
-    const rootPath = resolveInstalledPluginRoot(input.storageRoot, installedRecord);
+    const rootPath = await resolveInstalledPluginRootAsync(input.storageRoot, installedRecord);
     if (directoryExists(rootPath)) {
       const read = readComponentsAtRoot({
         diagnostics,
@@ -2662,7 +2686,7 @@ function readJsonFileSync(path: string): unknown {
 }
 
 async function writeJsonFile(path: string, value: unknown): Promise<void> {
-  await writeFileAtomically(path, `${JSON.stringify(value, null, 2)}\n`);
+  await writePluginTextIfChanged(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function getPluginCacheDir(

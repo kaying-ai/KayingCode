@@ -1,7 +1,42 @@
 import { statSync } from "node:fs";
-import { isAbsolute, relative, resolve, sep } from "node:path";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 
 const PLUGIN_SOURCE_CLEANUP_RETRY_DELAYS_MS = [0, 25, 100] as const;
+const PLUGIN_FS_RETRY_DELAYS_MS = [0, 25, 100] as const;
+
+export async function writePluginTextIfChanged(path: string, contents: string): Promise<void> {
+  try {
+    if ((await readFile(path, "utf8")) === contents) return;
+  } catch {
+    // 与原写入语义一致：读失败继续写，让实际写入错误向上传递。
+  }
+  await mkdir(dirname(path), { recursive: true });
+  const temporary = `${path}.tmp-${randomUUID()}`;
+  try {
+    await writeFile(temporary, contents, "utf8");
+    // 异步读写允许查询交错；原子替换避免读者看到半份目录或命令。
+    for (const [index, delayMs] of PLUGIN_FS_RETRY_DELAYS_MS.entries()) {
+      if (delayMs > 0) await delay(delayMs);
+      try {
+        await rename(temporary, path);
+        return;
+      } catch (error) {
+        // Windows 索引器可能短暂占用目标；有界重试仍保留旧文件与原子替换。
+        const code = (error as NodeJS.ErrnoException).code;
+        if (
+          !["EACCES", "EBUSY", "EEXIST", "ENOTEMPTY", "EPERM"].includes(code ?? "") ||
+          index === PLUGIN_FS_RETRY_DELAYS_MS.length - 1
+        )
+          throw error;
+      }
+    }
+  } finally {
+    await rm(temporary, { force: true }).catch(() => undefined);
+  }
+}
 
 export function resolveInside(rootPath: string, rawPath: string): string | null {
   if (isAbsolute(rawPath)) return null;
