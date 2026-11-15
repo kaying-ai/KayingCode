@@ -8,6 +8,7 @@ import type { TaskChatToolCallTreeNode } from "@/lib/toolCallTree.js";
 import type { ToolDisplayModel } from "@/lib/toolDisplay.js";
 import type { Theme } from "@/useTheme.js";
 import type { OpenPlanDetailSideTabRequest } from "@/lib/workspaceSidePane.js";
+import type { PluginUiToolBinding } from "@/plugin-ui/contract.js";
 // 只读分享时间线复用 renderer 时，子工具卡也必须用同一条装配路径（无 Desktop 宿主）。
 // 这里只 import type，不产生运行时边；ToolCallBlocks.tsx 反向 import 本文件的类型时不会成环。
 import type { ToolCallBlock } from "@/ToolCallBlocks.js";
@@ -210,6 +211,8 @@ export interface ToolCallBlockRenderContext {
   nestedToolRenderer: ComponentType<Parameters<typeof ToolCallBlock>[0]>;
   isOfficeMode?: boolean;
   toolCallNode: TaskChatToolCallTreeNode;
+  /** 插件 UI 绑定：scope 是沙箱登记范围，onOpenSidePane 是在侧栏打开的回调。 */
+  pluginUi?: PluginUiToolBinding;
   workspacePath: string;
   /**
    * 应用主题（store 耦合剥离）：由构建 render context 的宿主

@@ -13,6 +13,7 @@ import {
 import type { CodeViewerSource } from "@/lib/codeViewer.js";
 import { CuaGroupToolCallBlock } from "@/ToolCallBlocks/renderers/cua-group.js";
 import { resolveToolCallRenderer } from "@/ToolCallBlocks/resolveRenderer.js";
+import * as PluginUi from "@/plugin-ui/index.js";
 import { resolveToolCallIdentity } from "@/lib/toolIdentity.js";
 import {
   readRawToolCallFileSummaries,
@@ -152,6 +153,7 @@ function ToolCallBlockComponent({
   ) => ReactNode;
 }) {
   const { toolCall, childToolCalls } = toolCallNode;
+  const pluginUi = PluginUi.usePluginUiToolBinding(toolCall.toolId);
   const { intl } = useKayingCodeIntl();
   const isOfficeMode = useIsOfficeMode();
   const toolEntranceAnimationKey = `${streamingEntranceKeyPrefix}:${toolCall.toolId}`;
@@ -291,6 +293,7 @@ function ToolCallBlockComponent({
       nestedToolRenderer: ToolCallBlock,
       isOfficeMode,
       toolCallNode,
+      pluginUi,
       workspacePath,
       theme,
       codePreviewSettings,
@@ -363,7 +366,10 @@ function ToolCallBlockComponent({
     ],
   );
 
-  const ToolCallRenderer = useMemo(() => resolveToolCallRenderer(renderContext), [renderContext]);
+  const ToolCallRenderer = useMemo(() => {
+    const Renderer = resolveToolCallRenderer(renderContext);
+    return PluginUi.shouldRenderPluginUi(renderContext) ? PluginUi.PluginUiToolCallBlock : Renderer;
+  }, [renderContext]);
   // early return 必须在所有 hook 之后（见上方注释说明的崩溃原因）
   if (!showTodoToolCalls && identity.family === "todo") {
     return null;

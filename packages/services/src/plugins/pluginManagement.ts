@@ -95,3 +95,14 @@ export interface IPluginManagementService {
 export const IPluginManagementService = createServiceDescriptor<IPluginManagementService>(
   ServiceChannels.PluginManagement,
 );
+
+/**
+ * 入口只附加观测上下文。产品当前没有插件安装遥测通道，保留同名装配点，
+ * 避免 UI 层与上游调用方分叉；接入遥测时在这里代理 mutation 方法。
+ */
+export function withPluginTelemetry(
+  service: IPluginManagementService,
+  _telemetry: unknown,
+): IPluginManagementService {
+  return service;
+}

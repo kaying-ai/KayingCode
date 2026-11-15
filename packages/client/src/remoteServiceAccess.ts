@@ -34,6 +34,12 @@ import {
   IPluginSyncService,
   IPluginsService,
   IPluginManagementService,
+  IExtensionsService,
+  IExtensionViewsService,
+  IExtensionGrantsService,
+  IPluginUiBridgeService,
+  IPluginUiSamplingService,
+  IPluginUiAppToolsService,
   ISubagentsService,
   ICommandsService,
   IHooksService,
@@ -89,6 +95,8 @@ export function readMobileModelCatalog(
 export interface RemoteServiceAccessOptions {
   signal?: AbortSignal;
   sourceServerManagementService?: boolean;
+  /** 桌面本机 Window Host 的扩展门面（静态表/命令/日志/视图/授权）；Web 与手机不打开。 */
+  extensionsService?: boolean;
   windowProjectDirectory?: boolean;
   projectService?: boolean;
   remoteProjectService?: boolean;
@@ -155,6 +163,12 @@ export class RemoteServiceAccess implements IServiceAccessor {
   readonly pluginSyncService: IPluginSyncService;
   readonly pluginsService: IPluginsService;
   readonly pluginManagementService: IPluginManagementService;
+  readonly extensionsService?: IExtensionsService;
+  readonly extensionViewsService?: IExtensionViewsService;
+  readonly extensionGrantsService?: IExtensionGrantsService;
+  readonly pluginUiBridgeService: IPluginUiBridgeService;
+  readonly pluginUiSamplingService: IPluginUiSamplingService;
+  readonly pluginUiAppToolsService: IPluginUiAppToolsService;
   readonly subagentsService: ISubagentsService;
   readonly commandsService: ICommandsService;
   readonly hooksService: IHooksService;
@@ -320,6 +334,30 @@ export class RemoteServiceAccess implements IServiceAccessor {
     );
     this.pluginManagementService = ProxyChannel.toService<IPluginManagementService>(
       channelClient.getChannel(IPluginManagementService.channelName),
+    );
+    this.extensionsService = options.extensionsService
+      ? ProxyChannel.toService<IExtensionsService>(
+          channelClient.getChannel(IExtensionsService.channelName),
+        )
+      : undefined;
+    this.extensionViewsService = options.extensionsService
+      ? ProxyChannel.toService<IExtensionViewsService>(
+          channelClient.getChannel(IExtensionViewsService.channelName),
+        )
+      : undefined;
+    this.extensionGrantsService = options.extensionsService
+      ? ProxyChannel.toService<IExtensionGrantsService>(
+          channelClient.getChannel(IExtensionGrantsService.channelName),
+        )
+      : undefined;
+    this.pluginUiBridgeService = ProxyChannel.toService<IPluginUiBridgeService>(
+      channelClient.getChannel(IPluginUiBridgeService.channelName),
+    );
+    this.pluginUiSamplingService = ProxyChannel.toService<IPluginUiSamplingService>(
+      channelClient.getChannel(IPluginUiSamplingService.channelName),
+    );
+    this.pluginUiAppToolsService = ProxyChannel.toService<IPluginUiAppToolsService>(
+      channelClient.getChannel(IPluginUiAppToolsService.channelName),
     );
     this.subagentsService = ProxyChannel.toService<ISubagentsService>(
       channelClient.getChannel(ISubagentsService.channelName),

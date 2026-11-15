@@ -31,6 +31,7 @@ import type {
   PluginBrowserCompareContributionEntry,
 } from "@/lib/workspaceSidePane.js";
 import type { TreemappingSidePaneTab } from "@/lib/workspaceSidePane.js";
+import type { ExtensionViewSidePaneTab, FileViewerRouter } from "@/extension-slots/contract.js";
 import type { WorkspaceKayingCodeUIState } from "@/store/kayingcodeSessionStore.js";
 import type { RemoteConnectionLogEntry } from "@/hooks/useRemoteConnectionLogs.js";
 import type { Theme } from "@/useTheme.js";
@@ -321,6 +322,9 @@ export interface WorkspaceShellLayoutProps extends Omit<AppProps, "baseFeedbackS
   ) => void;
   handleOpenSelectionSideChat: (request: OpenSelectionSideChatRequest) => void;
   handleOpenPlanDetail: (request: OpenScopedPlanDetailSideTabRequest) => void;
+  handleOpenExtensionView: (tab: ExtensionViewSidePaneTab) => void;
+  handleOpenExtensionLogs: () => void;
+  routeFileViewer: FileViewerRouter;
   handleOpenWorkflowRun: (request: OpenScopedWorkflowRunSideTabRequest) => void;
   handleOpenWorkflowRunDirectory: (
     request: import("@/lib/workspaceSidePane.js").OpenScopedWorkflowRunDirectorySideTabRequest,

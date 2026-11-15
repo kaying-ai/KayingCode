@@ -49,6 +49,7 @@ import { usePluginsMentionProvider } from "./providers/pluginsMentionProvider.js
 import { useSessionsMentionProvider } from "./providers/sessionsMentionProvider.js";
 import { useSkillsMentionProvider } from "./providers/skillsMentionProvider.js";
 import { useWhiteboardMentionProvider } from "./providers/whiteboardMentionProvider.js";
+import { useExtensionMentionGroups } from "@/extension-slots/index.js";
 import type { MentionItem } from "./mentionTypes.js";
 import {
   getActivePromptInputTokenReplacementRange,
@@ -219,6 +220,14 @@ export function MentionPlugin({
     intl.formatMessage({ id: "chat.mention.plugins.title" }),
   );
 
+  const extensionGroups = useExtensionMentionGroups({
+    workspacePath,
+    ...(workspaceIdentity ? { workspaceIdentity } : {}),
+    sessionId: sessionId ?? null,
+    query: activeQuery,
+    enabled: isOpen && isContextTrigger,
+  });
+
   const panelGroups = useMemo<MentionResultGroup<MentionItem>[]>(() => {
     const groupsById = {
       files: {
@@ -265,10 +274,14 @@ export function MentionPlugin({
 
     // 产品约束：@ 固定为 Plugin → 文件 → 对话 → 画板；旧 # / $ 面板继续走
     // 原单分组 provider。这里仅重排发现入口，候选自身的 canonical markdown 不变。
-    return buildVisibleMentionGroups(
-      getMentionPanelGroupOrder(activeTrigger?.trigger).map((groupId) => groupsById[groupId]),
-    );
+    return [
+      ...buildVisibleMentionGroups(
+        getMentionPanelGroupOrder(activeTrigger?.trigger).map((groupId) => groupsById[groupId]),
+      ),
+      ...(activeTrigger?.trigger === "@" ? extensionGroups : []),
+    ];
   }, [
+    extensionGroups,
     fileResult.emptyText,
     fileResult.error,
     fileResult.items,

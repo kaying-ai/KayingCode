@@ -263,7 +263,7 @@ export { IPluginSyncService } from "./plugin-sync/pluginSync.js";
 // Plugins service — IPluginsService is both a type (interface) and value (descriptor)
 export { IPluginsService } from "./plugins/plugins.js";
 // 设置页插件管理薄服务（UI 平台能力面不再直触 kayingcodeAgentService）
-export { IPluginManagementService } from "./plugins/pluginManagement.js";
+export { IPluginManagementService, withPluginTelemetry } from "./plugins/pluginManagement.js";
 // 扩展门面契约（桌面本机 Host 注册，Browser 安全入口）
 export * from "./extensions/index.js";
 
@@ -382,9 +382,15 @@ export {
   createPluginUiAppToolsService,
   createPluginUiSamplingService,
 } from "./plugin-ui-bridge/index.js";
-export type { IPluginUiBridgeService } from "./plugin-ui-bridge/contract.js";
-export type { IPluginUiAppToolsService } from "./plugin-ui-bridge/appToolsContract.js";
-export type { IPluginUiSamplingService } from "./plugin-ui-bridge/samplingContract.js";
+export { IPluginUiBridgeService } from "./plugin-ui-bridge/contract.js";
+export { IPluginUiSamplingService } from "./plugin-ui-bridge/samplingContract.js";
+export { IPluginUiAppToolsService } from "./plugin-ui-bridge/appToolsContract.js";
+export type {
+  PluginUiCallToolResult,
+  PluginUiPluginScope,
+  PluginUiReadResourceResult,
+  PluginUiSurfaceEntry,
+} from "./plugin-ui-bridge/contract.js";
 
 export { IHighspeedCardService } from "./highspeed/highspeedCard.js";
 export {

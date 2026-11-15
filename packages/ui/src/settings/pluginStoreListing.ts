@@ -399,3 +399,31 @@ export function storeItemMatches(item: StorePluginItem, keyword: string, locale:
     [item.name, item.listing?.displayName, ...Object.values(item.listing?.displayNameI18n ?? {})],
   );
 }
+
+export function isItemBusy(
+  item: StorePluginItem,
+  actions: {
+    activeOperations?: ReadonlyArray<{ id: string }>;
+    togglingPluginId?: string | null;
+  },
+): boolean {
+  const activeOperations = actions.activeOperations ?? [];
+  return (
+    activeOperations.some(
+      (operation) => operation.id === `plugin:install:${item.name}@${item.marketplace}`,
+    ) ||
+    activeOperations.some((operation) => operation.id === `plugin:restore:${item.id}`) ||
+    activeOperations.some((operation) => operation.id === `plugin:uninstall:${item.id}`) ||
+    activeOperations.some((operation) => operation.id === `plugin:update:${item.id}`) ||
+    activeOperations.some((operation) => operation.id === `plugin:reset-config:${item.id}`) ||
+    activeOperations.some((operation) => operation.id === `plugin:configure:${item.id}`) ||
+    actions.togglingPluginId === item.id
+  );
+}
+
+export type PluginStoreSegment = "public" | "community" | "personal";
+
+export function resolvePluginStoreSegment(item: StorePluginItem): PluginStoreSegment {
+  if (!isPublicStoreMarketplaceId(item.marketplace)) return "personal";
+  return item.listing?.publisherType === "community" ? "community" : "public";
+}

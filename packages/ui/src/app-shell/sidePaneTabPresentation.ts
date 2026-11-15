@@ -72,6 +72,9 @@ export function getSidePaneTabSearchHint(tab: WorkspaceSidePaneTab): string {
   }
   if (tab.type === "terminal" || tab.type === "bash-output")
     return `${tab.title} terminal shell command`;
+  if (tab.type === "plugin-ui") return `${tab.title} plugin ui panel ${tab.pluginId}`;
+  if (tab.type === "extension-view") return `${tab.title} extension view ${tab.viewId}`;
+  if (tab.type === "extension-logs") return "extension logs host plugin";
   return tab.source.path ?? tab.source.title;
 }
 

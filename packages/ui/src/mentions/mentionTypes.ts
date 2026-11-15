@@ -5,6 +5,7 @@ export type MentionCategory =
   | "subagents"
   | "whiteboards"
   | "sessions"
+  | "extensions"
   | "plugins";
 
 export interface MentionItemData {

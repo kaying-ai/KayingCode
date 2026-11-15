@@ -18,7 +18,10 @@ import type {
   BrowserViewScreenshotSurfacePreparePayload,
   GitChangeSourceId,
 } from "@zcode/shared";
+import type { ExtensionViewSidePaneTab, FileViewerRouter } from "@/extension-slots/contract.js";
 import { PreviewPane } from "@/PreviewPane.js";
+import { PluginUiSidePane } from "@/plugin-ui/PluginUiSidePane.js";
+import { ExtensionViewPane, ExtensionLogsPane, ExtensionLauncherSection } from "@/extension-slots/index.js";
 import { SidePaneTerminalPane } from "@/SidePaneTerminalPane.js";
 import { useIsOfficeMode } from "@/hooks/useInterfaceMode.js";
 import { WorkspaceSidePaneToggleButton } from "@/WorkspaceSidePaneToggleButton.js";
@@ -334,6 +337,9 @@ export function AnimatedSidePanePanel({
   onOpenFileLink,
   onOpenSubagentSession,
   onOpenWorkflowActorSession,
+  onOpenExtensionView,
+  onOpenExtensionLogs,
+  onRouteFileViewer,
   onOpenWorkflowWorkspace,
   onOpenWorkflowArtifact,
   onOpenWorkflowRun,
@@ -405,6 +411,9 @@ export function AnimatedSidePanePanel({
   onOpenSubagentSession: (request: OpenScopedSubagentSideTabRequest) => void;
   /** run 详情页里点 ask 节点 → 打开那个 actor 实例的 transcript tab。 */
   onOpenWorkflowActorSession?: (request: OpenScopedWorkflowActorSessionSideTabRequest) => void;
+  onOpenExtensionView?: (tab: ExtensionViewSidePaneTab) => void;
+  onOpenExtensionLogs?: () => void;
+  onRouteFileViewer?: FileViewerRouter;
   /** run 详情页里点脚本行 → 打开该 run 的脚本 transcript tab，落到那一站。 */
   onOpenWorkflowWorkspace?: (request: OpenScopedWorkflowWorkspaceSideTabRequest) => void;
   /** run 详情页里点一张产物卡 → 打开那个产物的全尺寸查看 tab。 */
@@ -907,6 +916,11 @@ export function AnimatedSidePanePanel({
               );
             })}
           </div>
+          {/* 扩展分区不依赖会话；没有要显示的行时不渲染。 */}
+          <ExtensionLauncherSection
+            workspacePath={workspaceAbsPath}
+            {...(workspaceIdentity ? { workspaceIdentity } : {})}
+          />
         </div>
       </div>
     </div>
@@ -1345,6 +1359,26 @@ export function AnimatedSidePanePanel({
                             isWindowsDesktop={isWindowsDesktop}
                             onOpenBrowserUrl={onOpenBrowserUrl}
                           />
+                        ) : tab.type === "plugin-ui" ? (
+                          <PluginUiSidePane
+                            tab={tab}
+                            visible={isVisible && tab.id === visibleActiveTabId}
+                            onOpenBrowserUrl={onOpenBrowserUrl}
+                            onCloseTab={onCloseTab}
+                          />
+                        ) : tab.type === "extension-view" ? (
+                          <ExtensionViewPane
+                            tab={tab}
+                            visible={isVisible && tab.id === visibleActiveTabId}
+                            target={{
+                              workspacePath: workspaceAbsPath,
+                              ...(workspaceIdentity ? { workspaceIdentity } : {}),
+                              sessionId: activeTaskId,
+                            }}
+                            onOpenExternal={onOpenBrowserUrl}
+                          />
+                        ) : tab.type === "extension-logs" ? (
+                          <ExtensionLogsPane visible={isVisible && tab.id === visibleActiveTabId} />
                         ) : (
                           <HumanBrowserView
                             browserKey={tab.id}

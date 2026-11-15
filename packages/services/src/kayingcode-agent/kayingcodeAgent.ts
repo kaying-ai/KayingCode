@@ -944,6 +944,13 @@ export interface IKayingCodeAgentService {
   onDynamicModelRequestMetrics?(
     target: KayingCodeAgentWorkspaceTarget,
   ): Event<import("@zcode/shared/kayingcode-protocol-v4").ModelRequestMetricsFact>;
+  /** 本地桌面窗口创建插件页面的工具结果；旧 CLI 不提供。 */
+  onDynamicPluginUiToolResult?(): Event<
+    import("@zcode/shared").PluginUiToolResultNotification & {
+      workspacePath: string;
+      workspaceIdentity?: string;
+    }
+  >;
   // ── sessions-index 通道（列表活性）──
   subscribeSessionsIndexV4(
     params: KayingCodeAgentSessionsIndexSubscribeParams,

@@ -40,3 +40,12 @@ export function buildSessionPluginIconMap(
   }
   return iconById;
 }
+
+/** 同伴展示名投影：插件 UI 卡片使用与 chip 相同的 Session authority。 */
+export function buildSessionPluginNameMap(
+  authority: "session" | "workspace" | null,
+  entries: readonly KayingCodePluginReferenceCatalogEntry[],
+): ReadonlyMap<string, string> {
+  if (authority !== "session") return new Map();
+  return new Map(entries.map((entry) => [entry.pluginId, entry.name]));
+}

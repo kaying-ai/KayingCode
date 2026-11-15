@@ -456,3 +456,11 @@ export const usePluginManagementStore = create<PluginManagementState>((set, get)
     }
   },
 }));
+
+/**
+ * 上游按服务实例创建独立投影；本产品的插件管理 store 本身是单例，
+ * 保留同名入口让插件 UI 与设置页共享同一份查询/写入状态。
+ */
+export function useScopedPluginManagementStore(_service: IPluginManagementService) {
+  return usePluginManagementStore;
+}

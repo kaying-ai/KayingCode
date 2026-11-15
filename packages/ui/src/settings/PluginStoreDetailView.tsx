@@ -49,6 +49,7 @@ import {
 import type { PluginComponentDisplayGroup } from "@/settings/PluginComponentGroups.js";
 import { enrichPluginSkillGroups } from "@/settings/pluginSkillDetails.js";
 import { PluginSkillDetailItem } from "@/settings/PluginSkillDetailItem.js";
+import { ExtensionPermissionsSection } from "@/extension-slots/index.js";
 import type { PluginDescribeEntry } from "@/store/pluginManagementStore.js";
 
 // 组件分区顺序与截图一致：MCP 服务器 → 技能 → 命令 → 子智能体 → Hooks。
@@ -243,6 +244,8 @@ export function PluginStoreDetailView({
 
       {/* 信息区：listing 优先，manifest（运行时/describe）回退；无值整行省略。 */}
       <InfoSection item={item} describeMetadata={describeMetadata} />
+
+      {item.installed ? <ExtensionPermissionsSection pluginId={item.id} /> : null}
 
       {advanced}
     </div>

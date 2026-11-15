@@ -38,6 +38,10 @@ import {
 import { createQuickPickCommands } from "@/quickpick/quickPickCommands.js";
 import { CommandCenterDialog } from "@/command-center/CommandCenterDialog.js";
 import { FeedbackHost } from "@/feedback/FeedbackHost.js";
+import {
+  ExtensionViewsProvider,
+  type StartExtensionDraft,
+} from "@/extension-slots/index.js";
 import { useFeedbackStore } from "@/feedback/feedbackStore.js";
 import {
   resolveQuickPickConversationNavigation,
@@ -285,6 +289,9 @@ export function App({
     handleSyncSubagentSessionTabs,
     handleOpenSelectionSideChat,
     handleOpenPlanDetail,
+    handleOpenExtensionView,
+    handleOpenExtensionLogs,
+    routeFileViewer,
     handleOpenWorkflowRun,
     handleOpenWorkflowRunDirectory,
     handleOpenWorkflowActorSession,
@@ -1210,7 +1217,18 @@ export function App({
       {/* 反馈是应用级能力，必须固定走本机 base host；SSH session 连接中或断开时，
           workspace-scoped services 会切成断连代理，不能让反馈提交跟随远程 session 失效。 */}
       <FeedbackHost feedbackService={baseFeedbackService} platform={platform} />
-      <WorkspaceShellLayout
+      <ExtensionViewsProvider
+        onOpenTab={handleOpenExtensionView}
+        onOpenLogs={handleOpenExtensionLogs}
+        onStartDraft={(({ text, workspace }) => {
+          if (!workspace && workspaceReadOnlyReason) return false;
+          runVisibleWorkspaceCommand(() => {
+            onCreateTask({ initialPrompt: text, ...(workspace ? { targetWorkspace: workspace } : {}) });
+          });
+          return true;
+        }) satisfies StartExtensionDraft}
+      >
+        <WorkspaceShellLayout
         services={services}
         workspaceReadOnlyReason={workspaceReadOnlyReason}
         workspaceMainView={workspaceMainView}
@@ -1348,6 +1366,9 @@ export function App({
         handleSyncSubagentSessionTabs={handleSyncSubagentSessionTabs}
         handleOpenSelectionSideChat={handleOpenSelectionSideChat}
         handleOpenPlanDetail={handleOpenPlanDetail}
+        handleOpenExtensionView={handleOpenExtensionView}
+        handleOpenExtensionLogs={handleOpenExtensionLogs}
+        routeFileViewer={routeFileViewer}
         handleOpenWorkflowRun={handleOpenWorkflowRun}
         handleOpenWorkflowRunDirectory={handleOpenWorkflowRunDirectory}
         handleOpenWorkflowActorSession={handleOpenWorkflowActorSession}
@@ -1367,6 +1388,7 @@ export function App({
         // taskFindDialogProps 是对象 prop，内联创建会让 shell 在流式刷新中每轮都看到新引用。
         taskFindDialogProps={taskFindDialogProps}
       />
+      </ExtensionViewsProvider>
     </>
   );
 }

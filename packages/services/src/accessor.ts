@@ -46,6 +46,12 @@ import type { IConversationShareService } from "./conversation-share/conversatio
 import type { IBotsService } from "./bots/bots.js";
 import type { IOutputStyleService } from "./output-style/outputStyle.js";
 import type { ISourceServerWorkspaceService } from "./source-server-workspace/sourceServerWorkspace.js";
+import type { IExtensionsService } from "./extensions/contract.js";
+import type { IExtensionViewsService } from "./extensions/views/contract.js";
+import type { IExtensionGrantsService } from "./extensions/grants/contract.js";
+import type { IPluginUiBridgeService } from "./plugin-ui-bridge/contract.js";
+import type { IPluginUiSamplingService } from "./plugin-ui-bridge/samplingContract.js";
+import type { IPluginUiAppToolsService } from "./plugin-ui-bridge/appToolsContract.js";
 
 /** UI 层消费的统一服务接口 */
 export interface IServiceAccessor {
@@ -103,6 +109,14 @@ export interface IServiceAccessor {
   readonly pluginsService: IPluginsService;
   /** 设置页插件管理（UI 不再直触 kayingcodeAgentService 的 plugins/* 面） */
   readonly pluginManagementService: IPluginManagementService;
+  /** 扩展门面（仅桌面本机 Host）；Web/手机为 undefined。 */
+  readonly extensionsService?: IExtensionsService;
+  readonly extensionViewsService?: IExtensionViewsService;
+  readonly extensionGrantsService?: IExtensionGrantsService;
+  /** MCP App / Gen UI 沙箱桥；Web 或旧 host 可不提供。 */
+  readonly pluginUiBridgeService?: IPluginUiBridgeService;
+  readonly pluginUiSamplingService?: IPluginUiSamplingService;
+  readonly pluginUiAppToolsService?: IPluginUiAppToolsService;
   readonly subagentsService: ISubagentsService;
   readonly commandsService: ICommandsService;
   readonly hooksService: IHooksService;

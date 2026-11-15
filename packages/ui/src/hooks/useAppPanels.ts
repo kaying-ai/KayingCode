@@ -38,6 +38,8 @@ import {
   openWorkflowWorkspaceSidePane,
   openWorkflowArtifactSidePane,
   activateDeveloperToolsSidePane,
+  activateExtensionLogsSidePane,
+  activateExtensionViewSidePane,
   openBrowserSidePane,
   openTapTapPreviewSidePane,
   openPluginBrowserCompareSidePane,
@@ -94,6 +96,9 @@ import { clearConversationSelectionReferenceScope } from "@/lib/conversationSele
 import { subscribeTaskLifecycle } from "@/lib/taskLifecycleEvents.js";
 import { usePluginBrowserCompareAutoOpen } from "@/hooks/usePluginBrowserCompareAutoOpen.js";
 import { useTapTapPreviewAutoOpen } from "@/hooks/useTapTapPreviewAutoOpen.js";
+import { useFileViewerRouter, buildFileViewerTab } from "@/extension-slots/index.js";
+import type { ExtensionViewSidePaneTab } from "@/extension-slots/contract.js";
+import { resolveOfficeViewerDocumentPath } from "@/plugin-ui/officeViewerOpen.js";
 
 export interface BrowserNavigationRequest {
   id: string;
@@ -359,8 +364,49 @@ export function useAppPanels(options: {
     });
   }, [activeTaskId, activeWorkspaceKey, commitSidePaneState, sidePaneOwnerId]);
 
+  const handleOpenExtensionView = useCallback(
+    (tab: ExtensionViewSidePaneTab) => {
+      revealSidePaneForCurrentOwner();
+      commitOpenedSidePaneState((current) => activateExtensionViewSidePane(current, tab));
+      logger.info(`[App] 打开右侧面板 mode=extension-view view=${tab.viewId}`);
+    },
+    [commitOpenedSidePaneState, revealSidePaneForCurrentOwner],
+  );
+
+  const handleOpenExtensionLogs = useCallback(() => {
+    revealSidePaneForCurrentOwner();
+    commitOpenedSidePaneState(activateExtensionLogsSidePane);
+    logger.info("[App] 打开右侧面板 mode=extension-logs");
+  }, [commitOpenedSidePaneState, revealSidePaneForCurrentOwner]);
+
+  const routeFileViewer = useFileViewerRouter({
+    workspacePath: workspaceAbsPath,
+    ...(workspaceIdentity ? { workspaceIdentity } : {}),
+  });
+
   const handleOpenCodeViewer = useCallback(
     (source: CodeViewerSource) => {
+      // file.viewer 优先于内置代码预览：view target 直接开扩展视图标签；
+      // 无法严格相对化或没有插件查看器时保持原链路。
+      if (source.type === "file" && source.path) {
+        const relativePath = resolveOfficeViewerDocumentPath({
+          workspacePath: source.workspacePath ?? workspaceAbsPath,
+          filePath: source.path,
+        });
+        const route = relativePath ? routeFileViewer(source.path) : null;
+        if (relativePath && route?.target.kind === "view" && route.view) {
+          handleOpenExtensionView(
+            buildFileViewerTab(route.view, {
+              path: relativePath,
+              workspace: {
+                workspacePath: workspaceAbsPath,
+                ...(workspaceIdentity ? { workspaceIdentity } : {}),
+              },
+            }),
+          );
+          return;
+        }
+      }
       revealSidePaneForCurrentOwner();
       commitOpenedSidePaneState((current) => {
         const next = openCodeViewerSidePane(current, source, sidePaneOwnerIdRef.current);
@@ -373,7 +419,14 @@ export function useAppPanels(options: {
         return next;
       });
     },
-    [commitOpenedSidePaneState, revealSidePaneForCurrentOwner, workspaceAbsPath],
+    [
+      commitOpenedSidePaneState,
+      handleOpenExtensionView,
+      revealSidePaneForCurrentOwner,
+      routeFileViewer,
+      workspaceAbsPath,
+      workspaceIdentity,
+    ],
   );
 
   const handleOpenCodeViewers = useCallback(
@@ -1784,6 +1837,9 @@ export function useAppPanels(options: {
     handleSyncSubagentSessionTabs,
     handleOpenSelectionSideChat,
     handleOpenPlanDetail,
+    handleOpenExtensionView,
+    handleOpenExtensionLogs,
+    routeFileViewer,
     handleOpenWorkflowRun,
     handleOpenWorkflowRunDirectory,
     handleOpenWorkflowActorSession,
