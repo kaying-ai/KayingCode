@@ -1,5 +1,6 @@
 import type { ContextSection } from "./types.js";
 import { estimateTokens } from "./utils.js";
+import { TOTAL_TOKENS_SYSTEM_LINE } from "./total-tokens.js";
 
 const COMMUNICATION_PROMPT =
   "Write code that reads like the surrounding code: match its comment density, naming, and idiom.";
@@ -69,6 +70,11 @@ export function buildContextManagementSection(): ContextSection {
     "context_management",
     [CONTEXT_MANAGEMENT_PROMPT, ACT_DONT_REDERIVE_PROMPT].join("\n\n"),
   );
+}
+
+/** 固定的 token 预算行，是 system 的最后一段；倒数由每次请求的提醒附件表达。 */
+export function buildTotalTokensSection(): ContextSection {
+  return createDynamicSection("Total Tokens", "total_tokens", TOTAL_TOKENS_SYSTEM_LINE);
 }
 
 function createDynamicSection(

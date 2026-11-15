@@ -312,6 +312,7 @@ describe("runtime context announcements", () => {
         ["output_style_instructions", "# Output Style: Learning"],
         ["agents", "Available agent types"],
         ["skills", "The following skills"],
+        ["total_tokens", "<total_tokens>15000000 tokens left</total_tokens>"],
         ["output_style", "Learning output style is active"],
         ["instructions", "Codebase and user instructions"],
         ["session_context", "As you answer"],
@@ -1325,8 +1326,9 @@ describe("runtime context announcements", () => {
         "# Environment update\n - Primary working directory: /workspace/subdir (was /workspace)",
     });
     expect(all.filter((entry) => entry.metadata?.source === "session_context")).toHaveLength(1);
+    // 第三轮只追加：上一轮回复、轮首的 token 预算提醒和第三问。
     expect(requests[1]?.messages.map(({ role, content }) => ({ role, content }))).toEqual(
-      requests[2]?.messages.slice(0, -2).map(({ role, content }) => ({ role, content })),
+      requests[2]?.messages.slice(0, -3).map(({ role, content }) => ({ role, content })),
     );
   });
 
@@ -1389,9 +1391,10 @@ describe("runtime context announcements", () => {
       },
     });
     expect(contextSourcePort.resolveEnvironment).toHaveBeenCalledTimes(1);
+    // 同一条 MCS system 里，环境变化之后是轮首的 token 预算提醒。
     expect(requests[1]?.messages.at(-1)).toMatchObject({
       role: "system",
-      content: updates[1]?.kind === "attachment" ? updates[1].content : "",
+      content: `${updates[1]?.kind === "attachment" ? updates[1].content : ""}\n\n<total_tokens>15000000 tokens left</total_tokens>`,
     });
     runtime.setWorkingDirectory("/workspace");
     await runtime.executeTurn("return to repo");

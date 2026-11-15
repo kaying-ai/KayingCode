@@ -13,6 +13,7 @@ import { buildRequestUserContextSection } from "../context/sections/request-user
 import { buildSkillsSection } from "../context/sections/skills.js";
 import { estimateTokens } from "../context/utils.js";
 import { SUBAGENT_LAUNCHER_MESSAGES_NOTE, buildSubagentCommonNotes } from "./system-prompt.js";
+import { TOTAL_TOKENS_SYSTEM_LINE } from "../context/total-tokens.js";
 
 export interface SubagentContextBuilderConfig {
   agentPrompt: string;
@@ -105,6 +106,13 @@ function buildSubagentContextSections(config: SubagentContextBuilderConfig): Con
       // KayingCode by design：后续 Subagent system block 统一自带双换行左边界。
       // 启动方消息段排在 Notes 之前。
       content: `\n\n${SUBAGENT_LAUNCHER_MESSAGES_NOTE}\n\n${buildSubagentCommonNotes()}`,
+    }),
+    // 固定的 token 预算行紧跟 Notes，是子 agent system 的最后一段。
+    createSubagentSection({
+      name: "Total Tokens",
+      source: "total_tokens",
+      cacheHint: "stable",
+      content: `\n\n${TOTAL_TOKENS_SYSTEM_LINE}`,
     }),
     ...buildEnvironmentSections(config.envInfo, config.model),
   );

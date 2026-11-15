@@ -45,6 +45,7 @@ import {
 import { mainTurnCacheHitAggregateFromMessages } from "./turn-model-step-usage.js";
 import { refreshRestoredAnnouncements } from "./context-refresh.js";
 import { loadPromptSnapshot } from "../helpers/prompt-snapshot.js";
+import { createTotalTokensBudgetState } from "../helpers/total-tokens-budget.js";
 
 export function toScheduleState(
   this: AgentRuntimeInternal,
@@ -153,6 +154,8 @@ export async function resumeFromStore(
     workspaceRoot: this.workspaceRoot,
   });
   await this.ensureContextInitialized(traceContext);
+  // 预算计数只在内存；恢复后重新起算。
+  this.totalTokensBudget = createTotalTokensBudgetState();
   // 第一个轮次重建前缀前装好 prompt 快照，恢复后的请求发送会话记录的 system。
   await loadPromptSnapshot(this, traceContext);
   // 恢复的 envInfo 来自存储，不是刚读的 Git，不能当预取；恢复的窗口还没决定过时，下一次请求重新读取。

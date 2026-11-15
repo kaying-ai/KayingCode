@@ -136,6 +136,10 @@ import type { AgentRuntimeInternal } from "./internal.js";
 import { InMemoryRuntimeTaskRegistry, type RuntimeTaskRegistry } from "../runtime-task/registry.js";
 import type { WorkflowBlockedReminderClock } from "../runtime-task/workflow-blocked-reminder.js";
 import type { BackgroundSubagentStallClock } from "../subagent/background-stall.js";
+import {
+  createTotalTokensBudgetState,
+  type TotalTokensBudgetState,
+} from "./helpers/total-tokens-budget.js";
 import { createWorkflowBlockedReminder } from "./methods/dynamic-workflow-blocked-reminder.js";
 import { createSubagentStallReminder } from "./methods/subagent-stall-reminder.js";
 import { createMemoryRecallState } from "../memory/recall/index.js";
@@ -232,6 +236,7 @@ export class AgentRuntime {
   // 「run 还欠着决定、主代理闲着」的提醒钟；由命令队列的忙 / 闲沿驱动，beginShutdown 停掉。
   private workflowBlockedReminder: WorkflowBlockedReminderClock;
   private subagentStallReminder?: BackgroundSubagentStallClock;
+  private totalTokensBudget: TotalTokensBudgetState = createTotalTokensBudgetState();
   private branchGeneration = 0;
   private artifactStore?: ToolArtifactStorePort;
   private executionPort?: ExecutionPort;

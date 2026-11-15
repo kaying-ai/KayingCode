@@ -1,6 +1,7 @@
 import { PermissionService, ToolScheduler } from "./deps.js";
 import type { ModelRequestSessionFeature } from "@zcode/contracts";
 import type { PromptSnapshot } from "./helpers/prompt-snapshot.js";
+import type { TotalTokensBudgetState } from "./helpers/total-tokens-budget.js";
 import type { InstructionRefreshReason } from "../context/types.js";
 import type {
   Logger,
@@ -116,6 +117,8 @@ export interface AgentRuntimeInternal
   instructionRefreshReason?: InstructionRefreshReason;
   // 最近一次读取时读不出来的指令文件与 Memory 索引路径（启动与 compaction 采用重读时写入）；不算删除。
   unreadableInstructionPaths?: ReadonlySet<string>;
+  /** token 预算倒数的计数器；只在内存，resume 时重新开始。 */
+  totalTokensBudget: TotalTokensBudgetState;
   // 主会话的 prompt 快照（helpers/prompt-snapshot.ts 是唯一写入方）；undefined 没有，null 已清掉。
   promptSnapshot?: PromptSnapshot | null;
   memoryRoot?: string;

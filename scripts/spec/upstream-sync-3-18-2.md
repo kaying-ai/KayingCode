@@ -82,7 +82,7 @@
 | --- | --- | --- |
 | 1a | 已采纳 | instruction-files 基础：结构化文件模型、完整/增量渲染、旧公告解析；adapter 区分"文件不存在"与"读不出来"，读错误按 `user_instructions_read_failed` 诊断 |
 | 1b | 已采纳 | context_prefix 记录已公告文件、请求前增量公告、compaction 重读指令文件并在提交后应用；冷恢复/rewind 不再原位改写指令公告 |
-| 2 | 待做 | total-tokens 预算：计数状态、上下文提醒、输入附件收集原因 |
+| 2 | 已采纳 | total-tokens 预算：主/子 agent system 末尾固定预算行；runtime 计数状态、轮首/工具批次/文本续接的提醒与用户输入重锚；compaction rollover，resume 重置 |
 | 3 | 待做 | context-composition：组成分类、协议方法、查询与变更通知 |
 | 4 | 待做 | blockIndex：块到达序号、请求排序、持久化与工具历史 |
 
@@ -216,3 +216,13 @@
 - 回归：`instruction-files` + `runtime-context-announcements` **52/52**；core 全量 **228/234**，仍是既有 6 个 Windows 环境失败；更新了 3 个旧语义用例。
 - 验证：contracts/adapters/core typecheck；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
 - 简化：Memory 索引重读未同步 readFileStateEntry/unreadable 路径（本地 memory 读取接口尚无该返回），不影响指令文件增量判定。
+
+第十三批（2026-11-15，核心专项 2：total-tokens 预算）：
+
+- 新增 `context/total-tokens.ts`：固定 15,000,000 预算、`<total_tokens>N tokens left</total_tokens>` 提醒与 system 行；主/子 agent context builder 末尾都带该固定行。
+- 新增 `runtime/helpers/total-tokens-budget.ts`：按最近一条带 usage 的 assistant 计算窗口上下文，`consume` 保证已用量不回退，`reanchor` 在用户真实输入时重置窗口，`decideTotalTokensReminder` 区分轮首/工具批次/文本续接。
+- `internal`/`agent-runtime` 增加内存计数状态；`resume` 重置；`compact` 在 auto/reactive 提交后 rollover（手动 compact 不 rollover，下一条真实用户输入重锚）。
+- `turn-loop` 的输入附件收集改为记录原因（`turn_input`/`tool_batch`/`text_guide`），轮首用 `isRealUserPrompt`、文本续接用 drain 的 `userSteered` 判断是否重锚；收集尾部先写库再更新计数器。
+- `steering` 的 drain 诊断增加 `userSteered`；system reminder 增加持久化来源 `total_tokens_reminder`。
+- 回归：`total-tokens-budget` 4/4；`runtime-context-announcements` 47/47；`runtime-tool-hook-context` 2/2；core 全量 **232/238**，仍为既有 6 个 Windows 环境失败。
+- 验证：contracts/adapters/core/bootstrap typecheck；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
