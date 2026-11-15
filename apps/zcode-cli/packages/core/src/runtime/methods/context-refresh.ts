@@ -40,11 +40,14 @@ import { throwIfTurnAborted } from "../helpers/turn-errors.js";
 import { buildProjectionAnchor } from "./projection-anchor.js";
 import { persistRuntimeReminderMessage } from "./runtime-reminder-persistence.js";
 import { promptSnapshotFor } from "../helpers/prompt-snapshot.js";
+import { supersedeContextComposition } from "../context-composition/state.js";
 
 export function rebuildContextPrefix(
   runtime: AgentRuntimeInternal,
   options: { model?: Model; turnRequestEntries?: readonly RuntimeMessageEntry[] } = {},
 ): readonly RuntimeMessageEntry[] {
+  // 通知在 microtask 之后才发出（bootstrap tracker 合并），届时下面的同步重建已经完成。
+  supersedeContextComposition(runtime, "context_prefix");
   if (!runtime.contextBuilder || !runtime.contextInitialized) {
     // 首轮 context 初始化前，model/outputStyle/language 变更只能刷新同步预览，
     // 不能把 config-only fallback envInfo 写入 config.envInfo。否则真实 context source
@@ -101,35 +104,89 @@ export async function appendRuntimeContextAnnouncements(
   traceContext: TraceContext,
   signal?: AbortSignal,
 ): Promise<void> {
-  const last = lastAnnouncedAttachments(state.entries);
-  const result = runtime.latestContextBuildResult;
-  const attachments: RuntimeAttachmentEntry[] = [];
-  if (result?.sections.some((section) => section.source === "env_info")) {
-    const previous = environmentOf(last.get("environment"))?.snapshot;
-    const snapshot = await resolveCurrentEnvironment(runtime, previous, traceContext, signal);
-    const hasFullBlock = state.entries.some((entry) => environmentOf(entry)?.full);
-    const announcement = snapshot
-      ? buildEnvironmentAnnouncement(snapshot, previous, hasFullBlock)
-      : null;
-    if (announcement) attachments.push(environmentAttachment(announcement));
-    const identity = buildModelSection(model)!;
-    if (last.get("model")?.content !== identity.content) {
-      attachments.push(systemReminderAttachmentEntry("model", identity.content));
-    }
-    // output style 只对主线程宣告。内容与最近一次宣告不同时再宣告；
-    // 清除风格时，若最近一次宣告的是某个风格，宣告一次重置。
-    if (querySourceForTask(runtime.config.taskType) === "main_turn") {
-      const previousStyle = last.get("output_style_instructions")?.content;
-      const instructions =
-        buildOutputStyleInstructionsBody(outputStyle) ??
-        (previousStyle === undefined ? undefined : OUTPUT_STYLE_RESET_REMINDER);
-      if (instructions !== undefined && instructions !== previousStyle) {
-        attachments.push(systemReminderAttachmentEntry("output_style_instructions", instructions));
-      }
-    }
-  }
+  const contextResult = runtime.latestContextBuildResult;
+  const environment = announcesEnvironment(contextResult)
+    ? await resolveCurrentEnvironment(
+        runtime,
+        latestAnnouncedEnvironment(state.entries),
+        traceContext,
+        signal,
+      )
+    : undefined;
+  const attachments = buildRuntimeContextAnnouncements(runtime, state.entries, {
+    contextResult,
+    environment,
+    model,
+    outputStyle,
+  });
   throwIfTurnAborted(signal);
   await persistAnnouncements(runtime, state, attachments, traceContext);
+}
+
+function announcesEnvironment(contextResult: ContextBuildResult | undefined): boolean {
+  return contextResult?.sections.some((section) => section.source === "env_info") === true;
+}
+
+/**
+ * 环境、模型与 output style 指令公告的纯计算部分；当前环境由调用方先读好传入。
+ * 输入附件收集（读当前环境）与 context 组成预演（只用历史或启动快照）共用，二者产出同一组公告。
+ */
+export function buildRuntimeContextAnnouncements(
+  runtime: AgentRuntimeInternal,
+  entries: readonly RuntimeMessageEntry[],
+  input: {
+    contextResult: ContextBuildResult | undefined;
+    environment: EnvironmentSnapshot | undefined;
+    model: Model;
+    outputStyle: OutputStylePromptConfig | undefined;
+  },
+): RuntimeAttachmentEntry[] {
+  if (!announcesEnvironment(input.contextResult)) return [];
+  const last = lastAnnouncedAttachments(entries);
+  const attachments: RuntimeAttachmentEntry[] = [];
+  const previous = environmentOf(last.get("environment"))?.snapshot;
+  const hasFullBlock = entries.some((entry) => environmentOf(entry)?.full);
+  const announcement = input.environment
+    ? buildEnvironmentAnnouncement(input.environment, previous, hasFullBlock)
+    : null;
+  if (announcement) attachments.push(environmentAttachment(announcement));
+  const identity = buildModelSection(input.model)!;
+  if (last.get("model")?.content !== identity.content) {
+    attachments.push(systemReminderAttachmentEntry("model", identity.content));
+  }
+  // output style 只对主线程宣告。内容与最近一次宣告不同时再宣告；
+  // 清除风格时，若最近一次宣告的是某个风格，宣告一次重置。
+  if (querySourceForTask(runtime.config.taskType) === "main_turn") {
+    const previousStyle = last.get("output_style_instructions")?.content;
+    const instructions =
+      buildOutputStyleInstructionsBody(input.outputStyle) ??
+      (previousStyle === undefined ? undefined : OUTPUT_STYLE_RESET_REMINDER);
+    if (instructions !== undefined && instructions !== previousStyle) {
+      attachments.push(systemReminderAttachmentEntry("output_style_instructions", instructions));
+    }
+  }
+  return attachments;
+}
+
+/**
+ * 不做 IO 的当前环境：沿用历史里最近一次公告（没有时用启动快照），只换上当前 cwd 与 shell。
+ * 输入附件收集在目录未变时用它；context 组成预演一律用它（不重新探测仓库属性）。
+ */
+export function baselineCurrentEnvironment(
+  runtime: AgentRuntimeInternal,
+  previous: EnvironmentSnapshot | undefined,
+): EnvironmentSnapshot | undefined {
+  const initial = runtime.contextSourceSnapshot?.envInfo ?? runtime.config.envInfo;
+  const additionalWorkingDirectories = runtime.config.additionalDirectories ?? [];
+  const baseline =
+    previous ?? (initial ? environmentSnapshot(initial, additionalWorkingDirectories) : undefined);
+  if (!baseline) return undefined;
+  return {
+    ...baseline,
+    cwd: runtime.workingDirectory,
+    shell: runtime.config.bashShellSelection?.display.name ?? baseline.shell,
+    additionalWorkingDirectories: [...additionalWorkingDirectories],
+  };
 }
 
 async function resolveCurrentEnvironment(
@@ -188,8 +245,9 @@ async function resolveCurrentEnvironment(
 export function collectSkillsListing(
   runtime: AgentRuntimeInternal,
   entries: readonly RuntimeMessageEntry[],
+  contextResult: ContextBuildResult | undefined = runtime.latestContextBuildResult,
 ): RuntimeAttachmentEntry | undefined {
-  const content = currentSkillsListing(runtime);
+  const content = currentSkillsListing(contextResult);
   if (!content || lastAnnouncedAttachments(entries).has("skills_listing")) return undefined;
   return systemReminderAttachmentEntry("skills_listing", content);
 }
@@ -223,10 +281,9 @@ export function refreshRestoredAnnouncements(runtime: AgentRuntimeInternal): voi
   );
 }
 
-function currentSkillsListing(runtime: AgentRuntimeInternal): string | undefined {
-  return runtime.latestContextBuildResult?.metaUserAttachments.find(
-    (item) => item.source === "skills_listing",
-  )?.content;
+function currentSkillsListing(contextResult: ContextBuildResult | undefined): string | undefined {
+  return contextResult?.metaUserAttachments.find((item) => item.source === "skills_listing")
+    ?.content;
 }
 
 export async function appendRuntimeSkillsAnnouncement(
@@ -532,6 +589,25 @@ export async function resolveSessionContextAnnouncement(
   if (content) return systemReminderAttachmentEntry("session_context", content);
   if (git.isGitRepository === false) rememberNonGitDirectory(runtime, directory);
   return undefined;
+}
+
+/**
+ * context 组成预演用的 Git 会话上下文：判断规则同 resolveSessionContextAnnouncement，但不做 IO、
+ * 不消费 sessionStartGitPrefetch、不记住非仓库目录；需要读 Git 时一律取启动快照。
+ */
+export function previewSessionContextAnnouncement(
+  runtime: AgentRuntimeInternal,
+  entries: readonly RuntimeMessageEntry[],
+  contextResult: ContextBuildResult | undefined,
+): RuntimeAttachmentEntry | undefined {
+  if (runtime.config.subagentContext || runtime.config.systemPrompt?.trim()) return undefined;
+  const last = lastAnnouncedAttachments(entries);
+  if (last.has("session_context") || last.has("date")) return undefined;
+  if (runtime.nonGitDirectories?.has(runtime.workingDirectory)) return undefined;
+  const content = contextResult?.metaUserAttachments.find(
+    (item) => item.source === "session_context",
+  )?.content;
+  return content ? systemReminderAttachmentEntry("session_context", content) : undefined;
 }
 
 function rememberNonGitDirectory(runtime: AgentRuntimeInternal, directory: string): void {

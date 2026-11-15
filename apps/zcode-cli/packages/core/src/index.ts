@@ -166,6 +166,13 @@ export type {
   InputPredictionOutcome,
   InputPredictionTurnContext,
 } from "./runtime/methods/input-prediction-sidecar.js";
+// context 组成：bootstrap 的 v4 contextComposition 处理器消费查询结果类型。
+export type {
+  ContextCompositionChangeListener,
+  ContextCompositionChangeReason,
+  ContextCompositionMeasurement,
+  ContextCompositionQuery,
+} from "./runtime/context-composition/index.js";
 export type {
   ChildClientPortsContext,
   ClientFacingPorts,

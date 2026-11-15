@@ -655,6 +655,19 @@ export interface AgentRuntime {
   invalidateToolCache(): void;
   getToolExecutor(): ToolExecutor;
   subscribeEvents(sink: SessionEventSink): () => void;
+  /**
+   * context 组成（docs/design/v2/model/context-composition.md）：有效的请求组成且模型相同时返回它，
+   * 否则按所查模型预演下一个请求。预演不落库、不写历史；没有可用模型时为 null。
+   */
+  getContextComposition(
+    input?: import("./context-composition/query.js").ContextCompositionQuery,
+  ): Promise<import("./context-composition/state.js").ContextCompositionMeasurement | null>;
+  /** 组成变更时同步调用；合并与修订号由订阅方（bootstrap tracker）负责。 */
+  subscribeContextCompositionChanged(
+    listener: import("./context-composition/state.js").ContextCompositionChangeListener,
+  ): () => void;
+  /** 会话外部改了会影响组成的状态（换模型）：最近一次请求组成作废并通知。 */
+  markContextCompositionChanged(): void;
   /** Bootstrap-owned lifecycle producers append only validated session events through this durable path. */
   appendEvent(event: SessionEvent, traceContext: TraceContext): Promise<void>;
   /**

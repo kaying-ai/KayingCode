@@ -67,6 +67,7 @@ import {
   rereadInstructionSources,
 } from "./context.js";
 import { clearPromptSnapshot } from "../helpers/prompt-snapshot.js";
+import { supersedeContextComposition } from "../context-composition/state.js";
 import type { CompactTimelineContext, RuntimeModelTextResult } from "../types.js";
 import type { Model } from "../deps.js";
 import type { AgentRuntimeInternal } from "../internal.js";
@@ -743,6 +744,7 @@ async function compactActiveConversationImpl(
             turnRequestEntries: postCompactEntries,
           })
         : postCompactEntries;
+      supersedeContextComposition(this, "compact");
 
       return {
         displayText: "Compacted",

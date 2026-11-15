@@ -34,6 +34,12 @@ export interface ProviderRequestMessageProjectionResult {
   messages: ModelInputMessage[];
   /** 仅用于内部归属；runtime metadata 不会进入 `messages`。 */
   sourceEntries: Array<RuntimeMessageEntry | undefined>;
+  /**
+   * 仅用于 context 组成统计：与 `messages` 同索引，列出组成该消息的全部来源条目（含 attachment）。
+   * `sourceEntries` 只给一条代表条目，且纯 attachment 消息没有代表条目；MCS 合并、并入 tool result
+   * 的提醒只能从这里归因。派生消息（Tool loaded.）为空数组。
+   */
+  originEntries: Array<readonly RuntimeMessageEntry[]>;
   diagnostics: {
     bubbledAttachmentEntryCount: number;
     latestRealUserMessageIndex?: number;
@@ -106,9 +112,11 @@ export function buildProviderRequestMessages(input: {
   const sourceEntries: Array<RuntimeMessageEntry | undefined> = Array.from({
     length: messages.length,
   });
+  const originEntries: RuntimeMessageEntry[][] = Array.from({ length: messages.length }, () => []);
   for (const [projectedIndex, mergedIndex] of mergeResult.indexMap.entries()) {
-    if (sourceEntries[mergedIndex] !== undefined) continue;
     const entry = projectedEntries[projectedIndex];
+    if (entry) originEntries[mergedIndex]!.push(...origins.get(entry));
+    if (sourceEntries[mergedIndex] !== undefined) continue;
     if (entry) sourceEntries[mergedIndex] = origins.representative(entry);
   }
   const mappedLatestRealUserMessageIndex =
@@ -129,6 +137,7 @@ export function buildProviderRequestMessages(input: {
   return {
     messages,
     sourceEntries,
+    originEntries,
     diagnostics: {
       bubbledAttachmentEntryCount: reorderResult.bubbledAttachmentEntryCount,
       // 新标记能证明“没有真实用户”；省略索引会让媒体预算按 user role 重新猜来源。

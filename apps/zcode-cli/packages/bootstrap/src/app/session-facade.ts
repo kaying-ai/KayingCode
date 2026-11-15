@@ -669,6 +669,8 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
       } else {
         deps.runtime.setSessionModelSelection(sessionSelection);
       }
+      // 换模型后下一个请求的 context 组成随之变化（context-composition.md §3.4）。
+      deps.runtime.markContextCompositionChanged();
       // transient 切换不产出 modelChange 聊天通知：应用/还原成对出现会刷出两条无意义通知。
       if (!options?.transient) {
         deps.runtime.recordPendingModelChange({

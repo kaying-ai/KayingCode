@@ -255,6 +255,7 @@ export async function runRegularTurnLoop(
       latestRealUserMessageIndex: providerProjection.diagnostics.latestRealUserMessageIndex,
       messages,
       sourceEntries: providerProjection.sourceEntries,
+      originEntries: providerProjection.originEntries,
       requestEntries,
       recordedMessages: recordableProjection.messages,
       tools: prepared.request.tools,

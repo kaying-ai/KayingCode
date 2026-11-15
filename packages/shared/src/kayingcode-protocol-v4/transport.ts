@@ -382,6 +382,9 @@ export const V4_METHODS = {
   // 故收敛为 v4 query 而非 host 直连；旧词 usage/stats、session/usage 就此消费清零。
   usageStats: "v4/usage/stats",
   conversationUsage: "v4/conversation/usage",
+  // context 组成（context-composition/contract.ts）：只读、existing-only；
+  // 旧 CLI 返回 method-not-found，App 当作 null。
+  conversationContextComposition: "v4/conversation/contextComposition",
   // 项目数据彻底删除（schema 在 session-data.ts）：measure 只读；purge 幂等，已不存在的会话按 0 字节成功。
   // 新方法偏斜安全：旧 CLI 返回 method-not-found，Host 据此不显示「删除数据」选项。
   sessionDataMeasure: "v4/storage/sessionData/measure",
@@ -435,6 +438,8 @@ export const V4_NOTIFICATIONS = {
   // 仅当前进程 live ToolCallResult 产生；历史与 replayable 链路不得补造。
   cuaPermissionObservation: "v4/cua/permission-observation",
   pluginUiToolResult: "v4/plugin-ui/tool-result",
+  // context 组成变更：只带 { sessionId, revision }，live-only，不进 snapshot。
+  conversationContextCompositionChanged: "v4/conversation/contextCompositionChanged",
 } as const;
 
 /** 3.3.6 SSH 历史任务归属证明与 sessions-index 冷种子共享同一有界窗口。 */
