@@ -1,5 +1,183 @@
 # Changelog
 
+## [0.2.0](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.1.5...kaying-code-v0.2.0) (2026-11-15)
+
+### Features
+
+* **context-composition:** wire composition query end to end ([42c5cc3](https://github.com/kaying-ai/KayingCode/commit/42c5cc3701ebdf2d391664beff7f126953411aa8))
+
+* **context:** add structured instruction file foundation ([219c3f5](https://github.com/kaying-ai/KayingCode/commit/219c3f5d598918e96faa758c5316ccb6be23322a))
+  * core/context/sections/instruction-files: file block, full and delta
+  * context types: InstructionFile, InstructionRefreshReason and
+  * contracts: CONTEXT_SOURCE_INSTRUCTIONS_READ_FAILED
+  * adapters: only ENOENT/EISDIR/ENOTDIR mean "no instruction file";
+  * tests: instruction-files 5 cases (trim/hash, rendering, strict parse,
+
+* **context:** add the total tokens budget and reminders ([7f8ad6a](https://github.com/kaying-ai/KayingCode/commit/7f8ad6a4fd80bc2e02926ba5d3d5e6b9de58c828))
+  * add context/total-tokens with the fixed 15M budget, the system line and
+  * add total-tokens-budget: consume keeps the used amount monotonic,
+  * runtime keeps the counter in memory, resets it on resume, and rolls it
+  * input attachment collection now records its reason and passes
+  * steering diagnostics expose userSteered; total_tokens_reminder is a
+  * tests: budget 4/4, announcements 47/47, tool hook context 2/2
+
+* **context:** announce instruction file changes as deltas ([03e1d7c](https://github.com/kaying-ai/KayingCode/commit/03e1d7cc1180cabf1ffb06fea1e96bfb00f09f48))
+  * request-user-context builds structured instruction files; the context
+  * message history and the hydrator persist/restore the instructions
+  * context-refresh compares announced files with the current build and
+  * restored announcements no longer rewrite context_prefix in place, so
+  * context.ts adds rereadInstructionSources/buildRereadInstructionContext/
+  * compact-active re-reads in parallel, uses the result for the leading
+  * update three announcement tests to the delta semantics
+
+* **context:** order assistant blocks by their arrival index ([dedc772](https://github.com/kaying-ai/KayingCode/commit/dedc772a421e46b75d177f56934fa7e399924c86))
+  * contracts: text/reasoning/tool parts carry blockIndex; add
+  * adapters: orderedAssistantItems sorts by blockIndex and strips the
+  * core: streaming and non-streaming paths assign indexes and persist
+  * legacy messages without indexes keep the old content-then-tools
+  * pluginDiscoveryUi is added as an unwired default-false field for type
+  * request context-composition recording is intentionally not adopted
+
+* **credential:** add remote server v2 format gate ([f99e313](https://github.com/kaying-ai/KayingCode/commit/f99e31321109c2ac6db342f6984cdf047f52d0e6))
+
+* **credential:** adopt enc:v2 system keyring for desktop ([6465e64](https://github.com/kaying-ai/KayingCode/commit/6465e64f6781dfb65e35a0072075fe67a611b25e))
+
+* **diagnostics:** adopt ZCode 3.18.1 memory allocation diagnostics ([632f6ac](https://github.com/kaying-ai/KayingCode/commit/632f6ace6eaaa40520c36ed2e454234df2e7effb))
+  * new adapters/memory-diagnostics: inspector sampling recorder, atomic
+  * resource sampler starts a 15 s allocation diagnostic alongside the
+  * records land under ~/.kayingcode/cli/memory-diagnostics (product path
+  * protocol server collectMemoryDiagnostics({ includeEventStats: false })
+  * v4 gateway adds hydration/history-opening/binary-cache counters
+  * shared: CliMemoryDiagnostic sanitizer and retention limits;
+  * SOURCE_PACKAGES regenerated for the new adapter entry
+  * memory-diagnostics recorder test 10/10 (local vitest config, upstream
+  * shared/contracts/adapters/bootstrap/cli and root typecheck pass
+  * root lint 0 errors; source:check; architecture:check --changed
+
+* **plugin:** add app-control and extension gateway ([b2fd9d3](https://github.com/kaying-ai/KayingCode/commit/b2fd9d3baeda3ff8a53c2ba5369d04884e6e7b98))
+  * add app-control session facade and Host wiring via an in-process handle
+  * add extension service, capability gateway, grants store and session backends
+  * add shared app-control protocol plus plugin host query methods
+  * support extension input sources, command query turns and model request metrics
+  * allow extension view sandbox provenance and forward/cold message reads
+
+* **plugin:** add extension host process and supervisor ([409d3df](https://github.com/kaying-ai/KayingCode/commit/409d3df5309a82febffcae6bbb052a450499abff))
+  * add the singleton utility process, extension registry and activation transactions
+  * add the Main supervisor with crash budget, probes, log ring and window pairing
+  * start the host from Main and register extension services in the local Window Host
+  * build extension-host as a dedicated tsup entry with the MCP SDK inlined
+  * cover env allowlisting, pairing and crash-budget exhaustion
+
+* **plugin:** add session-control model tools and bindings ([c15f373](https://github.com/kaying-ai/KayingCode/commit/c15f3738f2b67464ea8bd40320d0269f4fe683e2))
+  * add model-facing session tools with injected request identity and retry reconciliation
+  * add App reverse-RPC binding and standalone CLI/TUI runtime
+  * verify caller workspace and root session against the active CLI connection
+  * register session tools by trusted launch kind and keep ListModels for CreateSession
+  * propagate timeout/cancel reconciliation notes into model-visible errors
+
+* **plugin:** adopt upstream built-in plugins ([f2c0206](https://github.com/kaying-ai/KayingCode/commit/f2c0206e3860ae85253a462ab138eedaab076679))
+
+* **plugin:** align manifest loading with upstream ZCode ([4b01a6b](https://github.com/kaying-ai/KayingCode/commit/4b01a6b980cfc69193dc963ed2788fb8cd803040))
+  * add type-only plugin-api 1.4.0 and session-control contracts
+  * add shared extension-host manifest, grants and slots validation
+  * prefer .zcode-plugin manifests while keeping .kayingcode-plugin fallback
+  * expand ZCODE_* and KAYINGCODE_* variables across MCP, commands, hooks and skills
+  * stage both manifest layouts and root placeholders with fail-closed MCP checks
+
+* **plugin:** restore extension slots and MCP app UI ([3db9e94](https://github.com/kaying-ai/KayingCode/commit/3db9e94bebcd12bb26cbeb89c7213cb627ee2fc9))
+  * restore the plugin-ui page host for MCP Apps and Gen UI
+  * add extension slots stores, hooks and components for five slots
+  * mount composer status, mention, nav, side-pane launcher and file viewer routing
+  * add extension logs and view side-pane tabs plus grant/permission sections
+  * expose extension services through the desktop base service accessor
+  * add extension test ids and localized UI text
+
+* **ui:** add the macOS font smoothing preference ([0134188](https://github.com/kaying-ai/KayingCode/commit/01341884b85cd43504e1b808b44630a4cb009427))
+  * store: fontSmoothingEnabled (default on) with local persistence under
+  * settings: Appearance shows a "Font smoothing" switch only on macOS
+  * styles: grayscale antialiasing only under
+  * the local SettingsRow has no settings-search searchId yet, so the
+
+* **ui:** adopt ZCode 3.18 image preview actions ([85652ce](https://github.com/kaying-ai/KayingCode/commit/85652ce9132a3e899b2226c370845b1a80e21078))
+  * new ImagePreviewActions: copy, download, save-and-open, save a copy
+  * ImagePreviewSurface gains onDownload/downloading and a navigation
+  * new lib/imagePreviewDownload and lib/copyPreviewImage; the dialog
+  * new useImageFilePreview and ConversationImageFileMention; the mention
+  * 10 new en-US/zh-CN keys; CONTRACT.md updated
+  * product exclusions: the design-mode element mention (zcode-element)
+
+* **ui:** adopt ZCode 3.18 working orb with KayingCode KY brand ([74f29bd](https://github.com/kaying-ai/KayingCode/commit/74f29bd918be78d958610a7c490950eff9fb6644))
+  * Morph target is KayingCode's "KY" instead of upstream ZCode's "Z":
+  * Icon slot stays 16 px; reduced motion shows a static KY
+  * Timer now displays whole seconds (formatRunningWorkDuration) and the
+  * styles: add .animated-gradient-text-foreground, remove the now-unused
+  * specs and modelRetryProgress E2E updated for the orb and "0 seconds"
+
+* **upstream:** adopt ZCode 3.18.2 background subagent stall reminder ([e591ed2](https://github.com/kaying-ai/KayingCode/commit/e591ed2e4e75b791d6a3d8bf60d6dff9544788ba))
+  * core: new background-stall clock and parent reminder; notify after 15
+  * registry: local_agent activity snapshot (last progress, running tools,
+  * runner: executionId lifecycle and stop-identity checks, failure
+  * notifications: stall reminders are excluded from background result
+  * contracts: SubagentTaskSnapshot.executionId, SubagentStopOptions.
+  * config: backgroundStallNotifyMs / backgroundStallMaxIntervalMs
+  * background-subagent-stall 22/22 (upstream regression)
+  * core suite 223/229; the 6 failures are the same Windows-only
+  * contracts, core, adapters, bootstrap, cli typechecks; root typecheck,
+
+* **upstream:** adopt ZCode 3.18.2 security and stability fixes ([eca1833](https://github.com/kaying-ai/KayingCode/commit/eca1833613be6878f02c8583b47efb3ee86a3cec))
+  * dynamic-workflow: vm escape fix (null-prototype sandbox, closure-scoped
+  * adapters: proxy fetch keeps the caller's abort signal and the request
+  * node-repl-host: tool contract now states the kernel runs unsandboxed and
+  * core: prompt snapshot session entry; main-session system bytes are
+  * shared: relay reconnect spread after acknowledgement plus heartbeat
+  * ui: QueuedSummaryContent React #185 fix (static path bypasses animated
+  * root typecheck; lint 0 errors; source:check; architecture:check --changed
+  * CLI package typechecks: contracts, core, adapters, bootstrap, cli
+  * prompt-snapshot 14/14; core suite 201/207 (6 Windows-only env failures)
+  * sandbox smoke test: process escape blocked with ReferenceError
+
+
+### Bug Fixes
+
+* **plugins:** make plugin file writes and reads transaction-safe ([2b4e1dc](https://github.com/kaying-ai/KayingCode/commit/2b4e1dcd9ff7c13cae3e8b47f3b7d8ecc9298b28))
+  * helpers: add writePluginTextIfChanged; identical bytes skip the write,
+  * atomic-directory: take the upstream transaction parser plus
+  * marketplace: use write-if-changed for JSON writes; add
+  * regression: plugins-atomic-write covers nested creation, content
+
+* **remote-projects:** release address reservations for removed profiles ([f460116](https://github.com/kaying-ai/KayingCode/commit/f4601169bc2c7fef0d237366f43e043b3e2be754))
+  * add findRemoteProjectHostIdForProfile (null instead of throwing for
+  * release only for unbound profiles (no sourceServerId), only when no
+  * source server management gains releaseUnboundProfileHost and calls it
+  * export the new entries from services/node and document the contract
+  * regression: membership release cases, 6/6
+
+* **session-data:** guard symlinked storage roots on deletion ([e9f6805](https://github.com/kaying-ai/KayingCode/commit/e9f6805c274ed978911d8c997e5439444a444f25))
+  * add SessionDataFile and optional listSessionFiles, with entries sorted
+  * before measuring or deleting a storage category, reject the path when
+  * removeSession accepts retained artifact ids: referenced attachment
+  * port the upstream node implementation and behaviour tests
+
+* **ui:** make the KY working orb bolder and squarer ([fe38bf5](https://github.com/kaying-ai/KayingCode/commit/fe38bf56298ed47f5429e1fe6c2a20e1d56349d5))
+  * Rebuild ORB_BRAND_POINTS from the letter strokes again: 35 points,
+  * Grow target dots from r=0.5 to r=0.7 during the morph so the strokes
+  * Reduced-motion static KY uses the bold radius
+  * Update the loading spec and the 3.18 adoption record
+
+* **ui:** thicken the KY working orb strokes ([5e727a3](https://github.com/kaying-ai/KayingCode/commit/5e727a391bc93d11cdac03913998869a8cd6521f))
+
+
+### Chores
+
+* **licenses:** refresh third-party notices for 0.2.0 ([f421ea0](https://github.com/kaying-ai/KayingCode/commit/f421ea0ea0182713ecbfe6607d09e1aea7d2fb95))
+
+* **upstream:** pin mobile web and advance base to 3.18.2 ([3c263f4](https://github.com/kaying-ai/KayingCode/commit/3c263f40d946dc2421ee04b3b6d2fa62b1b1745a))
+
+
+### Documentation
+
+* **release:** record 0.2.0 preflight deviation ([adbec80](https://github.com/kaying-ai/KayingCode/commit/adbec80b1e7f47c9b9c24baacabe90db505cbe91))
+
 ## [0.1.5](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.1.4...kaying-code-v0.1.5) (2026-11-13)
 
 ### Features
