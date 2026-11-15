@@ -31,6 +31,13 @@ const SHARP_VARIANT_PACKAGES = [
   "sharp-libvips-linuxmusl-arm64",
 ];
 
+// pnpm 会为 Linux 同时安装 gnu 与 musl 变体；桌面安装包只使用目标平台的 gnu 变体，
+// musl 变体不在 keyringPlatformPackage 的六项里，必须显式裁剪。
+const KEYRING_MUSL_VARIANTS = [
+  "@napi-rs/keyring-linux-x64-musl",
+  "@napi-rs/keyring-linux-arm64-musl",
+];
+
 const SHARP_VARIANTS_BY_PLATFORM = {
   "win32-x64": ["sharp-win32-x64"],
   "win32-arm64": ["sharp-win32-arm64"],
@@ -67,7 +74,10 @@ export function createDesktopNativePackagePrunePatterns(targetPlatformKey) {
       (name) => !SHARP_VARIANTS_BY_PLATFORM[targetPlatformKey].includes(name),
     ).map((name) => `!node_modules/@img/${name}/**`),
     // 系统凭据库同样按 optionalDependencies 分发全平台 .node；只保留目标平台变体。
-    ...SUPPORTED_DESKTOP_PLATFORM_KEYS.map((key) => keyringPlatformPackage(key))
+    ...[
+      ...SUPPORTED_DESKTOP_PLATFORM_KEYS.map((key) => keyringPlatformPackage(key)),
+      ...KEYRING_MUSL_VARIANTS,
+    ]
       .filter((name) => name !== keyringPlatformPackage(targetPlatformKey))
       .map((name) => `!node_modules/${name}/**`),
   ];

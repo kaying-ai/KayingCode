@@ -9,7 +9,15 @@ describe("desktop keyring native package policy", () => {
     const patterns = createDesktopNativePackagePrunePatterns("win32-x64");
     expect(patterns).toContain("!node_modules/@napi-rs/keyring-darwin-x64/**");
     expect(patterns).toContain("!node_modules/@napi-rs/keyring-linux-arm64-gnu/**");
+    expect(patterns).toContain("!node_modules/@napi-rs/keyring-linux-x64-musl/**");
+    expect(patterns).toContain("!node_modules/@napi-rs/keyring-linux-arm64-musl/**");
     expect(patterns).not.toContain("!node_modules/@napi-rs/keyring-win32-x64-msvc/**");
+  });
+
+  it("prunes musl variants for a linux gnu target", () => {
+    const patterns = createDesktopNativePackagePrunePatterns("linux-x64");
+    expect(patterns).toContain("!node_modules/@napi-rs/keyring-linux-x64-musl/**");
+    expect(patterns).not.toContain("!node_modules/@napi-rs/keyring-linux-x64-gnu/**");
   });
 
   it("fails closed on a non-target keyring variant", () => {
