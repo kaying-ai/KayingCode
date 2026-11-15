@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { releaseManifestSchema, type ReleaseManifest } from "../contracts.js";
+import { dirname, join, resolve } from "node:path";
+import { withFileLock } from "@zcode/shared/node";
+import {
+  releaseManifestSchema,
+  SERVER_CREDENTIAL_FORMAT,
+  type ReleaseManifest,
+} from "../contracts.js";
 import type { ServerLayout } from "./paths.js";
 import { ensureServerInstallOwnership } from "./installationOwnership.js";
 
@@ -145,6 +150,7 @@ export class ReleaseManager {
       throw new Error("No pending release is prepared");
     }
     await this.assertReleaseDir(pending);
+    await this.assertCredentialCompatibility(pending);
     await atomicWriteJson(this.layout.currentFile, pending);
     await rm(this.layout.pendingFile, { force: true });
     return pending;
@@ -153,10 +159,33 @@ export class ReleaseManager {
   public async restoreCurrent(manifest: ReleaseManifest | null): Promise<void> {
     if (manifest) {
       await this.assertReleaseDir(manifest);
+      await this.assertCredentialCompatibility(manifest);
       await atomicWriteJson(this.layout.currentFile, manifest);
       return;
     }
     await rm(this.layout.currentFile, { force: true });
+  }
+
+  private async assertCredentialCompatibility(manifest: ReleaseManifest): Promise<void> {
+    const filePath = join(this.layout.dataBaseDir, ".kayingcode", "v2", "credentials.json");
+    await withFileLock(filePath, async () => {
+      const raw = await readFile(filePath, "utf8").catch((error) => {
+        if ((error as { code?: string }).code === "ENOENT") return "";
+        throw error;
+      });
+      if (!raw.includes("enc:v2:")) return;
+      const metadata = await readFile(join(manifest.releaseDir, "runtime", "package.json"), "utf8")
+        .then((value) => JSON.parse(value) as { kayingcodeCredentialFormat?: unknown })
+        .catch(() => null);
+      if (metadata?.kayingcodeCredentialFormat === SERVER_CREDENTIAL_FORMAT) return;
+      // 旧版把未知密文当成 token，会在 401 后清掉账号。宁可保留现场并拒绝降级。
+      throw Object.assign(
+        new Error(
+          "Cannot roll back to a release that cannot read current encrypted credentials. Credentials are preserved; use a compatible release to recover.",
+        ),
+        { code: "CREDENTIAL_ROLLBACK_INCOMPATIBLE" },
+      );
+    });
   }
 
   private async readManifest(path: string): Promise<ReleaseManifest | null> {

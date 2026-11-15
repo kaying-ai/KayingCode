@@ -1,6 +1,7 @@
 import { access, chmod, cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { createRuntimeManifest, type ServerTarget } from "../runtime/manifest.js";
+import { SERVER_CREDENTIAL_FORMAT } from "../contracts.js";
 import {
   collectBareModuleSpecifiers,
   copyPackageDir,
@@ -259,7 +260,16 @@ export async function stageRelease(options: StageOptions): Promise<StagedRelease
   }
   await writeFile(
     join(runtimeDir, "package.json"),
-    `${JSON.stringify({ name: releaseName, private: true, type: "module" }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        name: releaseName,
+        private: true,
+        type: "module",
+        kayingcodeCredentialFormat: SERVER_CREDENTIAL_FORMAT,
+      },
+      null,
+      2,
+    )}\n`,
     "utf8",
   );
   await cp(options.agentBundlePath, join(runtimeDir, "kayingcode.cjs"), {
@@ -373,7 +383,11 @@ export async function stageRelease(options: StageOptions): Promise<StagedRelease
     },
     {
       id: "agent-runtime",
-      paths: ["runtime/kayingcode.cjs", "runtime/packages/bundled-skills", "runtime/licenses/agent"],
+      paths: [
+        "runtime/kayingcode.cjs",
+        "runtime/packages/bundled-skills",
+        "runtime/licenses/agent",
+      ],
     },
     ...(plugins.length > 0
       ? [

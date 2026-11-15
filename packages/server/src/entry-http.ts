@@ -1,8 +1,9 @@
 import {
-  createLocalServices,
+  createServerHostServices,
   getAppConfigDir,
   migrateApplicationStorage,
 } from "@zcode/services/node";
+import { hostname } from "node:os";
 import { createSettingService } from "@zcode/services/storage-startup";
 import {
   materializeBundledKayingCodeBuiltinProviderConfig,
@@ -25,12 +26,15 @@ async function main(): Promise<void> {
   // 再开放 RPC。否则 projectService 首次读树时才由 TaskIndexRepo 懒迁移，
   // lastWorkspaceSession 的项目种子不会被消费。
   await migrateApplicationStorage(await createSettingService().get());
-  const services = createLocalServices({
+  const serverId = hostname() || "kayingcode-server";
+  const { services } = await createServerHostServices({
+    sourceServerId: serverId,
     kayingcodeBuiltinProviderConfigFilePath,
     providerProvisioningTargetEnabled: Boolean(authToken),
   });
 
   createHttpServer(services, port, {
+    serverId,
     ...(host ? { host } : {}),
     ...(staticRoot ? { staticRoot, spaFallback: true } : {}),
     ...(authToken ? { authToken, authRequired: true } : {}),

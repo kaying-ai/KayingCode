@@ -35,6 +35,9 @@ const buildResult = await build({
   format: "cjs",
   target: "node22",
   plugins: [nativeAddonPlugin],
+  // 单文件远端 server 不携带 keyring node_modules；凭据启动前由 --prepare-credentials
+  // 写入私有 credential-secret，此时动态 import 不会执行。
+  external: ["@napi-rs/keyring"],
   // CJS 环境没有 import.meta.url，通过 banner 注入等价变量，
   // 再用 define 全局替换，这样源码无需关心最终打包格式。
   banner: {
@@ -44,7 +47,9 @@ const buildResult = await build({
     "import.meta.url": "__import_meta_url",
     "import.meta.dirname": "__import_meta_dirname",
     __KAYINGCODE_VERSION__: JSON.stringify(version),
-    __KAYINGCODE_BUILTIN_PROVIDER_CONFIG_JSON__: JSON.stringify(kayingcodeBuiltinProviderConfigJson),
+    __KAYINGCODE_BUILTIN_PROVIDER_CONFIG_JSON__: JSON.stringify(
+      kayingcodeBuiltinProviderConfigJson,
+    ),
   },
   metafile: true,
 });

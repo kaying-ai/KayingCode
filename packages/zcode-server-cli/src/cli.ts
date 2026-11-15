@@ -5,11 +5,14 @@ import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { isPublicKayingCodeErrorCode, KAYINGCODE_VERSION } from "@zcode/shared";
+import { prepareServerCredentialStorage } from "@zcode/shared/credential-security";
 import { SourceServerWorkspaceAliasRepo } from "@zcode/services/node";
 import {
   CORE_KILL_TIMEOUT_MS,
   CORE_READY_TIMEOUT_MS,
   CORE_STOP_GRACE_TIMEOUT_MS,
+  SERVER_CREDENTIAL_FORMAT,
+  SERVER_CREDENTIAL_FORMAT_ENV,
   SERVER_READY_WAIT_TIMEOUT_MS,
   controlRequestSchema,
   createStoppedServerStatus,
@@ -142,6 +145,12 @@ export async function runServerCli(
       migrateRetryRequested
         ? await resolveCanonicalServerLayout(parsed.layout.serverRoot)
         : parsed.layout;
+    if (["serve", "update"].includes(command) && parsed.argv.includes("--prepare-credentials")) {
+      // Desktop 的在线更新先于 ensureDaemon；候选 Core 启动前也必须准备同一持久密钥。
+      await prepareServerCredentialStorage({
+        filePath: join(layout.dataBaseDir, ".kayingcode", "v2", "credentials.json"),
+      });
+    }
     if (proxyStdioRequested) {
       try {
         await runProxyStdio({
@@ -475,6 +484,7 @@ async function runServe(
           execPath: runtimeNode,
           env: {
             ...inheritedEnv,
+            [SERVER_CREDENTIAL_FORMAT_ENV]: String(SERVER_CREDENTIAL_FORMAT),
             ...releaseWiring,
             ...(runtimeRoot ? { KAYINGCODE_SERVER_RUNTIME_ROOT: runtimeRoot } : {}),
             ...(release?.releaseId ? { KAYINGCODE_SERVER_RELEASE_ID: release.releaseId } : {}),
