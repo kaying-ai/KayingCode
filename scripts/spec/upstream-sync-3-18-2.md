@@ -44,8 +44,8 @@
 | 延后 | adapters | 推理历史/runner 归一化依赖 `blockIndex`、`signedReasoningReset` 协议批次，与 blockIndex 改造同批 |
 | 延后 | adapters | session-data 符号链接越界与 `listSessionFiles`/保留式删除，属会话永久删除特性，需协议与 Host 同批 |
 | 延后 | adapters | 插件目录原子写入、zip source 与插件安装流程整体改造 |
+| 已采纳 | memory-diagnostics | 3.18.1 内存分配诊断：新增 `adapters/src/memory-diagnostics`（recorder/storage/contract）；资源采样器以 15s 节拍采集 inspector 分配样本，落盘到 `~/.kayingcode/cli/memory-diagnostics`；协议 server 的 `collectMemoryDiagnostics` 支持跳过事件统计扫描；v4 gateway 补充 hydration/history/binary cache 计数 |
 | 延后 | android-emulator-plugin | 产品已删除该包，不恢复 |
-| 延后 | memory-diagnostics | 3.18.1 诊断模块，需 bootstrap 接线后单独验收 |
 
 ### B. 上下文与会话能力
 
@@ -134,3 +134,11 @@
 - 样式新增 `.animated-gradient-text-foreground`，删除已无引用的像素/ shimmer 规则。
 - 同步更新 `packages/ui/spec/chat-loading-indicator.md`、`packages/ui/spec/upstream-3-17-2.md` 与 `packages/ui/test/modelRetryProgress.e2e.mjs`（`0 秒`、整秒断言）。
 - 验证：`tsc -b packages/ui`、根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过；KY 点阵用 20px 实际尺寸渲染核对，字形可读。E2E 需要桌面浏览器环境，本轮未在 CI 中执行。
+
+第五批（2026-11-15，内存分配诊断）：
+
+- 新增 `adapters/src/memory-diagnostics/`（CONTRACT、contract、recorder、storage、types、module、index），采用上游 3.18.1 实现；默认落盘目录改为产品路径 `~/.kayingcode/cli/memory-diagnostics`。
+- `packages/shared/src/memoryDiagnostics.ts` 增加 `CliMemoryDiagnostic`/`CliMemoryReading` 与 `sanitizeCliMemoryDiagnostic`、文件保留上限；`ZCODE_COMMIT` 以产品构建提交提供兼容别名。
+- 资源采样器在既有 60s 节拍之外启动 15s 分配诊断，`stop()` 同时停止诊断；inspector 不可用时静默降级。
+- `collectMemoryDiagnostics({ includeEventStats: false })` 跳过历史事件扫描；v4 gateway 增加 hydration/history/binary cache 计数。
+- 回归：`memory-diagnostics/recorder.test.ts` **10/10 通过**；shared/contracts/adapters/bootstrap/cli 与根 typecheck 通过；根 lint、source:check、architecture:check --changed 通过。

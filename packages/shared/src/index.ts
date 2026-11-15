@@ -42,6 +42,8 @@ export {
   KAYINGCODE_COMMIT,
   KAYINGCODE_BUILD_TIME,
   ZCODE_UPSTREAM_VERSION,
+  ZCODE_VERSION,
+  ZCODE_COMMIT,
 } from "./version.js";
 export type { HelloMessage, HelloAckMessage } from "./handshake.js";
 export type { ArmsRumEnv, KayingCodeEnv, KayingCodeProductFlavor } from "./env.js";
