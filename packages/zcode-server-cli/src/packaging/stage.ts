@@ -101,18 +101,43 @@ async function copyDirectoryIfPresent(
   return names.map((name) => name.replace(/-plugin$/u, ""));
 }
 
-const PLUGIN_ROOT_PLACEHOLDER_PREFIX = "${KAYINGCODE_PLUGIN_ROOT}/";
+const PLUGIN_ROOT_PLACEHOLDER_PREFIXES = [
+  "${ZCODE_PLUGIN_ROOT}/",
+  "${KAYINGCODE_PLUGIN_ROOT}/",
+] as const;
+const PLUGIN_MANIFEST_CANDIDATES = [
+  [".zcode-plugin", "plugin.json"],
+  [".kayingcode-plugin", "plugin.json"],
+] as const;
 
 /**
  * Bug 原因：legacy prepare-prebuilds.mjs 曾显式构建并断言 android-emulator / ios-simulator /
  * browser-use 的 `dist/mcp/server.js`；切到 stageRelease 后只剩整目录复制，而插件 dist 被
  * gitignore，干净 CI 工作区会把只有 plugin.json 与 skills、却没有 MCP 入口的插件静默打进
  * archive，远端启用插件后 MCP server 启动时才报找不到文件。这里以 plugin.json 声明为事实源做
- * fail-closed 校验：manifest 缺失，或 mcpServers 的 command/args 引用的 `${KAYINGCODE_PLUGIN_ROOT}/...`
+ * fail-closed 校验：manifest 缺失，或 mcpServers 的 command/args 引用的 `${ZCODE_PLUGIN_ROOT}/...`
  * 文件不在 staged 目录里，staging 直接失败，而不是产出残缺 archive。
  */
 async function assertOfficialPluginRuntime(stagedDir: string, name: string): Promise<void> {
-  const manifestPath = join(stagedDir, ".kayingcode-plugin", "plugin.json");
+  let manifestPath: string | undefined;
+  for (const parts of PLUGIN_MANIFEST_CANDIDATES) {
+    const candidate = join(stagedDir, ...parts);
+    try {
+      await access(candidate);
+      manifestPath = candidate;
+      break;
+    } catch {
+      // 继续尝试下一个清单目录。
+    }
+  }
+  if (!manifestPath) {
+    throw new Error(
+      `Official plugin ${name} has no readable manifest: ${join(
+        stagedDir,
+        ...PLUGIN_MANIFEST_CANDIDATES[0],
+      )}`,
+    );
+  }
   let manifest: {
     mcpServers?: Record<string, { command?: unknown; args?: unknown } | undefined>;
   };
@@ -128,9 +153,12 @@ async function assertOfficialPluginRuntime(stagedDir: string, name: string): Pro
     if (!server) continue;
     const references = [server.command, ...(Array.isArray(server.args) ? server.args : [])];
     for (const reference of references) {
-      if (typeof reference !== "string" || !reference.startsWith(PLUGIN_ROOT_PLACEHOLDER_PREFIX))
-        continue;
-      const relativePath = reference.slice(PLUGIN_ROOT_PLACEHOLDER_PREFIX.length);
+      if (typeof reference !== "string") continue;
+      const prefix = PLUGIN_ROOT_PLACEHOLDER_PREFIXES.find((candidate) =>
+        reference.startsWith(candidate),
+      );
+      if (!prefix) continue;
+      const relativePath = reference.slice(prefix.length);
       try {
         await access(join(stagedDir, ...relativePath.split("/")));
       } catch {
