@@ -460,3 +460,51 @@ export interface ConversationRowsPartition {
    */
   readonly tail: readonly ConversationRow[];
 }
+
+/**
+ * 读不懂的历史行占位。只保留 RowBase 里最稳定的四个字段：rowId/turnId 决定身份、排序与分轮，
+ * createdAt/createdAtSeq 决定时间轴位置；其余字段无法判断偏斜位置，一律不保留。
+ * 用于 rows.window 与 rows/range 的历史回补，不用于 deltas。
+ */
+export interface UnreadableConversationRow {
+  kind: "unreadable";
+  rowId: number;
+  turnId: string;
+  createdAt: number;
+  createdAtSeq: number;
+  /** 原帧里那一行自报的 kind，区分「未知行类型」与「已知类型但字段偏斜」。 */
+  sourceKind: string;
+  entityId?: undefined;
+  productTurnId?: undefined;
+  visibility?: undefined;
+  actions?: undefined;
+}
+
+export const unreadableRowSchema = z
+  .object({
+    rowId: z.number(),
+    turnId: z.string(),
+    createdAt: timestampSchema,
+    createdAtSeq: z.number(),
+    kind: z.string(),
+  })
+  .transform(
+    (row): UnreadableConversationRow => ({
+      kind: "unreadable",
+      rowId: row.rowId,
+      turnId: row.turnId,
+      createdAt: row.createdAt,
+      createdAtSeq: row.createdAtSeq,
+      sourceKind: row.kind,
+    }),
+  );
+
+/**
+ * 展示用的行：先按严格 union 解析，失败才退到占位行。
+ * 严格成员必须排在前面，否则合法行也会被当成占位行。
+ */
+export const displayConversationRowSchema = z.union([conversationRowSchema, unreadableRowSchema]);
+export type DisplayConversationRow = z.infer<typeof displayConversationRowSchema>;
+
+/** 上游 3.18 命名：wire 行（不含 unreadable 占位）。产品内部既有 ConversationRow 即此类型。 */
+export type WireConversationRow = ConversationRow;

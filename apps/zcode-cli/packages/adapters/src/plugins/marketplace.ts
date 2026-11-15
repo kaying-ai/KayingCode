@@ -62,6 +62,7 @@ const MARKETPLACE_JSON_MAX_REDIRECTS = 5;
 const MARKETPLACE_JSON_TIMEOUT_MS = 180_000;
 const claudeIconMigrationAttempts = new Set<string>();
 const CLAUDE_MARKETPLACE_FILE = join(".claude-plugin", "marketplace.json");
+const ZCODE_MANIFEST_PATH = join(".zcode-plugin", "plugin.json");
 const KAYINGCODE_MANIFEST_PATH = join(".kayingcode-plugin", "plugin.json");
 const CLAUDE_MANIFEST_PATH = join(".claude-plugin", "plugin.json");
 const CODEX_MANIFEST_PATH = join(".codex-plugin", "plugin.json");
@@ -2210,7 +2211,12 @@ function findMarketplaceManifestPath(rootPath: string, explicitPath?: string): s
 }
 
 function findPluginManifestPath(rootPath: string): string | null {
-  for (const candidate of [KAYINGCODE_MANIFEST_PATH, CLAUDE_MANIFEST_PATH, CODEX_MANIFEST_PATH]) {
+  for (const candidate of [
+    ZCODE_MANIFEST_PATH,
+    KAYINGCODE_MANIFEST_PATH,
+    CLAUDE_MANIFEST_PATH,
+    CODEX_MANIFEST_PATH,
+  ]) {
     const path = join(rootPath, candidate);
     if (fileExists(path)) return path;
   }

@@ -599,10 +599,17 @@ describe("stageRelease", () => {
   async function writeOfficialPluginFixture(
     officialPluginsDir: string,
     name: string,
-    options: { mcpEntry?: string; withMcpEntryFile?: boolean; withManifest?: boolean } = {},
+    options: {
+      manifestDir?: ".kayingcode-plugin" | ".zcode-plugin";
+      mcpEntry?: string;
+      rootToken?: "KAYINGCODE" | "ZCODE";
+      withMcpEntryFile?: boolean;
+      withManifest?: boolean;
+    } = {},
   ): Promise<void> {
     const pluginDir = join(officialPluginsDir, name);
-    await mkdir(join(pluginDir, ".kayingcode-plugin"), { recursive: true });
+    const manifestDir = options.manifestDir ?? ".kayingcode-plugin";
+    await mkdir(join(pluginDir, manifestDir), { recursive: true });
     await writeFile(join(pluginDir, "README.md"), name, "utf8");
     // 真实官方插件的 package.json 都是 tracked 文件，是"该目录属于当前 checkout"的判据。
     await writeFile(
@@ -615,8 +622,12 @@ describe("stageRelease", () => {
       version: "0.1.0",
     };
     if (options.mcpEntry) {
+      const rootToken = options.rootToken ?? "KAYINGCODE";
       manifest.mcpServers = {
-        [name]: { command: "node", args: [`\${KAYINGCODE_PLUGIN_ROOT}/${options.mcpEntry}`] },
+        [name]: {
+          command: "node",
+          args: [`\${${rootToken}_PLUGIN_ROOT}/${options.mcpEntry}`],
+        },
       };
       if (options.withMcpEntryFile !== false) {
         const entryPath = join(pluginDir, ...options.mcpEntry.split("/"));
@@ -626,7 +637,7 @@ describe("stageRelease", () => {
     }
     if (options.withManifest !== false) {
       await writeFile(
-        join(pluginDir, ".kayingcode-plugin", "plugin.json"),
+        join(pluginDir, manifestDir, "plugin.json"),
         JSON.stringify(manifest),
         "utf8",
       );
@@ -812,6 +823,28 @@ describe("stageRelease", () => {
       ).rejects.toThrow(/android-emulator-plugin[\s\S]*dist\/mcp\/server\.js/u);
     },
   );
+
+  it("fails closed on a missing upstream .zcode-plugin MCP entry", async () => {
+    const fixture = await makeStageFixture();
+    const officialPluginsDir = join(await makeTempDir(), "packages");
+    await writeOfficialPluginFixture(officialPluginsDir, "android-emulator-plugin", {
+      manifestDir: ".zcode-plugin",
+      mcpEntry: "dist/mcp/server.js",
+      rootToken: "ZCODE",
+      withMcpEntryFile: false,
+    });
+    await writeOfficialPluginFixture(officialPluginsDir, "kayingcode-guide-plugin");
+
+    await expect(
+      stageRelease({
+        target: "linux-x64",
+        appVersion: "9.9.9-test",
+        archive: false,
+        officialPluginsDir,
+        ...fixture,
+      }),
+    ).rejects.toThrow(/android-emulator-plugin[\s\S]*dist\/mcp\/server\.js/u);
+  });
 
   it("fails closed when a staged official plugin has no plugin manifest", async () => {
     const fixture = await makeStageFixture();

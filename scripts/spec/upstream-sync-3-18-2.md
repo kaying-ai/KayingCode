@@ -237,3 +237,16 @@
 - 明确未采纳：`recordRequestContextComposition*`（phase 3 延后），model.ts 不记录组成预演数据。
 - 回归：core `tool-history-order` 21 + `message-history` 9 新增通过；adapters `model-transform` 32 + `reasoning-history-normalization` 65 通过；core 全量 **262/268**，仍是既有 6 个 Windows 环境失败。
 - 验证：contracts/adapters/core/bootstrap/cli typecheck；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
+
+第十五批（2026-11-15，插件体系 P0：基础契约与双兼容 loader）：
+
+- 新增 `packages/plugin-api`（1.4.0，4 个 type-only 入口）与 `packages/session-control`（contracts/cli/app/testing）；`@zcode/shared` 新增 `extension-host` 入口与 `@zcode/session-control` 依赖。
+- 新增 `packages/shared/src/extension-host/`：manifest 两步校验、grants 档位、slots 静态表、能力表与通道类型；协议导入改用 `kayingcode-protocol-v4`，`PLUGIN_MANIFEST_CANDIDATES` 增加 `.kayingcode-plugin` 回退。
+- 新增 `packages/shared/src/kayingcode-protocol-v4/context-composition/contract.ts`，补充 `displayConversationRowSchema`、`UnreadableConversationRow` 与 `WireConversationRow` 别名，供 extension-host 与 plugin-api 复用。
+- 插件 loader：`.zcode-plugin` > `.kayingcode-plugin` > `.claude-plugin` > `.codex-plugin`；marketplace 版本解析与 zip 根识别同步优先级。
+- 变量双兼容：MCP args/env、命令 shell 块、hooks、skills、Bash 会话 env 同时支持 `${ZCODE_*}` 与 `${KAYINGCODE_*}`；`${user_config.*}` 语义不变；stdio MCP 环境权威双写 `ZCODE_PLUGIN_ID` / `KAYINGCODE_PLUGIN_ID`。
+- 官方插件启动参数与打包 staging 同时识别两种清单目录、两种 `${*_PLUGIN_ROOT}/` 占位符；缺失 MCP 入口仍 fail-closed。
+- 规范：新增 `adapters/spec/plugin-manifest-compat.md`，明确 loader 与 extension-host 的状态所有者、接口与验收边界。
+- 回归：adapters `plugin-zcode-compat` 4/4、core `plugin-variable-compat` 3/3、shared `extension-host/contract` 6/6、session-control 103/103、plugin-api version 1/1、staging `.zcode-plugin` fail-closed 3/3（本机 Windows 运行）通过。
+- 验证：根 `pnpm run typecheck`（含 session-control 与 plugin-api）通过；根 `pnpm run lint` 0 errors / 128 个既有 warnings；`source:plugins`、`source:map`、`source:check`、`architecture:check --changed` 通过；`plugin-api` dts 构建通过。
+- 未接线：扩展进程、扩展网关、session-control 的 CLI/App adapter、extension-slots UI 与上游插件替换仍按 P1–P5 推进；`UPSTREAM_BASE` 保持 3.17.2。

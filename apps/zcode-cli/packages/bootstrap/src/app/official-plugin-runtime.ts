@@ -5,7 +5,7 @@ import {
   KAYINGCODE_PLUGIN_HOST_COMMAND,
   type McpServerConfig,
 } from "@zcode/contracts";
-import { KAYINGCODE_PLUGIN_ID_ENV_KEY } from "@zcode/shared";
+import { KAYINGCODE_PLUGIN_ID_ENV_KEY, ZCODE_PLUGIN_ID_ENV_KEY } from "@zcode/shared";
 import {
   createOfficialPluginCacheRetryBudget,
   type OfficialPluginCacheRetryBudget,
@@ -87,7 +87,11 @@ export function writeOfficialPluginRuntimeManifest(input: OfficialRuntimeManifes
     // 文档插件使用 dist/server.mjs；统一覆盖成 dist/mcp/server.js 会导致启动失败。
     mcpServer.args = [
       ...hostPrefixArgs,
-      ...serverArgs.map((arg) => arg.replaceAll("${KAYINGCODE_PLUGIN_ROOT}", input.rootPath)),
+      ...serverArgs.map((arg) =>
+        arg
+          .replaceAll("${ZCODE_PLUGIN_ROOT}", input.rootPath)
+          .replaceAll("${KAYINGCODE_PLUGIN_ROOT}", input.rootPath),
+      ),
     ];
     mcpServer.env = {
       ...mcpServerEnv,
@@ -98,6 +102,7 @@ export function writeOfficialPluginRuntimeManifest(input: OfficialRuntimeManifes
       // 其他 official plugin 仍带上不可伪造的 plugin identity；CUA broker 凭据由 shared
       // node_repl 的可信配置注入，不再写入独立 server。
       [KAYINGCODE_PLUGIN_ID_ENV_KEY]: `${input.pluginName}@${KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE}`,
+      [ZCODE_PLUGIN_ID_ENV_KEY]: `${input.pluginName}@${KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE}`,
     };
     mcpServers[serverKey] = mcpServer;
   }

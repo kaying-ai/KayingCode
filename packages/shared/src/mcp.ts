@@ -14,6 +14,9 @@ export const KAYINGCODE_CUA_OFFICIAL_MCP_NAMESPACE_NAME = "plugin:computer-use:c
 // 插件身份 env key：resolver（adapters/src/plugins/mcp.ts）权威写入 loaded.id，manifest/user env 不可覆盖。
 // bootstrap + cli/plugin-host-command.ts 复用此常量识别 official kayingcode-cua plugin server，避免字面量漂移。
 export const KAYINGCODE_PLUGIN_ID_ENV_KEY = "KAYINGCODE_PLUGIN_ID";
+// 上游插件读取的身份变量。双写 KAYINGCODE_PLUGIN_ID 与 ZCODE_PLUGIN_ID：产品自有插件继续读前者，
+// 直接采用的上游插件无需改代码即可读到同一权威身份。
+export const ZCODE_PLUGIN_ID_ENV_KEY = "ZCODE_PLUGIN_ID";
 
 export type McpSource =
   | "mcp"

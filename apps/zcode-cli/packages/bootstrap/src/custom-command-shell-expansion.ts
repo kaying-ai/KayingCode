@@ -13,7 +13,7 @@ const DEFAULT_SHELL_EXPANSION_OUTPUT_BYTES = 128 * 1024;
 const INLINE_SHELL_PATTERN = /!`([^`]*)`/gu;
 const FENCED_SHELL_PATTERN = /```!\s*\r?\n?([\s\S]*?)```/gu;
 const SHELL_CONTEXT_VARIABLE_PATTERN =
-  /\$\{(CLAUDE_CODE_SESSION_ID|CLAUDE_PLUGIN_DATA|CLAUDE_PLUGIN_ROOT|CLAUDE_PROJECT_DIR|CLAUDE_SESSION_ID|CLAUDE_SKILL_DIR|KAYINGCODE_PLUGIN_DATA|KAYINGCODE_PLUGIN_ROOT|KAYINGCODE_PROJECT_DIR|KAYINGCODE_SESSION_ID|KAYINGCODE_SKILL_DIR)\}/gu;
+  /\$\{(CLAUDE_CODE_SESSION_ID|CLAUDE_PLUGIN_DATA|CLAUDE_PLUGIN_ROOT|CLAUDE_PROJECT_DIR|CLAUDE_SESSION_ID|CLAUDE_SKILL_DIR|ZCODE_PLUGIN_DATA|ZCODE_PLUGIN_ID|ZCODE_PLUGIN_NAME|ZCODE_PLUGIN_ROOT|ZCODE_PROJECT_DIR|ZCODE_SESSION_ID|ZCODE_SKILL_DIR|KAYINGCODE_PLUGIN_DATA|KAYINGCODE_PLUGIN_ID|KAYINGCODE_PLUGIN_NAME|KAYINGCODE_PLUGIN_ROOT|KAYINGCODE_PROJECT_DIR|KAYINGCODE_SESSION_ID|KAYINGCODE_SKILL_DIR)\}/gu;
 
 interface ShellExpansionMatch {
   command: string;
@@ -164,15 +164,21 @@ function createShellExpansionEnv(input: {
 }) {
   const set: Record<string, string> = {};
   set.CLAUDE_PROJECT_DIR = input.workingDirectory;
+  set.ZCODE_PROJECT_DIR = input.workingDirectory;
   set.KAYINGCODE_PROJECT_DIR = input.workingDirectory;
   if (input.sessionId) {
     set.CLAUDE_CODE_SESSION_ID = input.sessionId;
     set.CLAUDE_SESSION_ID = input.sessionId;
+    set.ZCODE_SESSION_ID = input.sessionId;
     set.KAYINGCODE_SESSION_ID = input.sessionId;
   }
   if (input.plugin) {
     set.CLAUDE_PLUGIN_DATA = input.plugin.dataPath;
     set.CLAUDE_PLUGIN_ROOT = input.plugin.rootPath;
+    set.ZCODE_PLUGIN_DATA = input.plugin.dataPath;
+    set.ZCODE_PLUGIN_ID = input.plugin.id;
+    set.ZCODE_PLUGIN_NAME = input.plugin.name;
+    set.ZCODE_PLUGIN_ROOT = input.plugin.rootPath;
     set.KAYINGCODE_PLUGIN_DATA = input.plugin.dataPath;
     set.KAYINGCODE_PLUGIN_ID = input.plugin.id;
     set.KAYINGCODE_PLUGIN_NAME = input.plugin.name;
@@ -190,7 +196,11 @@ function assertShellExpansionContextAvailable(input: {
   for (const match of input.shellCommand.matchAll(SHELL_CONTEXT_VARIABLE_PATTERN)) {
     const name = match[1];
     if (!name) continue;
-    if (name === "CLAUDE_SKILL_DIR" || name === "KAYINGCODE_SKILL_DIR") {
+    if (
+      name === "CLAUDE_SKILL_DIR" ||
+      name === "ZCODE_SKILL_DIR" ||
+      name === "KAYINGCODE_SKILL_DIR"
+    ) {
       throw new Error(
         `Custom command /${input.command.metadata.name} variable requires a skill context: ${name}`,
       );
@@ -199,6 +209,7 @@ function assertShellExpansionContextAvailable(input: {
       !input.sessionId &&
       (name === "CLAUDE_CODE_SESSION_ID" ||
         name === "CLAUDE_SESSION_ID" ||
+        name === "ZCODE_SESSION_ID" ||
         name === "KAYINGCODE_SESSION_ID")
     ) {
       throw new Error(
@@ -209,7 +220,13 @@ function assertShellExpansionContextAvailable(input: {
       !input.plugin &&
       (name === "CLAUDE_PLUGIN_DATA" ||
         name === "CLAUDE_PLUGIN_ROOT" ||
+        name === "ZCODE_PLUGIN_DATA" ||
+        name === "ZCODE_PLUGIN_ID" ||
+        name === "ZCODE_PLUGIN_NAME" ||
+        name === "ZCODE_PLUGIN_ROOT" ||
         name === "KAYINGCODE_PLUGIN_DATA" ||
+        name === "KAYINGCODE_PLUGIN_ID" ||
+        name === "KAYINGCODE_PLUGIN_NAME" ||
         name === "KAYINGCODE_PLUGIN_ROOT")
     ) {
       throw new Error(

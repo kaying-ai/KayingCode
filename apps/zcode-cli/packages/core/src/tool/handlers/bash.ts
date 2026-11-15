@@ -430,6 +430,8 @@ function createBashSessionEnv(context: ToolExecutionContext): Record<string, str
     CLAUDE_CODE_SESSION_ID: context.sessionId,
     CLAUDE_PROJECT_DIR: context.workspaceRoot,
     CLAUDE_SESSION_ID: context.sessionId,
+    ZCODE_PROJECT_DIR: context.workspaceRoot,
+    ZCODE_SESSION_ID: context.sessionId,
     KAYINGCODE_PROJECT_DIR: context.workspaceRoot,
     KAYINGCODE_SESSION_ID: context.sessionId,
   };

@@ -34,6 +34,7 @@
     "./channel-mention": "./src/channel-mention.ts",
     "./usage-quota": "./src/usage-quota.ts",
     "./gen-ui": "./src/gen-ui/index.ts",
+    "./extension-host": "./src/extension-host/index.ts",
     "./sqlite-migrations": "./src/sqlite-migrations/index.ts",
     "./web-remote-relay": "./src/web-remote-relay/index.ts",
     "./bots": "./src/bots.ts",
@@ -52,6 +53,7 @@
   },
   "dependencies": {
     "@zcode/model-option-map": "workspace:*",
+    "@zcode/session-control": "workspace:*",
     "zod": "4.6.5"
   },
   "devDependencies": {

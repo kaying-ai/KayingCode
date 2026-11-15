@@ -104,6 +104,7 @@ export {
   type PluginUpdateStatus,
 } from "./version-compare.js";
 
+const ZCODE_MANIFEST_PATH = join(".zcode-plugin", "plugin.json");
 const KAYINGCODE_MANIFEST_PATH = join(".kayingcode-plugin", "plugin.json");
 const CLAUDE_MANIFEST_PATH = join(".claude-plugin", "plugin.json");
 const CODEX_MANIFEST_PATH = join(".codex-plugin", "plugin.json");
@@ -977,6 +978,13 @@ function loadPlugin(
 }
 
 function findManifest(rootPath: string): string | null {
+  // 上游 ZCode 插件使用 `.zcode-plugin`，产品自有插件使用 `.kayingcode-plugin`。对齐上游后
+  // 以上游目录为第一优先，同时保留产品目录作为回退，已安装插件和内置插件无需迁移。
+  const zcodePath = join(rootPath, ZCODE_MANIFEST_PATH);
+  if (fileExists(zcodePath)) {
+    return zcodePath;
+  }
+
   const kayingcodePath = join(rootPath, KAYINGCODE_MANIFEST_PATH);
   if (fileExists(kayingcodePath)) {
     return kayingcodePath;
