@@ -30,6 +30,8 @@ export {
 export {
   createRemoteProjectConnectionAdmission,
   createRemoteProjectService,
+  findRemoteProjectHostIdForProfile,
+  releaseRemoteProjectProfileHost,
   remoteProjectHostIdForProfile,
   remoteProjectHostIdForTarget,
   prepareRemoteServerConnection,

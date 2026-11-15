@@ -62,7 +62,7 @@
 | 状态 | 范围 | 内容 |
 | --- | --- | --- |
 | 已采纳 | web-remote-relay | `domain/retry.ts` 连接建立后首次重连在 1.5 秒窗口内打散，`acknowledged()` 设置打散、新增 `reset()`；`heartbeatTiming.ts` 删除无消费方的旧重连 jitter 导出 |
-| 延后 | remote-projects | 成员释放修复依赖 `desktop/src/host/index.ts` 的 admission 接线，随 Host 批次 |
+| 已采纳 | remote-projects | `releaseRemoteProjectProfileHost`：未识别线路删除/改址后归还按地址预留的成员行；`findRemoteProjectHostIdForProfile` 枚举时对无效身份返回 null；Host 在 `removeProfile`/`updateProfile` 后调用释放端口；新增 `CONTRACT.md` 记录对称释放语义 |
 
 ### D. UI 独立增量
 
@@ -176,3 +176,11 @@
 - 新增回归 `tests/plugins-atomic-write.test.ts`：创建父目录、内容更新、同内容不触碰文件、并发写只留完整文档。
 - 验证：adapters/bootstrap typecheck 通过；atomic-write + plugin-mcp-isolation **5/5 通过**；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
 - 未采纳：插件 discovery/query 全量异步化、material-change 中断、并发上限、zip source 与安装流程重写。
+
+第十批（2026-11-15，remote-projects 成员释放）：
+
+- `connection-membership` 新增 `findRemoteProjectHostIdForProfile` 与 `releaseRemoteProjectProfileHost`：已识别线路直接返回；无其他未归档同地址线路且地址行无入口时 `removeHost`；IPv6 等身份无效线路不再让枚举抛错。
+- `sourceServerManagementService` 增加 `releaseUnboundProfileHost` 端口，`removeProfile` 先释放后删设置，`updateProfile` 改址后释放旧地址；`host/index.ts` 注入 `releaseRemoteProjectProfileHost`。
+- `services` 的 `remote-projects/index.ts` 与 `node.ts` 导出新入口；新增 `packages/services/src/remote-projects/CONTRACT.md`。
+- 新增回归 `packages/services/test/remoteProjectMembership.test.ts`：删除释放、同地址活跃线路保留、retired 线路不阻止释放、有入口旧行保留、设备线路不释放、IPv6 地址正常释放，**6/6 通过**。
+- 验证：shared/services/desktop typecheck 通过；根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。
