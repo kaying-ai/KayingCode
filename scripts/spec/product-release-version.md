@@ -69,4 +69,5 @@
 - 原因：预验收与正式构建使用同一工作流、同一标签校验与同一签名环境；维护者要求缩短 0.2.0 发布链路，直接以正式构建作为本轮验证。
 - 影响范围：macOS Apple Silicon 签名与公证、Linux x64/arm64 的 GPG 签名、Windows 签名与 Android apksigner 未在预验收轮次单独验证，相关风险由正式构建首轮承担。任一步失败只重跑失败任务，不放宽签名、公证或验签标准；失败且无法修复时不发布该版本。
 - 验证依据：`kaying-code-v0.2.0` 三套正式构建结果、Actions 制品、`Publish GitHub release` 创建的 Release 与 `SHA256SUMS-0.2.0.txt` 作为本轮发布证据。
+- 发布过程：最终标签指向 `244f57bb`（PR #64 合并后的 main）。首次标签 `9ceb6d7a` 三平台均因扩展宿主 ready marker 未登记失败（PR #63 修复）；重指 `3aba493f` 后 Android 成功，macOS/Windows 因 keyring musl 变体越界失败（PR #64 修复）；重指 `244f57bb` 后 Linux x64/arm64、macOS arm64、Windows x64 与 Android 全部成功。前两轮未创建 Release，也未上传正式制品。
 - 后续基线：本条为一次性偏离；0.2.1 起恢复「同一 main 提交先预验收、再正式标签」。
