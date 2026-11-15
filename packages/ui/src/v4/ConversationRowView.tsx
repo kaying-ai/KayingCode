@@ -1248,6 +1248,7 @@ const UserInputRowView = memo(function UserInputRowView({
             <ConversationUserInputBody contentText={visibleText} rowId={row.rowId}>
               <ConversationUserInputContent
                 text={visibleText}
+                imagePreviewContext={context}
                 attachments={row.attachments}
                 contextAttachmentCount={countComposerPromptContexts(parsedPrompt)}
               />
