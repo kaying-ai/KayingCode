@@ -1,8 +1,8 @@
 {
   "repo": "https://github.com/zai-org/ZCode",
-  "commit": "a9fe401eede6e6e5e01be9048679c206fe6f02d9",
-  "version": "3.17.2",
-  "syncedAt": "2026-11-05",
+  "commit": "fec975905a2abd4c07e35c40d51fa097a2258ec9",
+  "version": "3.18.2",
+  "syncedAt": "2026-11-15",
   "strategy": "reviewed-product-merge",
-  "note": "Reviewed and adapted the 3.17.2 delta while retaining KayingCode localrun, Host/Relay, plugin and product UI boundaries. Adoption and explicit exclusions: scripts/spec/upstream-sync-3-17-2.md."
+  "note": "Reviewed and adapted the 3.18.2 delta (plugin/extension host, session control, credential enc:v2, mobile web pin) while retaining KayingCode localrun, Host/Relay, account and product UI boundaries. Adoption and explicit exclusions: scripts/spec/upstream-sync-3-18-2.md."
 }

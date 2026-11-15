@@ -111,7 +111,7 @@ try {
     resolve(artifacts, "result.json"),
     JSON.stringify(
       {
-        upstream: "3.17.2",
+        upstream: "3.18.2",
         route: "/remote/v4",
         fragmentRemoved: true,
         existingSessionOpened: true,

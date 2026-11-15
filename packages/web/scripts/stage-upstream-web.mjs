@@ -211,7 +211,7 @@ async function applyOverrides({ webRoot, stage, source }) {
  * 将固定官方提交导出到 `.cache/upstream-web/<commit>` 并记录补丁结果。
  *
  * web（工作台）和 web-share（/cn/share 分享页）都从同一份导出构建，
- * 这样分享页继续使用官方 3.17.2 的 share/auth 源码，不需要把上游源码复制回产品目录。
+ * 这样分享页继续使用官方 3.18.2 的 share/auth 源码，不需要把上游源码复制回产品目录。
  */
 export async function stageUpstreamWeb({ webRoot, repoRoot, force = false }) {
   const rawSource = await readFile(resolve(webRoot, "upstream-web.json"), "utf8");
