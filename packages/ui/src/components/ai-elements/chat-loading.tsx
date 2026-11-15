@@ -121,8 +121,8 @@ export function ChatLoadingOrbs() {
           dot,
           orbX + dx * stagger - (dy / length) * arc,
           orbY + dy * stagger + (dx / length) * arc,
-          // 球体阶段 0.5，变形后加粗到 0.7；非目标点在 stagger=1 时已淡出。
-          0.5 + 0.2 * stagger,
+          // 球体阶段 0.5，变形后加粗到 0.8；非目标点在 stagger=1 时已淡出。
+          0.5 + 0.3 * stagger,
           orbOpacity + ((target ? 1 : 0) - orbOpacity) * stagger,
         );
       });
@@ -134,7 +134,7 @@ export function ChatLoadingOrbs() {
         dots.forEach((dot, index) => {
           const target = ORB_BRAND_TARGETS.get(index);
           const [x, y] = target ?? [10, 10];
-          setDot(dot, x, y, 0.7, target ? 1 : 0);
+          setDot(dot, x, y, 0.8, target ? 1 : 0);
         });
       } else {
         startedAt = performance.now();

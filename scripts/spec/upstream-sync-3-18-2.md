@@ -68,7 +68,7 @@
 | 状态 | 范围 | 内容 |
 | --- | --- | --- |
 | 已采纳 | 会话渲染 | `ToolCallBlocks/QueuedSummaryContent` 的 React #185 修复：禁用动画走静态渲染，动画拆到子组件，同一摘要不再逐 token `setState`；保留产品已收窄的导出面 |
-| 已采纳 | 轮尾加载 | `ChatLoadingOrbs` 105 点球体动画；morph 目标由上游「Z」改为 KayingCode 的「KY」品牌点阵（35 点、约 15×9、变形时点半径 0.5→0.7 加粗），常量改为 `ORB_BRAND_*`；计时改为整秒；`workDuration` 补齐俄语空格并去掉十分之一秒 |
+| 已采纳 | 轮尾加载 | `ChatLoadingOrbs` 105 点球体动画；morph 目标由上游「Z」改为 KayingCode 的「KY」品牌点阵（35 点、约 15×9、变形时点半径 0.5→0.8 加粗），常量改为 `ORB_BRAND_*`；计时改为整秒；`workDuration` 补齐俄语空格并去掉十分之一秒 |
 | 延后 | 来源徽标 | 产品已主动简化 `InteractionRequestOriginBadge`（不再展示描述），与上游整行换行方案语义不同，单独评估 |
 | 延后 | 外观 | 字体平滑依赖设置页与 store 结构，随设置批次 |
 
