@@ -495,6 +495,7 @@ export function extractToolCallsFromResult(
           name: tc.name ?? tc.toolName,
           input: tc.input,
           providerExecuted: tc.providerExecuted,
+          blockIndex: tc.blockIndex,
         });
       }
     }
@@ -509,6 +510,7 @@ export function extractToolCallsFromResult(
           name: tc.name ?? tc.toolName,
           input: tc.input,
           providerExecuted: tc.providerExecuted,
+          blockIndex: tc.blockIndex,
         });
       }
     }

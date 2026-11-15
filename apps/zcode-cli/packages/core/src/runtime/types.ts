@@ -43,6 +43,7 @@ import type {
   ModelNetworkStatusEvent,
   ModelMessageContentBlock,
   ModelReasoningContentBlock,
+  ModelTextContentBlock,
   ModelStreamRecoveryStatus,
   ModelToolCall,
   ModelToolContract,
@@ -797,6 +798,7 @@ export interface PermissionDecisionResult {
 
 export interface ExecuteToolsOptions {
   toolSearch?: ToolSearchExecutionContext;
+  pluginDiscoveryUi?: boolean;
   automationTurn?: boolean;
   automationId?: string;
   offPeakTurn?: boolean;
@@ -896,6 +898,8 @@ export interface RunModelTextRequestOptions {
   messages: ModelInputMessage[];
   /** 与 messages 按索引对应的 canonical 来源，仅用于本地用量统计。 */
   sourceEntries?: readonly (RuntimeMessageEntry | undefined)[];
+  /** 与 messages 按索引对应的全部来源条目（含 attachment），仅用于 context 组成统计。 */
+  originEntries?: readonly (readonly RuntimeMessageEntry[])[];
   model: Model;
   onStreamSnapshot?: (snapshot: RuntimeModelStreamSnapshot) => void;
   onStreamReasoningDelta?: (text: string) => void;
@@ -911,6 +915,8 @@ export interface RuntimeModelStreamSnapshot {
   /** 当前轮（最后一个服务端内置工具之后）的内容；之前的轮在 providerToolRounds。 */
   reasoning: ModelReasoningContentBlock[];
   text: string;
+  /** 当前轮按到达顺序的文字块；`text` 是它们的直接拼接。 */
+  textBlocks?: ModelTextContentBlock[];
   providerToolRounds?: readonly ProviderToolRound[];
 }
 
@@ -928,10 +934,14 @@ export interface RuntimeModelTextResult {
   providerMetadata?: Record<string, unknown>;
   reasoning?: ModelReasoningContentBlock[];
   text: string;
+  /** 最后一轮按到达顺序的文字块；`text` 是它们的直接拼接。缺失时按旧数据写入和回放。 */
+  textBlocks?: ModelTextContentBlock[];
   toolCalls?: ModelToolCall[];
   /** 服务端内置工具切出的前序轮次；text/reasoning 只保留最后一轮。 */
   providerToolRounds?: ProviderToolRound[];
   usage: ModelUsage;
+  /** 结果来自签名修复后的重试，提交 assistant 时要记 signedReasoningReset。 */
+  signedReasoningReset?: boolean;
 }
 
 export type ParsedRewindCommand =

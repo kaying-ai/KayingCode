@@ -306,7 +306,7 @@ export interface AgentRuntimeTurnMethods {
       onStatus?: (event: ModelNetworkStatusEvent) => void;
       streamRecovery?: ModelStreamRecoveryStatus;
     },
-  ): ModelStatusSink;
+  ): ModelStatusSink & Disposable;
   logModelNetworkStatus(statusEvent: ModelNetworkStatusEvent, traceContext: TraceContext): void;
   buildBackgroundTaskPayload(
     taskId: string,
