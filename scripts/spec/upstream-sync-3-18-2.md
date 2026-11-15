@@ -69,6 +69,7 @@
 | --- | --- | --- |
 | 已采纳 | 会话渲染 | `ToolCallBlocks/QueuedSummaryContent` 的 React #185 修复：禁用动画走静态渲染，动画拆到子组件，同一摘要不再逐 token `setState`；保留产品已收窄的导出面 |
 | 已采纳 | 轮尾加载 | `ChatLoadingOrbs` 105 点球体动画；morph 目标由上游「Z」改为 KayingCode 的「KY」品牌点阵（35 点、约 15×9、变形时点半径 0.5→0.8 加粗），常量改为 `ORB_BRAND_*`；计时改为整秒；`workDuration` 补齐俄语空格并去掉十分之一秒 |
+| 已采纳 | 图片预览 | 新增 `ImagePreviewActions`：复制、下载、保存并打开、保存副本并选择应用、在文件管理器中显示、添加到聊天；新增 `useImageFilePreview`/`ConversationImageFileMention`，文件 mention 保留 `href` 以打开原图；未保存标注在关闭/切图前确认，导出期间拒绝离开；下载与复制逻辑下沉到 `lib/imagePreviewDownload`、`lib/copyPreviewImage` |
 | 延后 | 来源徽标 | 产品已主动简化 `InteractionRequestOriginBadge`（不再展示描述），与上游整行换行方案语义不同，单独评估 |
 | 延后 | 外观 | 字体平滑依赖设置页与 store 结构，随设置批次 |
 
@@ -149,3 +150,12 @@
 - `removeSession` 支持 `retainedArtifactIds`：只保留被 URI 引用的 artifact 附件，正文、执行日志与其他独占附件仍删除；无保留参数时保持原有整段删除语义与返回字节数。
 - 采用上游行为测试，覆盖符号链接根、清单排序与保留式删除；`session-data-files` 与 contract 测试共 **7/7 通过**（与 memory-diagnostics 合计 17/17）。
 - 类型检查 adapters 通过；后续统一执行根 lint、source:check、architecture:check。
+
+第七批（2026-11-15，图片预览操作条）：
+
+- 新增 `image-preview-editor/ImagePreviewActions.tsx`，把复制/下载/保存并打开/选择应用/文件管理器/添加到聊天收进预览操作区；工具条与 Surface 的保存区按上游调整。
+- 新增 `lib/imagePreviewDownload.ts`、`lib/copyPreviewImage.ts`；图库下载逻辑从 dialog 下沉，dialog 保留旧导出兼容现有调用方。
+- 新增 `hooks/useImageFilePreview.ts` 与 `v4/ConversationImageFileMention.tsx`；`mentionMarkdown` 为 file part 保留 `href`，图片引用可读取原目标。产品已移除的设计模式 `element` mention 不引入。
+- `ImagePreviewSurface` 增加 `onDownload`/`downloading`/`onNavigationGuardChange`；未保存标注在关闭/切图前确认，导出/添加忙态期间拒绝离开。
+- 补齐 10 个中英文 i18n key；`packages/ui/src/image-preview-editor/CONTRACT.md` 已更新。
+- 验证：`tsc -b packages/ui`、根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。上游 browser manual-review 用例（`preview-image-actions`、`inline-image-mention`、更新后的 `image-preview-edit`）需要 Playwright 浏览器环境，本轮未纳入 CI 执行。
