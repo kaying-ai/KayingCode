@@ -247,6 +247,7 @@ export { createPluginSyncService } from "./plugin-sync/pluginSyncService.js";
 export { createPluginsService } from "./plugins/pluginsService.js";
 export { createPluginManagementService } from "./plugins/pluginManagementService.js";
 export { createWindowHostExtensions, type WindowHostExtensions } from "./extensions/node.js";
+export type { AppControlServiceHandle } from "./app-control/contract.js";
 export { createSubagentsService } from "./subagents/subagentsService.js";
 export { createCommandsService } from "./commands/commandsService.js";
 export { createHooksService } from "./hooks/hooksService.js";

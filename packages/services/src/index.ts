@@ -264,6 +264,8 @@ export { IPluginSyncService } from "./plugin-sync/pluginSync.js";
 export { IPluginsService } from "./plugins/plugins.js";
 // 设置页插件管理薄服务（UI 平台能力面不再直触 kayingcodeAgentService）
 export { IPluginManagementService } from "./plugins/pluginManagement.js";
+// 扩展门面契约（桌面本机 Host 注册，Browser 安全入口）
+export * from "./extensions/index.js";
 
 // Subagents service — ISubagentsService is both a type (interface) and value (descriptor)
 export { ISubagentsService } from "./subagents/subagents.js";
