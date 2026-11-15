@@ -57,6 +57,12 @@ export interface LoginEntryAttempt {
 
 const CODE_PREVIEW_SETTINGS_KEY = "kayingcode-code-preview-settings";
 const PERFORMANCE_MODE_STORAGE_KEY = "kayingcode-performance-mode";
+const FONT_SMOOTHING_STORAGE_KEY = "kayingcode-macos-font-smoothing";
+
+function applyFontSmoothing(enabled: boolean): void {
+  // 仅设置展示标记；CSS 以本机 macOS desktop 为边界，远端设备与 Web 不受影响。
+  document.documentElement.classList.toggle("font-smoothing-enabled", enabled);
+}
 
 function loadCodePreviewSettings(): CodePreviewSettings {
   try {
@@ -103,6 +109,10 @@ export interface KayingCodeState {
   /** 代码预览设置 */
   codePreviewSettings: CodePreviewSettings;
   setCodePreviewSettings: (patch: Partial<CodePreviewSettings>) => void;
+
+  /** 本机 macOS 灰度字体平滑偏好。 */
+  fontSmoothingEnabled: boolean;
+  setFontSmoothingEnabled: (enabled: boolean) => void;
 
   /** UI 根 rem 字号（px） */
   uiFontSizePx: number;
@@ -172,9 +182,20 @@ export interface KayingCodeState {
 // 需要广播的字段 —— 只有这些字段的变更会发送给其他窗口
 // ============================================================================
 
-const BROADCAST_FIELDS = new Set(["theme", "locale", "uiFontSizePx", "interfaceMode"]);
+const BROADCAST_FIELDS = new Set([
+  "theme",
+  "locale",
+  "uiFontSizePx",
+  "fontSmoothingEnabled",
+  "interfaceMode",
+]);
 
-type BroadcastField = "theme" | "locale" | "uiFontSizePx" | "interfaceMode";
+type BroadcastField =
+  | "theme"
+  | "locale"
+  | "uiFontSizePx"
+  | "fontSmoothingEnabled"
+  | "interfaceMode";
 
 /** 广播频道名前缀 */
 const STATE_CHANNEL_PREFIX = "state:";
@@ -245,6 +266,13 @@ export function createKayingCodeStore(
         writeSafeLocalStorage(CODE_PREVIEW_SETTINGS_KEY, JSON.stringify(next));
         return { codePreviewSettings: next };
       }),
+
+    fontSmoothingEnabled: readSafeLocalStorage(FONT_SMOOTHING_STORAGE_KEY) !== "false",
+    setFontSmoothingEnabled: (enabled: boolean) => {
+      writeSafeLocalStorage(FONT_SMOOTHING_STORAGE_KEY, String(enabled));
+      applyFontSmoothing(enabled);
+      set({ fontSmoothingEnabled: enabled });
+    },
 
     uiFontSizePx: loadUiFontSizePx(),
     setUiFontSizePx: (fontSizePx: number) => {
@@ -430,6 +458,8 @@ export function createKayingCodeStore(
         (msg.payload === "office" || msg.payload === "coding")
       ) {
         state.setInterfaceMode(normalizeInterfaceMode(msg.payload));
+      } else if (field === "fontSmoothingEnabled" && typeof msg.payload === "boolean") {
+        state.setFontSmoothingEnabled(msg.payload);
       } else if (field === "uiFontSizePx" && typeof msg.payload === "number") {
         state.setUiFontSizePx(msg.payload);
       }
@@ -441,6 +471,7 @@ export function createKayingCodeStore(
   syncSystemThemeListener(useStore.getState().theme);
   applyTheme(useStore.getState().theme);
   applyUiFontSizePx(useStore.getState().uiFontSizePx);
+  applyFontSmoothing(useStore.getState().fontSmoothingEnabled);
   document.documentElement.classList.toggle(
     "dark",
     resolveTheme(useStore.getState().theme) === "dark",

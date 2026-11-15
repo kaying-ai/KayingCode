@@ -70,8 +70,8 @@
 | 已采纳 | 会话渲染 | `ToolCallBlocks/QueuedSummaryContent` 的 React #185 修复：禁用动画走静态渲染，动画拆到子组件，同一摘要不再逐 token `setState`；保留产品已收窄的导出面 |
 | 已采纳 | 轮尾加载 | `ChatLoadingOrbs` 105 点球体动画；morph 目标由上游「Z」改为 KayingCode 的「KY」品牌点阵（35 点、约 15×9、变形时点半径 0.5→0.8 加粗），常量改为 `ORB_BRAND_*`；计时改为整秒；`workDuration` 补齐俄语空格并去掉十分之一秒 |
 | 已采纳 | 图片预览 | 新增 `ImagePreviewActions`：复制、下载、保存并打开、保存副本并选择应用、在文件管理器中显示、添加到聊天；新增 `useImageFilePreview`/`ConversationImageFileMention`，文件 mention 保留 `href` 以打开原图；未保存标注在关闭/切图前确认，导出期间拒绝离开；下载与复制逻辑下沉到 `lib/imagePreviewDownload`、`lib/copyPreviewImage` |
+| 已采纳 | 外观 | 本机 macOS 字体平滑偏好：store 增加 `fontSmoothingEnabled`（默认开启、本地持久化、跨窗口广播），设置「外观」页新增开关（仅 macOS desktop 显示）；CSS 以 `:root.platform-mac-desktop.font-smoothing-enabled` 启用灰度抗锯齿，Web 与远控不继承 |
 | 延后 | 来源徽标 | 产品已主动简化 `InteractionRequestOriginBadge`（不再展示描述），与上游整行换行方案语义不同，单独评估 |
-| 延后 | 外观 | 字体平滑依赖设置页与 store 结构，随设置批次 |
 
 ### E. 本轮明确不采纳
 
@@ -159,3 +159,10 @@
 - `ImagePreviewSurface` 增加 `onDownload`/`downloading`/`onNavigationGuardChange`；未保存标注在关闭/切图前确认，导出/添加忙态期间拒绝离开。
 - 补齐 10 个中英文 i18n key；`packages/ui/src/image-preview-editor/CONTRACT.md` 已更新。
 - 验证：`tsc -b packages/ui`、根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。上游 browser manual-review 用例（`preview-image-actions`、`inline-image-mention`、更新后的 `image-preview-edit`）需要 Playwright 浏览器环境，本轮未纳入 CI 执行。
+
+第八批（2026-11-15，macOS 字体平滑偏好）：
+
+- store 增加 `fontSmoothingEnabled` / `setFontSmoothingEnabled`，默认开启，存储键为产品前缀 `kayingcode-macos-font-smoothing`；变更写入本地存储并广播到其他窗口。
+- 初始化时按偏好给根节点加 `font-smoothing-enabled`；CSS 只在 `.platform-mac-desktop` 下启用 `-webkit-font-smoothing: antialiased`，Web/远控不受影响。
+- 「外观」页仅在 macOS desktop 显示「字体平滑」开关；本地 `SettingsRow` 尚无 settings-search 的 `searchId`，本轮不引入该参数。
+- 补齐中英文文案；验证 `tsc -b packages/ui`、根 lint（0 errors）、`source:check`、`architecture:check --changed` 通过。设置页视觉未单独截图验证。
