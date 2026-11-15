@@ -83,7 +83,7 @@
 | 1a   | 已采纳   | instruction-files 基础：结构化文件模型、完整/增量渲染、旧公告解析；adapter 区分"文件不存在"与"读不出来"，读错误按 `user_instructions_read_failed` 诊断  |
 | 1b   | 已采纳   | context_prefix 记录已公告文件、请求前增量公告、compaction 重读指令文件并在提交后应用；冷恢复/rewind 不再原位改写指令公告                                |
 | 2    | 已采纳   | total-tokens 预算：主/子 agent system 末尾固定预算行；runtime 计数状态、轮首/工具批次/文本续接的提醒与用户输入重锚；compaction rollover，resume 重置    |
-| 3    | 部分延后 | context-composition：开源树内只有闭源 App 客户端消费，当前接入无产品入口；本轮只保留 blockIndex 所需的类型占位，完整分类/协议/查询待 App 侧接入后再排期 |
+| 3    | 本轮采纳 | context-composition 全链路：core 细类别分类/圆环投影/查询/草稿预演，bootstrap `v4/conversation/contextComposition` 查询与修订号通知，services 查询客户端与扩展数据泵接线；消费方为已有扩展能力 `context.get` / `context.onDidChange`，产品 UI 不新增入口，远程会话暂不开放 |
 | 4    | 已采纳   | blockIndex：块到达序号贯穿流式/非流式、持久化、冷恢复与请求排序；服务端工具轮次、文字块不合并、旧消息保持旧布局；工具历史与读文件状态按序号排序         |
 
 ### F. 不采纳与已调整范围（P5 后）
@@ -349,4 +349,15 @@
 - `packages/web/upstream-web.json` 从 `a9fe401e`（3.17.2）切到 `fec97590`（3.18.2）；`stage-upstream-web` 重新导出并应用既有 auth 覆盖、品牌、mobile webview 与 workspace identity 补丁。
 - `pnpm --filter @zcode/web run build:upstream` 通过，产出 manifest 的 upstream 为 3.18.2；`@zcode/web` 测试 **15/15**。
 - `UPSTREAM_BASE.json` 更新为 `fec97590` / 3.18.2 / `syncedAt=2026-11-15`；P0–P5、凭据 enc:v2 与本轮 mobile web pin 均已验收，明确不采纳项继续记录在 F 节。
-- 后续上游差异从 3.18.2 基线开始比较；context-composition 完整接线、voice-input 等仍按 F 节边界单独评估。
+- 后续上游差异从 3.18.2 基线开始比较；context-composition 已在第二十四批接通，voice-input 等仍按 F 节边界单独评估。
+
+第二十四批（2026-11-15，context-composition 全链路）：
+
+- Shared：补齐 `V4_METHODS.conversationContextComposition` 与 `V4_NOTIFICATIONS.conversationContextCompositionChanged`；线格式沿用既有 `kayingcode-protocol-v4/context-composition/contract.ts`。
+- Core：新增 `runtime/context-composition/`（classifier、items、state、query、preview）；`buildContextUsageSnapshot` 改为由同一份细类别分解投影圆环，`provider-request-messages` 补 `originEntries` 并在 turn-loop 透传；请求、usage、compact、工具缓存失效、context 前缀重建、换模型六类事件驱动查询作废与通知。
+- Core 预演：`context-refresh` 拆出纯 `buildRuntimeContextAnnouncements`、`baselineCurrentEnvironment`、`previewSessionContextAnnouncement`，预演复用正式请求同一套公告规则且不落库。
+- Bootstrap：新增 `kayingcode-protocol/context-composition/`（handler/tracker），注册 v4 查询 case，会话 record 建立时把 runtime 变更接到每 server 一份的修订号 tracker；通知只带 `{sessionId, revision}`。
+- Services：新增 `kayingcodeAgent/contextCompositionClient.ts`，existing-only 查询、method-not-found 归 null、通知按 workspace 路由；`kayingcodeAgentService` 暴露 `getContextComposition` / `onDynamicContextCompositionChanged`，已有扩展数据泵 `context.get` / `context.onDidChange` 由此可用。
+- 未纳入：远程会话不开放该查询；`models.onDidGenerate` 依赖的 `modelRequestMetrics` 通知仍在 F 节边界外，单独评估。
+- 测试：core context-composition **12/12**、bootstrap handler/tracker **5/5**、services client **5/5**；core 全量 **301 passed / 6 failed**，失败均为 Windows 既有路径断言（POSIX 绝对路径、含 `"` 的子代理目录），与本次改动无关；services capabilityGateway **7/7**。
+- 验证：根 typecheck、lint（0 errors/133 既有 warnings）、source:check、architecture:check --changed 通过；bootstrap 新增最小 `vitest.config.ts` 以便定向运行本包测试。

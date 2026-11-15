@@ -6,6 +6,7 @@ import {
 } from "@zcode/shared";
 /* eslint-disable max-lines -- KayingCode Protocol 的 session/workspace 方法共享同一个 server context 与 snapshot helpers，迁移期先集中维护。 */
 import { observeSessionDebug } from "./session-debug.js";
+import { subscribeSessionContextComposition } from "./context-composition/index.js";
 import {
   TASK_LIST_SESSION_TYPES,
   isTaskListSessionType,
@@ -3801,9 +3802,11 @@ async function createRecord(
   context.assertServing?.();
   let subscribed = true;
   let unsubscribeSessionEvents = () => {};
+  let unsubscribeContextComposition = () => {};
   record.unsubscribe = () => {
     subscribed = false;
     unsubscribeSessionEvents();
+    unsubscribeContextComposition();
   };
   unsubscribeSessionEvents = app.runtime.subscribeEvents({
     // 解除订阅前已排队的 callback 仍可能迟到，不能污染重启后的同名 session 投影。
@@ -3811,6 +3814,11 @@ async function createRecord(
       if (subscribed) onSessionEvent(context, record, event);
     },
   });
+  unsubscribeContextComposition = subscribeSessionContextComposition(
+    context,
+    sessionId,
+    app.runtime,
+  );
   // 绑定归属会话，供 automation-port 读取本会话实时 model/mode/thought。
   ownSessionRecord = record;
   return record;

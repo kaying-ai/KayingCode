@@ -43,6 +43,10 @@ import {
   startProviderToolCard,
   type ProviderToolRound,
 } from "../provider-tool-rounds/contract.js";
+import {
+  recordRequestContextComposition,
+  recordRequestContextCompositionUsage,
+} from "../context-composition/state.js";
 
 const TOOL_INPUT_STREAM_DELTA_FALLBACK_FLUSH_CHARS = 4096;
 
@@ -162,6 +166,12 @@ export async function runModelTextRequest(
   const contextUsageSnapshot = this.buildContextUsageSnapshot(projectedOptions);
   const contextUsageBreakdown = this.buildContextUsageBreakdownFromSnapshot(contextUsageSnapshot);
   this.logContextUsageSnapshot(projectedOptions, contextUsageSnapshot);
+  // context 组成的「请求」相位与圆环来自同一次分解（spec §3.4）。
+  recordRequestContextComposition(this, {
+    model,
+    breakdown: contextUsageSnapshot.composition,
+  });
+
   if (!this.shouldStreamModelText()) {
     const result = await runWithModelInvocationContext(modelInvocationContext, () =>
       model.generateText(modelRequest),
@@ -172,6 +182,7 @@ export async function runModelTextRequest(
       source: "generateText",
       traceContext: projectedOptions.traceContext,
     });
+    recordRequestContextCompositionUsage(this, contextUsageSnapshot.composition, result.usage);
     return {
       ...result,
       ...(contextUsageBreakdown.length > 0 ? { contextUsageBreakdown } : {}),
@@ -681,6 +692,7 @@ export async function runModelTextRequest(
     });
   }
 
+  recordRequestContextCompositionUsage(this, contextUsageSnapshot.composition, usage);
   return {
     ...(contextUsageBreakdown.length > 0 ? { contextUsageBreakdown } : {}),
     finishReason,

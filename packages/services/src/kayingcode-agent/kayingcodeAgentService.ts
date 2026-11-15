@@ -12,6 +12,7 @@ import {
   createPluginHostQueriesClient,
   type PluginUserOptionsReader,
 } from "#src/kayingcode-agent/pluginHostQueriesClient.js";
+import { createContextCompositionClient } from "#src/kayingcode-agent/contextCompositionClient.js";
 import { tapMakerProjectsRequestSchema, tapMakerProjectsResultSchema } from "@zcode/shared";
 import {
   localTtftFactsSchema,
@@ -2104,6 +2105,7 @@ export function createKayingCodeAgentService(
             });
           return;
         }
+        if (contextComposition.handleNotification(workspace, message)) return;
         if (message.method === V4_NOTIFICATIONS.conversationTelemetryFact) {
           const parsed = conversationTelemetryFactSchema.safeParse(message.params);
           if (parsed.success) {
@@ -3206,6 +3208,17 @@ export function createKayingCodeAgentService(
     getExistingClient: (target) => getReadOnlyClient(target, "existing-only"),
   });
 
+  // context 组成查询：existing-only；没有运行中的 CLI 时不拉进程，按「会话不在内存」返回 null。
+  const contextComposition = createContextCompositionClient({
+    getExistingClient: (target) => getReadOnlyClient(target, "existing-only"),
+    isRuntimeUnavailableError: (error) =>
+      error instanceof Error &&
+      "code" in error &&
+      (error as { code?: unknown }).code === KAYINGCODE_AGENT_RUNTIME_UNAVAILABLE_CODE,
+    resolveWorkspaceKey,
+    logger,
+  });
+
   // 全局工作流的载体运行时选择：
   // 调用方只给 `{ scope: "global" }` 不带 workspace 时，先复用任一已活跃的**本地** runtime
   // （existing-only 语义：只看 activeClientsByWorkspaceKey，绝不为此拉起新进程），否则回落到
@@ -3289,6 +3302,7 @@ export function createKayingCodeAgentService(
       emitter.dispose();
     }
     conversationTelemetryFactEmitters.clear();
+    contextComposition.dispose();
     localTtftFactsEmitter.dispose();
     sessionLifecycleEmitter.dispose();
     for (const emitter of workspaceConfigFrameEmitters.values()) {
@@ -4140,6 +4154,14 @@ export function createKayingCodeAgentService(
 
     async getPluginMentionItems(params: KayingCodeAgentPluginMentionItemsParams) {
       return pluginHostQueries.getPluginMentionItems(params);
+    },
+
+    getContextComposition(params) {
+      return contextComposition.getContextComposition(params);
+    },
+
+    onDynamicContextCompositionChanged(target) {
+      return contextComposition.onDidChange(target);
     },
 
     async getSkillReferenceCatalog(params: KayingCodeAgentSkillReferenceCatalogParams) {

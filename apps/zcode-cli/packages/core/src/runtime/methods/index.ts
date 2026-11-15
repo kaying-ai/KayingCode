@@ -18,6 +18,11 @@ import { invalidateToolCache } from "./config.js";
 import { getToolRegistry } from "./config.js";
 import { getToolExecutor } from "./config.js";
 import { subscribeEvents } from "./config.js";
+import {
+  markContextCompositionChanged,
+  subscribeContextCompositionChanged,
+} from "../context-composition/state.js";
+import { getContextComposition } from "../context-composition/query.js";
 import { getSessionEventStore } from "./config.js";
 import { notifyExternalChildSessionEvent } from "./config.js";
 import { createChildClientPorts } from "./config.js";
@@ -226,6 +231,9 @@ export function installAgentRuntimeMethods(ctor: AgentRuntimeConstructor): void 
   proto.getToolRegistry = getToolRegistry;
   proto.getToolExecutor = getToolExecutor;
   proto.subscribeEvents = subscribeEvents;
+  proto.getContextComposition = getContextComposition;
+  proto.subscribeContextCompositionChanged = subscribeContextCompositionChanged;
+  proto.markContextCompositionChanged = markContextCompositionChanged;
   proto.getSessionEventStore = getSessionEventStore;
   proto.notifyExternalChildSessionEvent = notifyExternalChildSessionEvent;
   proto.createChildClientPorts = createChildClientPorts;

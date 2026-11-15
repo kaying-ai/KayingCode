@@ -32,6 +32,7 @@ import { mirrorSubagentInteractionEvent } from "../../subagent/tool-event-mirror
 import { orderProviderVisibleToolContracts } from "../../tool/provider-visible-order.js";
 import { projectToolModelContract } from "../../tool/model-contract.js";
 import { rebuildContextPrefix } from "./context-refresh.js";
+import { supersedeContextComposition } from "../context-composition/state.js";
 import { filterEmbeddedSearchRuntimeVisibleTools } from "./embedded-search-branch.js";
 import {
   getSessionShellSelection as readSessionShellSelection,
@@ -156,6 +157,7 @@ export function getTools(this: AgentRuntimeInternal, model?: Model): ModelToolCo
 
 export function invalidateToolCache(this: AgentRuntimeInternal): void {
   this.cachedTools = null;
+  supersedeContextComposition(this, "tools");
 }
 
 export function getToolRegistry(this: AgentRuntimeInternal): ToolRegistry {

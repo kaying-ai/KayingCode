@@ -62,6 +62,7 @@ import {
   stopSession,
   subscribeSession,
 } from "./server-operations.js";
+import { getConversationContextComposition } from "./context-composition/index.js";
 import { listChildProcesses } from "./process-child-processes.js";
 import { ProtocolRuntimeResources } from "./runtime-resources.js";
 import {
@@ -705,6 +706,8 @@ export class KayingCodeProtocolAgentServer {
         return await getUsageStats(this.context, request.params);
       case V4_METHODS.conversationUsage:
         return await getTaskTokenUsage(this.context, request.params);
+      case V4_METHODS.conversationContextComposition:
+        return await getConversationContextComposition(this.context, request.params);
       // 项目数据彻底删除：不经 v4Gateway 会话投影，直接操作本进程的 store 与会话注册表。
       case V4_METHODS.sessionDataMeasure:
         return await measureSessionData(this.context, request.params);

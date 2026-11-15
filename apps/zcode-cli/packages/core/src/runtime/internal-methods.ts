@@ -36,6 +36,12 @@ import type {
 } from "./deps.js";
 import type { BackgroundResultOriginMeta, ContextUsageBreakdownItem } from "@zcode/contracts";
 import type { RuntimeCommand, RuntimeCommandId } from "./command-queue.js";
+import type {
+  ContextCompositionChangeListener,
+  ContextCompositionMeasurement,
+} from "./context-composition/state.js";
+import type { ContextCompositionQuery } from "./context-composition/query.js";
+import type { ContextUsageSnapshot } from "./methods/context-usage.js";
 import type { RuntimeMessageEntry } from "../agent/message-history.js";
 import type {
   ActiveTurnInfo,
@@ -296,7 +302,7 @@ export interface AgentRuntimeCoreMethods {
     messages: ModelInputMessage[],
     limit?: unknown,
   ): Array<Record<string, unknown>>;
-  buildContextUsageSnapshot(options: RunModelTextRequestOptions): Record<string, unknown>;
+  buildContextUsageSnapshot(options: RunModelTextRequestOptions): ContextUsageSnapshot;
   buildContextUsageBreakdownFromSnapshot(
     snapshot: Record<string, unknown>,
   ): ContextUsageBreakdownItem[];
@@ -320,6 +326,14 @@ export interface AgentRuntimeCoreMethods {
     values: Array<Pick<ContextUsageMetric, "chars" | "tokens">>,
     confidence: ContextUsageConfidence,
   ): ContextUsageMetric;
+  /** context 组成查询：有效的请求组成且模型相同时返回它，否则按模型预演；没有可用模型时为 null。 */
+  getContextComposition(
+    input?: ContextCompositionQuery,
+  ): Promise<ContextCompositionMeasurement | null>;
+  /** 组成变更时同步调用；合并与修订号由订阅方（bootstrap tracker）负责。 */
+  subscribeContextCompositionChanged(listener: ContextCompositionChangeListener): () => void;
+  /** 会话外部改了会影响组成的状态（换模型）：最近一次请求组成作废并通知。 */
+  markContextCompositionChanged(): void;
   emitModelStreamingEvent(
     payload: ModelStreamingPayload,
     traceContext: TraceContext,
