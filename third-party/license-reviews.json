@@ -579,7 +579,7 @@
     "releaseReviewRequired": "Release artifact inclusion, modifications and corresponding source availability must be verified before distribution."
   },
   {
-    "package": "oxlint-plugin-react-doctor@0.9.22",
+    "package": "oxlint-plugin-react-doctor@0.9.23",
     "expectedLicense": "SEE LICENSE IN LICENSE",
     "scope": "development",
     "selectedLicense": "Modified MIT",
@@ -587,7 +587,7 @@
     "evidence": {
       "file": "third-party/upstream/aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1.txt",
       "sha256": "aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1",
-      "source": "https://registry.npmjs.org/oxlint-plugin-react-doctor/0.9.22",
+      "source": "https://registry.npmjs.org/oxlint-plugin-react-doctor/0.9.23",
       "kind": "publisher-notice"
     },
     "installedEvidence": {
@@ -596,7 +596,7 @@
     }
   },
   {
-    "package": "react-doctor@0.9.22",
+    "package": "react-doctor@0.9.23",
     "expectedLicense": "SEE LICENSE IN LICENSE",
     "scope": "development",
     "selectedLicense": "Modified MIT",
@@ -604,7 +604,7 @@
     "evidence": {
       "file": "third-party/upstream/aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1.txt",
       "sha256": "aa9b278de35d20d320e40789db8b3e242096ed4a89c5aaf8fbe23a5e55c08ff1",
-      "source": "https://registry.npmjs.org/react-doctor/0.9.22",
+      "source": "https://registry.npmjs.org/react-doctor/0.9.23",
       "kind": "publisher-notice"
     },
     "installedEvidence": {
