@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.1](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.0...kaying-code-v0.2.1) (2026-11-16)
+
+### Bug Fixes
+
+* **taptap:** restore transcription comparison and update Maker ([92bdb63](https://github.com/kaying-ai/KayingCode/commit/92bdb63236b49ef78e3732e1006a77109a326905))
+
+
+### Documentation
+
+* **release:** record 0.2.0 tag retargets ([3db51fb](https://github.com/kaying-ai/KayingCode/commit/3db51fbe4014e055fbf88318a2275a3616c5bc31))
+
 ## [0.2.0](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.1.5...kaying-code-v0.2.0) (2026-11-15)
 
 ### Features
