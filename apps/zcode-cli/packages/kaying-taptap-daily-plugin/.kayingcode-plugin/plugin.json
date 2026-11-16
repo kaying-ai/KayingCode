@@ -1,0 +1,15 @@
+{
+  "name": "kaying-taptap-daily",
+  "version": "0.1.0",
+  "description": "Generate a daily TapTap game report with new-game discovery, hot rankings and genre crowding analysis.",
+  "author": {
+    "name": "kayingai.com",
+    "url": "https://kayingai.com"
+  },
+  "license": "MIT",
+  "skills": "./skills",
+  "commands": "./commands",
+  "description_i18n": {
+    "zh-CN": "每天生成 TapTap 游戏日报：新游发现、热门榜单与题材赛道拥挤度，输出可追溯的 Markdown/HTML 报告。"
+  }
+}

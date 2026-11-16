@@ -1970,4 +1970,95 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       ],
     },
   },
+  {
+    name: "kaying-taptap-daily",
+    version: "0.1.0",
+    rootCandidates: [
+      "packages/kaying-taptap-daily-plugin",
+      "../kaying-taptap-daily-plugin",
+      "../../kaying-taptap-daily-plugin",
+      "apps/zcode-cli/packages/kaying-taptap-daily-plugin",
+    ],
+    defaultEnabled: false,
+    listing: {
+      author: {
+        name: "kayingai.com",
+        url: "https://kayingai.com",
+      },
+      category: "developer-tools",
+      displayName: "TapTap Daily",
+      displayName_i18n: {
+        "zh-CN": "TapTap 游戏日报",
+      },
+      description_i18n: {
+        "zh-CN":
+          "每日采集 TapTap 新游、下载/预约/热玩榜单与题材赛道供给，生成带证据的 Markdown/HTML 游戏日报。",
+      },
+      examplePrompts: ["Generate today's TapTap game daily report"],
+      examplePrompts_i18n: {
+        "zh-CN": ["生成今天的 TapTap 游戏日报"],
+      },
+      skillDetails: [
+        {
+          name: "taptap-daily-report",
+          title: {
+            "en-US": "TapTap game daily report",
+            "zh-CN": "TapTap 游戏日报",
+          },
+          description: {
+            "en-US":
+              "Collect public TapTap rankings and release events, analyze new games and genre crowding, and render an evidence-backed daily report.",
+            "zh-CN": "采集 TapTap 公开榜单与发布事件，分析新游与题材拥挤度，生成有证据的日报。",
+          },
+          subskills: [
+            {
+              id: "collect",
+              title: {
+                "en-US": "Ranking and calendar collection",
+                "zh-CN": "榜单与日历采集",
+              },
+              description: {
+                "en-US":
+                  "Fetch three Top50 boards and the TapTap release calendar into a deterministic snapshot.",
+                "zh-CN": "抓取三榜 Top50 与 TapTap 游戏日历，形成确定性 snapshot。",
+              },
+            },
+            {
+              id: "analyze",
+              title: {
+                "en-US": "Subagent analysis and verification",
+                "zh-CN": "子代理分析与核验",
+              },
+              description: {
+                "en-US":
+                  "Fan out new-game, board and genre analysts, then verify every claim against evidence before writing.",
+                "zh-CN": "并行分析新游、榜单与赛道，并由独立核验员逐条核对证据后成稿。",
+              },
+            },
+            {
+              id: "publish",
+              title: {
+                "en-US": "Deterministic report rendering",
+                "zh-CN": "确定性报告渲染",
+              },
+              description: {
+                "en-US":
+                  "Render fixed-structure Markdown, self-contained HTML, JSON and a history index.",
+                "zh-CN": "渲染固定结构 Markdown、自包含 HTML、JSON 与历史索引。",
+              },
+            },
+          ],
+        },
+      ],
+    },
+    requiredSeedPaths: [
+      "dist/collector.mjs",
+      "dist/metrics.mjs",
+      "dist/renderer.mjs",
+      "commands/taptap-daily.md",
+      "skills/taptap-daily-report/SKILL.md",
+      "skills/taptap-daily-report/references/report-structure.md",
+      "workflows/taptap-daily.dwf.ts",
+    ],
+  },
 ];

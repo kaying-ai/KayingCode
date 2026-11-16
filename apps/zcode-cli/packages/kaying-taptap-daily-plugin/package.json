@@ -1,0 +1,22 @@
+{
+  "name": "@kayingcode/kaying-taptap-daily-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TapTap game daily report: public ranking/calendar collection, deterministic metrics, subagent analysis and a Linux-ready report service.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src test scripts --no-ignore",
+    "test": "tsx --test test/*.test.ts",
+    "bundle": "node scripts/build-deploy-bundle.mjs",
+    "export-import": "node scripts/export-import.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}

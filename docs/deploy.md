@@ -13,6 +13,7 @@
 | 上游 Web 构建与来源校验           | [Web](deploy/kayingcode-desktop-web.md)                                        |
 | GitHub 主库与 Gitee 备份镜像      | [仓库同步指南](deploy/github-gitee-repository.md)                              |
 | Agent CLI/TUI                     | [CLI](deploy/kayingcode-cli.md)                                                |
+| TapTap 游戏日报 Linux 服务        | [TapTap Daily](deploy/kayingcode-taptap-daily.md)                              |
 | 微信小程序与 H5 壳                | [Taro](deploy/kayingcode-mobile-taro.md)                                       |
 | Flutter 多端构建                  | [Flutter](deploy/kayingcode-mobile-flutter.md)                                 |
 

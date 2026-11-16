@@ -1,0 +1,11 @@
+[Unit]
+Description=Check Kaying Bot TapTap Daily freshness at 12:00 Asia/Shanghai
+
+[Timer]
+OnCalendar=*-*-* 12:00:00 Asia/Shanghai
+Persistent=false
+AccuracySec=1min
+Unit=kaying-bot-taptap-daily-health.service
+
+[Install]
+WantedBy=timers.target

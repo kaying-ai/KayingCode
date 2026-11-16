@@ -1,0 +1,16 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "kaying-taptap-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-13",
+  "observability": {
+    "enabled": true,
+  },
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "taptap-proxy.opentaptap.dev",
+      "custom_domain": true,
+    },
+  ],
+}

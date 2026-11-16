@@ -1,0 +1,198 @@
+{
+  "success": true,
+  "data": {
+    "list": [
+      {
+        "is_ad": false,
+        "type": "app",
+        "identification": "app:234493",
+        "app": {
+          "id": 234493,
+          "identifier": "com.miHoYo.Nap",
+          "title": "绝区零",
+          "title_labels": [],
+          "tags": [
+            {
+              "id": 933790,
+              "value": "二次元",
+              "uri": "taptap://taptap.com/library?tag=%E4%BA%8C%E6%AC%A1%E5%85%83",
+              "web_url": "/tag/%E4%BA%8C%E6%AC%A1%E5%85%83"
+            },
+            {
+              "id": 995689,
+              "value": "ARPG",
+              "uri": "taptap://taptap.com/library?tag=ARPG",
+              "web_url": "/tag/ARPG"
+            },
+            {
+              "id": 933783,
+              "value": "高画质",
+              "uri": "taptap://taptap.com/library?tag=%E9%AB%98%E7%94%BB%E8%B4%A8",
+              "web_url": "/tag/%E9%AB%98%E7%94%BB%E8%B4%A8"
+            }
+          ],
+          "stat": {
+            "rating": {
+              "score": "6.8",
+              "max": 10,
+              "latest_score": "6.9",
+              "latest_version_score": "6.3",
+              "latest_review_count": 105,
+              "latest_version_review_count": 546
+            },
+            "vote_info": {
+              "1": 26912,
+              "2": 17442,
+              "3": 12244,
+              "4": 10489,
+              "5": 46663
+            },
+            "hits_total": 18613562,
+            "play_total": 0,
+            "bought_count": 0,
+            "feed_count": 96321,
+            "reserve_count": 7219076,
+            "recent_sandbox_played_count": 0,
+            "album_count": 0,
+            "review_count": 114950,
+            "topic_count": 96214,
+            "video_count": 107,
+            "official_topic_count": 2098,
+            "official_video_count": 0,
+            "official_album_count": 0,
+            "fans_count": 14386181,
+            "hits_total_val": 18613562,
+            "pc_sale_count": 0,
+            "pc_download_count": 166819,
+            "wish_count": 906,
+            "level_like_count": 0
+          },
+          "released_time": 1719882005,
+          "icon": {
+            "url": "https://img-tc.tapimg.com/market/images/b85d6bed54ea3aa29f4ea853000d4ee8.png/_tap_appicon.jpg",
+            "medium_url": "https://img-tc.tapimg.com/market/images/b85d6bed54ea3aa29f4ea853000d4ee8.png/_tap_appicon_m.jpg",
+            "small_url": "https://img-tc.tapimg.com/market/images/b85d6bed54ea3aa29f4ea853000d4ee8.png/_tap_appicon_s.jpg",
+            "original_url": "https://img-tc.tapimg.com/market/images/b85d6bed54ea3aa29f4ea853000d4ee8.png",
+            "original_format": "png",
+            "width": 270,
+            "height": 270,
+            "color": "0x996136",
+            "original_size": 272054,
+            "large_url": "https://img-tc.tapimg.com/market/images/b85d6bed54ea3aa29f4ea853000d4ee8.png/_tap_appicon.jpg"
+          },
+          "platform_info": {
+            "current_platform": {
+              "key": "pc"
+            },
+            "supported_platforms": [
+              {
+                "key": "android"
+              },
+              {
+                "key": "ios"
+              },
+              {
+                "key": "pc"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "is_ad": false,
+        "type": "app",
+        "identification": "app:2247",
+        "app": {
+          "id": 2247,
+          "identifier": "com.tencent.KiHan",
+          "title": "火影忍者",
+          "title_labels": [],
+          "tags": [
+            {
+              "id": 73737,
+              "value": "格斗",
+              "uri": "taptap://taptap.com/library?tag=%E6%A0%BC%E6%96%97",
+              "web_url": "/tag/%E6%A0%BC%E6%96%97"
+            },
+            {
+              "id": 873,
+              "value": "动作",
+              "uri": "taptap://taptap.com/library?tag=%E5%8A%A8%E4%BD%9C",
+              "web_url": "/tag/%E5%8A%A8%E4%BD%9C"
+            },
+            {
+              "id": 99824,
+              "value": "横版",
+              "uri": "taptap://taptap.com/library?tag=%E6%A8%AA%E7%89%88",
+              "web_url": "/tag/%E6%A8%AA%E7%89%88"
+            }
+          ],
+          "stat": {
+            "rating": {
+              "score": "5.9",
+              "max": 10,
+              "latest_score": "4.0",
+              "latest_version_score": "3.8",
+              "latest_review_count": 149,
+              "latest_version_review_count": 98
+            },
+            "vote_info": {
+              "1": 26240,
+              "2": 4269,
+              "3": 6116,
+              "4": 7187,
+              "5": 21662
+            },
+            "hits_total": 15471846,
+            "play_total": 67162,
+            "bought_count": 0,
+            "feed_count": 81497,
+            "reserve_count": 3,
+            "recent_sandbox_played_count": 0,
+            "album_count": 775,
+            "review_count": 67737,
+            "topic_count": 74673,
+            "video_count": 6049,
+            "official_topic_count": 2147,
+            "official_video_count": 0,
+            "official_album_count": 0,
+            "fans_count": 27244958,
+            "hits_total_val": 15471846,
+            "pc_sale_count": 0,
+            "pc_download_count": 0,
+            "wish_count": 241,
+            "level_like_count": 0
+          },
+          "released_time": 1463230488,
+          "icon": {
+            "url": "https://img-tc.tapimg.com/market/images/24231ebc714c5dd8e41a290161c14776.jpg/_tap_appicon.jpg",
+            "medium_url": "https://img-tc.tapimg.com/market/images/24231ebc714c5dd8e41a290161c14776.jpg/_tap_appicon_m.jpg",
+            "small_url": "https://img-tc.tapimg.com/market/images/24231ebc714c5dd8e41a290161c14776.jpg/_tap_appicon_s.jpg",
+            "original_url": "https://img-tc.tapimg.com/market/images/24231ebc714c5dd8e41a290161c14776.jpg",
+            "original_format": "jpeg",
+            "width": 270,
+            "height": 270,
+            "color": "0x996d49",
+            "original_size": 74405,
+            "large_url": "https://img-tc.tapimg.com/market/images/24231ebc714c5dd8e41a290161c14776.jpg/_tap_appicon.jpg"
+          },
+          "platform_info": {
+            "current_platform": {
+              "key": "android"
+            },
+            "supported_platforms": [
+              {
+                "key": "android"
+              },
+              {
+                "key": "ios"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "total": 150,
+    "next_page": "/webapiv2/app-top/v2/hits?from=40&limit=10&type_name=pop"
+  }
+}

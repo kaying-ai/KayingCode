@@ -1,0 +1,12 @@
+[Unit]
+Description=Kaying Bot TapTap Daily health check
+
+[Service]
+Type=oneshot
+User=@SERVICE_USER@
+Group=@SERVICE_USER@
+Environment=HOME=@STATE_ROOT@
+Environment=TZ=Asia/Shanghai
+EnvironmentFile=-@CONFIG_ROOT@/report.env
+ExecStart=@BOT_ROOT@/healthcheck.sh
+TimeoutStartSec=300

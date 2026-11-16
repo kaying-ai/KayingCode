@@ -1,0 +1,11 @@
+[Unit]
+Description=Trigger Kaying Bot TapTap Daily Report at 09:00 Asia/Shanghai
+
+[Timer]
+OnCalendar=*-*-* 09:00:00 Asia/Shanghai
+Persistent=true
+AccuracySec=1min
+Unit=kaying-bot-taptap-daily.service
+
+[Install]
+WantedBy=timers.target
