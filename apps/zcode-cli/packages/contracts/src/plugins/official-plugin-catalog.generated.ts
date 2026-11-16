@@ -257,7 +257,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
   },
   {
     name: "kaying-for-taptap",
-    version: "0.1.1",
+    version: "0.1.2",
     rootCandidates: [
       "packages/kaying-for-taptap-plugin",
       "../kaying-for-taptap-plugin",

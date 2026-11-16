@@ -46,6 +46,22 @@ try {
     publishedAt: "2026-10-18T00:00:00.000Z",
     revision: 1,
   };
+  const compareReceipt = {
+    ...receipt,
+    workspaceKey: "transcription",
+    pluginId: "kaying-for-taptap@builtin",
+    contributionId: "transcription-compare",
+    operationId: "compare-1",
+    sourceUrl: "https://example.com/game",
+    targetUrl: receipt.previewUrl,
+    viewport: { width: 720, height: 1280 },
+    targetPublication: { operationId: receipt.operationId, revision: 1 },
+  };
+  delete compareReceipt.previewUrl;
+  const writeComparison = (value) =>
+    page.evaluate((value) => window.previewTest.writeComparison(value, "/transcription"), value);
+  const comparisons = (count) =>
+    page.waitForFunction((count) => window.previewTest.comparisons.length === count, count);
   const publish = (value, path) =>
     page.evaluate(({ value, path }) => window.previewTest.write(value, path), { value, path });
   const opened = (count) =>
@@ -58,10 +74,15 @@ try {
   };
   // 首轮 compare receipt 尚未创建；连续转写提交也不能打开独立游戏预览。
   await page.evaluate(() =>
-    window.previewTest.render({ workspaceKey: "transcription", workspacePath: "/transcription" }),
+    window.previewTest.render({
+      workspaceKey: "transcription",
+      workspacePath: "/transcription",
+      compare: true,
+    }),
   );
-  await page.waitForFunction(() =>
-    window.previewTest.watched.some((watch) => watch.path === "/transcription"),
+  await page.waitForFunction(
+    () =>
+      window.previewTest.watched.filter((watch) => watch.path === "/transcription").length === 2,
   );
   for (const revision of [1, 2, 2]) {
     await publishAndRead(
@@ -71,9 +92,16 @@ try {
     assert.equal(await page.evaluate(() => window.previewTest.state), null);
     assert.equal(await page.evaluate(() => window.previewTest.opened.length), 0);
   }
-  await page.getByRole("button", { name: "打开转写对比" }).click();
+  await writeComparison(compareReceipt);
+  await comparisons(1);
+  const firstCompareState = await page.evaluate(() => window.previewTest.state);
+  await writeComparison({ ...compareReceipt, operationId: "compare-2", revision: 2 });
+  await comparisons(2);
   const compareState = await page.evaluate(() => window.previewTest.state);
   assert.equal(compareState.tabs[0].type, "plugin-browser-compare");
+  assert.equal(compareState.activeTabId, compareState.tabs[0].id);
+  assert.equal(compareState.tabs[0].sourceTabId, firstCompareState.tabs[0].sourceTabId);
+  assert.equal(compareState.tabs[0].targetTabId, firstCompareState.tabs[0].targetTabId);
   await publishAndRead(
     {
       ...receipt,
@@ -93,6 +121,7 @@ try {
       workspaceKey: "transcription",
       workspacePath: "/transcription",
       task: "task-b",
+      compare: true,
     }),
   );
   await publishAndRead(
@@ -114,6 +143,24 @@ try {
     "/transcription",
   );
   await opened(1);
+  await page.getByRole("button", { name: "关闭预览" }).click();
+  await page.evaluate(
+    (receipt) => {
+      window.previewTest.comparisonBeforeSubscribe = { receipt, path: "/subscribe-race" };
+      window.previewTest.render({
+        workspacePath: "/subscribe-race",
+        workspaceKey: receipt.workspaceKey,
+        enabled: false,
+        compare: true,
+      });
+    },
+    { ...compareReceipt, workspaceKey: "subscribe-race" },
+  );
+  await comparisons(3);
+  assert.equal(
+    await page.evaluate(() => window.previewTest.state.tabs[0].type),
+    "plugin-browser-compare",
+  );
   await page.getByRole("button", { name: "关闭预览" }).click();
   await page.evaluate(() => {
     window.previewTest.opened.length = 0;

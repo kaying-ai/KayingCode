@@ -5,9 +5,15 @@
 - vendor/instant-games-open-mcp/upstream-lock.json 是所分发 Maker 与 MCP 包的唯一版本及完整性来源；维护时查 npm 官方 registry 的 latest，并检查包差异后固定具体版本与 SHA-512，不把 latest 带入运行时。
 - 同步沿用 scripts/sync-vendor.mjs；先校验 npm tarball integrity，再应用本地发布策略，最后记录分发文件的 distSha512。THIRD_PARTY_NOTICES.md 与锁定版本保持一致。
 - Maker 本地工作区仍为文件快照唯一所有者。更新不得恢复远端 needs_pull 的快进覆盖或阻塞 preflight；远端推进时沿用 fetch 历史、ours 合并保留本地内容、重试 push。不得自动发布用户项目。
-- 官方插件身份不变；本轮更新以 0.1.0 为当前清单基线，升级到 0.1.1，package、manifest、MCP 报告版本保持一致。官方目录由配置和真实清单重新生成。
+- 官方插件身份沿用现有 ID。更新分发运行时时同步递增 package、manifest 和 MCP 报告版本，供插件安装和缓存识别。官方目录由配置和真实清单重新生成。
 - 上游技能只在明确来源、许可、接口兼容时同步；KayingCode 原创技能和预览归属逻辑不被上游整包覆盖。
 - 0.0.38 的云端工作区修复诊断与项目 settings 健康规则适配进现有 game-publisher/gameplay-engineer；保留原有工具名、右侧预览和固定运行时。不会导入要求全局升级、独立控制台或另一套预览流程的技能。
+
+## 2026-11-16 接入
+
+- Maker runtime 从 0.0.38 升到 npm latest 0.0.41，Instant Games Open MCP 继续固定在 1.24.14，官方插件版本递增到 0.1.2。
+- 0.0.41 延续云端工作区修复并扩充 Git 失败诊断。沿用本地快照权威补丁，将新版诊断中的手动 `git sync` 提示改为重试插件发布，保留 stderr/stdout 和云端状态排查。补丁锚点失效时同步失败。
+- 仅同步已分发的 runtime bundle。新版控制台项目检查与上游技能不增加 KayingCode 自动化入口，现有工作区、发布和转写预览接口继续沿用。
 
 ## 所有者与时序
 

@@ -3,14 +3,14 @@
 	"packages": [
 		{
 			"packageName": "@taptap/maker",
-			"version": "0.0.38",
-			"tarball": "https://registry.npmmirror.com/@taptap/maker/-/maker-0.0.38.tgz",
-			"integrity": "sha512-H7uoEZcqnD5fJEd0JvMzy0lWHggEWbMQD71DSywMcjWkRPOkw7HAP12Fjk6TE3nZy0BQJuYS8Zh+gaK5B2R2iQ==",
+			"version": "0.0.41",
+			"tarball": "https://registry.npmmirror.com/@taptap/maker/-/maker-0.0.41.tgz",
+			"integrity": "sha512-zdeTup32kMCWv1cDal3lCBfiVUAIxaHhhIlUAPKlRuZXD8FlXV/hwRJ4rYZt5iwVG4/Za8dWLyyYQmCtfPBJxw==",
 			"distFiles": [
 				"maker.js"
 			],
 			"distSha512": {
-				"maker.js": "19e44737c3e06e80dec59df765c073570555a5900f9ec110ef5b0fe24f41c3f2f5ce76e922e7a3aba70a93b5e32d63854dfed4296458444add2bbd0ed7090839"
+				"maker.js": "e6c970867d873ae5145a2191b50a84e5b1945cb66b9352a7666da10b7a47c7fabe44cbbf6d382b244039c1bc7c66aae4464ff95643b3c6ebfaf5982c8900c2f9"
 			}
 		},
 		{

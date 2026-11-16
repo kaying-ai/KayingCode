@@ -71,14 +71,14 @@ async function patchMakerPushPolicy(bundlePath) {
   let source = await readFile(bundlePath, "utf8");
   if (source.includes(makerPushPolicyMarker)) return;
   const requiredReplace = (text, pattern, replacement, label) => {
-    if (!pattern.test(text)) throw new Error(`Maker 0.0.38 patch could not find ${label}`);
+    if (!pattern.test(text)) throw new Error(`Maker push policy patch could not find ${label}`);
     return text.replace(pattern, replacement);
   };
   const pushFunction =
     /\nasync function pushMakerProject\(options\d*\) \{[\s\S]*?(?=\n(?:async )?function \w+\()/;
   if (!pushFunction.test(source)) throw new Error("Maker push function missing");
   source = source.replace(pushFunction, (body) => {
-    // 0.0.38 改用 gitStepWithTransientRetry 并增加云端修复；只移除会引入远端文件的路径。
+    // 保留上游重试与云端修复，只替换会引入远端文件的路径。
     body = requiredReplace(
       body,
       /\n {2}const remoteSyncStatus = await inspectMakerRemoteSyncStatus\(cwd\);[\s\S]*?\n {2}const statusBefore/,
@@ -134,9 +134,9 @@ async function patchMakerPushPolicy(bundlePath) {
   source = source.replace(/\nasync function pushMakerProject\(/, (match) => `${helpers}${match}`);
   source = requiredReplace(
     source,
-    /远端拒绝了本次推送。运行 `taptap-maker git sync --target-dir <项目目录>` 拉取并合并远端 main 后，再重试 maker_build_current_directory；不要新建分支。/,
-    "远端拒绝了本次推送。历史推进时 Maker 自动获取历史并以 ours 策略保留本地文件；若仍失败，保留本地提交并报告 fetch/merge/push 详情，不要手动 pull/rebase。",
-    "remote rejection guidance",
+    /再用 `taptap-maker git sync --target-dir <项目目录>` 合并并重试原提交\/构建操作/,
+    "然后重试插件发布。历史推进时插件只获取远端历史并以 ours 合并保留本地文件，不手动 pull/rebase 或 git sync",
+    "remote diagnosis sync guidance",
   );
   await writeFile(bundlePath, source, "utf8");
 }

@@ -58,7 +58,7 @@ export function usePluginBrowserCompareAutoOpen(input: {
                   entry.contribution.publicationFile,
                 );
                 const slice = await fileService.readTextFile({ path, length: MAX_RECEIPT_BYTES });
-                if (slice.isBinary || slice.truncated) return;
+                if (cancelled || slice.isBinary || slice.truncated) return;
                 const publication = parsePluginBrowserComparePublicationV1(
                   JSON.parse(slice.content) as unknown,
                 );
@@ -69,11 +69,16 @@ export function usePluginBrowserCompareAutoOpen(input: {
                 ) {
                   return;
                 }
-                const key = `${entry.pluginId}\0${entry.contribution.id}\0${publication.sessionId}`;
+                const key = JSON.stringify([
+                  publication.workspaceKey,
+                  entry.pluginId,
+                  entry.contribution.id,
+                  publication.sessionId,
+                ]);
                 const previousRevision = seenRevisionRef.current.get(key) ?? 0;
                 if (publication.revision <= previousRevision) return;
                 seenRevisionRef.current.set(key, publication.revision);
-                if (!cancelled) current.onPublication(entry, publication);
+                current.onPublication(entry, publication);
               } catch (cause) {
                 const message = cause instanceof Error ? cause.message : String(cause);
                 if (!/ENOENT|not found|does not exist/iu.test(message)) {
@@ -94,11 +99,14 @@ export function usePluginBrowserCompareAutoOpen(input: {
 
     void refresh();
     void fileWatcherService
-      .watch({ path: input.workspacePath })
+      // 回执写在工作区的嵌套目录，根目录非递归监听会漏掉首次写入及后续原子替换。
+      .watch({ path: input.workspacePath, recursive: true })
       .then(({ id }) => {
         if (cancelled) return void fileWatcherService.unwatch({ id });
         watcherId = id;
         subscription = fileWatcherService.onDynamicChange(id)(() => void refresh());
+        // 补读初次读取与订阅建立之间写入的回执。
+        void refresh();
       })
       .catch((cause: unknown) => {
         logger.warn("[PluginBrowserCompare] 无法监视自动打开回执", {

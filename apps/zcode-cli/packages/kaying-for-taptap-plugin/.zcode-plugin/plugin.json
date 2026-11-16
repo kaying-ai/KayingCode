@@ -1,6 +1,6 @@
 {
   "name": "kaying-for-taptap",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "TapTap Maker game development, publishing, preview, and three.js / Canvas web-game transcription with a built-in runtime; no manual MCP setup required.",
   "author": {
     "name": "kayingai.com",

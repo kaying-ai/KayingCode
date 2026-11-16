@@ -172,6 +172,10 @@ profile 由具体转换工程维护。坐标是 receipt viewport 的 CSS pixel�
 
 将 Browser Use 保存的两张原始 PNG 按字节复制到转换工程的
 `verify/visual-compare/<comparison-operation-id>/`，分别命名为 `source.png` 和 `target.png`。
+自动执行时只用文件系统创建目录、复制原图，不调用「另存为」、浏览器下载或系统截图工具。
+Windows 上用 PowerShell 的 `Copy-Item -LiteralPath` 或当前 shell 的等效文件复制命令。
+使用工具返回的真实原图路径，完整引用含空格的路径。若工具没有返回落盘路径、文件不存在或复制失败，
+记录本轮证据未落盘的具体错误。
 转写 MCP 从工作区读取输入。`cwd` 使用转换工程相对工作区的路径，其余路径相对 `cwd`。
 调用 `kaying-for-taptap_transcription`，将示例中的目录和 operation ID 换成本次实际值。
 

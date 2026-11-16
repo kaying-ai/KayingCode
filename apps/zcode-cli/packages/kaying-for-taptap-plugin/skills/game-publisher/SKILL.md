@@ -13,7 +13,7 @@ Use `kaying-for-taptap_doctor` when a concrete failure needs diagnosis; it is no
 step before every publish. Do not manually pull, merge or reset the Maker remote to work around a
 failed publish; use the tool's reported recovery path.
 
-Maker 0.0.38 may report `cloud_workspace_blocked` when the remote working tree has uncommitted
+Maker may report `cloud_workspace_blocked` when the remote working tree has uncommitted
 changes. The bundled publisher owns cloud repair and preserves the local file snapshot when
 reconciling remote history. If diagnostics include `cloudRepair`, explain its actual status and the
 remaining failure; a successful cloud repair alone is not a successful game build. Do not run

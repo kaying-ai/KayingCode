@@ -7,7 +7,7 @@ description: "Implement and debug gameplay in existing TapTap Maker Lua projects
 
 Read AGENTS.md and the existing project structure before editing. Keep gameplay, UI, data and shared libraries in their established modules. Discover native operations through kaying-for-taptap_game_command search/describe and preserve prepared-effect confirmation for mutations. Use ordinary project assets. Validate changed code with relevant project checks. Preserve converter output and do not reinitialize or overwrite an existing project to satisfy an architectural preference. Local execution is an on-demand user task, not an automatic development prerequisite.
 
-Maker 0.0.38 checks `.project/settings.json` before publication. For ordinary feature changes,
+Maker checks `.project/settings.json` before publication. For ordinary feature changes,
 preserve its build fields and existing `@runtime` settings. If diagnostics identify invalid JSON
 or damaged build-critical fields, inspect that exact evidence and recover from project Git history
 or an intact project copy. Do not invent project identity, entry, version, resource groups or engine
