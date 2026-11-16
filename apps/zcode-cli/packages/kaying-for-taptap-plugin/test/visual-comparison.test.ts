@@ -152,6 +152,8 @@ test("MCP prepare directs resumed tasks to discover the current comparison guest
   assert.match(guidance, /agent\.browsers\.list\(\).*current Desktop session/u);
   assert.match(guidance, /tabs\.list\(\).*ID prefix.*user\.openTabs\(\).*tabGroup/u);
   assert.match(guidance, /Copy.*original PNG.*workspace.*t3m compare/u);
+  assert.match(guidance, /filesystem.*PowerShell.*Copy-Item -LiteralPath/u);
+  assert.match(guidance, /Do not use.*Save As.*download/u);
   assert.deepEqual(JSON.parse(content[0]!.text), result.structuredContent);
 
   const failed = await client.callTool({

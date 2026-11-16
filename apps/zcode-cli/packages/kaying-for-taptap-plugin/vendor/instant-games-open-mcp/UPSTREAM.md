@@ -2,8 +2,8 @@
 
 - Repository: https://github.com/taptap/instant-games-open-mcp
 - License: MIT; see `LICENSE` in this directory.
-- Last synchronized: 2026-09-29.
-- Packages: `@taptap/maker@0.0.36` and `@taptap/instant-games-open-mcp@1.24.14`.
+- Last synchronized: 2026-11-16.
+- Packages: `@taptap/maker@0.0.41` and `@taptap/instant-games-open-mcp@1.24.14`.
 - Sync command: `pnpm --filter @kayingcode/kaying-for-taptap-plugin sync:vendor`（或在本包目录执行 `node scripts/sync-vendor.mjs`）.
 - Local patches: the synchronized `maker.js` bundle removes the remote fetch/sync preflight
   (including `needs_pull` fast-forward). If TapTap rejects a normal push because remote history

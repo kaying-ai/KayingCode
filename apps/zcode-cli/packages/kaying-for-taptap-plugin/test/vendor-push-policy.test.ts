@@ -33,9 +33,14 @@ test("locked Maker distribution and notices match the audited upstream", async (
   const maker = lock.packages.find(
     (pkg: { packageName: string }) => pkg.packageName === "@taptap/maker",
   );
-  assert.equal(maker.version, "0.0.38");
+  assert.equal(maker.version, "0.0.41");
   const source = await bundle();
   assert.ok(source.includes(`TapTap Maker MCP version: ${maker.version}`));
+  assert.match(source, /failure\.stderr\/stdout.+重试插件发布/u);
+  assert.doesNotMatch(
+    source,
+    /再用 `taptap-maker git sync --target-dir <项目目录>` 合并并重试原提交\/构建操作/u,
+  );
   const push = functionSource(source, "pushMakerProject");
   assert.ok(!push.includes("remoteSyncStatus"), "preflight must not merge remote files");
   assert.ok(push.includes("pushMakerProjectWithHistoryFallback"));
