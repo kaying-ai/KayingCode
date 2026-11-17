@@ -22,6 +22,7 @@ export interface CompactGame {
   reserveCount: number;
   developers: string[];
   releasedTime: number | null;
+  iconUrl: string | null;
   sourceUrl: string;
 }
 
@@ -67,6 +68,7 @@ export interface ReportJson {
     tags: string[];
     rating: number | null;
     reserveCount: number;
+    iconUrl: string | null;
     boards: { board: BoardId; rank: number; rankChange: number | null }[];
   }[];
   genres: GenreMetric[];
@@ -77,7 +79,7 @@ export interface ReportJson {
     newGames7d: number;
     newGames30d: number;
   }[];
-  topMovers: { title: string; changes: string[]; sourceUrl: string }[];
+  topMovers: { title: string; changes: string[]; iconUrl: string | null; sourceUrl: string }[];
   insights: Insights;
   warnings: Warning[];
   reportUrl: string;
@@ -92,6 +94,7 @@ function compactGame(event: GameRecord): CompactGame {
     reserveCount: event.reserveCount,
     developers: event.developers,
     releasedTime: event.releasedTime,
+    iconUrl: event.iconUrl,
     sourceUrl: event.sourceUrl,
   };
 }
@@ -147,7 +150,13 @@ export function buildReportJson(ctx: RenderContext): ReportJson {
       const score = Math.max(
         ...item.boards.map((membership) => Math.abs(membership.rankChange ?? 0)),
       );
-      return { title: item.title, changes, sourceUrl: item.sourceUrl, score };
+      return {
+        title: item.title,
+        changes,
+        iconUrl: item.iconUrl,
+        sourceUrl: item.sourceUrl,
+        score,
+      };
     })
     .filter((item) => item.changes.length > 0)
     .sort((a, b) => b.score - a.score)
@@ -180,6 +189,7 @@ export function buildReportJson(ctx: RenderContext): ReportJson {
       tags: item.tags,
       rating: item.rating,
       reserveCount: item.reserveCount,
+      iconUrl: item.iconUrl,
       boards: item.boards,
     })),
     genres: metrics.genres,

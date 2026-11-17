@@ -2055,6 +2055,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       "dist/collector.mjs",
       "dist/metrics.mjs",
       "dist/renderer.mjs",
+      "dist/support-contact-qr.png",
       "commands/taptap-daily.md",
       "skills/taptap-daily-report/SKILL.md",
       "skills/taptap-daily-report/references/report-structure.md",

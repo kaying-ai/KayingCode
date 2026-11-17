@@ -2123,6 +2123,7 @@
         "dist/collector.mjs",
         "dist/metrics.mjs",
         "dist/renderer.mjs",
+        "dist/support-contact-qr.png",
         "commands/taptap-daily.md",
         "skills/taptap-daily-report/SKILL.md",
         "skills/taptap-daily-report/references/report-structure.md",
@@ -2131,7 +2132,12 @@
       "buildScript": "build",
       "bootstrapBuildScript": "scripts/build.mjs",
       "devArtifact": "dist/renderer.mjs",
-      "generatedSeedPaths": ["dist/collector.mjs", "dist/metrics.mjs", "dist/renderer.mjs"],
+      "generatedSeedPaths": [
+        "dist/collector.mjs",
+        "dist/metrics.mjs",
+        "dist/renderer.mjs",
+        "dist/support-contact-qr.png"
+      ],
       "requiredRuntimePaths": [
         "dist/collector.mjs",
         "dist/metrics.mjs",

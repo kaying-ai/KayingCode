@@ -108,6 +108,8 @@ snapshot 的 `source.proxyBaseUrl` 记录使用的代理域名；**token 不写�
 
 采集器只保留日报需要的字段，不保存 `description`、`screenshots`、`banner` 等大字段。
 
+`iconUrl` 依次取 `app.icon.url`、`app.icon.medium_url`、`app.icon.small_url`，仅用于报告表格的 28×28 图标；三者为空时记为 `null`，不视为解析失败。渲染器只接受 `http:`/`https:` 的图标 URL，缺失或非法时显示 `—`。
+
 ## 4. 新游与发布事件（游戏日历）
 
 路径：`/webapiv2/calendar/v1/event-list?day=<timestamp>`

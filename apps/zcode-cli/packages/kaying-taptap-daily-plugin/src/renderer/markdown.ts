@@ -8,12 +8,14 @@ import {
   confidenceLabel,
   crowdingLabel,
   dataQualityLabel,
+  escapeHtml,
   escapeMarkdown,
   evidenceRefsMarkdown,
   formatNumber,
   formatPercent,
   formatRankChange,
   formatRating,
+  safeImageUrl,
 } from "./format.js";
 import { resolveSummary } from "./summary.js";
 
@@ -28,12 +30,19 @@ function sourceLink(url: string): string {
   return `[来源](${url})`;
 }
 
+function gameIconMarkdown(iconUrl: string | null): string {
+  const url = safeImageUrl(iconUrl);
+  if (!url) return "—";
+  return `<img src="${escapeHtml(url)}" width="28" height="28" alt="图标" loading="lazy" referrerpolicy="no-referrer">`;
+}
+
 function genresOf(tags: string[]): string {
   return classifyGenres(tags).map(genreLabel).join("、");
 }
 
 function gameRow(event: CalendarEvent): string[] {
   return [
+    gameIconMarkdown(event.iconUrl),
     event.eventDate,
     event.title,
     genresOf(event.tags),
@@ -47,6 +56,7 @@ function gameRow(event: CalendarEvent): string[] {
 
 function boardRows(ctx: RenderContext, boardId: BoardId): string[][] {
   return ctx.metrics.boards[boardId].items.map((item) => [
+    gameIconMarkdown(item.iconUrl),
     String(item.rank),
     item.title,
     genresOf(item.tags),
@@ -194,7 +204,7 @@ export function renderMarkdown(ctx: RenderContext): string {
       "",
       snapshotBoard.degraded ? "> 数据降级：本轮可用条目不足 30 条。" : "",
       table(
-        ["名次", "游戏", "赛道", "评分", "预约", "变化", "来源"],
+        ["图标", "名次", "游戏", "赛道", "评分", "预约", "变化", "来源"],
         boardRows(ctx, board.id).slice(0, 20),
       ),
       "",
@@ -228,7 +238,10 @@ export function renderMarkdown(ctx: RenderContext): string {
     return [
       `### ${snapshotBoard.label}（完整 Top${snapshotBoard.items.length}）`,
       "",
-      table(["名次", "游戏", "赛道", "评分", "预约", "变化", "来源"], boardRows(ctx, board.id)),
+      table(
+        ["图标", "名次", "游戏", "赛道", "评分", "预约", "变化", "来源"],
+        boardRows(ctx, board.id),
+      ),
       "",
     ].join("\n");
   }).join("\n");
@@ -254,13 +267,16 @@ export function renderMarkdown(ctx: RenderContext): string {
     "### 首发 Top 20",
     "",
     releaseRows.length > 0
-      ? table(["日期", "游戏", "赛道", "类型", "预约", "评分", "厂商", "来源"], releaseRows)
+      ? table(["图标", "日期", "游戏", "赛道", "类型", "预约", "评分", "厂商", "来源"], releaseRows)
       : "本轮没有可用的首发记录。",
     "",
     "### 新开预约 Top 20",
     "",
     reservationRows.length > 0
-      ? table(["日期", "游戏", "赛道", "类型", "预约", "评分", "厂商", "来源"], reservationRows)
+      ? table(
+          ["图标", "日期", "游戏", "赛道", "类型", "预约", "评分", "厂商", "来源"],
+          reservationRows,
+        )
       : "本轮没有可用的新开预约记录。",
     "",
     "### 深度解读",
@@ -278,8 +294,12 @@ export function renderMarkdown(ctx: RenderContext): string {
     "",
     movers.length > 0
       ? table(
-          ["游戏", "变化"],
-          movers.map(({ item, changes }) => [item.title, changes.join("；")]),
+          ["图标", "游戏", "变化"],
+          movers.map(({ item, changes }) => [
+            gameIconMarkdown(item.iconUrl),
+            item.title,
+            changes.join("；"),
+          ]),
         )
       : "没有可用的上一份快照，排名变化为空。",
     "",
@@ -287,8 +307,9 @@ export function renderMarkdown(ctx: RenderContext): string {
     "",
     crossBoard.length > 0
       ? table(
-          ["游戏", "上榜情况"],
+          ["图标", "游戏", "上榜情况"],
           crossBoard.map((item) => [
+            gameIconMarkdown(item.iconUrl),
             item.title,
             item.boards
               .map((membership) => `${BOARD_LABELS[membership.board]} #${membership.rank}`)
@@ -353,7 +374,7 @@ export function renderMarkdown(ctx: RenderContext): string {
     "",
     table(["ID", "类型", "URL", "原始文件"], evidenceRows),
     "",
-    `> 在线报告：${ctx.reportUrl}`,
+    "> 更多报告联系 [service@kayingai.com](mailto:service@kayingai.com)",
     "",
   ].join("\n");
 }

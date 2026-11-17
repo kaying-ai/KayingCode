@@ -44,6 +44,8 @@ install -d -m 0755 "$STATE_ROOT" "$STATE_ROOT/workspace" \
 
 install -m 0755 "$BUNDLE_DIR"/dist/*.mjs "$BOT_ROOT/tools/taptap-daily/"
 install -m 0755 "$BUNDLE_DIR"/dist/*.mjs "$STATE_ROOT/workspace/tools/taptap-daily/"
+install -m 0644 "$BUNDLE_DIR/dist/support-contact-qr.png" "$BOT_ROOT/tools/taptap-daily/"
+install -m 0644 "$BUNDLE_DIR/dist/support-contact-qr.png" "$STATE_ROOT/workspace/tools/taptap-daily/"
 install -m 0755 "$BUNDLE_DIR/run-report.sh" "$BUNDLE_DIR/validate-run.mjs" \
   "$BUNDLE_DIR/publish-report.mjs" "$BUNDLE_DIR/healthcheck.sh" "$BOT_ROOT/"
 install -m 0644 "$BUNDLE_DIR/workflows/taptap-daily.dwf.ts" \

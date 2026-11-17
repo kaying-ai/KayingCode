@@ -1,4 +1,4 @@
-import { mkdir, rm } from "node:fs/promises";
+import { copyFile, mkdir, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { build } from "esbuild";
 
@@ -22,3 +22,9 @@ await build({
   legalComments: "none",
   sourcemap: true,
 });
+
+// renderer 运行期读取同目录 PNG 并内嵌为 data URL；失败时构建直接报错，避免静默丢二维码。
+await copyFile(
+  resolve(root, "assets/support-contact-qr.png"),
+  resolve(dist, "support-contact-qr.png"),
+);

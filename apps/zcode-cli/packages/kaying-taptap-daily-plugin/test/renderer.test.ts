@@ -16,11 +16,13 @@ function setup() {
         rating: 9.2,
         reserveCount: 12_345,
         developers: ["测试厂商"],
+        iconUrl: "https://img.example/icon.png",
       }),
       makeEvent(3101, "模拟经营新游", ["模拟经营"], "release", "2026-11-15"),
       makeEvent(3301, "二次元预约", ["二次元"], "reservation", "2026-11-16"),
     ],
   });
+  snapshot.boards.download.items[0]!.iconUrl = "https://img.example/board-icon.png";
   const metrics = computeMetrics(snapshot, null, GENERATED_AT);
   const insights: Insights = {
     schemaVersion: 1,
@@ -94,11 +96,26 @@ test("renders markdown, html and report json with fixed sections", () => {
   assert.match(rendered.markdown, /二次元新游A/);
   assert.match(rendered.markdown, /https:\/\/www\.taptap\.cn\/app\/3001/);
   assert.match(rendered.markdown, /事件:30010|event:30010/);
+  assert.match(rendered.markdown, /<img src="https:\/\/img\.example\/icon\.png"/);
+  assert.match(rendered.markdown, /更多报告联系.*service@kayingai\.com/);
 
   assert.match(rendered.html, /<!doctype html>/);
   assert.match(rendered.html, /<h1>TapTap 游戏日报 · 2026-11-16<\/h1>/);
   assert.match(rendered.html, /今日信号 A/);
+  assert.match(rendered.html, /<img class="game-icon" src="https:\/\/img\.example\/icon\.png"/);
+  assert.match(
+    rendered.html,
+    /<img class="game-icon" src="https:\/\/img\.example\/board-icon\.png"/,
+  );
   assert.doesNotMatch(rendered.html, /<script\b/);
+  assert.match(rendered.html, /更多报告联系/);
+  assert.match(rendered.html, /service@kayingai\.com/);
+  assert.match(rendered.html, /由 KayingCode kaying-taptap-daily 生成/);
+  assert.match(rendered.html, /开源一站式游戏开发Harness/);
+  assert.match(rendered.html, /https:\/\/kayingai\.com/);
+  assert.match(rendered.html, /加群交流/);
+  assert.match(rendered.html, /alt="客服二维码"/);
+  assert.match(rendered.html, /src="data:image\/png;base64,/);
 
   assert.equal(rendered.reportJson.counts.release7d, 2);
   assert.equal(rendered.reportJson.counts.reservation7d, 1);
@@ -108,6 +125,31 @@ test("renders markdown, html and report json with fixed sections", () => {
   );
   assert.equal(rendered.reportJson.insights.summary[0], "今日信号 A");
   assert.ok(rendered.reportJson.topGenres.length > 0);
+  assert.ok(
+    rendered.reportJson.newGames.topReleases.some(
+      (item) => item.iconUrl === "https://img.example/icon.png",
+    ),
+  );
+  assert.equal(
+    rendered.reportJson.boards.download.items[0]!.iconUrl,
+    "https://img.example/board-icon.png",
+  );
+});
+
+test("rejects non-http icon urls", () => {
+  const { snapshot, metrics, insights } = setup();
+  snapshot.calendar.events[0]!.iconUrl = "javascript:alert(1)";
+  snapshot.boards.download.items[0]!.iconUrl = "data:image/svg+xml,<svg/>";
+  const rendered = renderReport({
+    snapshot,
+    metrics,
+    insights,
+    publicBaseUrl: "",
+    generatedAt: GENERATED_AT,
+  });
+  assert.doesNotMatch(rendered.html, /javascript:/);
+  assert.doesNotMatch(rendered.html, /<img class="game-icon" src="data:image/);
+  assert.doesNotMatch(rendered.markdown, /javascript:|data:image/);
 });
 
 test("drops unknown evidence ids and records a warning", () => {
@@ -156,4 +198,8 @@ test("renders an archive index", () => {
   assert.match(html, /历史归档/);
   assert.match(html, /2026-11-16/);
   assert.match(html, /\.\/2026-11-15\//);
+  assert.match(html, /加群交流/);
+  assert.match(html, /alt="客服二维码"/);
+  assert.match(html, /由 KayingCode kaying-taptap-daily 生成/);
+  assert.match(html, /开源一站式游戏开发Harness/);
 });

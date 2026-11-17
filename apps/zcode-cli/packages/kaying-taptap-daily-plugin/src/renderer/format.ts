@@ -17,6 +17,21 @@ export function escapeMarkdown(value: unknown): string {
     .replaceAll("\r", " ");
 }
 
+/**
+ * 只接受 http(s) 图标地址；Collector / 人工导入都可能带任意字符串，
+ * 直接拼进 <img src> 会让 `javascript:` 之类的值进入报告。
+ */
+export function safeImageUrl(value: string | null | undefined): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function formatNumber(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return "—";
   return new Intl.NumberFormat("zh-CN").format(value);

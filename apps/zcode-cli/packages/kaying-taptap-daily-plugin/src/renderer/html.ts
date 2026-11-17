@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { classifyGenres, genreLabel } from "../collector/genres.js";
 import { formatBeijingDateTime } from "../lib/date.js";
 import type { BoardId, CalendarEvent } from "../types.js";
@@ -14,10 +15,39 @@ import {
   formatPercent,
   formatRankChange,
   formatRating,
+  safeImageUrl,
 } from "./format.js";
 import { resolveSummary } from "./summary.js";
 
 type Cell = string | { html: string };
+
+/**
+ * 客服二维码随报告内嵌为 data URL：源码测试走 plugin/assets，打包后走
+ * dist/ 旁的 PNG（build.mjs 复制），报告因此不需要额外的静态文件。
+ */
+const CONTACT_QR_CANDIDATES = [
+  new URL("../../assets/support-contact-qr.png", import.meta.url),
+  new URL("./support-contact-qr.png", import.meta.url),
+];
+
+function loadContactQrDataUrl(): string {
+  for (const url of CONTACT_QR_CANDIDATES) {
+    try {
+      return `data:image/png;base64,${readFileSync(url).toString("base64")}`;
+    } catch {
+      // 尝试下一个候选路径；全部失败时页脚仍保留邮箱。
+    }
+  }
+  return "";
+}
+
+const contactQrDataUrl = loadContactQrDataUrl();
+
+function contactQrMarkup(): string {
+  return contactQrDataUrl
+    ? `<img src="${escapeHtml(contactQrDataUrl)}" alt="客服二维码" width="200" height="200">`
+    : `<p class="muted small">二维码暂不可用，请邮件联系。</p>`;
+}
 
 const BASE_CSS = `
 :root{--bg:#f5f6f8;--card:#fff;--ink:#1f2329;--muted:#667085;--line:#e4e7ec;--accent:#0f766e;--accent-soft:#e6f4f1;--warn:#b45309;--bad:#b42318;--good:#067647}
@@ -26,7 +56,8 @@ body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.65 -apple-system
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
 .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 64px}
-.hero{background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;border-radius:18px;padding:28px 28px 24px;box-shadow:0 10px 30px rgba(15,118,110,.18)}
+.hero{background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;border-radius:18px;padding:28px 28px 24px;box-shadow:0 10px 30px rgba(15,118,110,.18);display:flex;align-items:center;justify-content:space-between;gap:24px}
+.hero-main{min-width:0;flex:1}
 .hero h1{margin:0 0 8px;font-size:30px;line-height:1.25}
 .hero p{margin:4px 0;color:#d1fae5;font-size:13px}
 .badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
@@ -52,25 +83,34 @@ th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;verti
 th{background:#f9fafb;color:#475467;font-weight:600;white-space:nowrap}
 tr:last-child td{border-bottom:0}
 tbody tr:hover{background:#fcfcfd}
+.game-icon{display:block;width:28px;height:28px;border-radius:7px;object-fit:cover;background:#eaecf0}
 .tag{display:inline-block;border-radius:999px;padding:1px 8px;background:var(--accent-soft);color:#0f766e;font-size:12px;white-space:nowrap}
 .level-high{background:#fee4e2;color:#b42318}
 .level-medium{background:#fef0c7;color:#93370d}
 .level-low{background:#dcfae6;color:#067647}
 .level-unknown{background:#eaecf0;color:#475467}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
-.insight{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.grid>*{min-width:0}
+.insight{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:0;overflow-wrap:anywhere;word-break:break-word}
 .insight h4{margin:0 0 6px}
-.kv{display:grid;grid-template-columns:88px 1fr;gap:4px 10px;font-size:13px;margin-top:8px}
+.kv{display:grid;grid-template-columns:88px minmax(0,1fr);gap:4px 10px;font-size:13px;margin-top:8px}
 .kv dt{color:var(--muted)}
-.kv dd{margin:0}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere;word-break:break-word}
 .notice{background:#fffaeb;border:1px solid #fedf89;color:#93370d;border-radius:10px;padding:10px 12px;margin:10px 0}
 details{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:10px 0}
 summary{cursor:pointer;font-weight:600}
-.footer{margin-top:36px;color:var(--muted);font-size:12px}
+.footer{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px 10px;margin-top:36px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px;text-align:center}
+.footer-sep{color:#d0d5dd}
+.hero-contact{flex:none;width:150px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.24);border-radius:14px;padding:9px;text-align:center;color:#fff}
+.hero-contact .hero-contact-title{display:flex;align-items:center;justify-content:center;gap:5px;font-size:12px;font-weight:600}
+.hero-contact img{display:block;width:100%;max-width:120px;height:auto;margin:6px auto 0;border-radius:7px;background:#fff}
+.hero-contact p{margin:5px 0 0;color:#d1fae5;font-size:10px;line-height:1.35}
+.hero-contact a{color:#fff}
+.hero-contact .muted{color:#d1fae5}
 .risk{border-left:4px solid var(--bad)}
 .opportunity{border-left:4px solid var(--good)}
-@media (max-width:720px){.hero{padding:22px 18px}.hero h1{font-size:24px}.wrap{padding:18px 12px 48px}}
-@media print{body{background:#fff}.wrap{max-width:none;padding:0}.hero{box-shadow:none;background:#115e59}details{border:0;padding:0}summary{display:none}.table-wrap{overflow:visible}}
+@media (max-width:720px){.hero{padding:22px 18px;flex-wrap:wrap;gap:14px}.hero h1{font-size:24px}.hero-main{flex-basis:100%}.hero-contact{width:132px;margin-left:auto}.hero-contact img{max-width:108px}.wrap{padding:18px 12px 48px}.footer{flex-direction:column;gap:3px}.footer-sep{display:none}}
+@media print{body{background:#fff}.wrap{max-width:none;padding:0}.hero{box-shadow:none;background:#115e59}details{border:0;padding:0}summary{display:none}.table-wrap{overflow:visible}.hero-contact{display:none}}
 `;
 
 function link(url: string, text: string): string {
@@ -98,8 +138,17 @@ function genresOf(tags: string[]): string {
   return classifyGenres(tags).map(genreLabel).join("、");
 }
 
+function gameIconCell(iconUrl: string | null): Cell {
+  const url = safeImageUrl(iconUrl);
+  if (!url) return "—";
+  return {
+    html: `<img class="game-icon" src="${escapeHtml(url)}" alt="" width="28" height="28" loading="lazy" decoding="async" referrerpolicy="no-referrer">`,
+  };
+}
+
 function gameCells(event: CalendarEvent): Cell[] {
   return [
+    gameIconCell(event.iconUrl),
     event.eventDate,
     event.title,
     genresOf(event.tags),
@@ -114,6 +163,7 @@ function gameCells(event: CalendarEvent): Cell[] {
 function boardCells(ctx: RenderContext, boardId: BoardId, limit?: number): Cell[][] {
   const items = ctx.metrics.boards[boardId].items.slice(0, limit ?? undefined);
   return items.map((item) => [
+    gameIconCell(item.iconUrl),
     String(item.rank),
     item.title,
     genresOf(item.tags),
@@ -163,10 +213,10 @@ export function renderHtml(ctx: RenderContext): string {
       ? `<div class="notice">数据降级：本轮可用条目不足 30 条。</div>`
       : "";
     return `<h3>${escapeHtml(snapshotBoard.label)}</h3>${notice}${renderTable(
-      ["名次", "游戏", "赛道", "评分", "预约", "变化", "来源"],
+      ["图标", "名次", "游戏", "赛道", "评分", "预约", "变化", "来源"],
       boardCells(ctx, board.id, 20),
     )}<details><summary>展开完整 Top${snapshotBoard.items.length}</summary>${renderTable(
-      ["名次", "游戏", "赛道", "评分", "预约", "变化", "来源"],
+      ["图标", "名次", "游戏", "赛道", "评分", "预约", "变化", "来源"],
       boardCells(ctx, board.id),
     )}</details>`;
   }).join("");
@@ -298,6 +348,7 @@ export function renderHtml(ctx: RenderContext): string {
 <body>
 <main class="wrap">
 <section class="hero">
+<div class="hero-main">
 <h1>TapTap 游戏日报 · ${escapeHtml(snapshot.reportDate)}</h1>
 <p>数据截止 ${escapeHtml(formatBeijingDateTime(Date.parse(snapshot.capturedAt) / 1000))}（北京时间） · 来源：${escapeHtml(
     snapshot.source.kind === "web" ? "TapTap 公开页面" : "人工导入",
@@ -310,6 +361,12 @@ export function renderHtml(ctx: RenderContext): string {
   )}</span><span class="badge">新游 ${escapeHtml(metrics.newGames.uniqueGames7d)} 款</span><span class="badge">赛道 ${escapeHtml(
     metrics.genres.length,
   )} 个</span></div>
+</div>
+<aside class="hero-contact" aria-label="加群交流">
+<div class="hero-contact-title"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>加群交流</div>
+${contactQrMarkup()}
+<p>微信扫码加群交流</p>
+</aside>
 </section>
 
 <div class="cards">${cards}</div>
@@ -327,9 +384,9 @@ export function renderHtml(ctx: RenderContext): string {
     metrics.newGames.reservations7d,
   )} 款，测试 ${escapeHtml(metrics.newGames.tests7d)} 款；涉及游戏 ${escapeHtml(metrics.newGames.uniqueGames7d)} 款。</p>
 <h3>首发 Top 20</h3>
-${renderTable(["日期", "游戏", "赛道", "类型", "预约", "评分", "厂商", "来源"], metrics.newGames.topReleases.map(gameCells))}
+${renderTable(["图标", "日期", "游戏", "赛道", "类型", "预约", "评分", "厂商", "来源"], metrics.newGames.topReleases.map(gameCells))}
 <h3>新开预约 Top 20</h3>
-${renderTable(["日期", "游戏", "赛道", "类型", "预约", "评分", "厂商", "来源"], metrics.newGames.topReservations.map(gameCells))}
+${renderTable(["图标", "日期", "游戏", "赛道", "类型", "预约", "评分", "厂商", "来源"], metrics.newGames.topReservations.map(gameCells))}
 <h3>深度解读</h3>
 <div class="grid">${newGameInsights || '<p class="muted">本轮没有可用的新游深度解读。</p>'}</div>
 </section>
@@ -358,8 +415,9 @@ ${
 ${
   movers.length > 0
     ? renderTable(
-        ["游戏", "变化"],
+        ["图标", "游戏", "变化"],
         movers.map(({ item }) => [
+          gameIconCell(item.iconUrl),
           item.title,
           item.boards
             .filter((membership) => membership.rankChange !== null)
@@ -376,8 +434,9 @@ ${
 ${
   crossBoard.length > 0
     ? renderTable(
-        ["游戏", "上榜情况"],
+        ["图标", "游戏", "上榜情况"],
         crossBoard.map((item) => [
+          gameIconCell(item.iconUrl),
           item.title,
           item.boards
             .map((membership) => `${BOARD_LABELS[membership.board]} #${membership.rank}`)
@@ -449,7 +508,7 @@ ${warnings.length > 0 ? renderTable(["代码", "说明"], warningRows) : '<p cla
 ${BOARDS.map((board) => {
   const snapshotBoard = metrics.boards[board.id];
   return `<details><summary>${escapeHtml(snapshotBoard.label)}（Top${snapshotBoard.items.length}）</summary>${renderTable(
-    ["名次", "游戏", "赛道", "评分", "预约", "变化", "来源"],
+    ["图标", "名次", "游戏", "赛道", "评分", "预约", "变化", "来源"],
     boardCells(ctx, board.id),
   )}</details>`;
 }).join("")}
@@ -459,7 +518,13 @@ ${BOARDS.map((board) => {
   )}</details>
 </section>
 
-<p class="footer">在线报告：${link(ctx.reportUrl, ctx.reportUrl)} · 由 KayingCode kaying-taptap-daily 生成</p>
+<footer class="footer">
+<span>更多报告联系 ${link("mailto:service@kayingai.com", "service@kayingai.com")}</span>
+<span class="footer-sep" aria-hidden="true">·</span>
+<span>由 KayingCode kaying-taptap-daily 生成</span>
+<span class="footer-sep" aria-hidden="true">·</span>
+<span>开源一站式游戏开发Harness ${link("https://kayingai.com", "https://kayingai.com")}</span>
+</footer>
 </main>
 </body>
 </html>`;
@@ -497,14 +562,27 @@ export function renderArchiveIndex(entries: ArchiveEntry[]): string {
 <body>
 <main class="wrap">
 <section class="hero">
+<div class="hero-main">
 <h1>TapTap 游戏日报 · 历史归档</h1>
 <p>共 ${escapeHtml(sorted.length)} 期 · 数据来自 TapTap 公开页面</p>
+</div>
+<aside class="hero-contact" aria-label="加群交流">
+<div class="hero-contact-title"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>加群交流</div>
+${contactQrMarkup()}
+<p>微信扫码加群交流</p>
+</aside>
 </section>
 <section>
 <h2>全部日报</h2>
 ${renderTable(["日期", "近7日首发", "近7日预约", "最拥挤赛道", "质量"], rows)}
 </section>
-<p class="footer">由 KayingCode kaying-taptap-daily 生成</p>
+<footer class="footer">
+<span>更多报告联系 ${link("mailto:service@kayingai.com", "service@kayingai.com")}</span>
+<span class="footer-sep" aria-hidden="true">·</span>
+<span>由 KayingCode kaying-taptap-daily 生成</span>
+<span class="footer-sep" aria-hidden="true">·</span>
+<span>开源一站式游戏开发Harness ${link("https://kayingai.com", "https://kayingai.com")}</span>
+</footer>
 </main>
 </body>
 </html>`;

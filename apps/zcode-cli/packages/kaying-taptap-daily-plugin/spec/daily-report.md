@@ -30,7 +30,7 @@
 07 附录            完整榜单、标签映射、历史日报链接
 ```
 
-HTML 为自包含静态页：内联 CSS、无外部 JS、无远程图标依赖；支持移动端与打印。Markdown 与 `report.json` 同步生成。
+HTML 内联 CSS、无外部 JS；核心内容不依赖远程资源。游戏表格首列为 28×28 图标，引用 `snapshot` 中的 `iconUrl`（TapTap 图标 CDN），使用 `loading="lazy"` 与 `referrerpolicy="no-referrer"`；图标缺失或加载失败时显示 `—`，不影响报告可读性。Hero 右侧固定展示“加群交流”客服二维码卡片（内嵌 data URL），不依赖外部图片。页脚为三段信息条：更多报告联系 service@kayingai.com、由 KayingCode kaying-taptap-daily 生成、开源一站式游戏开发Harness https://kayingai.com。支持移动端与打印。Markdown 与 `report.json` 同步生成。
 
 ## 4. 指标定义
 
