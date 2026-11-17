@@ -48,6 +48,10 @@ export function ProviderTemplatePicker({
       templates: templates.filter((template) => !zhipuIds.includes(template.templateId)),
     },
   ] as const;
+  // 智谱预设已经是内置 Provider，不再出现在目录里；没有模板时也不留下空分组标题。
+  const visibleGroups = groups.filter(
+    (group) => group.id === "other" || group.templates.length > 0,
+  );
   const createWithFeedback = async (create: () => Promise<void>) => {
     const feedbackKey = "provider-template-create";
     dismissFeedback(feedbackKey);
@@ -88,7 +92,7 @@ export function ProviderTemplatePicker({
       </div>
 
       <div className="space-y-6">
-        {groups.map((group) => (
+        {visibleGroups.map((group) => (
           <section key={group.id} data-provider-template-group={group.id} className="space-y-3">
             <h3 className="text-ui-base font-medium text-foreground-subtle">
               {intl.formatMessage({ id: `settings.modelProvider.templateGroup.${group.id}` })}

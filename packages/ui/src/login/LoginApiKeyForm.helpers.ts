@@ -1,11 +1,10 @@
-import {
-  BUILTIN_PROVIDER_TEMPLATE_IDS,
-  type AppSettings,
-  type Locale,
-  type ProviderFamilyDomain,
-} from "@zcode/shared";
+import type { AppSettings, Locale, ProviderFamilyDomain } from "@zcode/shared";
 import type { ModelSelectionView } from "@zcode/services";
 import { encodeCustomModelValue } from "@/lib/kayingcodeCustomModelValue.js";
+import {
+  PRESET_PROVIDER_IDS,
+  type PresetProviderId,
+} from "@/settings/model-provider-section/constants.js";
 
 export type ApiKeyProviderChoice = "zai" | "bigmodel";
 
@@ -13,12 +12,8 @@ export function resolveLoginApiKeyDefaultProvider(locale: Locale): ApiKeyProvide
   return locale === "zh-CN" ? "bigmodel" : "zai";
 }
 
-export function resolveLoginApiKeyTemplateId(
-  choice: ApiKeyProviderChoice,
-): "zai-api" | "bigmodel-api" {
-  return choice === "zai"
-    ? BUILTIN_PROVIDER_TEMPLATE_IDS.zai
-    : BUILTIN_PROVIDER_TEMPLATE_IDS.bigmodel;
+export function resolveLoginApiKeyProviderId(choice: ApiKeyProviderChoice): PresetProviderId {
+  return choice === "zai" ? PRESET_PROVIDER_IDS.zai : PRESET_PROVIDER_IDS.bigmodel;
 }
 
 export function resolveLoginApiKeyProviderLabel(choice: ApiKeyProviderChoice): string {

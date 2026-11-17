@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ProviderSettingsFormProvider } from "@/lib/providerSettingsFormTypes.js";
 import {
-  BUILTIN_MODEL_PROVIDER_IDS,
+  resolveModelProviderFamilyIdByProviderId,
   type ModelConnectivityResult,
 } from "@zcode/shared";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
@@ -11,7 +11,10 @@ import { useConfirmDialog } from "@/hooks/useConfirmDialog.js";
 import { useModelProviders } from "@/hooks/useModelProviders.js";
 import { usePlatform } from "@/hooks/usePlatform.js";
 import { logger } from "@/logger.js";
-import { PRESET_PROVIDER_SPECS } from "./model-provider-section/constants.js";
+import {
+  PRESET_PROVIDER_IDS,
+  PRESET_PROVIDER_SPECS,
+} from "./model-provider-section/constants.js";
 import { ModelProviderSectionDetail } from "./model-provider-section/Detail.js";
 import { ModelProviderSectionLayout } from "./model-provider-section/SectionLayout.js";
 import { ProviderTemplatePicker } from "./model-provider-section/ProviderTemplatePicker.js";
@@ -46,11 +49,10 @@ function resolveModelProviderNavNodeKey(providerId: string): string {
   if (preset) {
     return createPresetProviderNodeKey(preset.id);
   }
-  if (
-    providerId === BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan ||
-    providerId === BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan
-  ) {
-    return createPresetProviderNodeKey(providerId);
+  // 历史账号 / Coding Plan ID 只做导航映射，不恢复账号 Provider。
+  const familyId = resolveModelProviderFamilyIdByProviderId(providerId);
+  if (familyId) {
+    return createPresetProviderNodeKey(PRESET_PROVIDER_IDS[familyId]);
   }
   return createCustomProviderNodeKey(providerId);
 }

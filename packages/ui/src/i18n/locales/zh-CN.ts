@@ -2693,8 +2693,8 @@ const zhCN: Record<string, string> = {
   "settings.modelProvider.modelsCount": "{count} 个模型",
   "settings.modelProvider.presetTitle": "智谱",
   "settings.modelProvider.presetDescription":
-    "内置 Z.ai 与 BigModel 供应商，支持通过 OAuth 辅助完成配置。",
-  "settings.modelProvider.presetEmpty": "尚未同步，请先完成 OAuth 登录。",
+    "内置 Z.ai 与 BigModel 供应商，使用 API Key 配置。",
+  "settings.modelProvider.presetEmpty": "内置供应商配置暂不可用，请刷新后重试。",
   "settings.modelProvider.customTitle": "自定义供应商",
   "settings.modelProvider.refresh": "刷新",
   "settings.modelProvider.reorderProvider": "拖拽调整供应商顺序",

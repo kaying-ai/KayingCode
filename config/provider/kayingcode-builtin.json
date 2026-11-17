@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": 30,
+  "revision": 31,
   "config": {
     "providerConfigRules": {
       "templateRules": [
@@ -563,7 +563,54 @@
           }
         }
       ],
-      "providerRules": []
+      "providerRules": [
+        {
+          "providerId": "zai-standard-api",
+          "providerName": "Z.ai",
+          "config": {
+            "group": "zai-family",
+            "access": {
+              "type": "api-key",
+              "apiKeyManagementUrl": "https://z.ai/manage-apikey/apikey-list"
+            },
+            "api": {
+              "type": "openai-chat-completions",
+              "baseUrl": "https://api.z.ai/api/paas/v4"
+            },
+            "builtinModelIds": [
+              "GLM-5.3",
+              "GLM-5.3-Flash"
+            ],
+            "logo": {
+              "type": "builtin",
+              "key": "zai"
+            }
+          }
+        },
+        {
+          "providerId": "bigmodel-standard-api",
+          "providerName": "BigModel",
+          "config": {
+            "group": "bigmodel-family",
+            "access": {
+              "type": "api-key",
+              "apiKeyManagementUrl": "https://bigmodel.cn/usercenter/proj-mgmt/apikeys"
+            },
+            "api": {
+              "type": "openai-chat-completions",
+              "baseUrl": "https://open.bigmodel.cn/api/paas/v4"
+            },
+            "builtinModelIds": [
+              "GLM-5.3",
+              "GLM-5.3-Flash"
+            ],
+            "logo": {
+              "type": "builtin",
+              "key": "bigmodel"
+            }
+          }
+        }
+      ]
     },
     "modelConfigRules": {
       "modelRules": [

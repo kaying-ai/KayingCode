@@ -1,7 +1,4 @@
-import {
-  resolveModelProviderFamilySpecByProviderId,
-  type ModelConnectivityResult,
-} from "@zcode/shared";
+import type { ModelConnectivityResult } from "@zcode/shared";
 import {
   getProviderFormApiKeyManagementUrl,
   type ProviderSettingsFormProvider,
@@ -13,10 +10,6 @@ import {
   ModelProviderLoadingCard,
   PresetProviderPlaceholderCard,
 } from "./StatusCards.js";
-import {
-  ProviderFamilyDetailShell,
-  ProviderFamilyHeader,
-} from "./ProviderFamilyModeHeader.js";
 import { useProviderSettingsView } from "@/hooks/useProviderSettingsView.js";
 import type { ProviderSettingsView } from "@zcode/services";
 import type { SavePersonalModelDraftInput } from "@zcode/provider";
@@ -92,31 +85,28 @@ export function ModelProviderSectionDetail({
     }
 
     const presetProvider = selectedNavItem.provider;
+    const presetApiKeyUrl = getProviderFormApiKeyManagementUrl(presetProvider);
 
-    const familySpec = resolveModelProviderFamilySpecByProviderId(selectedNavItem.presetId);
-    const presetFamilyHeader = familySpec ? (
-      <ProviderFamilyHeader selectedNavItem={selectedNavItem} />
-    ) : null;
     return (
-      <ProviderFamilyDetailShell header={presetFamilyHeader}>
-        <InlineEditableProviderCard
-          provider={presetProvider}
-          onSave={onSave}
-          {...modelEditingProps}
-          onReorderModelIds={
-            onReorderProviderModels
-              ? (modelIds) => onReorderProviderModels(presetProvider.providerId, modelIds)
-              : undefined
-          }
-          onTestModel={onTestModel}
-          readOnlyEndpoints
-          // 预置供应商名称承载固定 API Key 入口语义，
-          // 允许重命名会让侧边栏和模型选择器展示含义不一致，因此只允许自定义供应商改名。
-          nameEditable={false}
-          headerVisible={!familySpec}
-          headerActionsVisible={familySpec ? false : undefined}
-        />
-      </ProviderFamilyDetailShell>
+      <InlineEditableProviderCard
+        provider={presetProvider}
+        onSave={onSave}
+        {...modelEditingProps}
+        onReorderModelIds={
+          onReorderProviderModels
+            ? (modelIds) => onReorderProviderModels(presetProvider.providerId, modelIds)
+            : undefined
+        }
+        onTestModel={onTestModel}
+        readOnlyEndpoints
+        presetApiKeyUrl={presetApiKeyUrl}
+        onOpenPresetApiKey={
+          presetApiKeyUrl ? () => onOpenApiKeyUrl(presetApiKeyUrl) : undefined
+        }
+        // 预置供应商名称承载固定 API Key 入口语义，
+        // 允许重命名会让侧边栏和模型选择器展示含义不一致，因此只允许自定义供应商改名。
+        nameEditable={false}
+      />
     );
   }
 

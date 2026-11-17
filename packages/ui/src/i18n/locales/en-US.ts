@@ -3054,8 +3054,9 @@ const enUS: Record<string, string> = {
   "settings.usage.dayLabel.wed": "Wed",
   "settings.usage.dayLabel.fri": "Fri",
   "settings.modelProvider.presetDescription":
-    "Built-in Z.ai and BigModel providers with OAuth-assisted configuration.",
-  "settings.modelProvider.presetEmpty": "Not synced yet. Complete OAuth login first.",
+    "Built-in Z.ai and BigModel providers configured with an API key.",
+  "settings.modelProvider.presetEmpty":
+    "Built-in provider configuration is unavailable. Refresh and try again.",
   "settings.modelProvider.customTitle": "Custom providers",
   "settings.modelProvider.refresh": "Refresh",
   "settings.modelProvider.reorderProvider": "Drag to reorder provider",
