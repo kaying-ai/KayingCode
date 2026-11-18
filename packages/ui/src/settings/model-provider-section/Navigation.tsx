@@ -21,7 +21,6 @@ import { Loader2Icon } from "lucide-react";
 import { ProviderStatusIndicator } from "./ProviderStatusIndicator.js";
 
 import {
-  resolveModelProviderFamilySpecByProviderId,
   isStartPlanModelProviderId,
   TID_MODEL_PROVIDER_NAV_ITEM,
   testId,
@@ -73,7 +72,7 @@ function shouldShowModelProviderGroupLoadingIndicator(params: {
 
 function resolveModelProviderSideNavLabel(item: ModelProviderNavItem): string {
   if (item.type === "preset") {
-    return resolveModelProviderFamilySpecByProviderId(item.presetId)?.label ?? item.label;
+    return item.label;
   }
   if (item.type === "codingPlan" && isStartPlanModelProviderId(item.presetId)) {
     return "Start Plan";

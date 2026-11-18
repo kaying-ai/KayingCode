@@ -5,7 +5,6 @@ import type {
   ProviderFamilyConnectionSelection,
   ProviderFamilyDomain,
 } from "@zcode/shared";
-import { resolveModelProviderFamilySpecByProviderId } from "@zcode/shared";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 import {
   type ModelProviderNavGroup,
@@ -65,11 +64,7 @@ export function useModelProviderNavigation({
           type: "preset" as const,
           presetId: id,
           label: displayName,
-          logo: modelProviders.find(
-            (candidate) =>
-              candidate.providerId ===
-              resolveModelProviderFamilySpecByProviderId(id)?.individualCodingPlanProviderId,
-          )?.config.logo,
+          logo: provider?.config.logo,
           provider,
           displayName,
           statusProvider: provider,

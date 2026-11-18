@@ -7,7 +7,6 @@ import {
   type OAuthProviderId,
   KAYINGCODE_ENV,
   ZAI_PROVIDER_ID,
-  type BuiltinModelProviderId,
 } from "@zcode/shared";
 import type { ProviderSettingsFormProvider } from "@/lib/providerSettingsFormTypes.js";
 import { getProviderFormLabel } from "@/lib/providerSettingsFormTypes.js";
@@ -22,26 +21,31 @@ const BIGMODEL_CODING_PLAN_PERSONAL_MANAGE_URL = buildBigModelCodingPlanPersonal
   KAYINGCODE_ENV,
 });
 
+/** localrun 内置入口使用按量 API Key Provider，不再依赖账号 / Coding Plan。 */
+export const PRESET_PROVIDER_IDS = {
+  zai: "zai-standard-api",
+  bigmodel: "bigmodel-standard-api",
+} as const;
+
+export type PresetProviderId = (typeof PRESET_PROVIDER_IDS)[keyof typeof PRESET_PROVIDER_IDS];
+
 export interface PresetProviderSpec {
-  id: BuiltinModelProviderId;
+  id: PresetProviderId;
   displayName: string;
-  oauthProviderId?: OAuthProviderId;
 }
 
 export const PRESET_PROVIDER_SPECS: PresetProviderSpec[] = [
   {
-    id: BUILTIN_MODEL_PROVIDER_IDS.zaiStartPlan,
+    id: PRESET_PROVIDER_IDS.zai,
     displayName: "Z.ai",
-    oauthProviderId: ZAI_PROVIDER_ID,
   },
   {
-    id: BUILTIN_MODEL_PROVIDER_IDS.bigmodelStartPlan,
+    id: PRESET_PROVIDER_IDS.bigmodel,
     displayName: "BigModel",
-    oauthProviderId: BIGMODEL_PROVIDER_ID,
   },
 ];
 
-export const PRESET_PROVIDER_SPEC_BY_ID = new Map<BuiltinModelProviderId, PresetProviderSpec>(
+export const PRESET_PROVIDER_SPEC_BY_ID = new Map<PresetProviderId, PresetProviderSpec>(
   PRESET_PROVIDER_SPECS.map((item) => [item.id, item]),
 );
 
@@ -137,7 +141,7 @@ export type ModelProviderNavItem =
       logo?: ProviderSettingsFormProvider["config"]["logo"];
       /** 账号组圆点只展示当前具体连接的公共执行结果。 */
       statusProvider?: ProviderSettingsFormProvider | null;
-      presetId: BuiltinModelProviderId;
+      presetId: PresetProviderId;
       label: string;
       provider: ProviderSettingsFormProvider | null;
       displayName: string;

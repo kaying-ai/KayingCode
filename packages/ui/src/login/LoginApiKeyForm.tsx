@@ -33,7 +33,7 @@ import {
   buildLoginApiKeyDefaultModelPreferenceFromSelection,
   buildLoginApiKeySkipSettings,
   resolveLoginApiKeyDefaultProvider,
-  resolveLoginApiKeyTemplateId,
+  resolveLoginApiKeyProviderId,
   resolveLoginApiKeyProviderLabel,
   shouldShowLoginApiKeyLink,
   type ApiKeyProviderChoice,
@@ -63,11 +63,11 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
     providerSettingsRead.state.status === "ready" ? providerSettingsRead.state.view : null;
 
   const providerLabel = resolveLoginApiKeyProviderLabel(providerChoice);
-  const templateId = resolveLoginApiKeyTemplateId(providerChoice);
-  const templateAccess = providerSettingsView?.providerTemplates.find(
-    (template) => template.templateId === templateId,
-  )?.config.access;
-  const apiKeyUrl = isApiKeyAccess(templateAccess) ? templateAccess.apiKeyManagementUrl : undefined;
+  const providerId = resolveLoginApiKeyProviderId(providerChoice);
+  const providerAccess = providerSettingsView?.providers.find(
+    (provider) => provider.providerId === providerId,
+  )?.effectiveConfig.access;
+  const apiKeyUrl = isApiKeyAccess(providerAccess) ? providerAccess.apiKeyManagementUrl : undefined;
   // 用户已经输入或回填 API Key 后，右侧获取入口会挤占密码输入区域。
   const showApiKeyLink = shouldShowLoginApiKeyLink(apiKeyValue, apiKeyUrl ?? undefined);
 
@@ -81,10 +81,10 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
     setSaving(true);
     setError(null);
     try {
-      const template = (await providerSettingsService.getView()).providerTemplates.find(
-        (item) => item.templateId === templateId,
-      );
-      if (!template || !isApiKeyAccess(template.config.access)) {
+      const view = await providerSettingsService.getView();
+      const provider = view.providers.find((item) => item.providerId === providerId);
+      const access = provider?.effectiveConfig.access;
+      if (!provider || !isApiKeyAccess(access)) {
         setError(
           intl.formatMessage(
             { id: "login.apiKey.providerMissingError" },
@@ -94,19 +94,19 @@ export function LoginApiKeyForm({ onCancel, onSaved, onSkipped }: LoginApiKeyFor
         return;
       }
 
-      const created = await providerSettingsService.createPersonalProvider({
-        templateId,
-        initialConfig: { access: { type: template.config.access.type, apiKey } },
+      // 内置 Provider 已存在，登录只补 API Key，不能另建一个重复的 Personal Provider。
+      await providerSettingsService.savePersonalProviderOverlay(providerId, {
+        access: { type: access.type, apiKey },
       });
       const defaultModelPreference = buildLoginApiKeyDefaultModelPreferenceFromSelection(
         await modelSelectionService.getView(),
-        created.providerId,
+        providerId,
       );
       markApiKeyLoginSuccess(defaultModelPreference);
       await onSaved();
     } catch (saveError) {
       logger.error("[LoginEntry] 保存 API Key provider 失败", {
-        templateId,
+        providerId,
         error: saveError,
       });
       setError(
