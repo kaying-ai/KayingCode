@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.2](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.1...kaying-code-v0.2.2) (2026-11-18)
+
+### Features
+
+* **model-provider:** make Z.ai and BigModel presets API-key providers ([d3362a5](https://github.com/kaying-ai/KayingCode/commit/d3362a5e2431b4fbc2d5e5fc3f46f11b38a074fb))
+  * add zai-standard-api and bigmodel-standard-api builtin provider rules
+  * point settings presets at built-in API-key providers and remove OAuth copy
+  * save welcome-page API keys as sparse personal overlays
+  * add spec and regression tests
+
 ## [0.2.1](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.0...kaying-code-v0.2.1) (2026-11-16)
 
 ### Bug Fixes
