@@ -43,7 +43,11 @@ for (const entry of entries) {
     assert.ok(blender, "Blender must be discovered as a builtin without local installation");
     assert.equal(blender.enabled, false);
     assert.equal(blender.source, "official");
-    assert.deepEqual(blender.declaredMcpServerNames, ["blender", "blender_doctor"]);
+    assert.deepEqual(blender.declaredMcpServerNames, [
+      "blender",
+      "blender_doctor",
+      "blender_setup",
+    ]);
     const configuration = JSON.parse(
       await readFile(join(repoRoot, "config/official-plugins.json")),
     );

@@ -4,7 +4,7 @@ description: 按会话诊断 Blender 连接、工具调用及生成质量，并�
 
 调用独立 MCP `blender_doctor` 的 `blender_doctor` 工具。该工具无需 Blender MCP 主服务可用。
 
-先给当前阻塞项、证据和一个可执行的下一步。需要安装时给出 `installation.addonPath` 的完整可复制路径、期望版本与协议，并说明 `executionHost` 是文件所在主机、`target` 是 Blender 握手地址。向用户区分磁盘发现的副本与 `addon.running` 实际报告的版本。握手超时时说明仍需复查。诊断期间只读，不安装软件、不修改用户配置、不清缓存、不执行 Blender Python。
+先给当前阻塞项、证据和 `nextAction` 给出的下一步。需要安装时优先建议 `/blender-install`，并给出 `installation.addonPath` 的完整可复制路径、期望版本与协议，以及只读发现的 `blenderVersion`、`addonsDir`；说明 `executionHost` 是文件所在主机、`target` 是 Blender 握手地址。向用户区分磁盘发现的副本与 `addon.running` 实际报告的版本。握手超时时说明仍需复查。诊断期间只读，不安装软件、不修改用户配置、不清缓存、不执行 Blender Python。
 
 ## 生成结果与验收排查
 

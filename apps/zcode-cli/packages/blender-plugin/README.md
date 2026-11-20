@@ -6,11 +6,11 @@
 
 1. 安装 Blender（上游要求 3.0+）和 [官方 uv](https://docs.astral.sh/uv/getting-started/installation/)。
 2. 启用 Blender 插件。启动器使用随包源码与 `uv.lock`，在用户缓存创建 Python 3.11 环境。首次可能需要网络下载 Python 和依赖；安装日志进入 stderr。插件目录可以只读。
-3. 在聊天中运行 `/blender-doctor` 或说“诊断 Blender 环境”。复制诊断给出的随包 `addon.py` 完整路径。
-4. 在实际运行 Blender 的设备上，通过 Preferences 的 Install from Disk 选择该随包文件，启用 MCP for Blender。在 3D 视图按 N，打开插件面板，确认服务已启动（默认 localhost:9876）。
-5. 再次运行 `/blender-doctor` 确认连接和协议。更新已有副本后，按诊断提示重新加载或重启 Blender。
+3. 在聊天中运行 `/blender-install`。Agent 先返回 dry-run 计划（Blender 版本、目标 addons 目录、是否需要覆盖）；确认后才写入 Blender 用户配置并启用 add-on。安装器只处理本机，不联网、不改其他 MCP 客户端配置。
+4. 打开或重启 Blender。add-on 默认会在加载场景时自动启动服务（默认 localhost:9876）；只有你曾停止服务、端口冲突或旧场景保存了关闭状态时，才需要在 3D 视图按 N 并在面板重新连接。
+5. 运行 `/blender-doctor` 确认连接和协议。
 
-启用插件不会自动打开 Blender、安装 add-on、运行上游 setup 或改写其他 AI 客户端配置。doctor 只读检查，不会安装/下载。离线使用需先在同一主机准备好缓存环境。
+`/blender-install` 拒绝在 Blender 运行中、远端 `BLENDER_HOST`、Blender 版本目录未初始化或发现 extensions 副本时写入，并给出对应手动步骤。降级路径仍是 Preferences 的 Install from Disk：使用 doctor 的 `installation.addonPath`，启用 MCP for Blender 后重启。启用插件、会话启动和 doctor 都不会自动安装 add-on、运行上游 setup 或改写配置。离线使用需先在同一主机准备好缓存环境。
 
 ## 调度与体验
 
@@ -45,7 +45,7 @@ macOS/Linux 默认缓存位于 `${XDG_CACHE_HOME:-~/.cache}/kayingcode/blender/<
 node apps/zcode-cli/packages/blender-plugin/scripts/doctor.mjs
 ```
 
-输出包括 `ready`、各检查的 `status/evidence/suggestion`、已校验的安装路径 `installation.addonPath` 和握手地址 `target`。未就绪退出 1。运行版本以握手 `addon.running` 为准，磁盘扫描单列于 `addon-files`。握手超时时保留未验证状态。远程安装时，把执行主机上的随包文件交给实际运行 Blender 的主机。
+输出包括 `ready`、`nextAction`、各检查的 `status/evidence/suggestion`、已校验的安装路径 `installation.addonPath`、只读发现的 `blenderVersion/addonsDir` 和握手地址 `target`。未就绪退出 1。运行版本以握手 `addon.running` 为准，磁盘扫描单列于 `addon-files`。握手超时时保留未验证状态。远程安装时，把执行主机上的随包文件交给实际运行 Blender 的主机，`/blender-install` 不处理远端。
 
 ## 跟随上游
 

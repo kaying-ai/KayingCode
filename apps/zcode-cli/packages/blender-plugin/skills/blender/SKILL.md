@@ -11,8 +11,9 @@ description: Create, edit, inspect, render and export Blender scenes through the
 
 - uv 缺失：使用官方 uv，或配置 `KAYINGCODE_BLENDER_UV` 绝对路径。GUI 的 PATH 可能与终端不同。
 - Python 环境未准备：启用/重新启用插件，启动器按随包 uv.lock 准备独立环境；首次可能需要下载，检查网络、代理、证书、缓存写权限。
-- add-on 缺失或协议不同：使用 doctor 的 `installation.addonPath`，在实际运行 Blender 的设备上通过 Install from Disk 安装该随包副本。诊断显示磁盘副本与运行实例不符时，先核对 Blender 实例，重启并复查握手。在 3D 视图按 N，打开 MCP for Blender，确认服务已启动。以随包安装步骤为准。
-- doctor 只诊断，不应把用户的诊断请求解释为安装或重写配置。安装帮助见插件 README。
+- add-on 缺失或协议不同：本机优先运行 `/blender-install`，先看 dry-run 计划，用户确认后再写入。安装器不可用（Blender 运行中、远端主机、版本未初始化）时，使用 doctor 的 `installation.addonPath` 和 `addonsDir`，在实际运行 Blender 的设备上通过 Install from Disk 安装随包副本，或在目标主机运行同一安装入口。诊断显示磁盘副本与运行实例不符时，先核对 Blender 实例，重启并复查握手。
+- add-on 默认 `auto_start_server=True`；安装并启用后打开或重启 Blender 即会自动监听。只有用户曾停止服务、端口冲突或旧场景保存了关闭状态时，才需要在 3D 视图按 N 打开 MCP for Blender 并重新连接。
+- doctor 只诊断，不应把用户的诊断请求解释为安装或重写配置。安装只通过用户显式发起的 `/blender-install` 执行；安装帮助见插件 README。
 
 doctor 就绪后调用上游 `get_addon_status` 获取当前版本、能力和可用集成；再调用 `get_scene_info` 读取场景。以本次工具发现的 schema 为准，不照搬旧版上游工具名。
 

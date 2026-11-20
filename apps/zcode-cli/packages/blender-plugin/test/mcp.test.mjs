@@ -50,6 +50,43 @@ test("snapshot corruption fails closed; cached build writes do not contaminate v
   await assert.rejects(verifyUpstream(root), /differs/);
 });
 
+test("setup MCP exposes a dry-run installer and rejects unsafe arguments", async (t) => {
+  const client = startMcp(join(pluginRoot, "scripts/setup-server.mjs"), {
+    BLENDER_HOST: "127.0.0.1",
+    BLENDER_PORT: "9876",
+  });
+  t.after(() => client.close());
+  await client.initialize();
+  const list = await client.request("tools/list");
+  assert.deepEqual(
+    list.tools.map((item) => item.name),
+    ["blender_install_addon"],
+  );
+  assert.equal(list.tools[0].annotations.readOnlyHint, false);
+  assert.equal(list.tools[0].annotations.destructiveHint, true);
+  const planned = await client.request("tools/call", {
+    name: "blender_install_addon",
+    arguments: {},
+  });
+  const report = JSON.parse(planned.content[0].text);
+  assert.equal(report.dryRun, true);
+  assert.ok(Array.isArray(report.blockers));
+  await assert.rejects(
+    client.request("tools/call", {
+      name: "blender_install_addon",
+      arguments: { confirm: "yes" },
+    }),
+    /布尔值/,
+  );
+  await assert.rejects(
+    client.request("tools/call", {
+      name: "blender_install_addon",
+      arguments: { executable: "relative/blender" },
+    }),
+    /绝对路径/,
+  );
+});
+
 test("snapshot mismatch names the file and explains Windows CRLF drift", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "blender-snapshot-mismatch-"));
   t.after(() => rm(root, { recursive: true, force: true }));
@@ -89,10 +126,14 @@ test("builtin catalog contains every adapter and the entire pinned upstream runt
     "scripts/prepare-runtime.mjs",
     "scripts/addon-files.mjs",
     "scripts/asset-check.py",
+    "scripts/blender-paths.mjs",
+    "scripts/install-addon.mjs",
+    "scripts/setup-server.mjs",
     "skills/blender/SKILL.md",
     "skills/blender/references/from-reference.md",
     "commands/blender-doctor.md",
     "commands/blender-from-reference.md",
+    "commands/blender-install.md",
   ]) {
     assert.ok(entry.requiredSeedPaths.includes(file), file);
   }

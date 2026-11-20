@@ -16,6 +16,10 @@ export function readDeclaredAddonVersion(source) {
   return parts ? addonVersionLabel(parts.slice(1).filter(Boolean).map(Number)) : null;
 }
 
+export function isMcpAddonSource(source) {
+  return /["']name["']\s*:\s*["'](?:MCP for Blender|Blender MCP)["']/.test(source);
+}
+
 export async function inspectAddonFiles(expectedProtocol, env = process.env) {
   const home = homedir();
   const base =
@@ -60,7 +64,7 @@ export async function inspectAddonFiles(expectedProtocol, env = process.env) {
         if (error.code === "ENOENT") continue;
         throw error;
       }
-      if (!/["']name["']\s*:\s*["'](?:MCP for Blender|Blender MCP)["']/.test(source)) continue;
+      if (!isMcpAddonSource(source)) continue;
       const protocol = Number(source.match(/^ADDON_PROTOCOL_VERSION\s*=\s*(\d+)/m)?.[1]) || null;
       installed.push({ path, protocol, addonVersion: readDeclaredAddonVersion(source) });
     }

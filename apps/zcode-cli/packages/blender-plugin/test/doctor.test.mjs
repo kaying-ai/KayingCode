@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { test } from "node:test";
 
-import { probeAddon, diagnose } from "../scripts/diagnostics.mjs";
+import { probeAddon, diagnose, resolveNextAction } from "../scripts/diagnostics.mjs";
 import { pluginRoot, resolveConnection, runtimePlan } from "../scripts/runtime.mjs";
 import { verifyUpstream } from "../scripts/verify-upstream.mjs";
 
@@ -129,6 +129,48 @@ test("wrong service, old add-on and busy timeout produce distinct evidence", asy
   );
 });
 
+test("nextAction follows the first blocking layer and points at /blender-install", () => {
+  const passing = ["snapshot", "uv", "python-runtime", "connection-config"].map((id) => ({
+    id,
+    status: "pass",
+  }));
+  const base = {
+    ready: false,
+    checks: passing,
+    installation: { protocol: 16 },
+    addonFiles: { installed: [{ protocol: 16 }] },
+    addon: { id: "addon", status: "pass" },
+    target: { host: "127.0.0.1", port: 9876, remote: false },
+  };
+  const action = (overrides = {}) =>
+    resolveNextAction({ ...base, ...overrides }).id;
+  assert.equal(action({ ready: true }), "ready");
+  assert.equal(
+    action({ checks: [{ id: "snapshot", status: "error" }, ...passing] }),
+    "restore-snapshot",
+  );
+  assert.equal(
+    action({ checks: passing.map((item) => (item.id === "uv" ? { ...item, status: "error" } : item)) }),
+    "install-uv",
+  );
+  assert.equal(
+    action({
+      checks: passing.map((item) =>
+        item.id === "python-runtime" ? { ...item, status: "error" } : item,
+      ),
+    }),
+    "prepare-python-runtime",
+  );
+  assert.equal(action({ addonFiles: { installed: [] } }), "install-addon");
+  assert.equal(action({ target: { ...base.target, remote: true } }), "install-addon-remote");
+  assert.equal(
+    action({ addon: { id: "addon", status: "error", running: { protocol: 15 } } }),
+    "restart-blender",
+  );
+  assert.equal(action({ addon: { id: "addon", status: "error" } }), "fix-connection");
+  assert.equal(action({ addon: { id: "addon", status: "warning" } }), "fix-connection");
+});
+
 test("doctor survives missing dependencies and malformed configuration", async () => {
   const report = await diagnose({
     KAYINGCODE_BLENDER_UV: "/missing-uv",
@@ -142,6 +184,7 @@ test("doctor survives missing dependencies and malformed configuration", async (
   }
   assert.equal(report.checks.find((check) => check.id === "snapshot").status, "pass");
   assert.equal(report.target, null);
+  assert.equal(report.nextAction.id, "install-uv");
 });
 
 test("doctor reports the verified install path, disk copy and running version separately", async (t) => {
@@ -199,9 +242,13 @@ test("doctor reports the verified install path, disk copy and running version se
       });
       assert.ok(running.suggestion.includes(addonPath));
       assert.match(running.suggestion, /磁盘/);
+      // 该环境没有 uv/Python 运行时，运行时准备优先于 add-on 重启。
+      assert.equal(report.nextAction.id, "prepare-python-runtime");
 
       await writeFile(addonPath, "corrupted addon");
-      assert.equal((await diagnose(env, root)).installation, null);
+      const corrupted = await diagnose(env, root);
+      assert.equal(corrupted.installation, null);
+      assert.equal(corrupted.nextAction.id, "restore-snapshot");
     },
   );
 });

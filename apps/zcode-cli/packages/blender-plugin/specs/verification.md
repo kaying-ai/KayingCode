@@ -1,5 +1,17 @@
 # Blender 接入验收
 
+## 2026-11-21 · 显式一键安装与 doctor 下一步
+
+- 环境：Windows x64，Node 25.9.0，本机 Blender 5.2.1；插件 0.2.0 / 上游 2.3.0 / protocol 16。安装测试使用临时 `BLENDER_USER_CONFIG` 与 `BLENDER_USER_SCRIPTS`，未修改本机现有 Blender 配置。
+- 新增 `/blender-install` 和独立 MCP `blender_setup` 的 `blender_install_addon`。默认 dry-run；只有 `confirm=true` 才写入。安装器校验随包快照、定位 Blender 版本、复制固定字节、保留 `.bak`、复制后核对 hash，并以 headless Blender 启用和保存偏好。
+- 守卫覆盖：Blender 运行中、远端 `BLENDER_HOST`、版本目录未初始化、设置迁移待完成、extensions 既有副本和启用失败均返回明确阻塞项；未确认、dry-run 和阻塞路径不写文件、不启动 Blender。启用进程使用 `--disable-autoexec`，保留用户偏好。
+- 真实 Blender 验证：隔离配置下 `installAddon` 成功复制并启用，随后独立 headless 进程读取到 `mcp_for_blender_addon` 已持久化在 `bpy.context.preferences.addons`。通过 `setup-server.mjs` 走 MCP 的 dry-run 与 `confirm=true` 写入同样成功，receipt 与磁盘文件一致。
+- doctor 新增只读的 `installation.blenderExecutable/blenderVersion/addonsDir` 和 `nextAction`（`ready`、`restore-snapshot`、`install-uv`、`prepare-python-runtime`、`fix-connection-config`、`install-addon`、`install-addon-remote`、`restart-blender`、`fix-connection`）。`nextAction` 按阻塞层级选择，不执行写入。
+- 文档明确 add-on 默认 `auto_start_server=True`：安装并重启 Blender 后自动监听；只有停过服务、端口冲突或旧场景关闭过才在 N 面板重新连接。
+- 验证：插件测试 24 项通过（未设置 `BLENDER_EXECUTABLE` 时真实 Blender 用例跳过；设置后 24/24 通过）；`pnpm run typecheck`、`pnpm run source:check`、`pnpm run architecture:check --changed` 通过；`pnpm run lint` 0 错误、133 条存量警告。
+- 官方插件发现 e2e：源码 CLI 入口通过并返回 `blender`、`blender_doctor`、`blender_setup`；`packages/desktop/bundled-agents/win32-x64` 仍是旧构建，需重新打包后再复验该入口。
+- 未执行：真实 GUI 自动监听后的 doctor 握手、macOS/Linux 实机、远端主机安装和 Desktop 权限确认 UI。安装器拒绝远端目标，未宣称远程自动安装。
+
 ## 2026-11-20 · Windows 快照校验与输入防护
 
 - 环境：Windows x64 10.0.26300，Node 25.9.0（仓库 `mise.toml` 固定 24.14.0，CI 以工作流配置为准），插件 0.2.0 / 上游 2.3.0（`b6a2ce30c14636a562b5549684d9db6fc01f29ab`）/ protocol 16。

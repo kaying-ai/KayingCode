@@ -12,6 +12,7 @@ import {
 } from "./runtime.mjs";
 import { verifyUpstream } from "./verify-upstream.mjs";
 import { addonVersionLabel, inspectAddonFiles, readDeclaredAddonVersion } from "./addon-files.mjs";
+import { parseBlenderVersion, resolveBlenderPaths } from "./blender-paths.mjs";
 import { verifyRuntimeProject } from "./prepare-runtime.mjs";
 
 const check = (id, status, evidence, suggestion = "") => ({ id, status, evidence, suggestion });
@@ -120,40 +121,96 @@ export async function probeAddon(
   });
 }
 
-async function blenderCheck(env, remote) {
-  if (remote)
-    return check(
-      "blender-app",
-      "warning",
-      "配置指向远端，未检查远端 Blender 可执行文件。",
-      "Blender 和 add-on 必须在 BLENDER_HOST 指向的主机运行。依赖检查针对 MCP 执行主机。",
-    );
+async function resolveBlender(env) {
   const executable = await findExecutable("blender", {
     env,
     explicit: env.BLENDER_EXECUTABLE,
     candidates: ["/Applications/Blender.app/Contents/MacOS/Blender", "/snap/bin/blender"],
   });
   if (!executable)
-    return check(
-      "blender-app",
-      "warning",
-      "未在 PATH/标准位置发现 Blender；安装状态未知。",
-      "若已安装，可设置 BLENDER_EXECUTABLE 为绝对路径；Windows 的版本安装目录通常不在 PATH 中。握手结果可确认正在运行的 Blender。",
-    );
+    return {
+      executable: null,
+      version: null,
+      check: check(
+        "blender-app",
+        "warning",
+        "未在 PATH/标准位置发现 Blender；安装状态未知。",
+        "若已安装，可设置 BLENDER_EXECUTABLE 为绝对路径；Windows 的版本安装目录通常不在 PATH 中。握手结果可确认正在运行的 Blender。",
+      ),
+    };
   try {
-    return check(
-      "blender-app",
-      "pass",
-      (await capture(executable, ["--version"], { env })).split("\n")[0],
-    );
+    const output = await capture(executable, ["--version"], { env });
+    return {
+      executable,
+      version: parseBlenderVersion(output),
+      check: check("blender-app", "pass", output.split("\n")[0]),
+    };
   } catch (error) {
-    return check(
-      "blender-app",
-      "warning",
-      `无法运行 Blender 版本检查：${error.message}`,
-      "核对 BLENDER_EXECUTABLE、执行权限及系统依赖。运行中应用仍以 add-on 握手为准。",
-    );
+    return {
+      executable,
+      version: null,
+      check: check(
+        "blender-app",
+        "warning",
+        `无法运行 Blender 版本检查：${error.message}`,
+        "核对 BLENDER_EXECUTABLE、执行权限及系统依赖。运行中应用仍以 add-on 握手为准。",
+      ),
+    };
   }
+}
+
+export function resolveNextAction({ ready, checks, installation, addonFiles, addon, target }) {
+  const status = (id) => checks.find((item) => item.id === id)?.status;
+  if (ready) return { id: "ready", message: "环境已就绪，可以开始 Blender 任务。" };
+  if (status("snapshot") === "error")
+    return { id: "restore-snapshot", message: "恢复内置 Blender 插件并重新校验随包快照。" };
+  if (status("uv") === "error")
+    return {
+      id: "install-uv",
+      message: "安装官方 uv，或设置 KAYINGCODE_BLENDER_UV 为绝对路径。",
+    };
+  if (status("python-runtime") === "error")
+    return {
+      id: "prepare-python-runtime",
+      message: "启用或重新启用 Blender 插件，让 uv 按随包 lock 准备 Python 环境。",
+    };
+  if (status("connection-config") === "error")
+    return {
+      id: "fix-connection-config",
+      message: "修正 BLENDER_HOST/BLENDER_PORT 后重新启用插件。",
+    };
+  if (target?.remote)
+    return {
+      id: "install-addon-remote",
+      message: "在运行 Blender 的主机安装随包 add-on；/blender-install 只处理本机。",
+    };
+  const protocol = installation?.protocol;
+  const diskMatches = Boolean(
+    addonFiles?.installed?.some((item) => item.protocol === protocol),
+  );
+  if (!diskMatches)
+    return {
+      id: "install-addon",
+      message:
+        "运行 /blender-install 安装并启用随包 add-on，或按 installation.addonPath 手动安装。",
+    };
+  if (addon?.running && addon.running.protocol !== protocol)
+    return {
+      id: "restart-blender",
+      message: "磁盘副本协议已匹配，但运行实例不同；重启 Blender 加载随包副本后复查。",
+    };
+  if (addon?.status === "error")
+    return {
+      id: "fix-connection",
+      message:
+        "随包副本已安装但握手失败；打开 Blender 并核对监听端口与实例，必要时在 N 面板重新连接。",
+    };
+  if (addon?.status === "warning")
+    return {
+      id: "fix-connection",
+      message: "握手未完成；确认 Blender 忙碌或被弹窗阻塞后重新诊断。",
+    };
+  return { id: "fix-connection", message: "按 addon 检查的证据核对连接后重新诊断。" };
 }
 
 export async function diagnose(env = process.env, root = pluginRoot) {
@@ -169,6 +226,9 @@ export async function diagnose(env = process.env, root = pluginRoot) {
       addonVersion: readDeclaredAddonVersion(await readFile(addonPath, "utf8")),
       protocol: pinned.addonProtocol,
       executionHost: hostname(),
+      blenderExecutable: null,
+      blenderVersion: null,
+      addonsDir: null,
     };
     lock = pinned;
     checks.push(
@@ -248,7 +308,34 @@ export async function diagnose(env = process.env, root = pluginRoot) {
     );
   }
   const remote = connection && !["localhost", "127.0.0.1", "::1"].includes(connection.host);
-  checks.push(await blenderCheck(env, remote));
+  const blender = remote
+    ? {
+        executable: null,
+        version: null,
+        check: check(
+          "blender-app",
+          "warning",
+          "配置指向远端，未检查远端 Blender 可执行文件。",
+          "Blender 和 add-on 必须在 BLENDER_HOST 指向的主机运行。依赖检查针对 MCP 执行主机。",
+        ),
+      }
+    : await resolveBlender(env);
+  checks.push(blender.check);
+  if (installation && !remote) {
+    installation.blenderExecutable = blender.executable;
+    installation.blenderVersion = blender.version?.label ?? null;
+    if (blender.version) {
+      try {
+        installation.addonsDir = resolveBlenderPaths({
+          platform: process.platform,
+          env,
+          version: blender.version,
+        }).addonsDir;
+      } catch {
+        installation.addonsDir = null;
+      }
+    }
+  }
   let addonFiles;
   if (lock && !remote) {
     try {
@@ -265,9 +352,10 @@ export async function diagnose(env = process.env, root = pluginRoot) {
       );
     }
   }
+  let addon;
   if (connection && installation) {
-    const installAdvice = `在 Blender 的 Install from Disk 选择随包文件「${installation.addonPath}」，启用 MCP for Blender，确认服务已启动，然后重新诊断。`;
-    const addon = await probeAddon(connection, lock.addonProtocol, 2500, installAdvice);
+    const installAdvice = `运行 /blender-install 安装随包 add-on，或在 Blender 的 Install from Disk 选择「${installation.addonPath}」，启用 MCP for Blender，确认服务已启动，然后重新诊断。`;
+    addon = await probeAddon(connection, lock.addonProtocol, 2500, installAdvice);
     // 磁盘扫描无法判断实际加载的副本，只有握手能确认监听实例的协议。
     if (
       addon.running &&
@@ -278,15 +366,18 @@ export async function diagnose(env = process.env, root = pluginRoot) {
     }
     checks.push(addon);
   }
+  const target = connection ? { ...connection, remote } : null;
+  const ready = ["snapshot", "uv", "python-runtime", "connection-config", "addon"].every((id) =>
+    checks.some((item) => item.id === id && item.status === "pass"),
+  );
   return {
-    ready: ["snapshot", "uv", "python-runtime", "connection-config", "addon"].every((id) =>
-      checks.some((item) => item.id === id && item.status === "pass"),
-    ),
+    ready,
+    nextAction: resolveNextAction({ ready, checks, installation, addonFiles, addon, target }),
     upstream: lock
       ? { repository: lock.repository, version: lock.version, commit: lock.commit }
       : null,
     installation,
-    target: connection ? { ...connection, remote } : null,
+    target,
     checks,
   };
 }

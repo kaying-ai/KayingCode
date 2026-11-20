@@ -47,11 +47,21 @@ sequenceDiagram
 
 - CLI：`node scripts/doctor.mjs`；输出 JSON，`ready` 为 false 时退出 1。
 - MCP：`blender_doctor`，无参数，返回相同结构，包括 `ready`、`checks[]`、每项 `id/status/evidence/suggestion` 和固定上游信息。
-- `installation` 在快照验证通过时提供已校验的 `addonPath`、`pluginRoot`、预期 `addonVersion`、`protocol` 和 `executionHost`；否则为 `null`。`target` 提供实际握手目标 `host`、`port` 及远程标记；地址配置无效时为 `null`。`addon-files` 的 `installed` 为本地扫描到的磁盘副本及声明版本，`addon` 的 `running` 为有效 `get_addon_info` 响应报告的运行版本和协议。较旧和较新的协议均指向对应执行主机上的随包副本。通过握手可确认协议吻合，文件身份以单独的快照校验和磁盘证据解释。
+- `installation` 在快照验证通过时提供已校验的 `addonPath`、`pluginRoot`、预期 `addonVersion`、`protocol`、`executionHost`，以及只读发现的 `blenderExecutable`、`blenderVersion` 和当前版本目标 `addonsDir`（未发现时为 `null`）；否则为 `null`。`target` 提供实际握手目标 `host`、`port` 及远程标记；地址配置无效时为 `null`。`addon-files` 的 `installed` 为本地扫描到的磁盘副本及声明版本，`addon` 的 `running` 为有效 `get_addon_info` 响应报告的运行版本和协议。较旧和较新的协议均指向对应执行主机上的随包副本。通过握手可确认协议吻合，文件身份以单独的快照校验和磁盘证据解释。
+- `nextAction` 按检查结果给出一个下一步：`ready`、`restore-snapshot`、`install-uv`、`prepare-python-runtime`、`fix-connection-config`、`install-addon`、`restart-blender`、`open-blender` 或 `fix-connection`。它只描述只读诊断后的建议，不执行安装、下载或配置写入。
 - 检查快照完整性、uv（包括 GUI PATH 缺失时的标准安装位置及显式路径）、缓存 Python 和锁定依赖、Blender 可执行文件、端口配置、add-on 握手及协议一致性。
 - `KAYINGCODE_BLENDER_UV`、`KAYINGCODE_BLENDER_CACHE`、`BLENDER_EXECUTABLE` 支持显式主机配置；`BLENDER_HOST/BLENDER_PORT` 与上游保持一致。非法端口在连接前失败，不静默回落。远端地址提示依赖所属主机及隧道边界，不因本地未找到 Blender 误判远端未安装。
 - 检测拒绝连接、DNS/网络错误、握手超时/断开、非 JSON 或其他服务响应、旧/新协议、缺少 Python 依赖、文件丢失/篡改；建议必须对应证据。默认禁用服务端 telemetry。
 - 生成效果诊断沿用 `/blender-doctor` 的只读流程。按本次会话获取路径、真实工具结果、参考和预览图片、已有脚本、产物及时间点。区分不可用与未验证，分别归因连接与配对、输入与能力、建模及材质、渲染与交付验收。只读取相关数据，保留用户产物和应用运行状态。
+
+## 显式安装入口
+
+- `/blender-install` 与独立 MCP `blender_setup` 的 `blender_install_addon` 把随包 add-on 安装并启用。只有用户显式调用命令并确认后才写入；插件启用、会话启动、doctor 和任何后台流程都不自动安装。默认 `dryRun`，`confirm=true` 才允许写入。
+- 安装器只读取并写入当前执行主机的 Blender 用户配置：校验随包快照后复制固定字节到目标 addons 目录，覆盖前保留 `.bak`，复制后核对 hash；再以 headless Blender 调用 `addon_utils.enable`，仅在 `savePreferences=true` 时保存用户偏好。启用进程读取用户偏好但禁用 `.blend` 自动执行脚本（`--disable-autoexec`），不使用会覆盖偏好的工厂启动。不联网、不执行上游 setup/update、不修改项目文件或其他 MCP 客户端配置。
+- Blender 正在运行、目标为远端 `BLENDER_HOST`、找不到可执行文件、Blender 版本目录尚未初始化或发现 extensions 目录中的既有副本时拒绝写入，并返回具体阻塞项和手动步骤。新 Blender 版本尚未首次启动时只报告需要先打开一次，不写入偏好，避免吞掉设置迁移选择。
+- 多版本共存时以 `BLENDER_EXECUTABLE` 或可发现的 Blender 版本为准，只处理该版本目录；切换版本后重新安装。安装成功返回 `blender`、`target`、`enabled`、`savedPreferences`、`needsRestart`、`blockers` 和 `nextAction`，不把“文件已复制”表述为“服务已连接”。
+- add-on 默认 `auto_start_server=True`；安装并启用后，用户打开或重启 Blender 即会自动监听。只有用户曾停止服务、端口冲突或旧场景保存了关闭状态时，才需要在 3D 视图 N 面板重新点击连接，随后由 doctor 验证握手。
+- 远程 Blender 主机不通过本地安装器写入；把随包 add-on 交到执行主机，或在目标主机运行同一安装脚本后再由 doctor 验证。
 
 ## 上游更新
 
@@ -72,3 +82,6 @@ sequenceDiagram
 8. Python 入口先装配禁用配置再导入上游；即使继承环境尝试启用遥测，服务端仍禁用。get_addon_status 正常返回版本与能力，不再出现缺少 blender_mcp.config 的错误。
 9. 使用含空格的 staged 插件路径进行安装与诊断。从正式制品启用后，缺 uv 或 Python 时 doctor 仍可用。覆盖磁盘新版本与运行旧版本并存、不同协议恢复、远程目标与本地安装路径分别显示。
 10. 导入候选 commit 后七篇指南可从实际插件副本读取。真实 Agent 会话按任务调用相关主题；纯连接诊断保持 doctor 单一路径。
+11. `/blender-install` 先返回 dry-run 计划；未确认时不写任何文件、不启动 Blender。确认后只写目标版本的 addons 目录和用户偏好，覆盖前生成 `.bak`，复制后 hash 与随包快照一致。
+12. Blender 运行中、远端目标、版本目录未初始化、extensions 既有副本和启用失败分别返回明确阻塞项；不自动关闭 Blender、不写其他版本目录、不改其他 MCP 客户端配置。
+13. 安装并重启 Blender 后 add-on 自动监听；doctor 的 `nextAction` 从 `install-addon` 转为 `ready`。用户曾停止服务时返回 `fix-connection` 并指向 N 面板重新连接。
