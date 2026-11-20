@@ -50,6 +50,32 @@ test("snapshot corruption fails closed; cached build writes do not contaminate v
   await assert.rejects(verifyUpstream(root), /differs/);
 });
 
+test("snapshot mismatch names the file and explains Windows CRLF drift", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "blender-snapshot-mismatch-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await cp(join(pluginRoot, "vendor"), join(root, "vendor"), { recursive: true });
+  await cp(join(pluginRoot, "upstream-lock.json"), join(root, "upstream-lock.json"));
+  const file = join(root, "vendor/mcp-for-blender/src/blender_mcp/__init__.py");
+  const source = await readFile(file, "utf8");
+  // 模拟 Windows 切分支后未重写的老文件：索引仍是 LF，工作区是 CRLF。
+  await writeFile(file, source.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n"));
+  await assert.rejects(verifyUpstream(root), (error) => {
+    assert.match(error.message, /src\/blender_mcp\/__init__\.py/);
+    assert.match(error.message, /CRLF/);
+    assert.match(error.message, /re-checkout/);
+    return true;
+  });
+  await rm(file);
+  await writeFile(join(root, "vendor/mcp-for-blender/extra.py"), "extra");
+  // 数量相同的一缺一多不能被当成“没有变化”。
+  await assert.rejects(verifyUpstream(root), (error) => {
+    assert.match(error.message, /missing=1/);
+    assert.match(error.message, /unexpected=1/);
+    assert.match(error.message, /re-run sync-upstream/);
+    return true;
+  });
+});
+
 test("builtin catalog contains every adapter and the entire pinned upstream runtime", async () => {
   const config = JSON.parse(
     await readFile(new URL("../../../../../config/official-plugins.json", import.meta.url), "utf8"),

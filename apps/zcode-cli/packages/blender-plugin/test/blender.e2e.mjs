@@ -182,6 +182,20 @@ test(
     await client.initialize();
     assert.match(JSON.stringify(await call("get_scene_info", { query: "DoorLeaf" })), /DoorLeaf/);
     const checker = await readFile(join(staged, "scripts/asset-check.py"), "utf8");
+    for (const [code, message] of [
+      [
+        'inspect_asset("DoorLeaf", requirements={"DoorLeaf": {"dimensions": [1, 2]}})',
+        /dimensions must be a list of 3/,
+      ],
+      [
+        'inspect_asset("DoorLeaf", requirements={"DoorLeaf": {"max_triangles": -1}})',
+        /non-negative integer/,
+      ],
+      ['inspect_asset("DoorLeaf", requirements={"DoorLeaf": {"unknown": 1}})', /Unknown checks/],
+    ]) {
+      const rejected = await call("execute_blender_code", { code: `${checker}\n${code}` });
+      assert.match(rejected.content[0].text, message);
+    }
     const missingCamera = await call("execute_blender_code", {
       code: `import bpy\nbpy.context.scene.camera = None\n${checker}\ninspect_asset("DoorLeaf", require_camera=True)`,
     });

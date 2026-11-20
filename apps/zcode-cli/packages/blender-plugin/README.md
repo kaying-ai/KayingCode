@@ -65,6 +65,8 @@ node scripts/licenses.mjs notices
 
 脚本按 Git commit 导入白名单快照，校验 add-on 两份副本、协议及 lock 版本，更新文件 hash、插件版本和生成目录；不会覆盖本地适配层。审查上游差异与许可后提交。Python 锁文件变化会在新 commit 的隔离环境生效；用户手动在 Blender 内升级 add-on 时应重新诊断匹配性。发布前还需真实 Blender 的建模、预览、保存与导出验收。
 
+Windows 上从旧分支切换过来时，未改动的 vendor 文件可能保留 CRLF，`verify` 会列出这些文件并说明它们仅换行不同。按提示删除对应文件后重新 checkout 即可；不要用转换过换行的副本覆盖快照或放宽 hash 校验。
+
 可选真实 GUI 验收用 `pnpm --dir apps/zcode-cli/packages/blender-plugin run test:blender`，必要时设置 `BLENDER_EXECUTABLE`。测试从含空格的 staged 路径调用 Blender 安装和启用操作，使用临时用户目录与随机端口，并隔离复读 `.blend` 和导入 GLB。设置 `KAYINGCODE_BLENDER_E2E_OUTPUT` 可保留测试预览与产物。
 
 上游原始许可见 [vendor LICENSE](vendor/mcp-for-blender/LICENSE)；不随包分发 Blender。

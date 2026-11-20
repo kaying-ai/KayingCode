@@ -14,6 +14,7 @@ function invoke(
   result: McpToolCallResult,
   pluginId: string | undefined = blenderPluginId,
   useImageProcessor = true,
+  useArtifactStore = true,
 ) {
   const originals: Uint8Array[] = [];
   let compressions = 0;
@@ -34,17 +35,21 @@ function invoke(
           },
         }
       : {}),
-    artifactStore: {
-      async writeToolResultBinaryArtifact(input: { content: Uint8Array }) {
-        originals.push(input.content);
-        return {
-          path: "/workspace/original.png",
-          uri: "artifact://original",
-          bytes: input.content.length,
-          contentType: "image/png",
-        };
-      },
-    },
+    ...(useArtifactStore
+      ? {
+          artifactStore: {
+            async writeToolResultBinaryArtifact(input: { content: Uint8Array }) {
+              originals.push(input.content);
+              return {
+                path: "/workspace/original.png",
+                uri: "artifact://original",
+                bytes: input.content.length,
+                contentType: "image/png",
+              };
+            },
+          },
+        }
+      : {}),
   } as ToolExecutionContext;
   const serverName = "plugin:blender:blender";
   const port = { callTool: async () => result } as unknown as McpPort;
@@ -88,6 +93,24 @@ test("Blender compression falls back to the original artifact and leaves third-p
   const { output, originals } = await invoke("look", small);
   assert.equal(output, small);
   assert.deepEqual(originals, []);
+});
+
+test("Blender keeps the inline thumbnail when no artifact store can retain the original", async () => {
+  const result = {
+    content: [{ type: "image", data: preview.toString("base64"), mimeType: "image/png" }],
+  };
+  const { output, originals, compressions } = await invoke(
+    "look",
+    result,
+    blenderPluginId,
+    true,
+    false,
+  );
+  assert.equal(compressions, 1);
+  assert.deepEqual(originals, []);
+  assert.deepEqual(output.content, [
+    { type: "image", data: thumbnail, mimeType: "image/jpeg" },
+  ]);
 });
 
 test("Blender's tool-level error text is marked failed without interpreting successful script output", async () => {

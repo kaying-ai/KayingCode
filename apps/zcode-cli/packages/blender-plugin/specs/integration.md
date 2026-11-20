@@ -41,6 +41,7 @@ sequenceDiagram
 - 通过会话现有文件读取能力取得插件适配层的只读检查脚本，在 Blender 所在主机经现有 `execute_blender_code` 运行。输入为明确命名的对象或集合及可选项目约束，输出 JSON 检查事实与 `pass`、`needs-fix` 或 `unverified`。检查范围仅包含选定资产，读取物体尺度、世界空间枢轴、评估网格三角面数、材质与文件纹理、活跃 Action 与帧范围。不推断未给定的预算或动画要求。模块化资产以项目明确的尺寸、摆放要求和碰撞对象为准。代表性姿势通过 `look` 关键帧核对。
 - Blender 保存场景事实。检查只读取有效场景与必要文件状态，不修改帧、选择、模型或文件，不另建 MCP、队列或持久化状态。工具输出中的文件路径归属 Blender 主机。发布验收在隔离进程复读 `.blend`，在空场景导入 GLB 并核对对象、材质和动画。
 - `inspect_asset(..., require_camera=True)` 用于带渲染交付的工作副本，在检查输出中报告当前场景的 `active_camera`。缺失活动相机或相机不属于当前场景时返回 `needs-fix`，默认调用维持原有报告。保存前分配交付机位，复读后确认活动相机与该机位一致。外部纹理是否需要随包或打包按用户交付目标检查。
+- `requirements` 在读取场景前校验：向量字段固定为 3/3/2 个有限数值，`max_triangles` 为非负整数，材质为非空名称列表，`action` 为非空字符串；`unit_scale` 为正有限数，`tolerance` 为非负有限数。非法输入返回带字段名的 `ValueError`，不触碰场景、选择或帧。
 
 ## doctor 接口及失败语义
 
@@ -56,6 +57,7 @@ sequenceDiagram
 
 - 维护者运行 `scripts/sync-upstream.mjs --source <干净本地 checkout> --ref <commit/tag> --plugin-version <version>`，固定读取 Git commit 的白名单内容，不联网、不执行上游安装脚本。
 - 提交前校验项目结构、add-on 副本一致、uv.lock 对应包版本、协议字段、许可证登记和生成入口。验证成功才替换 vendor 并刷新 hash、版本、来源登记及生成目录。普通读写或生成失败时恢复本次涉及的文件，保留原快照；同步在专用开发 worktree 串行执行。适配代码、doctor、skills、commands 保持独立。Git checkout 保留 vendor 原始字节。
+- `verify` 发现快照不一致时列出路径并区分缺失、额外、真实改动和仅 CRLF 的检出漂移。CRLF 漂移通常来自 Windows 旧分支检出：提示删除对应文件后重新 checkout，不修改 lock、不放宽字节校验。其他不一致要求恢复内置快照或重新同步。
 - 不在用户启动时拉取 HEAD/更新 add-on。用户手动在 Blender 内升级导致协议偏离时，doctor 提示使用随包 add-on 或升级整套内置插件。
 
 ## 验收

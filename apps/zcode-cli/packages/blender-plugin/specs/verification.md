@@ -1,5 +1,16 @@
 # Blender 接入验收
 
+## 2026-11-20 · Windows 快照校验与输入防护
+
+- 环境：Windows x64 10.0.26300，Node 25.9.0（仓库 `mise.toml` 固定 24.14.0，CI 以工作流配置为准），插件 0.2.0 / 上游 2.3.0（`b6a2ce30c14636a562b5549684d9db6fc01f29ab`）/ protocol 16。
+- 从旧分支切入后，14 个内容未变的 vendor 文件仍保留 CRLF，`verify` 报 hash 不一致。按 lock 的字节重写后通过，31 个文件与 lock 全部一致；该现象只影响旧检出的工作区，不影响新 clone 和 CI。
+- `verify` 现在列出不一致路径，并区分仅 CRLF 的检出漂移、缺失、额外和真实改动；CRLF 情形提示删除对应文件后重新 checkout，不修改 lock。新增 CRLF 漂移、缺失和等量“一缺一多”三个回归。
+- `asset-check.py` 在读取场景前校验 `requirements`、`target`、`unit_scale` 和 `tolerance`；非法输入返回带字段名的 `ValueError`。真实 Blender e2e 增加维度长度、负面数预算和未知字段三类拒绝用例；本机另以最小假 `bpy` 模块执行 12 个非法输入分支，均返回预期错误（临时校验，未纳入 CI）。
+- 删除重复且过期的 `docs/features/blender-plugin-optimization-assessment.md`，状态与方案以插件 [评估](blender-plugin-optimization-assessment.md) 和本记录为准。
+- `pnpm --filter @kayingcode/blender-plugin run verify` 通过；`test` 14 项通过；`blenderMcpPreview.test.ts` 4 项通过（新增无 artifactStore 时保留内联缩略图的回退）。
+- `pnpm run typecheck`、`pnpm run source:check`、`pnpm run architecture:check --changed` 通过；`pnpm run lint` 0 错误、133 条存量警告。`node scripts/licenses.mjs check` 因第三方声明在 macOS 生成、当前 Windows 主机平台不匹配而拒绝执行，未在本机重新生成声明。
+- 本轮未执行真实 Blender GUI、真实上游 MCP、Desktop 安装包、Windows/Linux 实机与手机接续；这些仍以既有记录为基线，不据此宣称跨端验收完成。
+
 ## 参考图建模默认连续执行
 
 - 隔离 KayingCode 运行时加载了已播种的新版命令、Skill、参考图指南及 doctor。命令展开保留 Skill 要求和带空格的路径，并要求同一轮继续细化和交付。指南明确本地路线、自行修正及用户要求分阶段时的例外。
