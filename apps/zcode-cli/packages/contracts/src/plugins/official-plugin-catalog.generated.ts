@@ -1493,7 +1493,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
   },
   {
     name: "blender",
-    version: "0.1.0",
+    version: "0.2.0",
     rootCandidates: [
       "packages/blender-plugin",
       "../blender-plugin",
@@ -1520,12 +1520,12 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       },
       examplePrompts: [
         "Diagnose my Blender connection",
-        "Create a Blender scene and verify it from multiple views",
+        "/blender-from-reference Build an editable model from my reference and verify it before delivery",
       ],
       examplePrompts_i18n: {
         "zh-CN": [
           "诊断 Blender 环境并给出修复建议",
-          "在 Blender 中创建场景，多视角检查后保存并导出",
+          "/blender-from-reference 按参考图建模，自查姿势和剪影后交付可编辑文件",
         ],
       },
       skillDetails: [
@@ -1677,7 +1677,9 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       "upstream-lock.json",
       "THIRD_PARTY_NOTICES.md",
       "skills/blender/SKILL.md",
+      "skills/blender/references/from-reference.md",
       "commands/blender-doctor.md",
+      "commands/blender-from-reference.md",
       "vendor/mcp-for-blender/LICENSE",
       "vendor/mcp-for-blender/pyproject.toml",
       "vendor/mcp-for-blender/uv.lock",
@@ -1685,6 +1687,7 @@ export const GENERATED_OFFICIAL_PLUGIN_DEFINITIONS: readonly OfficialPluginRelea
       "vendor/mcp-for-blender/src/blender_mcp/server.py",
       "scripts/prepare-runtime.mjs",
       "scripts/addon-files.mjs",
+      "scripts/asset-check.py",
       "scripts/server.py",
     ],
     runtimeTopLevelPaths: ["vendor", "upstream-lock.json", "THIRD_PARTY_NOTICES.md"],

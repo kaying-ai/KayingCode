@@ -1,6 +1,7 @@
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { createConnection } from "node:net";
-import { join } from "node:path";
+import { hostname } from "node:os";
+import { join, resolve } from "node:path";
 import {
   capture,
   findExecutable,
@@ -10,14 +11,19 @@ import {
   runtimePlan,
 } from "./runtime.mjs";
 import { verifyUpstream } from "./verify-upstream.mjs";
-import { inspectAddonFiles } from "./addon-files.mjs";
+import { addonVersionLabel, inspectAddonFiles, readDeclaredAddonVersion } from "./addon-files.mjs";
 import { verifyRuntimeProject } from "./prepare-runtime.mjs";
 
 const check = (id, status, evidence, suggestion = "") => ({ id, status, evidence, suggestion });
 const addonAdvice =
   "在 Blender 中安装随包 add-on（vendor/mcp-for-blender/addon.py），启用 MCP for Blender，重启 Blender 后点击 Start MCP Server。不要使用未固定版本的 uvx 更新命令。";
 
-export async function probeAddon(connection, expectedProtocol, timeoutMs = 2500) {
+export async function probeAddon(
+  connection,
+  expectedProtocol,
+  timeoutMs = 2500,
+  installAdvice = addonAdvice,
+) {
   return new Promise((resolveProbe) => {
     const socket = createConnection(connection);
     let chunks = [],
@@ -64,25 +70,29 @@ export async function probeAddon(connection, expectedProtocol, timeoutMs = 2500)
           typeof reply?.message === "string"
             ? reply.message.slice(0, 200)
             : "响应缺少 get_addon_info protocol_version。";
-        return finish(check("addon", "error", reason, addonAdvice + "核对端口是否属于 Blender。"));
+        return finish(
+          check("addon", "error", reason, installAdvice + "核对端口是否属于 Blender。"),
+        );
       }
       const info = reply.result;
+      const running = {
+        protocol: info.protocol_version,
+        addonVersion: addonVersionLabel(info.addon_version),
+        blenderVersion:
+          typeof info.blender_version === "string" ? info.blender_version.slice(0, 80) : null,
+      };
+      const evidence = `Blender ${running.blenderVersion || "版本未知"}，add-on ${running.addonVersion || "版本未知"}，protocol ${running.protocol}`;
       if (info.protocol_version !== expectedProtocol)
-        return finish(
-          check(
+        return finish({
+          ...check(
             "addon",
             "error",
-            `add-on protocol ${info.protocol_version}，随包服务端要求 ${expectedProtocol}。`,
-            addonAdvice,
+            `${evidence}，随包服务端要求 protocol ${expectedProtocol}。`,
+            installAdvice,
           ),
-        );
-      finish(
-        check(
-          "addon",
-          "pass",
-          `Blender ${info.blender_version || "版本未知"}，add-on protocol ${info.protocol_version}。`,
-        ),
-      );
+          running,
+        });
+      finish({ ...check("addon", "pass", `${evidence}。`), running });
     });
     socket.once("end", () =>
       finish(
@@ -149,8 +159,18 @@ async function blenderCheck(env, remote) {
 export async function diagnose(env = process.env, root = pluginRoot) {
   const checks = [];
   let lock;
+  let installation = null;
   try {
-    lock = await verifyUpstream(root);
+    const pinned = await verifyUpstream(root);
+    const addonPath = resolve(root, "vendor/mcp-for-blender/addon.py");
+    installation = {
+      pluginRoot: resolve(root),
+      addonPath,
+      addonVersion: readDeclaredAddonVersion(await readFile(addonPath, "utf8")),
+      protocol: pinned.addonProtocol,
+      executionHost: hostname(),
+    };
+    lock = pinned;
     checks.push(
       check("snapshot", "pass", `固定上游 ${lock.version} / ${lock.commit}，文件 hash 全部一致。`),
     );
@@ -229,9 +249,11 @@ export async function diagnose(env = process.env, root = pluginRoot) {
   }
   const remote = connection && !["localhost", "127.0.0.1", "::1"].includes(connection.host);
   checks.push(await blenderCheck(env, remote));
+  let addonFiles;
   if (lock && !remote) {
     try {
-      checks.push(await inspectAddonFiles(lock.addonProtocol, env));
+      addonFiles = await inspectAddonFiles(lock.addonProtocol, env);
+      checks.push(addonFiles);
     } catch (error) {
       checks.push(
         check(
@@ -243,7 +265,19 @@ export async function diagnose(env = process.env, root = pluginRoot) {
       );
     }
   }
-  if (connection && lock) checks.push(await probeAddon(connection, lock.addonProtocol));
+  if (connection && installation) {
+    const installAdvice = `在 Blender 的 Install from Disk 选择随包文件「${installation.addonPath}」，启用 MCP for Blender，确认服务已启动，然后重新诊断。`;
+    const addon = await probeAddon(connection, lock.addonProtocol, 2500, installAdvice);
+    // 磁盘扫描无法判断实际加载的副本，只有握手能确认监听实例的协议。
+    if (
+      addon.running &&
+      addon.status === "error" &&
+      addonFiles?.installed.some((entry) => entry.protocol === lock.addonProtocol)
+    ) {
+      addon.suggestion = `磁盘已发现 protocol ${lock.addonProtocol} 的副本。核对监听端口对应的 Blender 实例，重启 Blender 并复查。${installAdvice}`;
+    }
+    checks.push(addon);
+  }
   return {
     ready: ["snapshot", "uv", "python-runtime", "connection-config", "addon"].every((id) =>
       checks.some((item) => item.id === id && item.status === "pass"),
@@ -251,6 +285,8 @@ export async function diagnose(env = process.env, root = pluginRoot) {
     upstream: lock
       ? { repository: lock.repository, version: lock.version, commit: lock.commit }
       : null,
+    installation,
+    target: connection ? { ...connection, remote } : null,
     checks,
   };
 }

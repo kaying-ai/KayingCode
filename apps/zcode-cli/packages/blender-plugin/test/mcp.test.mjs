@@ -52,7 +52,7 @@ test("snapshot corruption fails closed; cached build writes do not contaminate v
 
 test("builtin catalog contains every adapter and the entire pinned upstream runtime", async () => {
   const config = JSON.parse(
-    await readFile(join(pluginRoot, "../../config/official-plugins.json"), "utf8"),
+    await readFile(new URL("../../../../../config/official-plugins.json", import.meta.url), "utf8"),
   );
   const entry = config.plugins.find((item) => item.name === "blender");
   assert.ok(entry);
@@ -62,11 +62,45 @@ test("builtin catalog contains every adapter and the entire pinned upstream runt
     "scripts/diagnostics.mjs",
     "scripts/prepare-runtime.mjs",
     "scripts/addon-files.mjs",
+    "scripts/asset-check.py",
     "skills/blender/SKILL.md",
+    "skills/blender/references/from-reference.md",
     "commands/blender-doctor.md",
+    "commands/blender-from-reference.md",
   ]) {
     assert.ok(entry.requiredSeedPaths.includes(file), file);
   }
   for (const path of ["vendor", "upstream-lock.json", "THIRD_PARTY_NOTICES.md"])
     assert.ok(entry.runtimeTopLevelPaths.includes(path));
+  const lock = await verifyUpstream();
+  const skill = await readFile(join(pluginRoot, "skills/blender/SKILL.md"), "utf8");
+  for (const topic of [
+    "scene",
+    "materials",
+    "retopology",
+    "rigging",
+    "animation",
+    "level-design",
+    "bpy",
+  ]) {
+    assert.ok(lock.files[`src/blender_mcp/guides/${topic}.md`]);
+    assert.ok(skill.includes(`\`${topic}.md\``));
+  }
+});
+
+test("reference command and skill use internal draft review by default", async () => {
+  const [command, skill, guide] = await Promise.all(
+    [
+      "commands/blender-from-reference.md",
+      "skills/blender/SKILL.md",
+      "skills/blender/references/from-reference.md",
+    ].map((path) => readFile(join(pluginRoot, path), "utf8")),
+  );
+
+  assert.match(command, /^skills: blender$/m);
+  assert.match(command, /同一轮继续细化和交付/);
+  assert.match(skill, /用户明确要求分阶段验收/);
+  assert.match(guide, /未启用或未获授权时，直接用可行的本地方案/);
+  assert.match(guide, /对照参考、局部修正并复看/);
+  assert.match(guide, /用户明确要求分阶段验收/);
 });

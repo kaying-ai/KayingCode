@@ -14,10 +14,11 @@ export const MCP_IMAGE_INLINE_BASE64_BYTES = 200 * 1024;
 export const MCP_IMAGE_INLINE_RAW_BYTES = Math.floor((MCP_IMAGE_INLINE_BASE64_BYTES * 3) / 4);
 export const HOST_NODE_REPL_IMAGE_MAX_DIMENSION = 2048;
 // Provider 的模型图片上限是 2000px；Browser 轮尾展示仍沿用独立的 2048px 预算。
-const HOST_NODE_REPL_MODEL_IMAGE_MAX_DIMENSION = 2000;
+const MCP_MODEL_IMAGE_MAX_DIMENSION = 2000;
 
 export async function normalizeMcpToolResultForModel(input: {
   compressOversizedImages: boolean;
+  retainOversizedImageOriginals?: boolean;
   context: ToolExecutionContext;
   descriptor: McpToolDescriptor;
   result: McpToolCallResult;
@@ -38,7 +39,8 @@ export async function normalizeMcpToolResultForModel(input: {
       browserScreenshotArtifact,
     });
     changed ||= normalized !== block;
-    content.push(normalized);
+    if (Array.isArray(normalized)) content.push(...normalized);
+    else content.push(normalized);
     // 提示文本插在 image 之前会把 node_repl 特意排成 image-first 的
     // tool_result.content 重新变成 text-first；Anthropic 兼容网关只解析开头的连续 image，
     // text 一领先后面的图就被丢弃，模型又看不到截图。落在 image 之后即可保持 image-first。
@@ -58,12 +60,13 @@ async function normalizeMcpContentBlockForModel(
   block: McpContentBlock,
   input: {
     compressOversizedImages: boolean;
+    retainOversizedImageOriginals?: boolean;
     context: ToolExecutionContext;
     descriptor: McpToolDescriptor;
     toolName: string;
     browserScreenshotArtifact?: BrowserScreenshotArtifact;
   },
-): Promise<McpContentBlock> {
+): Promise<McpContentBlock | McpContentBlock[]> {
   if (block.type !== "image") return block;
 
   const data = typeof block.data === "string" ? block.data : undefined;
@@ -74,16 +77,15 @@ async function normalizeMcpContentBlockForModel(
   const base64Bytes = Buffer.byteLength(base64Payload, "utf8");
   if (base64Bytes <= MCP_IMAGE_INLINE_BASE64_BYTES) return block;
 
-  if (input.compressOversizedImages) {
-    // browser screenshot 由可信宿主 node_repl 产生，不能和第三方 MCP 图片一样直接
-    // 落 artifact，导致模型失去视觉结果；这里复用统一图片端口压到 200 KiB，而不另造编解码器。
-    const compressed = await tryCompressHostNodeReplImage({
-      base64Payload,
-      context: input.context,
-      mimeType,
-    });
-    if (compressed) return compressed;
-  }
+  const compressed = input.compressOversizedImages
+    ? await tryCompressMcpImage({
+        base64Payload,
+        context: input.context,
+        mimeType,
+      })
+    : undefined;
+  if (compressed && (!input.retainOversizedImageOriginals || !input.context.artifactStore))
+    return compressed;
 
   const summary = {
     base64Bytes,
@@ -120,14 +122,17 @@ async function normalizeMcpContentBlockForModel(
     toolName: input.toolName,
   });
 
-  return {
+  const receipt = {
     type: "text",
     text: [
-      `MCP image content saved instead of being inlined: ${mimeType}, base64=${formatByteSize(base64Bytes)}, inlineLimit=${formatByteSize(MCP_IMAGE_INLINE_BASE64_BYTES)}.`,
+      compressed
+        ? `MCP image thumbnail inlined. Original saved: ${mimeType}, base64=${formatByteSize(base64Bytes)}.`
+        : `MCP image content saved instead of being inlined: ${mimeType}, base64=${formatByteSize(base64Bytes)}, inlineLimit=${formatByteSize(MCP_IMAGE_INLINE_BASE64_BYTES)}.`,
       `Artifact: ${artifact.path ?? artifact.uri}`,
       `Artifact URI: ${artifact.uri}`,
     ].join("\n"),
   };
+  return compressed ? [compressed, receipt] : receipt;
 }
 
 interface BrowserScreenshotArtifact {
@@ -189,7 +194,7 @@ async function persistBrowserScreenshotArtifact(
   }
 }
 
-async function tryCompressHostNodeReplImage(input: {
+async function tryCompressMcpImage(input: {
   base64Payload: string;
   context: ToolExecutionContext;
   mimeType: string;
@@ -205,7 +210,7 @@ async function tryCompressHostNodeReplImage(input: {
       {
         data: decoded,
         maxBase64Bytes: MCP_IMAGE_INLINE_BASE64_BYTES,
-        maxDimension: HOST_NODE_REPL_MODEL_IMAGE_MAX_DIMENSION,
+        maxDimension: MCP_MODEL_IMAGE_MAX_DIMENSION,
         maxRawBytes: MCP_IMAGE_INLINE_RAW_BYTES,
         mediaType: input.mimeType,
         trace: traceFromToolContext(input.context),

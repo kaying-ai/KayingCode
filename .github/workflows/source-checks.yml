@@ -51,6 +51,11 @@ jobs:
           pnpm run typecheck
           pnpm run lint
           pnpm run architecture:check
+      - name: Check Blender plugin snapshot and adapters
+        run: |
+          pnpm --filter @kayingcode/blender-plugin run verify
+          pnpm --filter @kayingcode/blender-plugin test
+          node --disable-warning=DEP0205 --import tsx --test apps/zcode-cli/packages/core/test/blenderMcpPreview.test.ts
       - name: Check versions and run Taro tests
         run: |
           node --test scripts/first-public-release.test.mjs

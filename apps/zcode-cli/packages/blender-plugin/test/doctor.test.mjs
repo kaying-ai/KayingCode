@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
+import { cp, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { test } from "node:test";
 
 import { probeAddon, diagnose } from "../scripts/diagnostics.mjs";
-import { resolveConnection, runtimePlan } from "../scripts/runtime.mjs";
+import { pluginRoot, resolveConnection, runtimePlan } from "../scripts/runtime.mjs";
+import { verifyUpstream } from "../scripts/verify-upstream.mjs";
 
 async function withAddon(handler, run) {
   const sockets = new Set();
@@ -30,20 +34,22 @@ test("invalid ports never fall back to the default", () => {
 });
 
 test("runtime plan pins the project and external environment; no client setup or update", () => {
+  const plugin = resolve("plugin with spaces");
+  const cache = resolve("writable cache", "a".repeat(40));
   const plan = runtimePlan(
-    "/plugin with spaces",
+    plugin,
     { commit: "a".repeat(40) },
     {
-      KAYINGCODE_BLENDER_CACHE: "/writable cache",
+      KAYINGCODE_BLENDER_CACHE: resolve("writable cache"),
       DISABLE_TELEMETRY: "false",
     },
   );
   assert.ok(plan.args.includes("--frozen"));
-  assert.equal(plan.source, "/plugin with spaces/vendor/mcp-for-blender");
-  assert.ok(plan.args.includes(`/writable cache/${"a".repeat(40)}/project`));
-  assert.equal(plan.env.UV_PROJECT_ENVIRONMENT, `/writable cache/${"a".repeat(40)}/environment`);
+  assert.equal(plan.source, join(plugin, "vendor", "mcp-for-blender"));
+  assert.ok(plan.args.includes(join(cache, "project")));
+  assert.equal(plan.env.UV_PROJECT_ENVIRONMENT, join(cache, "environment"));
   assert.equal(plan.env.DISABLE_TELEMETRY, "true");
-  assert.deepEqual(plan.args.slice(-3), ["python", "-B", "/plugin with spaces/scripts/server.py"]);
+  assert.deepEqual(plan.args.slice(-3), ["python", "-B", join(plugin, "scripts", "server.py")]);
   assert.ok(!plan.args.some((arg) => ["setup", "update", "install-addon"].includes(arg)));
 });
 
@@ -135,4 +141,67 @@ test("doctor survives missing dependencies and malformed configuration", async (
     assert.equal(report.checks.find((check) => check.id === id).status, "error");
   }
   assert.equal(report.checks.find((check) => check.id === "snapshot").status, "pass");
+  assert.equal(report.target, null);
+});
+
+test("doctor reports the verified install path, disk copy and running version separately", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "Blender staged plugin "));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await cp(join(pluginRoot, "vendor"), join(root, "vendor"), { recursive: true });
+  await cp(join(pluginRoot, "upstream-lock.json"), join(root, "upstream-lock.json"));
+  const lock = await verifyUpstream(root);
+  const addonPath = join(root, "vendor/mcp-for-blender/addon.py");
+  const addons = join(root, "Blender addons");
+  await mkdir(addons);
+  const installed = join(addons, "addon.py");
+  await cp(addonPath, installed);
+  await withAddon(
+    (socket) =>
+      socket.once("data", () =>
+        socket.end(
+          JSON.stringify({
+            status: "success",
+            result: {
+              protocol_version: lock.addonProtocol - 1,
+              addon_version: [1, 9],
+              blender_version: "5.2",
+            },
+          }),
+        ),
+      ),
+    async (port) => {
+      const env = {
+        BLENDER_HOST: "127.0.0.1",
+        BLENDER_PORT: String(port),
+        BLENDER_USER_ADDONS: addons,
+      };
+      const report = await diagnose(env, root);
+      assert.equal(report.ready, false);
+      assert.equal(report.installation.addonPath, addonPath);
+      assert.equal(report.installation.pluginRoot, root);
+      assert.equal(report.installation.protocol, lock.addonProtocol);
+      assert.match(report.installation.addonVersion, /^\d+\.\d+/);
+      assert.deepEqual(report.target, { host: "127.0.0.1", port, remote: false });
+      const disk = report.checks.find((check) => check.id === "addon-files");
+      assert.deepEqual(
+        disk.installed.find(({ path }) => path === installed),
+        {
+          path: installed,
+          protocol: lock.addonProtocol,
+          addonVersion: report.installation.addonVersion,
+        },
+      );
+      const running = report.checks.find((check) => check.id === "addon");
+      assert.deepEqual(running.running, {
+        protocol: lock.addonProtocol - 1,
+        addonVersion: "1.9",
+        blenderVersion: "5.2",
+      });
+      assert.ok(running.suggestion.includes(addonPath));
+      assert.match(running.suggestion, /磁盘/);
+
+      await writeFile(addonPath, "corrupted addon");
+      assert.equal((await diagnose(env, root)).installation, null);
+    },
+  );
 });

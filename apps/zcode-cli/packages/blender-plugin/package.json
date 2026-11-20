@@ -1,6 +1,6 @@
 {
   "name": "@kayingcode/blender-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Blender workflows, read-only diagnostics and a pinned upstream MCP runtime.",
   "license": "MIT",

@@ -1,14 +1,17 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { execFile, spawn } from "node:child_process";
+import { access, cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
+import { promisify } from "node:util";
 import { diagnose } from "../scripts/diagnostics.mjs";
 import { findExecutable, pluginRoot } from "../scripts/runtime.mjs";
 import { startMcp } from "./mcp-client.mjs";
+
+const execute = promisify(execFile);
 
 test(
   "real Blender GUI: draft preview and checkpoint before refinement, animation and delivery",
@@ -19,13 +22,18 @@ test(
       candidates: ["/Applications/Blender.app/Contents/MacOS/Blender"],
     });
     assert.ok(executable, "Set BLENDER_EXECUTABLE to run this optional GUI acceptance test");
-    const root = await mkdtemp(join(tmpdir(), "kayingcode-blender-gui-"));
+    // macOS 的 /var 是 /private/var 的别名，模块入口会采用真实路径。
+    const root = await realpath(await mkdtemp(join(tmpdir(), "kayingcode-blender-gui-")));
     t.after(() => rm(root, { recursive: true, force: true }));
     const reserve = createServer();
     await new Promise((resolve) => reserve.listen(0, "127.0.0.1", resolve));
     const port = reserve.address().port;
     await new Promise((resolve) => reserve.close(resolve));
     for (const directory of ["config", "scripts"]) await mkdir(join(root, directory));
+    const staged = join(root, "Staged Blender plugin");
+    await mkdir(staged);
+    for (const entry of ["scripts", "vendor", "upstream-lock.json", "skills", ".mcp.json"])
+      await cp(join(pluginRoot, entry), join(staged, entry), { recursive: true });
     const readyPath = join(root, "ready.json");
     const env = {
       ...process.env,
@@ -33,6 +41,7 @@ test(
       BLENDER_PORT: String(port),
       BLENDER_USER_CONFIG: join(root, "config"),
       BLENDER_USER_SCRIPTS: join(root, "scripts"),
+      BLENDERMCP_NO_UPDATE_CHECK: "1",
       DISABLE_TELEMETRY: "true",
     };
     const blender = spawn(
@@ -43,7 +52,7 @@ test(
         "--python",
         join(pluginRoot, "test/blender-fixture.py"),
         "--",
-        join(pluginRoot, "vendor/mcp-for-blender/addon.py"),
+        join(staged, "vendor/mcp-for-blender/addon.py"),
         String(port),
         readyPath,
       ],
@@ -76,11 +85,27 @@ test(
         await delay(100);
       }
     }
-    const doctor = await diagnose(env);
-    assert.equal(doctor.ready, true, JSON.stringify(doctor));
-    const client = startMcp(join(pluginRoot, "scripts/launch.mjs"), env);
+    let client = startMcp(join(staged, "scripts/launch.mjs"), env);
     t.after(() => client.close());
     await client.initialize();
+    const doctor = await diagnose(env, staged);
+    assert.equal(doctor.ready, true, JSON.stringify(doctor));
+    assert.equal(doctor.installation.addonPath, join(staged, "vendor/mcp-for-blender/addon.py"));
+    const isolatedDoctor = startMcp(join(staged, "scripts/doctor-server.mjs"), {
+      ...env,
+      KAYINGCODE_BLENDER_UV: join(root, "missing uv"),
+      KAYINGCODE_BLENDER_CACHE: join(root, "missing runtime"),
+    });
+    t.after(() => isolatedDoctor.close());
+    await isolatedDoctor.initialize();
+    const blocked = JSON.parse(
+      (await isolatedDoctor.request("tools/call", { name: "blender_doctor" })).content[0].text,
+    );
+    assert.equal(blocked.ready, false);
+    assert.equal(blocked.installation.addonPath, doctor.installation.addonPath);
+    assert.equal(blocked.checks.find(({ id }) => id === "uv").status, "error");
+    assert.equal(blocked.checks.find(({ id }) => id === "python-runtime").status, "error");
+    assert.equal(blocked.checks.find(({ id }) => id === "addon").status, "pass");
     const tools = await client.request("tools/list");
     assert.ok(tools.tools.some((tool) => tool.name === "execute_blender_code"));
     const call = async (name, args = {}) => {
@@ -94,15 +119,32 @@ test(
     await call("get_addon_status");
     await call("get_scene_info");
     await call("execute_blender_code", {
-      code: "import bpy\nbpy.ops.mesh.primitive_uv_sphere_add(location=(0,0,2))\nbpy.context.object.name='KayingCodeAcceptanceSphere'\nprint(bpy.context.object.name)",
+      code: [
+        "import bpy, math",
+        "bpy.ops.mesh.primitive_cube_add()",
+        "door=bpy.context.object",
+        "door.name='DoorLeaf'",
+        "for vert in door.data.vertices:",
+        "    vert.co=((vert.co.x + 1) / 2, vert.co.y * 0.05, vert.co.z + 1)",
+        "door.data.update()",
+        "material=bpy.data.materials.new('DoorPaint')",
+        "material.diffuse_color=(0.8,0.2,0.1,1)",
+        "door.data.materials.append(material)",
+        "for frame, angle in [(1,0), (12,math.pi/2), (24,0)]:",
+        "    door.rotation_euler.z=angle",
+        "    door.keyframe_insert(data_path='rotation_euler',frame=frame)",
+        "door.animation_data.action.name='Door_Open'",
+        "bpy.ops.mesh.primitive_cube_add(size=0.25, location=(4,0,0))",
+        "bpy.context.object.name='UnrelatedProp'",
+        "bpy.context.scene.frame_set(1)",
+        "print('Initial door and animation ready')",
+      ].join("\n"),
     });
-    assert.match(
-      JSON.stringify(await call("get_scene_info", { query: "KayingCodeAcceptanceSphere" })),
-      /KayingCodeAcceptanceSphere/,
-    );
+    assert.match(JSON.stringify(await call("get_scene_info", { query: "DoorLeaf" })), /DoorLeaf/);
     const preview = await call("look", {
       mode: "angles",
-      target: ["KayingCodeAcceptanceSphere"],
+      shading: "solid",
+      target: ["DoorLeaf"],
       views: ["front", "three_quarter"],
       max_size: 400,
     });
@@ -118,33 +160,55 @@ test(
     assert.ok((await readFile(draft)).length > 1000, "Draft must be usable before refinement");
     await call("execute_blender_code", {
       code: [
-        "import bpy",
-        "obj=bpy.data.objects['KayingCodeAcceptanceSphere']",
-        "obj.scale=(1.2,1,1)",
-        "material=bpy.data.materials.new('AcceptanceMaterial')",
-        "material.diffuse_color=(0.8,0.2,0.1,1)",
-        "obj.data.materials.append(material)",
+        "import bpy, math",
+        "door=bpy.data.objects['DoorLeaf']",
+        "for vert in door.data.vertices:",
+        "    vert.co.x *= 1.2",
+        "door.data.update()",
         "scene=bpy.context.scene",
-        "scene.frame_start=1; scene.frame_end=24",
-        "for frame,x in [(1,0),(12,1),(24,0)]:",
-        "    obj.location.x=x",
-        "    obj.keyframe_insert(data_path='location',frame=frame)",
-        "scene.frame_set(1)",
-        "assert len([o for o in bpy.data.objects if o.name.startswith('KayingCodeAcceptanceSphere')]) == 1",
-        "assert obj.data.materials[0].name == 'AcceptanceMaterial'",
-        "assert obj.animation_data.action is not None",
-        "positions=[]",
-        "for frame in [1,12,24]:",
+        "assert len([o for o in bpy.data.objects if o.name.startswith('DoorLeaf')]) == 1",
+        "assert door.data.materials[0].name == 'DoorPaint'",
+        "assert door.animation_data.action.name == 'Door_Open'",
+        "assert tuple(bpy.data.objects['UnrelatedProp'].location) == (4,0,0)",
+        "for frame, angle in [(1,0), (12,math.pi/2), (24,0)]:",
         "    scene.frame_set(frame)",
-        "    positions.append(round(obj.location.x,2))",
-        "assert positions == [0,1,0], positions",
+        "    assert math.isclose(door.rotation_euler.z, angle, abs_tol=0.0001)",
         "scene.frame_set(1)",
         "print('refinement and motion verified')",
       ].join("\n"),
     });
+    await client.close();
+    client = startMcp(join(staged, "scripts/launch.mjs"), env);
+    await client.initialize();
+    assert.match(JSON.stringify(await call("get_scene_info", { query: "DoorLeaf" })), /DoorLeaf/);
+    const checker = await readFile(join(staged, "scripts/asset-check.py"), "utf8");
+    const missingCamera = await call("execute_blender_code", {
+      code: `import bpy\nbpy.context.scene.camera = None\n${checker}\ninspect_asset("DoorLeaf", require_camera=True)`,
+    });
+    const missingRows = JSON.parse(
+      missingCamera.content[0].text.replace(/^Code executed successfully: /, ""),
+    );
+    assert.equal(missingRows.find((row) => row.check === "active_camera").status, "needs-fix");
+    await call("execute_blender_code", {
+      code: "import bpy\ncamera = bpy.data.objects['Camera']\ncamera.name = 'DeliveryCamera'\nbpy.context.scene.camera = camera",
+    });
+    const inspection = await call("execute_blender_code", {
+      code: `${checker}\ninspect_asset("DoorLeaf", require_camera=True, requirements={"DoorLeaf": {"dimensions": [1.2, 0.1, 2], "origin": [0, 0, 0], "max_triangles": 1, "materials": ["DoorPaint"], "action": "Door_Open", "frame_range": [1, 24]}})`,
+    });
+    const rows = JSON.parse(
+      inspection.content[0].text.replace(/^Code executed successfully: /, ""),
+    );
+    const check = Object.fromEntries(rows.map((row) => [row.check, row]));
+    assert.equal(check.active_camera.status, "pass");
+    assert.equal(check.active_camera.actual, "DeliveryCamera");
+    for (const field of ["dimensions", "origin", "materials", "action", "frame_range"])
+      assert.equal(check[field].status, "pass", JSON.stringify(check[field]));
+    assert.equal(check.max_triangles.actual, 12);
+    assert.equal(check.max_triangles.status, "needs-fix");
     const animation = await call("look", {
       mode: "frames",
-      target: ["KayingCodeAcceptanceSphere"],
+      shading: "solid",
+      target: ["DoorLeaf"],
       frames: [1, 12, 24],
       view: "front",
       distance: 8,
@@ -156,9 +220,54 @@ test(
     const blend = join(outputRoot, "acceptance.blend"),
       glb = join(outputRoot, "acceptance.glb");
     await call("execute_blender_code", {
-      code: `import bpy\nbpy.ops.wm.save_as_mainfile(filepath=${JSON.stringify(blend)})\nbpy.ops.export_scene.gltf(filepath=${JSON.stringify(glb)}, export_format='GLB')\nprint('saved and exported')`,
+      code: [
+        "import bpy",
+        `bpy.ops.wm.save_as_mainfile(filepath=${JSON.stringify(blend)})`,
+        "selection = list(bpy.context.selected_objects)",
+        "active = bpy.context.view_layer.objects.active",
+        "try:",
+        "    for obj in selection: obj.select_set(False)",
+        "    bpy.data.objects['DoorLeaf'].select_set(True)",
+        `    bpy.ops.export_scene.gltf(filepath=${JSON.stringify(glb)}, export_format='GLB', use_selection=True)`,
+        "finally:",
+        "    bpy.data.objects['DoorLeaf'].select_set(False)",
+        "    for obj in selection: obj.select_set(True)",
+        "    bpy.context.view_layer.objects.active=active",
+        "assert set(bpy.context.selected_objects) == set(selection)",
+        "assert bpy.context.view_layer.objects.active == active",
+        "print('saved and exported')",
+      ].join("\n"),
     });
     assert.ok((await readFile(blend)).length > 1000);
     assert.equal((await readFile(glb)).subarray(0, 4).toString(), "glTF");
+    const validation = await execute(
+      executable,
+      [
+        "--background",
+        "--factory-startup",
+        "--python-exit-code",
+        "1",
+        "--python-expr",
+        [
+          "import bpy",
+          `bpy.ops.wm.open_mainfile(filepath=${JSON.stringify(blend)})`,
+          "assert bpy.context.scene.camera.name == 'DeliveryCamera'",
+          "obj=bpy.data.objects['DoorLeaf']",
+          "assert abs(obj.dimensions.x - 1.2) < 0.001",
+          "assert obj.data.materials[0].name == 'DoorPaint'",
+          "assert obj.animation_data.action.name == 'Door_Open'",
+          "assert tuple(bpy.data.objects['UnrelatedProp'].location) == (4,0,0)",
+          "bpy.ops.wm.read_factory_settings(use_empty=True)",
+          `bpy.ops.import_scene.gltf(filepath=${JSON.stringify(glb)})`,
+          "obj=bpy.data.objects['DoorLeaf']",
+          "assert obj.data.materials[0].name.startswith('DoorPaint')",
+          "assert bpy.data.objects.get('UnrelatedProp') is None",
+          "assert any(action.name.startswith('Door_Open') for action in bpy.data.actions)",
+          "print('Reopened blend and imported GLB')",
+        ].join("\n"),
+      ],
+      { env, timeout: 30000 },
+    );
+    assert.match(validation.stdout, /Reopened blend and imported GLB/);
   },
 );

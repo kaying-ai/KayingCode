@@ -268,9 +268,9 @@
   },
   {
     "id": "mcp-for-blender",
-    "referenceRevision": "5a3618fccb2d982d0dd61e7a1879912c3100073b",
-    "importRevision": "5a3618fccb2d982d0dd61e7a1879912c3100073b",
-    "source": "https://github.com/ahujasid/mcp-for-blender/blob/5a3618fccb2d982d0dd61e7a1879912c3100073b/LICENSE",
+    "referenceRevision": "b6a2ce30c14636a562b5549684d9db6fc01f29ab",
+    "importRevision": "b6a2ce30c14636a562b5549684d9db6fc01f29ab",
+    "source": "https://github.com/ahujasid/mcp-for-blender/blob/b6a2ce30c14636a562b5549684d9db6fc01f29ab/LICENSE",
     "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/LICENSE",
     "sha256": "049501fd54d27852507853a5b88094ca1c6ff97404418a5032f3310eecc9cde6",
     "roots": [
