@@ -55,6 +55,10 @@ jobs:
         run: |
           pnpm --filter @kayingcode/blender-plugin run verify
           pnpm --filter @kayingcode/blender-plugin test
+          # 修复依据：blenderMcpPreview.test.ts 经 core src 运行时导入 @zcode/contracts，
+          # 其入口是 dist/index.js；CI 检出没有 dist，必须先构建（@zcode/shared 直接导出
+          # src/*.ts，由 tsx 现场转译，无需构建）。
+          pnpm --filter @zcode/contracts run build
           node --disable-warning=DEP0205 --import tsx --test apps/zcode-cli/packages/core/test/blenderMcpPreview.test.ts
       - name: Check versions and run Taro tests
         run: |
