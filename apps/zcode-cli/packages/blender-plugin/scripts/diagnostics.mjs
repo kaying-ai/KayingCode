@@ -199,6 +199,11 @@ export function resolveNextAction({ ready, checks, installation, addonFiles, add
       id: "restart-blender",
       message: "磁盘副本协议已匹配，但运行实例不同；重启 Blender 加载随包副本后复查。",
     };
+  if (addon?.status === "error" && /ECONNREFUSED/.test(String(addon.evidence)))
+    return {
+      id: "open-blender",
+      message: "Blender 未在监听；打开 Blender 后 add-on 默认会自动启动服务，再重新诊断。",
+    };
   if (addon?.status === "error")
     return {
       id: "fix-connection",

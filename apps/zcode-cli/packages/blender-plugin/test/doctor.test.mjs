@@ -167,6 +167,12 @@ test("nextAction follows the first blocking layer and points at /blender-install
     action({ addon: { id: "addon", status: "error", running: { protocol: 15 } } }),
     "restart-blender",
   );
+  assert.equal(
+    action({
+      addon: { id: "addon", status: "error", evidence: "连接失败：ECONNREFUSED。" },
+    }),
+    "open-blender",
+  );
   assert.equal(action({ addon: { id: "addon", status: "error" } }), "fix-connection");
   assert.equal(action({ addon: { id: "addon", status: "warning" } }), "fix-connection");
 });
