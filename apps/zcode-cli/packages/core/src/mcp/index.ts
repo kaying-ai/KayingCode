@@ -136,6 +136,10 @@ export function createMcpToolEntry(
   const providerVisible = resolveMcpToolVisibility(descriptor).includes("model");
   const isHostNodeReplExecution =
     descriptor.serverName === "node_repl" && descriptor.toolName === "js";
+  const isBundledBlender =
+    presentation.pluginId === "blender@kayingcode-plugins-official" &&
+    descriptor.serverName === "plugin:blender:blender";
+  const isBlenderLook = isBundledBlender && descriptor.toolName === "look";
   const isCuaAppObservation = isKayingCodeCuaGetAppState(descriptor);
   // 宿主 node_repl 的 js 能执行本机 Node 代码，不能沿用普通未知 MCP 的 medium/network
   // 默认值；否则权限 UI 会把文件/进程级能力错误描述成普通网络调用。
@@ -279,15 +283,26 @@ export function createMcpToolEntry(
             : {}),
         },
       );
+      const first = result.content[0];
+      const message = first?.type === "text" && typeof first.text === "string" ? first.text : "";
+      // 固定上游把这些失败作为正常文本返回，交付进度应以实际工具结果为准。
+      const blenderTextError =
+        isBundledBlender &&
+        ((descriptor.toolName === "get_addon_status" &&
+          message.startsWith("Error checking addon status:")) ||
+          (descriptor.toolName === "execute_blender_code" &&
+            /^(Error executing code:|Rejected by safe mode -)/.test(message)));
       // MCP server 会返回大 base64 图片；resultBudget 只看到图片占位文本，
       // 必须在 handler 阶段保存副本并替换模型可见内容，避免 provider 请求体被打爆。
       return normalizeMcpToolResultForModel({
         // 上游独立 CUA MCP 返回普通 image block，不带旧 producer 的 frame attestation。
         // 仍需走统一图片预算，否则 Windows/Linux 原生截图可绕过 200 KiB 上限直接灌入模型。
-        compressOversizedImages: isHostNodeReplExecution || officialCuaAuthorityVerified,
+        compressOversizedImages:
+          isHostNodeReplExecution || officialCuaAuthorityVerified || isBlenderLook,
+        retainOversizedImageOriginals: isBlenderLook,
         context,
         descriptor,
-        result,
+        result: blenderTextError ? { ...result, isError: true } : result,
         toolName: name,
       });
     },

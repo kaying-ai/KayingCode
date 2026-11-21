@@ -1,4 +1,5 @@
-"""One generate/poll/import flow across Tripo, Hunyuan3D, Hyper3D Rodin and Meshy.
+"""One generate/poll/import flow across Tripo, Hunyuan3D, Hyper3D Rodin and Meshy,
+and for World Labs worlds (generate_gaussian_world).
 
 Each provider used to be three or four tools with different id shapes. Here a
 generation is a single call: submit, poll until done or out of time, import.
@@ -30,18 +31,34 @@ from .premium_hint import PREMIUM_URL
 logger = logging.getLogger("BlenderMCPServer")
 
 PROVIDERS = ("tripo", "hunyuan3d", "hyper3d", "meshy")
+# World generators: whole environments for generate_gaussian_world, never generate_3d.
+WORLD_PROVIDERS = ("worldlabs",)
 
 # Auto-pick order. Premium generators come first because the user is paying
-# for them and they run the stronger models; among those Tripo is Premium-only.
-PREMIUM_ORDER = ("meshy", "tripo", "hunyuan3d", "hyper3d")
-OWN_KEY_ORDER = ("hunyuan3d", "hyper3d", "meshy")
+PREMIUM_ORDER = ("tripo", "meshy", "hyper3d", "hunyuan3d")
+OWN_KEY_ORDER = ("hunyuan3d", "hyper3d", "tripo", "meshy")
+
 
 # Meshy task kinds: text preview, text refine, image to model, and a Premium
 # job (either input, preview and refine done by the Premium server).
 MESHY_KINDS = ("t2p", "t2r", "i2m", "prm")
 # Addons from this protocol on can run Meshy through Premium.
 MESHY_PREMIUM_PROTOCOL = 14
+# Addons from this protocol on pass pose_mode to Meshy.
+MESHY_POSE_PROTOCOL = 15
+# World Labs job kinds: an operation on the user's own key, or a Premium job.
+WORLDLABS_KINDS = ("op", "prm")
+# Addons from this protocol on have World Labs.
+WORLDLABS_PROTOCOL = 16
+# Splat files a finished world offers, smallest first.
+WORLD_RESOLUTIONS = ("100k", "500k", "full_res")
+# Meshy's pose_mode values; the model comes out in that pose, ready to rig.
+MESHY_POSES = ("a-pose", "t-pose")
 MESHY_PROMPT_MAX = 800
+TRIPO_PROMPT_MAX = 1024
+# Rodin takes several views of one object; a folder sends the images in it.
+RODIN_MAX_IMAGES = 5
+RODIN_FOLDER_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp")
 
 POLL_INTERVAL_S = 5.0
 # A whole generate_3d call, submit included, stays under this. MCP clients on
@@ -52,14 +69,20 @@ MAX_CALL_S = 45.0
 # Premium sweeper fails jobs after 60 minutes, and provider results expire.
 PENDING_MAX_AGE_S = 2 * 3600
 
-TRIPO_UNAVAILABLE = (f"Tripo is only available with MCP for Blender Premium: {PREMIUM_URL}?ref=mcp-tripo. If "
-                     "Premium is on, update the Blender addon: run `uvx mcp-for-blender install-addon`, then "
-                     "restart Blender.")
+TRIPO_UNAVAILABLE = ("Tripo is not enabled. In the MCP for Blender sidebar in Blender (press N in the 3D Viewport), "
+                     "tick Tripo under AI Model Generation and paste a Tripo API key, or use MCP for Blender Premium: "
+                     f"{PREMIUM_URL}?ref=mcp-tripo. If Premium is on, update the Blender addon: run "
+                     "`uvx mcp-for-blender install-addon`, then restart Blender.")
 MESHY_UNAVAILABLE = ("Meshy is not enabled. In the MCP for Blender sidebar in Blender (press N in the 3D Viewport), "
                      "tick Meshy under AI Model Generation and paste a Meshy API key (needs a paid Meshy plan).")
 MESHY_PREMIUM_NEEDS_UPDATE = ("Meshy through MCP for Blender Premium needs the latest Blender addon: run "
                               "`uvx mcp-for-blender install-addon`, then restart Blender and tick Meshy in the "
                               "MCP for Blender sidebar.")
+MESHY_POSE_NEEDS_UPDATE = ("pose_mode needs the latest Blender addon: run `uvx mcp-for-blender install-addon`, "
+                           "then restart Blender.")
+MESHY_POSE_NOT_IN_PREMIUM = ("pose_mode isn't available through MCP for Blender Premium yet, only on your own Meshy "
+                             "API key. Generate without pose_mode, or switch Generation Source to Your own API keys "
+                             "in the addon preferences.")
 
 Send = Callable[[str, dict], Any]
 Progress = Callable[[float, float], Awaitable[None]]
@@ -76,7 +99,8 @@ class Unsupported(GenerationError):
 @dataclass
 class Job:
     provider: str
-    kind: str   # tripo: "rid"; hyper3d: "fal" | "main"; hunyuan3d: "job"; meshy: one of MESHY_KINDS
+    kind: str   # tripo: "rid" | "task"; hyper3d: "fal" | "main"; hunyuan3d: "job"; meshy: one of MESHY_KINDS;
+                # worldlabs: one of WORLDLABS_KINDS
     ident: str  # request id, job id, task id, or "<task_uuid>|<subscription_key>"
     name: str
 
@@ -87,20 +111,31 @@ class Job:
     @classmethod
     def parse(cls, handle: str, name: str) -> "Job":
         provider, kind, ident = (handle.split(":", 2) + ["", ""])[:3]
-        if provider not in PROVIDERS or not kind or not ident or (provider == "meshy" and kind not in MESHY_KINDS):
+        if (provider not in PROVIDERS + WORLD_PROVIDERS or not kind or not ident
+                or (provider == "meshy" and kind not in MESHY_KINDS)
+                or (provider == "worldlabs" and kind not in WORLDLABS_KINDS)):
             raise GenerationError(f"Not a generation job handle: {handle!r}")
         return cls(provider, kind, ident, name)
 
     @property
+    def is_world(self) -> bool:
+        return self.provider in WORLD_PROVIDERS
+
+    @property
     def resume_hint(self) -> str:
-        return (f'Call generate_3d(job="{self.handle}", name="{self.name}") to keep waiting; it imports the '
-                "model when it's ready. Don't start a new generation.")
+        tool, thing = ("generate_gaussian_world", "world") if self.is_world else ("generate_3d", "model")
+        return (f'Call {tool}(job="{self.handle}", name="{self.name}") to keep waiting; it imports the '
+                f"{thing} when it's ready. Don't start a new generation.")
 
 
 def request_key(provider: str, prompt: str | None, image: str | None,
-                quality: str | None, bbox_condition: list | None) -> str:
+                quality: str | None, bbox_condition: list | None, pose_mode: str | None = None) -> str:
     """Identifies a request, so a retry of one still running can be recognised."""
-    raw = json.dumps([provider, prompt, image, quality, bbox_condition])
+    fields = [provider, prompt, image, quality, bbox_condition]
+    # Only when set, so requests without a pose keep the keys they had.
+    if pose_mode:
+        fields.append(pose_mode)
+    raw = json.dumps(fields)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
@@ -214,12 +249,11 @@ def choose_provider(requested: str, premium: list[str], own_key_enabled: dict[st
                 raise GenerationError(f"{requested} is not switched on in MCP for Blender Premium. "
                                       f"On: {', '.join(premium)}. Tick it in the Blender sidebar.")
             return requested, True
-        if requested == "tripo":
-            # Also what an addon from before Premium looks like, so say how to update.
-            raise GenerationError(TRIPO_UNAVAILABLE)
         if not own_key_enabled.get(requested):
             if requested == "meshy":
                 raise GenerationError(MESHY_UNAVAILABLE)
+            if requested == "tripo":
+                raise GenerationError(TRIPO_UNAVAILABLE)
             raise GenerationError(f"{requested} is not enabled. Turn it on and add an API key in the "
                                   "MCP for Blender sidebar in Blender (press N in the 3D Viewport).")
         return requested, False
@@ -231,9 +265,15 @@ def choose_provider(requested: str, premium: list[str], own_key_enabled: dict[st
             return name, False
     raise GenerationError(
         "No 3D generator is enabled. In Blender's MCP for Blender sidebar, turn on Hunyuan3D, Hyper3D "
-        "Rodin or Meshy with an API key, or use MCP for Blender Premium (no keys needed): "
+        "Rodin, Tripo or Meshy with an API key, or use MCP for Blender Premium (no keys needed): "
         f"{PREMIUM_URL}?ref=mcp-no-generator"
     )
+
+
+def is_image_bytes(data: bytes) -> bool:
+    """PNG, JPEG or WebP, by their magic numbers rather than the file name."""
+    return (data.startswith(b"\x89PNG\r\n\x1a\n") or data.startswith(b"\xff\xd8\xff")
+            or (data[:4] == b"RIFF" and data[8:12] == b"WEBP"))
 
 
 def _rodin_images(image: str) -> list:
@@ -241,8 +281,35 @@ def _rodin_images(image: str) -> list:
         return [image]
     if not os.path.exists(image):
         raise GenerationError(f"Image not found: {image}. Give an absolute file path or an http(s) URL.")
-    with open(image, "rb") as f:
-        return [(Path(image).suffix, base64.b64encode(f.read()).decode("ascii"))]
+    paths = [Path(image)]
+    if os.path.isdir(image):
+        # Sorted, so the first view (the one Premium uses) is predictable.
+        paths = sorted(p for p in Path(image).iterdir()
+                       if p.is_file() and p.suffix.lower() in RODIN_FOLDER_SUFFIXES)
+        if not paths:
+            raise GenerationError(f"No PNG, JPEG or WebP images in {image}.")
+        if len(paths) > RODIN_MAX_IMAGES:
+            raise GenerationError(f"Hyper3D takes up to {RODIN_MAX_IMAGES} images; {image} has {len(paths)}. "
+                                  "Put the views of one object in a folder of their own.")
+    images = []
+    for path in paths:
+        data = path.read_bytes()
+        # The bytes go to a third-party service, so a path to anything but an
+        # image (a key file, a config) must not be sent.
+        if not is_image_bytes(data):
+            raise GenerationError(f"Not a PNG, JPEG or WebP image: {path}")
+        images.append((path.suffix, base64.b64encode(data).decode("ascii")))
+    return images
+
+
+def submit_world(send: Send, name: str, prompt: str | None, image: str | None) -> Job:
+    """Start a World Labs world. The addon reads image files and folders itself
+    and picks the model: the sidebar's on the user's key, Marble 1.1 through Premium."""
+    result = send("create_worldlabs_job", {"text_prompt": prompt, "image": image, "name": name})
+    _relay(result)
+    if not isinstance(result, dict) or not result.get("job_id") or result.get("kind") not in WORLDLABS_KINDS:
+        raise GenerationError(f"World Labs returned no job: {result}")
+    return Job("worldlabs", result["kind"], result["job_id"], name)
 
 
 def process_bbox(bbox: list | None) -> list[int] | None:
@@ -256,25 +323,37 @@ def process_bbox(bbox: list | None) -> list[int] | None:
 
 
 def submit(send: Send, provider: str, name: str, prompt: str | None, image: str | None,
-           quality: str | None, bbox_condition: list | None, supports_quality: bool) -> Job | str:
+           quality: str | None, bbox_condition: list | None, supports_quality: bool,
+           pose_mode: str | None = None) -> Job | str:
     """Start a generation. Returns a Job, or a finished message for providers
     that generate synchronously (Hunyuan3D LOCAL_API)."""
+    if image and provider != "hyper3d" and os.path.isdir(image):
+        raise GenerationError(f"{provider} takes one image file, not a folder. Pass one image, "
+                              "or provider='hyper3d' to send the folder's images as views of one object.")
     if provider == "tripo":
+        if prompt and len(prompt) > TRIPO_PROMPT_MAX:
+            raise GenerationError(f"Tripo prompts are limited to {TRIPO_PROMPT_MAX} characters; "
+                                  f"this one is {len(prompt)}. Shorten it.")
         params = {"text_prompt": prompt, "image": image}
         if quality:
             params["quality"] = quality
         result = send("create_tripo_job", params)
         _relay(result)
-        if not result.get("request_id"):
-            raise GenerationError(f"Tripo returned no request id: {result}")
-        return Job("tripo", "rid", result["request_id"], name)
+        if isinstance(result, dict) and result.get("request_id"):
+            return Job("tripo", "rid", result["request_id"], name)
+        if isinstance(result, dict) and result.get("task_id"):
+            return Job("tripo", "task", result["task_id"], name)
+        raise GenerationError(f"Tripo returned no job id: {result}")
 
     if provider == "meshy":
         # No quality or bbox: Meshy sizes the model itself (auto_size).
         if prompt and len(prompt) > MESHY_PROMPT_MAX:
             raise GenerationError(f"Meshy prompts are limited to {MESHY_PROMPT_MAX} characters; "
                                   f"this one is {len(prompt)}. Shorten it.")
-        result = send("create_meshy_job", {"text_prompt": prompt, "image": image})
+        params = {"text_prompt": prompt, "image": image}
+        if pose_mode:
+            params["pose_mode"] = pose_mode
+        result = send("create_meshy_job", params)
         _relay(result)
         started = ("t2p", "i2m", "prm")
         if not isinstance(result, dict) or not result.get("task_id") or result.get("kind") not in started:
@@ -313,6 +392,19 @@ def submit(send: Send, provider: str, name: str, prompt: str | None, image: str 
 def poll(send: Send, job: Job) -> tuple[str, Any]:
     """("running" | "done" | "failed", detail) for one status check, or
     ("refine", None) when a Meshy preview is ready for its refine."""
+    if job.provider == "worldlabs":
+        result = send("poll_worldlabs_job", {"job_id": job.ident, "kind": job.kind})
+        status = str(result.get("status", "")).upper() if isinstance(result, dict) else ""
+        # A failed world also carries "error"; read the status first so it
+        # counts as World Labs' verdict, not as a lost connection.
+        if status == "FAILED":
+            return "failed", result.get("error") or status
+        _relay(result)
+        if status == "SUCCEEDED":
+            return "done", None
+        progress = result.get("progress") if isinstance(result, dict) else None
+        return "running", str(progress or status or "IN_PROGRESS")
+
     if job.provider == "meshy":
         result = send("poll_meshy_job_status", {"task_id": job.ident, "kind": job.kind})
         status = str(result.get("status", "")).upper() if isinstance(result, dict) else ""
@@ -333,6 +425,24 @@ def poll(send: Send, job: Job) -> tuple[str, Any]:
         parts = [status or "PENDING"]
         if job.kind in ("t2p", "t2r"):
             parts.append("texturing" if job.kind == "t2r" else "modelling")
+        if isinstance(result, dict) and result.get("progress") is not None:
+            parts.append(f"{result['progress']}%")
+        return "running", " ".join(parts)
+
+    if job.provider == "tripo" and job.kind == "task":
+        result = send("poll_tripo_job_status", {"task_id": job.ident})
+        status = str(result.get("status", "")).lower() if isinstance(result, dict) else ""
+        # A failed task also carries "error"; read the status first so it counts
+        # as Tripo's verdict, not as a lost connection.
+        if status in ("failed", "cancelled", "banned", "expired"):
+            return "failed", result.get("error") or status
+        if status == "success":
+            if not result.get("model_url"):
+                return "failed", result.get("error") or "finished without a model URL"
+            _relay(result)
+            return "done", result["model_url"]
+        _relay(result)
+        parts = [status or "queued"]
         if isinstance(result, dict) and result.get("progress") is not None:
             parts.append(f"{result['progress']}%")
         return "running", " ".join(parts)
@@ -376,11 +486,16 @@ def poll(send: Send, job: Job) -> tuple[str, Any]:
     return "running", status or "WAIT"
 
 
-def import_result(send: Send, job: Job, detail: Any) -> Any:
-    if job.provider == "meshy" and job.kind == "prm":
+def import_result(send: Send, job: Job, detail: Any, options: dict | None = None) -> Any:
+    if job.provider == "worldlabs":
+        result = send("import_worldlabs_world", {"name": job.name, "job_id": job.ident, "kind": job.kind,
+                                                 **(options or {})})
+    elif job.provider == "meshy" and job.kind == "prm":
         result = send("import_generated_asset_meshy", {"name": job.name, "task_id": job.ident})
     elif job.provider == "meshy":
         result = send("import_generated_asset_meshy", {"name": job.name, "model_url": detail})
+    elif job.provider == "tripo" and job.kind == "task":
+        result = send("import_generated_asset_tripo", {"name": job.name, "model_url": detail})
     elif job.provider == "tripo":
         result = send("import_generated_asset_tripo", {"request_id": job.ident, "name": job.name})
     elif job.provider == "hyper3d" and job.kind == "fal":
@@ -422,8 +537,10 @@ async def wait_and_import(send: Send, job: Job, wait_seconds: float,
                           progress: Progress | None = None,
                           sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
                           clock: Callable[[], float] = time.monotonic,
-                          pending: Pending | None = None) -> tuple[bool, str]:
-    """Poll until done or `wait_seconds` pass. (imported, message).
+                          pending: Pending | None = None,
+                          import_options: dict | None = None) -> tuple[bool, Any]:
+    """Poll until done or `wait_seconds` pass. (imported, the import's reply
+    or the latest status). `import_options` go to the import command.
 
     Once a job is submitted, any error short of the provider saying it failed
     carries the job handle, since the generation may still finish and is paid.
@@ -436,7 +553,7 @@ async def wait_and_import(send: Send, job: Job, wait_seconds: float,
                 _start_refine(send, job, pending)
                 continue
             if state == "done":
-                import_result(send, job, detail)
+                imported = import_result(send, job, detail, import_options)
         except Unsupported:
             raise
         except Exception as e:
@@ -444,7 +561,7 @@ async def wait_and_import(send: Send, job: Job, wait_seconds: float,
         if state == "done":
             if pending:
                 pending.remove(job)
-            return True, job.name
+            return True, imported if job.is_world else job.name
         if state == "failed":
             if pending:
                 pending.remove(job)

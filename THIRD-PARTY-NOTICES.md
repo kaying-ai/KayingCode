@@ -3092,7 +3092,7 @@ The original import revisions of copied components are not recorded in the curre
 
 - Material Icons font (subset) (CC-BY-4.0): apps/kayingcode-mobile-taro/src/ui/icons. License reference: https://creativecommons.org/licenses/by/4.0/legalcode.txt. Original import revision: not recorded.
 
-- mcp-for-blender (MIT): apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender. License reference: https://github.com/ahujasid/mcp-for-blender/blob/5a3618fccb2d982d0dd61e7a1879912c3100073b/LICENSE. Original import revision: 5a3618fccb2d982d0dd61e7a1879912c3100073b.
+- mcp-for-blender (MIT): apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender. License reference: https://github.com/ahujasid/mcp-for-blender/blob/b6a2ce30c14636a562b5549684d9db6fc01f29ab/LICENSE. Original import revision: b6a2ce30c14636a562b5549684d9db6fc01f29ab.
 
 Fig autocomplete source carries the repository's MIT license; the generated registry records npm @withfig/autocomplete@2.692.3 metadata as ISC. The original source MIT notice is retained below.
 
@@ -78884,7 +78884,7 @@ Creative Commons may be contacted at creativecommons.org.
 
 ### Notice 049501fd54d27852507853a5b88094ca1c6ff97404418a5032f3310eecc9cde6
 
-- mcp-for-blender: https://github.com/ahujasid/mcp-for-blender/blob/5a3618fccb2d982d0dd61e7a1879912c3100073b/LICENSE
+- mcp-for-blender: https://github.com/ahujasid/mcp-for-blender/blob/b6a2ce30c14636a562b5549684d9db6fc01f29ab/LICENSE
 
 
 

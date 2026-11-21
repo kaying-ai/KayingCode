@@ -2,6 +2,24 @@ import { readFile, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+export function addonVersionLabel(version) {
+  return Array.isArray(version) &&
+    (version.length === 2 || version.length === 3) &&
+    version.every((part) => Number.isSafeInteger(part) && part >= 0)
+    ? version.join(".")
+    : null;
+}
+
+export function readDeclaredAddonVersion(source) {
+  const info = source.match(/^bl_info\s*=\s*\{([^}]*)\}/m)?.[1];
+  const parts = info?.match(/["']version["']\s*:\s*\((\d+)\s*,\s*(\d+)(?:\s*,\s*(\d+))?\s*,?\s*\)/);
+  return parts ? addonVersionLabel(parts.slice(1).filter(Boolean).map(Number)) : null;
+}
+
+export function isMcpAddonSource(source) {
+  return /["']name["']\s*:\s*["'](?:MCP for Blender|Blender MCP)["']/.test(source);
+}
+
 export async function inspectAddonFiles(expectedProtocol, env = process.env) {
   const home = homedir();
   const base =
@@ -46,19 +64,25 @@ export async function inspectAddonFiles(expectedProtocol, env = process.env) {
         if (error.code === "ENOENT") continue;
         throw error;
       }
-      if (!/["']name["']\s*:\s*["'](?:MCP for Blender|Blender MCP)["']/.test(source)) continue;
+      if (!isMcpAddonSource(source)) continue;
       const protocol = Number(source.match(/^ADDON_PROTOCOL_VERSION\s*=\s*(\d+)/m)?.[1]) || null;
-      installed.push({ path, protocol });
+      installed.push({ path, protocol, addonVersion: readDeclaredAddonVersion(source) });
     }
   }
   return {
     id: "addon-files",
+    installed,
     status:
       installed.length && installed.every((item) => item.protocol === expectedProtocol)
         ? "pass"
         : "warning",
     evidence: installed.length
-      ? installed.map((item) => `${item.path}: protocol ${item.protocol ?? "未知"}`).join("\n")
+      ? installed
+          .map(
+            (item) =>
+              `${item.path}: add-on ${item.addonVersion ?? "版本未知"}, protocol ${item.protocol ?? "未知"}`,
+          )
+          .join("\n")
       : "未在当前用户 Blender 配置中发现 add-on；其他配置目录的安装状态未知。",
     suggestion:
       installed.length && installed.every((item) => item.protocol === expectedProtocol)

@@ -6,15 +6,21 @@
 
 1. 安装 Blender（上游要求 3.0+）和 [官方 uv](https://docs.astral.sh/uv/getting-started/installation/)。
 2. 启用 Blender 插件。启动器使用随包源码与 `uv.lock`，在用户缓存创建 Python 3.11 环境。首次可能需要网络下载 Python 和依赖；安装日志进入 stderr。插件目录可以只读。
-3. 在 Blender 的 Preferences → Add-ons → Install from Disk 中选择此插件安装目录里的 `vendor/mcp-for-blender/addon.py`，启用 MCP for Blender。Blender 版本较新时安装入口可能在 Preferences 菜单中。
-4. 重启 Blender。在 3D 视图按 N，打开 MCP for Blender 面板，确认服务已启动（默认 localhost:9876）。
-5. 在聊天中运行 `/blender-doctor` 或说“诊断 Blender 环境”；通过后即可描述创作目标。
+3. 在聊天中运行 `/blender-install`。Agent 先返回 dry-run 计划（Blender 版本、目标 addons 目录、是否需要覆盖）；确认后才写入 Blender 用户配置并启用 add-on。安装器只处理本机，不联网、不改其他 MCP 客户端配置。
+4. 打开或重启 Blender。add-on 默认会在加载场景时自动启动服务（默认 localhost:9876）；只有你曾停止服务、端口冲突或旧场景保存了关闭状态时，才需要在 3D 视图按 N 并在面板重新连接。
+5. 运行 `/blender-doctor` 确认连接和协议。
 
-启用插件不会自动打开 Blender、安装 add-on、运行上游 setup 或改写其他 AI 客户端配置。doctor 只读检查，不会安装/下载。离线使用需先在同一主机准备好缓存环境。
+`/blender-install` 拒绝在 Blender 运行中、远端 `BLENDER_HOST`、Blender 版本目录未初始化或发现 extensions 副本时写入，并给出对应手动步骤。降级路径仍是 Preferences 的 Install from Disk：使用 doctor 的 `installation.addonPath`，启用 MCP for Blender 后重启。启用插件、会话启动和 doctor 都不会自动安装 add-on、运行上游 setup 或改写配置。离线使用需先在同一主机准备好缓存环境。
 
 ## 调度与体验
 
 内置 skill 复用会话阶段清单，按“检查 → 草模及首张预览 → 局部细化 → 动画验证 → 保存交付”推进。先给真实草模图和工作副本，再细化；每个阶段结束说明已完成项和下一步。模糊的精细化请求先收敛为 2–3 个具体目标，默认一轮实现、一轮纠偏后返回当前成果及限制，避免无目标地反复微调。细则与验收边界见 [创作进度规范](specs/creation-progress.md)。这是 Agent 工作流指导，不承诺模型每次都遵循或保证耗时。
+
+Agent 按任务读取随包上游指南。草模使用低成本视图，材质和动画按需通过同视角或关键帧验证。交付时可只读检查项目要求的尺寸、枢轴、面数、材质和动画，并展示工作副本、请求的导出与实测摘要。
+
+参考图或指定角色任务先核对生成能力和可用资产，首张草模及终稿都提供参考图与实际预览的对照。仅支持手写草模时先说明可达效果，按用户认可的范围继续。图片超出内联预算时，模型仍可获得缩略图，原图保存在会话产物。生成效果或速度异常可运行 `/blender-doctor`，结合本轮工具记录、参考和产物诊断。
+
+附上参考图后使用 `/blender-from-reference [创作目标]`。Agent 会自行渲染草模、对照并修正，再继续细化，一次交付预览、可编辑 `.blend` 和剩余差距。需要先看草模再继续时，可以明确要求分阶段验收。带渲染的交付会核对重新打开文件后的活动相机。
 
 复用上游 MCP 的工具、资源和客户端能力协商，不假设宿主一定支持上游的内联 viewport/素材选择界面；不支持时使用 `look` 图像及场景工具验证。宿主从第一次模型重试开始展示实际恢复状态，有退避时显示剩余秒数；该状态不代表 Blender 报错或进度。
 
@@ -39,7 +45,7 @@ macOS/Linux 默认缓存位于 `${XDG_CACHE_HOME:-~/.cache}/kayingcode/blender/<
 node apps/zcode-cli/packages/blender-plugin/scripts/doctor.mjs
 ```
 
-输出 `ready` 和各检查的 `status/evidence/suggestion`；未就绪退出 1。快照缺失/篡改、依赖未准备、协议不一致会阻塞就绪；未发现 Blender 文件仅表示安装位置未知，以实际握手为准。握手超时可能是 Blender 忙碌/弹窗阻塞。非本地主机时，应用检查标为未验证，网络与依赖属于执行主机/目标主机各自的范围。
+输出包括 `ready`、`nextAction`、各检查的 `status/evidence/suggestion`、已校验的安装路径 `installation.addonPath`、只读发现的 `blenderVersion/addonsDir` 和握手地址 `target`。未就绪退出 1。运行版本以握手 `addon.running` 为准，磁盘扫描单列于 `addon-files`。握手超时时保留未验证状态。远程安装时，把执行主机上的随包文件交给实际运行 Blender 的主机，`/blender-install` 不处理远端。
 
 ## 跟随上游
 
@@ -59,6 +65,8 @@ node scripts/licenses.mjs notices
 
 脚本按 Git commit 导入白名单快照，校验 add-on 两份副本、协议及 lock 版本，更新文件 hash、插件版本和生成目录；不会覆盖本地适配层。审查上游差异与许可后提交。Python 锁文件变化会在新 commit 的隔离环境生效；用户手动在 Blender 内升级 add-on 时应重新诊断匹配性。发布前还需真实 Blender 的建模、预览、保存与导出验收。
 
-可选真实 GUI 验收：`pnpm --dir apps/zcode-cli/packages/blender-plugin run test:blender`，必要时设置 `BLENDER_EXECUTABLE`。它启动独立 factory-startup 进程、临时用户目录和随机端口，不安装 add-on、不保存用户配置；退出后清理测试进程及临时文件。设置 `KAYINGCODE_BLENDER_E2E_OUTPUT` 可保留测试预览、`.blend` 与 `.glb`。
+Windows 上从旧分支切换过来时，未改动的 vendor 文件可能保留 CRLF，`verify` 会列出这些文件并说明它们仅换行不同。按提示删除对应文件后重新 checkout 即可；不要用转换过换行的副本覆盖快照或放宽 hash 校验。
+
+可选真实 GUI 验收用 `pnpm --dir apps/zcode-cli/packages/blender-plugin run test:blender`，必要时设置 `BLENDER_EXECUTABLE`。测试从含空格的 staged 路径调用 Blender 安装和启用操作，使用临时用户目录与随机端口，并隔离复读 `.blend` 和导入 GLB。设置 `KAYINGCODE_BLENDER_E2E_OUTPUT` 可保留测试预览与产物。
 
 上游原始许可见 [vendor LICENSE](vendor/mcp-for-blender/LICENSE)；不随包分发 Blender。

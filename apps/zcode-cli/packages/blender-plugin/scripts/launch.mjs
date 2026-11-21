@@ -4,13 +4,15 @@ import { verifyUpstream } from "./verify-upstream.mjs";
 import { prepareRuntime } from "./prepare-runtime.mjs";
 
 try {
-  resolveConnection();
+  const { host, port } = resolveConnection();
   const lock = await verifyUpstream();
   const uv = await findUv();
   if (!uv) throw new Error("未找到 uv。安装 uv 或设置 KAYINGCODE_BLENDER_UV 为绝对路径。");
   const plan = runtimePlan(pluginRoot, lock);
   await prepareRuntime(plan, lock);
-  const child = spawn(uv, plan.args, { env: plan.env, stdio: "inherit", windowsHide: true });
+  // 向 Python 传递和 doctor 相同的解析结果，避免空白地址导致两者检查不同目标。
+  const env = { ...plan.env, BLENDER_HOST: host, BLENDER_PORT: String(port) };
+  const child = spawn(uv, plan.args, { env, stdio: "inherit", windowsHide: true });
   process.on("SIGTERM", () => child.kill("SIGTERM"));
   process.on("SIGINT", () => child.kill("SIGINT"));
   const code = await new Promise((resolveRun, reject) => {

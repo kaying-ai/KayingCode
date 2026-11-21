@@ -50,9 +50,72 @@ test("snapshot corruption fails closed; cached build writes do not contaminate v
   await assert.rejects(verifyUpstream(root), /differs/);
 });
 
+test("setup MCP exposes a dry-run installer and rejects unsafe arguments", async (t) => {
+  const client = startMcp(join(pluginRoot, "scripts/setup-server.mjs"), {
+    BLENDER_HOST: "127.0.0.1",
+    BLENDER_PORT: "9876",
+  });
+  t.after(() => client.close());
+  await client.initialize();
+  const list = await client.request("tools/list");
+  assert.deepEqual(
+    list.tools.map((item) => item.name),
+    ["blender_install_addon"],
+  );
+  assert.equal(list.tools[0].annotations.readOnlyHint, false);
+  assert.equal(list.tools[0].annotations.destructiveHint, true);
+  const planned = await client.request("tools/call", {
+    name: "blender_install_addon",
+    arguments: {},
+  });
+  const report = JSON.parse(planned.content[0].text);
+  assert.equal(report.dryRun, true);
+  assert.ok(Array.isArray(report.blockers));
+  await assert.rejects(
+    client.request("tools/call", {
+      name: "blender_install_addon",
+      arguments: { confirm: "yes" },
+    }),
+    /布尔值/,
+  );
+  await assert.rejects(
+    client.request("tools/call", {
+      name: "blender_install_addon",
+      arguments: { executable: "relative/blender" },
+    }),
+    /绝对路径/,
+  );
+});
+
+test("snapshot mismatch names the file and explains Windows CRLF drift", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "blender-snapshot-mismatch-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await cp(join(pluginRoot, "vendor"), join(root, "vendor"), { recursive: true });
+  await cp(join(pluginRoot, "upstream-lock.json"), join(root, "upstream-lock.json"));
+  const file = join(root, "vendor/mcp-for-blender/src/blender_mcp/__init__.py");
+  const source = await readFile(file, "utf8");
+  // 模拟 Windows 切分支后未重写的老文件：索引仍是 LF，工作区是 CRLF。
+  await writeFile(file, source.replace(/\r\n/g, "\n").replace(/\n/g, "\r\n"));
+  await assert.rejects(verifyUpstream(root), (error) => {
+    assert.match(error.message, /src\/blender_mcp\/__init__\.py/);
+    assert.match(error.message, /CRLF/);
+    assert.match(error.message, /re-checkout/);
+    return true;
+  });
+  await rm(file);
+  await writeFile(join(root, "vendor/mcp-for-blender/extra.py"), "extra");
+  // 数量相同的一缺一多不能被当成“没有变化”。
+  await assert.rejects(verifyUpstream(root), (error) => {
+    assert.match(error.message, /missing=1/);
+    assert.match(error.message, /unexpected=1/);
+    assert.match(error.message, /re-run sync-upstream/);
+    return true;
+  });
+});
+
 test("builtin catalog contains every adapter and the entire pinned upstream runtime", async () => {
   const config = JSON.parse(
-    await readFile(join(pluginRoot, "../../config/official-plugins.json"), "utf8"),
+    await readFile(new URL("../../../../../config/official-plugins.json", import.meta.url), "utf8"),
   );
   const entry = config.plugins.find((item) => item.name === "blender");
   assert.ok(entry);
@@ -62,11 +125,49 @@ test("builtin catalog contains every adapter and the entire pinned upstream runt
     "scripts/diagnostics.mjs",
     "scripts/prepare-runtime.mjs",
     "scripts/addon-files.mjs",
+    "scripts/asset-check.py",
+    "scripts/blender-paths.mjs",
+    "scripts/install-addon.mjs",
+    "scripts/setup-server.mjs",
     "skills/blender/SKILL.md",
+    "skills/blender/references/from-reference.md",
     "commands/blender-doctor.md",
+    "commands/blender-from-reference.md",
+    "commands/blender-install.md",
   ]) {
     assert.ok(entry.requiredSeedPaths.includes(file), file);
   }
   for (const path of ["vendor", "upstream-lock.json", "THIRD_PARTY_NOTICES.md"])
     assert.ok(entry.runtimeTopLevelPaths.includes(path));
+  const lock = await verifyUpstream();
+  const skill = await readFile(join(pluginRoot, "skills/blender/SKILL.md"), "utf8");
+  for (const topic of [
+    "scene",
+    "materials",
+    "retopology",
+    "rigging",
+    "animation",
+    "level-design",
+    "bpy",
+  ]) {
+    assert.ok(lock.files[`src/blender_mcp/guides/${topic}.md`]);
+    assert.ok(skill.includes(`\`${topic}.md\``));
+  }
+});
+
+test("reference command and skill use internal draft review by default", async () => {
+  const [command, skill, guide] = await Promise.all(
+    [
+      "commands/blender-from-reference.md",
+      "skills/blender/SKILL.md",
+      "skills/blender/references/from-reference.md",
+    ].map((path) => readFile(join(pluginRoot, path), "utf8")),
+  );
+
+  assert.match(command, /^skills: blender$/m);
+  assert.match(command, /同一轮继续细化和交付/);
+  assert.match(skill, /用户明确要求分阶段验收/);
+  assert.match(guide, /未启用或未获授权时，直接用可行的本地方案/);
+  assert.match(guide, /对照参考、局部修正并复看/);
+  assert.match(guide, /用户明确要求分阶段验收/);
 });

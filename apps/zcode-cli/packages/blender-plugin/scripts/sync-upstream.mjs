@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -8,8 +8,47 @@ import { inspectSnapshot, snapshotPaths } from "./verify-upstream.mjs";
 
 const execute = promisify(execFile);
 const repository = "https://github.com/ahujasid/mcp-for-blender";
+const repositoryRoot = fileURLToPath(new URL("../../../../../", import.meta.url));
 
-export async function syncUpstream({ source, ref, pluginVersion, root = pluginRoot }) {
+async function prepareRelease(root) {
+  const noticesPath = join(root, "third-party/copied-components.json");
+  const notices = JSON.parse(await readFile(noticesPath, "utf8"));
+  const notice = notices.find((item) => item.id === "mcp-for-blender");
+  if (!notice) throw new Error("Missing mcp-for-blender copied-source notice record");
+  const [{ generateOfficialPluginCatalog }, { generateSourceMap }] = await Promise.all([
+    import("../../../../../scripts/generate-official-plugin-catalog.mjs"),
+    import("../../../../../scripts/generate-source-map.mjs"),
+  ]);
+  if (
+    typeof generateOfficialPluginCatalog !== "function" ||
+    typeof generateSourceMap !== "function"
+  )
+    throw new Error("Missing official plugin or source-map generator");
+  return {
+    paths: [
+      noticesPath,
+      join(
+        root,
+        "apps/zcode-cli/packages/contracts/src/plugins/official-plugin-catalog.generated.ts",
+      ),
+      join(root, "packages/shared/src/official-plugin-defaults.generated.ts"),
+      join(root, "SOURCE_PACKAGES.md"),
+    ],
+    async update(lock) {
+      Object.assign(notice, {
+        referenceRevision: lock.commit,
+        importRevision: lock.commit,
+        source: `${repository}/blob/${lock.commit}/LICENSE`,
+        sha256: lock.files.LICENSE,
+      });
+      await writeFile(noticesPath, `${JSON.stringify(notices, null, 2)}\n`);
+      await generateOfficialPluginCatalog(root);
+      await generateSourceMap(root);
+    },
+  };
+}
+
+export async function syncUpstream({ source, ref, pluginVersion, root = pluginRoot, releaseRoot }) {
   if (!/^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(pluginVersion))
     throw new Error("Invalid plugin version");
   const git = async (...args) =>
@@ -26,10 +65,15 @@ export async function syncUpstream({ source, ref, pluginVersion, root = pluginRo
     .trim();
   const parent = join(root, "vendor");
   await mkdir(parent, { recursive: true });
-  const stage = await mkdtemp(join(parent, ".snapshot-"));
+  const transaction = join(root, ".snapshot-sync");
+  // 同一个 checkout 只允许一次同步，避免生成器基于其他同步的中间文件计算结果。
+  await mkdir(transaction);
+  const stage = join(transaction, "candidate");
   const target = join(parent, "mcp-for-blender");
-  const backup = `${stage}-previous`;
+  const backup = join(transaction, "previous");
+  let keepBackup = false;
   try {
+    const release = releaseRoot && (await prepareRelease(releaseRoot));
     const entries = (await git("ls-tree", "-r", "-z", commit, "--", ...snapshotPaths))
       .toString()
       .split("\0")
@@ -48,31 +92,71 @@ export async function syncUpstream({ source, ref, pluginVersion, root = pluginRo
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
     const pkg = JSON.parse(await readFile(packagePath, "utf8"));
     const lock = { schemaVersion: 1, repository, commit, license: "MIT", ...snapshot };
-    // 先验证完整快照再替换；上游结构变化不应摧毁当前可运行版本。
-    await rename(target, backup).catch((error) => {
-      if (error.code !== "ENOENT") throw error;
-    });
-    try {
-      await rename(stage, target);
-    } catch (error) {
-      await rename(backup, target).catch(() => {});
-      throw error;
-    }
-    for (const [path, value] of [
+    const updates = [
       [manifestPath, { ...manifest, version: pluginVersion }],
       [packagePath, { ...pkg, version: pluginVersion }],
       [join(root, "upstream-lock.json"), lock],
-    ]) {
-      await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
+    ];
+    const paths = [...updates.map(([path]) => path), ...(release?.paths ?? [])];
+    const original = await Promise.all(
+      paths.map(async (path) => {
+        try {
+          return await readFile(path);
+        } catch (error) {
+          if (error.code === "ENOENT") return null;
+          throw error;
+        }
+      }),
+    );
+    let hadSnapshot = true;
+    await rename(target, backup).catch((error) => {
+      if (error.code !== "ENOENT") throw error;
+      hadSnapshot = false;
+    });
+    let published = false;
+    try {
+      await rename(stage, target);
+      published = true;
+      for (const [path, value] of updates) {
+        await writeFile(path, `${JSON.stringify(value, null, 2)}\n`);
+      }
+      await release?.update(lock);
+    } catch (error) {
+      // 生成步骤也会写入文件，任何一步失败都恢复本次同步写集。
+      const restoreSnapshot = async () => {
+        if (published) await rm(target, { recursive: true, force: true });
+        if (hadSnapshot) await rename(backup, target);
+      };
+      const restorations = await Promise.allSettled([
+        restoreSnapshot(),
+        ...(published
+          ? paths.map((path, index) =>
+              original[index] === null
+                ? rm(path, { force: true })
+                : writeFile(path, original[index]),
+            )
+          : []),
+      ]);
+      const failures = restorations.filter((item) => item.status === "rejected");
+      if (failures.length) {
+        keepBackup = true;
+        throw new AggregateError(
+          [error, ...failures.map((failure) => failure.reason)],
+          `Blender sync rollback failed; inspect ${transaction} and the worktree`,
+        );
+      }
+      throw error;
     }
-    await rm(backup, { recursive: true, force: true });
     return lock;
   } finally {
-    await rm(stage, { recursive: true, force: true });
+    if (!keepBackup) await rm(transaction, { recursive: true, force: true });
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  (await realpath(process.argv[1]).catch(() => "")) === fileURLToPath(import.meta.url)
+) {
   const args = process.argv.slice(2);
   const options = {};
   for (let i = 0; i < args.length; i += 2) {
@@ -86,24 +170,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     source: resolve(options.source),
     ref: options.ref,
     pluginVersion: options["plugin-version"],
+    releaseRoot: repositoryRoot,
   });
-  const root = resolve(pluginRoot, "../..");
-  const noticesPath = join(root, "third-party/copied-components.json");
-  const notices = JSON.parse(await readFile(noticesPath, "utf8"));
-  const notice = notices.find((item) => item.id === "mcp-for-blender");
-  if (!notice) throw new Error("Missing mcp-for-blender copied-source notice record");
-  Object.assign(notice, {
-    referenceRevision: lock.commit,
-    importRevision: lock.commit,
-    source: `${repository}/blob/${lock.commit}/LICENSE`,
-    sha256: lock.files.LICENSE,
-  });
-  await writeFile(noticesPath, `${JSON.stringify(notices, null, 2)}\n`);
-  const { generateOfficialPluginCatalog } =
-    await import("../../../../../scripts/generate-official-plugin-catalog.mjs");
-  const { generateSourceMap } = await import("../../../../../scripts/generate-source-map.mjs");
-  await generateOfficialPluginCatalog(root);
-  await generateSourceMap(root);
   process.stdout.write(
     `Synced Blender ${lock.version} (${lock.commit}); run verify, tests and node scripts/licenses.mjs notices before release.\n`,
   );

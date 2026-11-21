@@ -59,6 +59,40 @@ async function accessRuntime(root) {
   await readFile(join(root, "src/blender_mcp/server.py"));
 }
 
+async function crlfOnly(root, path, expectedHash) {
+  try {
+    const raw = await readFile(join(root, path));
+    if (!raw.includes(Buffer.from("\r\n"))) return false;
+    // 用 latin1 逐字节往返，避免把二进制内容误当 UTF-8 解码。
+    const normalized = Buffer.from(raw.toString("latin1").replace(/\r\n/g, "\n"), "latin1");
+    return createHash("sha256").update(normalized).digest("hex") === expectedHash;
+  } catch {
+    return false;
+  }
+}
+
+async function throwSnapshotMismatch(snapshotRoot, actual, lock, changed, missing, unexpected) {
+  const crlf = (
+    await Promise.all(changed.map((path) => crlfOnly(snapshotRoot, path, lock.files[path])))
+  ).reduce((paths, isCrlf, index) => (isCrlf ? [...paths, changed[index]] : paths), []);
+  const crlfSet = new Set(crlf);
+  const other = changed.filter((path) => !crlfSet.has(path));
+  const limit = 8;
+  const listed = [...crlf, ...other, ...missing, ...unexpected];
+  const detail = listed.length
+    ? `\n${listed.slice(0, limit).join("\n")}${listed.length > limit ? `\n… and ${listed.length - limit} more` : ""}`
+    : "";
+  const reason =
+    crlf.length && !other.length && !missing.length && !unexpected.length
+      ? "Files differ only by CRLF line endings, usually a stale Windows checkout left by an earlier branch switch; delete the listed vendor files and re-checkout them, or re-clone the repository."
+      : "Restore the builtin plugin or re-run sync-upstream for this commit.";
+  throw new Error(
+    `Upstream snapshot mismatch: expected ${lock.version} / protocol ${lock.addonProtocol}, found ${actual.version} / protocol ${actual.addonProtocol}; ` +
+      `changed=${changed.length} (crlf-only=${crlf.length}), missing=${missing.length}, unexpected=${unexpected.length}. ` +
+      `${reason}${detail}`,
+  );
+}
+
 export async function verifyUpstream(root = pluginRoot) {
   const lock = JSON.parse(await readFile(join(root, "upstream-lock.json"), "utf8"));
   if (lock.schemaVersion !== 1 || !/^[a-f0-9]{40}$/.test(lock.commit))
@@ -67,14 +101,22 @@ export async function verifyUpstream(root = pluginRoot) {
     if (posix.isAbsolute(path) || path.includes("\\") || path.split("/").includes(".."))
       throw new Error("Invalid inventory path");
   }
-  const actual = await inspectSnapshot(join(root, "vendor/mcp-for-blender"));
+  const snapshotRoot = join(root, "vendor/mcp-for-blender");
+  const actual = await inspectSnapshot(snapshotRoot);
+  const lockedFiles = lock.files || {};
+  const changed = Object.keys(lockedFiles).filter(
+    (path) => path in actual.files && lockedFiles[path] !== actual.files[path],
+  );
+  const missing = Object.keys(lockedFiles).filter((path) => !(path in actual.files));
+  const unexpected = Object.keys(actual.files).filter((path) => !(path in lockedFiles));
   if (
     actual.version !== lock.version ||
     actual.addonProtocol !== lock.addonProtocol ||
-    Object.keys(actual.files).length !== Object.keys(lock.files || {}).length ||
-    Object.entries(actual.files).some(([path, hash]) => lock.files[path] !== hash)
+    changed.length ||
+    missing.length ||
+    unexpected.length
   )
-    throw new Error("Upstream snapshot hash/metadata mismatch; restore the builtin plugin");
+    await throwSnapshotMismatch(snapshotRoot, actual, lock, changed, missing, unexpected);
   return lock;
 }
 

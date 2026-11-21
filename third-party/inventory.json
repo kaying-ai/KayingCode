@@ -6,7 +6,7 @@
   },
   "inputHashEncoding": "UTF-8 with CRLF normalized to LF; notice and source snapshot hashes remain byte-exact",
   "scope": "Installed production dependencies on the generating host across current workspace projects, copied source/assets and native tools; optional packages absent on this host are listed separately. Not a per-installer SBOM or a certification of all licensing obligations.",
-  "noticesSha256": "adee022e7c97529266b5661201a38f28c4597ab7b0c69f6564cede281aa15b60",
+  "noticesSha256": "9cc2542cb9ca24a67bc58b0373b1ec1b6b11389661c3c0bce0bd26dd1b45f1b2",
   "inputs": {
     ".agents/skills/agent-browser/references/authentication.md": "53dba5ce99c231b5693216ed4c9d75b2ab74ff8b0ad4026c386eb738ff4dc1b5",
     ".agents/skills/agent-browser/references/commands.md": "3ea0ba97e9a6d9d4d0f42c70608089b463d2a5a8352f297626a1cb4081b2bc4a",
@@ -166,20 +166,20 @@
     "apps/zcode-cli/package.json": "017578f37983faecb59a8fb78554cd0a82ba61a1f4fb2e6197cd7a008b947f51",
     "apps/zcode-cli/packages/adapters/package.json": "f0556184a53a55b3bb4f8fba5a104d3dddbe0bef841d0bd9354a940ef9a83eb1",
     "apps/zcode-cli/packages/android-emulator-plugin/package.json": "4619263ebc844576dca1ea8a6a21b79dd1e5d6d3c4bc95126592aa871bdadba3",
-    "apps/zcode-cli/packages/blender-plugin/package.json": "14ce1559e849e0215caf71635365d3fea64fb3324aa2d6518642337426eaa460",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/addon.py": "229ee114f0504b486bdd24bbc8b08fa9b22112f5e831ef8b2e9cc507e9ccbbfe",
+    "apps/zcode-cli/packages/blender-plugin/package.json": "6a1adbe9e75f00b05734759cc41cfed27311fbeaca87352aa72ac2ff58981ac0",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/addon.py": "35e5f317b932d15b485a37d914f7c9d7b527c7ea527f526569c1c111e5f39a05",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/LICENSE": "049501fd54d27852507853a5b88094ca1c6ff97404418a5032f3310eecc9cde6",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/pyproject.toml": "04996707414123f2685b07700df9ee8f8b9c07f0a5cd69e070ad2b81ba3eafb1",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/README.md": "fc96f24d1a05d87e59f3c39b8631cdcfdca6464d92184e9c2e67015f482821eb",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/pyproject.toml": "13b8aea5a63e7638317d6aaefac0eddc2408ad6a7cd49a2a19565e8ea20ae5d9",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/README.md": "58d30e2ae5c708cabb72f2a2acd66b0437cb605bde08afa66ce25787febcf15d",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/__init__.py": "e5c184d2696d3383ffe6b653b0f448a26c2a3cc6b2ce9d8bd460c53c14c9fce8",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/addon_manager.py": "4c6591b5c62ee4ca0217ca899749f9b80780eaaaf3cd7bb9c0965e037cbec693",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/addon_manager.py": "d9f5e50412bdf3400452f2e68c73080541a948c47de921ac6451e051a84f5ce2",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/apps/viewport.html": "a69acee1fbd8b85fb873fa965e92cc4e508f4cec631a3a51e7ce068d83738374",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/blender_scripts.py": "b2fb96d6e95d6f18d0024d84117299e73458169e1744c204ab2f4f3108d60124",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/blender_scripts.py": "88687b5c9b1c57e2838d9e8251afb3322f361777cd0f4a80b9dcb7be7ec72920",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/bundled/__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/bundled/addon.py": "229ee114f0504b486bdd24bbc8b08fa9b22112f5e831ef8b2e9cc507e9ccbbfe",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/bundled/addon.py": "35e5f317b932d15b485a37d914f7c9d7b527c7ea527f526569c1c111e5f39a05",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/consent_prompt.py": "413ee3e627b4be74c7f9e96226a2a1a58e5b0ce84b9cb1d10ff1021236977659",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/context_log.py": "a8e2f180a850388e03d137f98d5f7a061d5487cb23dd7a4c8de585bbd2adac84",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/generation.py": "59fd35a03f34be2d5cf1dc392aaa81ad88ada48847a5fc435520278eda6a3bd3",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/generation.py": "b447b92b391e88de102b358ef41c08d0ac22710b0405f82711413cb00aa19fe5",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/guides.py": "17b23a8cba8a335392cb0c23211fddb04a6f98bfe4ef044fc4b31621adb5aa1c",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/guides/animation.md": "c65ee11aa9a35dbbab1717385d24932da63ddc389eea6e81313a50f2b3e03447",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/guides/bpy.md": "f2e7d1ced7fe2fcc3b323bcd102c7064ccdea05a85ab8c2181b41999006cf165",
@@ -188,16 +188,16 @@
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/guides/retopology.md": "1100988d01389ed3786d805ff512022697b505ef2fdb40cfadb6355a3f6e63bd",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/guides/rigging.md": "a70cbe9894f8f58b648e1ed1cc4c42055ee216547084d96317a73adb7a718755",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/guides/scene.md": "c3dd5897ad2f5390ca68912b621eb61057dd98cab7ba7986fe93f8f0f0812dcc",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/openai_apps.py": "7fac0e23a19786a300ce1647a2c897137ef79abab2cff16249a685a44a1f61d9",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/premium_hint.py": "e5b86255a8cb605062cbc1159b8cf8ee7f33bf93bc758571b039b8829632fa0b",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/openai_apps.py": "0ec6afa2ad7c0b0e8428919d89856f1417f2a3b7274e0e877d423cd342c17d64",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/premium_hint.py": "20d8d6ea55c895b873b97995e1c5407bc9dbc3abee9f4fbb80357fcf093a3cc3",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/safe_mode.py": "b16e7cac74fc4f6b48901a7976a0a81e6c3f6325dbb6030d941b2e7a8006a1fa",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/server.py": "7a64d18a0ecf25e9de537c007bc28b9aa9ad07cc82f14640d5c41266af966c8a",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/setup_cli.py": "006e062ea5a7c1ea0ecb0ceb2815c37de498bcb4df52b84c8ad8187069b59596",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/telemetry_decorator.py": "4f0da2619bddd1c5f5d0202b324326fb8473acb2e8a124ea7e06f6e2b066f270",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/telemetry.py": "fd65b30cbf053cb870f96e6af054b517e28fa6c594230a768cb2ff67f6a011ea",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/trajectory.py": "4615ebdfd1845637bc6833b2f1ac6a15619b184c3b0d985d162e8e9a95d0c53c",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/server.py": "bfb5aeb98f503e9d5fb31bf9df40a8ca64402c7555c4d0bef1dae343e4d0f651",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/setup_cli.py": "47e69edf25cda47407a41d0743d3389d1a3b11f2236ef8c1b7f3fe538db964d5",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/telemetry_decorator.py": "df5e3b9fa36d7d1aeb23e7b909bf5d0b2151d4732c6f3139c98d8bae974054f2",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/telemetry.py": "04f45448a91fd623f56ff193d54cbdd25767ccd896056dd67c34dd34a0164c86",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/trajectory.py": "8cf5f8039417a81fc4703ab8c05c8b087d81bb9e04cf740047784ee335ab4f72",
     "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/update_cli.py": "3446e291fd48260b52befc9e6c4cced3e23b68e07384f14129c213103509f07d",
-    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/uv.lock": "93a6297318bd1b0de2c48c389b89820ff1dd95f1baa094ddf8326f22d91901af",
+    "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/uv.lock": "2aea894f64b2ff5b7522af2bfe48702a6d6143049ad317d8184a1e7efaff0191",
     "apps/zcode-cli/packages/bootstrap/package.json": "af4a7af9ea8dcdbb9587a81af5d314d7967db1886965dd6daa9776765d2ca87a",
     "apps/zcode-cli/packages/browser-use-plugin/package.json": "53a2c64811fbb85a8a88bf22ac2b42dbca7a283e3c83f0ebd24601889223741d",
     "apps/zcode-cli/packages/cli/package.json": "5f5c5e4f69a4d0cf73e2b70727c1ed7229a8efafe1fb560393fbaf07ef33ea3b",
@@ -2672,7 +2672,7 @@
     "scripts/license-texts/Apache-2.0.txt": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
     "scripts/native-search-tools-config.mjs": "02f126a916f881a6dfc353bd4189a650cfe44d4daec39dd4388d888708015acc",
     "scripts/remote-native-search-tools-config.mjs": "472322a66f84c7452f96aa9e16e9c4e0600f7c2588a03dc6bc869229161b1cb2",
-    "third-party/copied-components.json": "be7bdae45c52d9d944efb1926597e0cace592d762deb2cc90c3cbb6a2bb6f672",
+    "third-party/copied-components.json": "0aed78650d69af361c8e61b44d83ad3e42bbfcce0c63143c73a7fc6ec412fd9a",
     "third-party/embedded-components.json": "9586ccca15897f56d4ca1d703dffe9e02880fedd766c1dff93f7ac1f52ea891a",
     "third-party/license-reviews.json": "5987600820f7032a7a53abb448914f4a25e748474f891318dbf8801a6bd8b03d",
     "third-party/native-search/licenses/00373c9bf56a894b2ed67586596bc1e8b0630cabbaf1ab46c75fc754b6bcd1ce.txt": "00373c9bf56a894b2ed67586596bc1e8b0630cabbaf1ab46c75fc754b6bcd1ce",
@@ -34274,9 +34274,9 @@
     },
     {
       "id": "mcp-for-blender",
-      "referenceRevision": "5a3618fccb2d982d0dd61e7a1879912c3100073b",
-      "importRevision": "5a3618fccb2d982d0dd61e7a1879912c3100073b",
-      "source": "https://github.com/ahujasid/mcp-for-blender/blob/5a3618fccb2d982d0dd61e7a1879912c3100073b/LICENSE",
+      "referenceRevision": "b6a2ce30c14636a562b5549684d9db6fc01f29ab",
+      "importRevision": "b6a2ce30c14636a562b5549684d9db6fc01f29ab",
+      "source": "https://github.com/ahujasid/mcp-for-blender/blob/b6a2ce30c14636a562b5549684d9db6fc01f29ab/LICENSE",
       "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/LICENSE",
       "sha256": "049501fd54d27852507853a5b88094ca1c6ff97404418a5032f3310eecc9cde6",
       "roots": [
@@ -34291,15 +34291,15 @@
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/README.md",
-          "sha256": "fc96f24d1a05d87e59f3c39b8631cdcfdca6464d92184e9c2e67015f482821eb"
+          "sha256": "58d30e2ae5c708cabb72f2a2acd66b0437cb605bde08afa66ce25787febcf15d"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/addon.py",
-          "sha256": "229ee114f0504b486bdd24bbc8b08fa9b22112f5e831ef8b2e9cc507e9ccbbfe"
+          "sha256": "35e5f317b932d15b485a37d914f7c9d7b527c7ea527f526569c1c111e5f39a05"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/pyproject.toml",
-          "sha256": "04996707414123f2685b07700df9ee8f8b9c07f0a5cd69e070ad2b81ba3eafb1"
+          "sha256": "13b8aea5a63e7638317d6aaefac0eddc2408ad6a7cd49a2a19565e8ea20ae5d9"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/__init__.py",
@@ -34307,7 +34307,7 @@
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/addon_manager.py",
-          "sha256": "4c6591b5c62ee4ca0217ca899749f9b80780eaaaf3cd7bb9c0965e037cbec693"
+          "sha256": "d9f5e50412bdf3400452f2e68c73080541a948c47de921ac6451e051a84f5ce2"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/apps/viewport.html",
@@ -34315,7 +34315,7 @@
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/blender_scripts.py",
-          "sha256": "b2fb96d6e95d6f18d0024d84117299e73458169e1744c204ab2f4f3108d60124"
+          "sha256": "88687b5c9b1c57e2838d9e8251afb3322f361777cd0f4a80b9dcb7be7ec72920"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/bundled/__init__.py",
@@ -34323,7 +34323,7 @@
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/bundled/addon.py",
-          "sha256": "229ee114f0504b486bdd24bbc8b08fa9b22112f5e831ef8b2e9cc507e9ccbbfe"
+          "sha256": "35e5f317b932d15b485a37d914f7c9d7b527c7ea527f526569c1c111e5f39a05"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/consent_prompt.py",
@@ -34335,7 +34335,7 @@
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/generation.py",
-          "sha256": "59fd35a03f34be2d5cf1dc392aaa81ad88ada48847a5fc435520278eda6a3bd3"
+          "sha256": "b447b92b391e88de102b358ef41c08d0ac22710b0405f82711413cb00aa19fe5"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/guides/animation.md",
@@ -34371,11 +34371,11 @@
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/openai_apps.py",
-          "sha256": "7fac0e23a19786a300ce1647a2c897137ef79abab2cff16249a685a44a1f61d9"
+          "sha256": "0ec6afa2ad7c0b0e8428919d89856f1417f2a3b7274e0e877d423cd342c17d64"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/premium_hint.py",
-          "sha256": "e5b86255a8cb605062cbc1159b8cf8ee7f33bf93bc758571b039b8829632fa0b"
+          "sha256": "20d8d6ea55c895b873b97995e1c5407bc9dbc3abee9f4fbb80357fcf093a3cc3"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/safe_mode.py",
@@ -34383,23 +34383,23 @@
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/server.py",
-          "sha256": "7a64d18a0ecf25e9de537c007bc28b9aa9ad07cc82f14640d5c41266af966c8a"
+          "sha256": "bfb5aeb98f503e9d5fb31bf9df40a8ca64402c7555c4d0bef1dae343e4d0f651"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/setup_cli.py",
-          "sha256": "006e062ea5a7c1ea0ecb0ceb2815c37de498bcb4df52b84c8ad8187069b59596"
+          "sha256": "47e69edf25cda47407a41d0743d3389d1a3b11f2236ef8c1b7f3fe538db964d5"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/telemetry.py",
-          "sha256": "fd65b30cbf053cb870f96e6af054b517e28fa6c594230a768cb2ff67f6a011ea"
+          "sha256": "04f45448a91fd623f56ff193d54cbdd25767ccd896056dd67c34dd34a0164c86"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/telemetry_decorator.py",
-          "sha256": "4f0da2619bddd1c5f5d0202b324326fb8473acb2e8a124ea7e06f6e2b066f270"
+          "sha256": "df5e3b9fa36d7d1aeb23e7b909bf5d0b2151d4732c6f3139c98d8bae974054f2"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/trajectory.py",
-          "sha256": "4615ebdfd1845637bc6833b2f1ac6a15619b184c3b0d985d162e8e9a95d0c53c"
+          "sha256": "8cf5f8039417a81fc4703ab8c05c8b087d81bb9e04cf740047784ee335ab4f72"
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/src/blender_mcp/update_cli.py",
@@ -34407,7 +34407,7 @@
         },
         {
           "file": "apps/zcode-cli/packages/blender-plugin/vendor/mcp-for-blender/uv.lock",
-          "sha256": "93a6297318bd1b0de2c48c389b89820ff1dd95f1baa094ddf8326f22d91901af"
+          "sha256": "2aea894f64b2ff5b7522af2bfe48702a6d6143049ad317d8184a1e7efaff0191"
         }
       ]
     }
