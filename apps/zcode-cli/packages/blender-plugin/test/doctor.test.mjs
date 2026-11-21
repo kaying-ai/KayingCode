@@ -223,6 +223,13 @@ test("doctor reports the verified install path, disk copy and running version se
         BLENDER_HOST: "127.0.0.1",
         BLENDER_PORT: String(port),
         BLENDER_USER_ADDONS: addons,
+        // uv 检查只验证“二进制可执行”：用 node 本体替身（--version 退出码为 0），
+        // 不依赖开发者机器是否安装了 uv（CI runner 上没有 uv）。
+        KAYINGCODE_BLENDER_UV: process.execPath,
+        // 运行时缓存按 lock.commit 落在机器共享位置（%LOCALAPPDATA%/KayingCode/Cache/blender），
+        // 与本测试的临时插件根无关；已用过插件的机器上检查会通过，导致 nextAction 落到
+        // restart-blender。指向测试根内的空目录让 python-runtime 检查确定性失败。
+        KAYINGCODE_BLENDER_CACHE: join(root, "empty runtime cache"),
       };
       const report = await diagnose(env, root);
       assert.equal(report.ready, false);
@@ -248,7 +255,8 @@ test("doctor reports the verified install path, disk copy and running version se
       });
       assert.ok(running.suggestion.includes(addonPath));
       assert.match(running.suggestion, /磁盘/);
-      // 该环境没有 uv/Python 运行时，运行时准备优先于 add-on 重启。
+      // uv 通过、Python 运行时未准备（空缓存目录），运行时准备优先于 add-on 重启；
+      // 该顺序由上面的环境变量在任意机器上固定，不再依赖本机状态。
       assert.equal(report.nextAction.id, "prepare-python-runtime");
 
       await writeFile(addonPath, "corrupted addon");
