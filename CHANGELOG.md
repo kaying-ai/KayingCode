@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.2.3](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.2...kaying-code-v0.2.3) (2026-11-21)
+
+### Features
+
+* **blender:** add explicit add-on installer and doctor next actions ([60359d7](https://github.com/kaying-ai/KayingCode/commit/60359d7550cd4deec5da92bdb17f64c30f108873))
+  * 新增 /blender-install 与 blender_setup MCP：默认 dry-run，confirm 后复制固定字节、备份旧副本并以 headless Blender 启用
+  * 守卫 Blender 运行中、远端目标、版本未初始化、设置迁移、extensions 副本与启用失败；启用进程禁用 .blend 自动执行
+  * doctor 增加 blenderExecutable/blenderVersion/addonsDir 与 nextAction，文档明确 add-on 默认自动启动
+  * 补安装器、doctor 和 setup MCP 测试，并用真实 Blender 5.2.1 隔离配置验证持久化
+  * 更新插件目录、生成 catalog、spec 与验证记录
+
+* **blender:** ship reference-based modeling workflow in 0.2.0 ([6e4785f](https://github.com/kaying-ai/KayingCode/commit/6e4785f0a2cd6545c6417b1c1918d59bcd6f51fe))
+  * sync bundled mcp-for-blender to b6a2ce3 with pinned license notices
+  * add /blender-from-reference command, skill reference and asset checker
+  * keep original look screenshots through the core MCP image budget
+  * cover preview normalization and register CI verification steps
+
+
+### Bug Fixes
+
+* **blender:** harden snapshot verification and asset input checks ([d10cb14](https://github.com/kaying-ai/KayingCode/commit/d10cb1474df554ce04a6c9a13ad35f6fad4c780f))
+  * 快照不一致时列出路径，识别 Windows 旧检出留下的 CRLF 漂移并给出恢复方式，补齐缺失/额外/等量替换回归
+  * asset-check 在读取场景前校验 requirements、target、unit_scale 和 tolerance，非法输入返回字段级错误
+  * 补充 Blender look 在无 artifactStore 时的内联缩略图回退测试
+  * 更新 README、spec 与 Windows 验证记录，移除重复过期的评估文档
+
+* **blender:** make doctor next-action test independent of local runtime cache ([abfc8c6](https://github.com/kaying-ai/KayingCode/commit/abfc8c6717dcf068c33413b172a48c70902352da))
+
+* **blender:** point doctor at opening Blender when the port is closed ([b6ff912](https://github.com/kaying-ai/KayingCode/commit/b6ff912b684302681ad390cc342c71a48cab99a6))
+
 ## [0.2.2](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.1...kaying-code-v0.2.2) (2026-11-18)
 
 ### Features
