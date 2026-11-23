@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.4](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.3...kaying-code-v0.2.4) (2026-11-23)
+
+### Bug Fixes
+
+* **game-center:** register restored projects and bind agent drafts ([1776874](https://github.com/kaying-ai/KayingCode/commit/17768746663de40444a4b3aae2db777d849276ef))
+  * Register the restore target through `projectService.saveProject` so the
+  * Pass the registered project id in an object contract and open the draft
+  * Include local project roots in TapMaker association candidates so
+  * Distinguish local/cloud cards with border, corner ribbon and dedicated
+  * Cover the flows with unit tests, browser E2E and updated specs.
+
+* **taptap:** match local projects by maker app id ([67be93d](https://github.com/kaying-ai/KayingCode/commit/67be93d8e8cc16d5beb938b35a9b7b46a895f654))
+
 ## [0.2.3](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.2...kaying-code-v0.2.3) (2026-11-21)
 
 ### Features
