@@ -23,6 +23,40 @@ test("local association reads app identity and handles malformed and missing fil
   }
 });
 
+test("maker config id wins over the engine-side project id", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tapmaker-association-priority-"));
+  try {
+    await mkdir(path.join(root, ".project"));
+    await mkdir(path.join(root, ".maker-mcp"));
+    await writeFile(
+      path.join(root, ".project/project.json"),
+      JSON.stringify({ project_id: "m_jarj" }),
+    );
+    await writeFile(
+      path.join(root, ".maker-mcp/config.json"),
+      JSON.stringify({ project_id: "remote-id" }),
+    );
+    // 两个 id 同时存在时必须返回远端 app id，否则列表永远匹配不上本地目录。
+    assert.equal(await readLocalMakerAppId(root), "remote-id");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("engine project id remains the fallback when maker config is absent", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "tapmaker-association-fallback-"));
+  try {
+    await mkdir(path.join(root, ".project"));
+    await writeFile(
+      path.join(root, ".project/project.json"),
+      JSON.stringify({ project_id: "m_jarj" }),
+    );
+    assert.equal(await readLocalMakerAppId(root), "m_jarj");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("safe restore creates a child rather than replacing an unrelated nonempty directory", async () => {
   const root = await mkdtemp(path.join(tmpdir(), "tapmaker-safe-"));
   try {

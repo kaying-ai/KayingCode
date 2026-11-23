@@ -1139,9 +1139,28 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutContent({
     [handleStartDraftInWorkspace, showChatMainView],
   );
   const handleCreateProjectDraft = useCallback(
-    (path: string, identity?: string) =>
-      handleStartDraftInWorkspaceInChat(path, identity, undefined, "project"),
-    [handleStartDraftInWorkspaceInChat],
+    (path: string, workspaceIdentity?: string, projectId?: string) => {
+      // 恢复/打开本地项目已完成项目登记：按项目身份走 Host prepareSession，
+      // 草稿与输入框项目选择器才能绑定同一项目；只按目录开 tab 会停在“选择项目”。
+      // 仅限本地项目；远端身份仍走原目录导航，避免丢失 host。
+      if (projectId && !workspaceIdentity) {
+        handleCreateTaskInChat({ projectId, createSource: "project" });
+        return;
+      }
+      handleStartDraftInWorkspaceInChat(path, workspaceIdentity, undefined, "project");
+    },
+    [handleCreateTaskInChat, handleStartDraftInWorkspaceInChat],
+  );
+  // 游戏中心的 onOpenProject 用对象传递目录和项目 ID；这里显式适配到侧栏入口的
+  // (path, workspaceIdentity, projectId) 顺序，避免项目 ID 被误当成 workspace 身份
+  // 而让新 tab 走远端断连服务。
+  const handleOpenGameProject = useCallback(
+    ({
+      path,
+      projectId,
+    }: import("@/game-features/tapMakerProjectAssociation.js").TapMakerOpenProjectTarget) =>
+      handleCreateProjectDraft(path, undefined, projectId),
+    [handleCreateProjectDraft],
   );
   const activeWorkspacePurpose =
     workspaceTabs.find(
@@ -1868,7 +1887,7 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutContent({
                           isDesktop={isDesktop === true}
                           supportsEmbeddedBrowser={supportsEmbeddedBrowser === true}
                           onNavigate={onWorkspaceMainViewChange}
-                          onOpenProject={handleCreateProjectDraft}
+                          onOpenProject={handleOpenGameProject}
                           onBack={showChatMainView}
                         />
                       ) : workspaceMainView === "automations" ? (

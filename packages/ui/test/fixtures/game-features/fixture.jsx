@@ -26,6 +26,9 @@ window.fixture = {
   projects: [project],
   calls: [],
   opened: [],
+  openedProjectIds: [],
+  projectSaves: [],
+  folders: [],
   directory: null,
   fail: false,
   defer: false,
@@ -33,9 +36,37 @@ window.fixture = {
   external: [],
   finishedRestores: 0,
 };
+// 项目库是侧栏项目行的唯一事实源；恢复与候选目录都要经过它。
+const localProjects = [
+  {
+    id: "manual-project",
+    deleted: false,
+    roots: [{ rootPath: "C:/games/manual-project", isPrimary: true }],
+  },
+];
+const projectService = {
+  readProjects: async () => localProjects,
+  saveProject: async (input) => {
+    window.fixture.projectSaves.push(input);
+    const rootPath = input.roots?.[0] ?? "restored";
+    return {
+      id: `project:${rootPath}`,
+      name: input.name ?? "restored",
+      deleted: false,
+      roots: (input.roots ?? []).map((root, index) => ({
+        rootPath: root,
+        isPrimary: index === 0,
+      })),
+    };
+  },
+};
 const platform = {
   selectDirectory: async () => window.fixture.directory,
   openExternal: (url) => window.fixture.external.push(url),
+  openInFileManager: async (path) => {
+    window.fixture.folders.push(path);
+    return { success: true };
+  },
 };
 const service = {
   manageTapMakerProjects: async (input) => {
@@ -82,8 +113,9 @@ function Fixture() {
             isDesktop={window.fixture.isDesktop}
             supportsEmbeddedBrowser={new URLSearchParams(location.search).has("embedded")}
             onNavigate={setView}
-            onOpenProject={(path) => {
+            onOpenProject={({ path, projectId }) => {
               window.fixture.opened.push(path);
+              if (projectId) window.fixture.openedProjectIds.push(projectId);
               setView("chat");
             }}
             onBack={() => setView("chat")}
@@ -97,7 +129,7 @@ createRoot(document.getElementById("root")).render(
   <TooltipProvider>
     <KayingCodeIntlProvider initialLocale="zh-CN">
       <PlatformProvider platform={platform}>
-        <ServiceProvider services={{ kayingcodeAgentService: service }}>
+        <ServiceProvider services={{ kayingcodeAgentService: service, projectService }}>
           <TabStoreProvider>
             <Fixture />
           </TabStoreProvider>

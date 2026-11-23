@@ -9,7 +9,11 @@ import { listMakerRemoteProjects, restoreMakerRemoteProject } from "./remote-pro
 import { authorizeTapTap } from "./setup.js";
 
 export async function readLocalMakerAppId(directory: string): Promise<string | null> {
-  for (const config of [".project/project.json", ".maker-mcp/config.json"]) {
+  // Bug 原因：`.project/project.json` 的 project_id 是 Maker 引擎侧 id（如 m_jarj、p_nfyc），
+  // 与远端列表和恢复使用的 app id 不是同一命名空间；先读它会让本地目录永远关联不上远端游戏。
+  // 修复依据：`.maker-mcp/config.json` 由 maker init 写入，与 `maker apps --json` 同源，
+  // 是远端 id 的权威来源；仅在缺失或损坏时回退到引擎侧配置。
+  for (const config of [".maker-mcp/config.json", ".project/project.json"]) {
     try {
       const value: unknown = JSON.parse(await readFile(path.join(directory, config), "utf8"));
       if (
