@@ -1,19 +1,32 @@
-import { Cloud, Folder, Gamepad2, Loader2, LogIn, Pin, RefreshCw } from "lucide-react";
+import { Cloud, Gamepad2, Loader2, LogIn, Pin, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
+import { toast } from "@/components/ui/toast.js";
+import { cn } from "@/components/lib/utils.js";
+import { usePlatform } from "@/hooks/usePlatform.js";
 import { useTapMakerProjects } from "@/hooks/useTapMakerProjects.js";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
+import type { TapMakerOpenProjectTarget } from "@/game-features/tapMakerProjectAssociation.js";
 
 export function TapMakerProjectsPage({
   isDesktop,
   onOpenProject,
 }: {
   isDesktop: boolean;
-  onOpenProject: (path: string) => void;
+  onOpenProject: (target: TapMakerOpenProjectTarget) => void;
 }) {
   const { intl, locale } = useKayingCodeIntl();
+  const platform = usePlatform();
   const { projects, loading, error, working, refresh, restore, openLocal, authorize } =
     useTapMakerProjects(onOpenProject);
   const t = (key: string) => intl.formatMessage({ id: `gameFeatures.${key}` });
+  const openLocalFolder = async (path: string) => {
+    try {
+      const result = await platform.openInFileManager(path);
+      if (!result.success) throw new Error(result.error ?? "open-in-file-manager-failed");
+    } catch {
+      toast(intl.formatMessage({ id: "appHeader.openInFileManagerFailed" }));
+    }
+  };
   return (
     <div
       className="@container h-full overflow-y-auto p-3 sm:p-4"
@@ -74,17 +87,30 @@ export function TapMakerProjectsPage({
         <div className="mx-auto grid max-w-5xl gap-4 @xl:grid-cols-2 @xl:px-8 @min-[54rem]:grid-cols-3">
           {projects.map((project) => {
             const metadata = [project.gameType, project.stage].filter(Boolean).join(" · ");
-            const location = project.localDirectory ?? t("remoteOnly");
-            const LocationIcon = project.localDirectory ? Folder : Cloud;
+            const localDirectory = project.localDirectory;
+            const isLocal = Boolean(localDirectory);
+            const location = localDirectory ?? t("remoteOnly");
             return (
               <article
                 key={project.id}
-                className="flex min-w-0 flex-col gap-3 rounded-xl border border-card-border bg-card p-4"
+                className={cn(
+                  "relative flex min-w-0 flex-col gap-3 overflow-hidden rounded-xl border bg-card p-4 transition-colors",
+                  isLocal ? "border-card-border" : "border-dashed border-border",
+                )}
                 data-testid="tapmaker-project-card"
+                data-state={isLocal ? "local" : "remote"}
               >
-                <div className="flex min-w-0 items-start gap-2.5">
+                {isLocal ? (
+                  <span className="pointer-events-none absolute top-4 -right-4 w-20 rotate-45 bg-success/15 py-0.5 text-center text-ui-xs font-medium whitespace-nowrap text-success">
+                    {t("localState")}
+                  </span>
+                ) : null}
+                <div className={cn("flex min-w-0 items-start gap-2.5", isLocal && "pr-14")}>
                   <span
-                    className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface text-foreground-subtle"
+                    className={cn(
+                      "flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface",
+                      isLocal ? "text-foreground" : "text-foreground-subtle",
+                    )}
                     aria-hidden="true"
                   >
                     <Gamepad2 className="size-4" />
@@ -110,6 +136,16 @@ export function TapMakerProjectsPage({
                           {metadata}
                         </span>
                       ) : null}
+                      {/* 云端状态保留轻量标识；本地状态由右上角横幅表达，避免重复。 */}
+                      {!isLocal ? (
+                        <span className="inline-flex shrink-0 items-center gap-1 text-foreground-subtlest">
+                          <span
+                            aria-hidden="true"
+                            className="size-1 rounded-full border border-foreground-subtlest"
+                          />
+                          {t("cloudState")}
+                        </span>
+                      ) : null}
                       <ProjectActivityDate
                         value={
                           project.lastConversationAt ?? project.lastAccessedAt ?? project.createdAt
@@ -119,25 +155,53 @@ export function TapMakerProjectsPage({
                     </div>
                   </div>
                 </div>
-                <div className="mt-auto flex min-w-0 items-center justify-between gap-2 border-t border-card-border pt-3">
-                  <p className="flex min-w-0 items-center gap-1.5 text-ui-sm text-foreground-subtle">
-                    <LocationIcon className="size-3.5 shrink-0" aria-hidden="true" />
-                    <span className="truncate" title={location}>
-                      {location}
-                    </span>
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="text-ui-sm"
-                    disabled={!!working || (!project.localDirectory && !isDesktop)}
-                    onClick={() =>
-                      project.localDirectory ? openLocal(project) : void restore(project)
-                    }
-                  >
-                    {working === project.id ? <Loader2 className="animate-spin" /> : null}
-                    {t(project.localDirectory ? "openLocal" : "restore")}
-                  </Button>
+                <div
+                  className={cn(
+                    "mt-auto flex min-w-0 items-center gap-2 border-t border-card-border pt-3",
+                    isLocal ? "flex-wrap justify-end" : "justify-between",
+                  )}
+                >
+                  {isLocal && localDirectory ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="text-ui-sm whitespace-nowrap"
+                        disabled={!isDesktop}
+                        onClick={() => void openLocalFolder(localDirectory)}
+                      >
+                        {t("openFolder")}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="text-ui-sm whitespace-nowrap"
+                        disabled={!!working}
+                        onClick={() => void openLocal(project)}
+                      >
+                        {t("openInAgent")}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="flex min-w-0 items-center gap-1.5 text-ui-sm text-foreground-subtlest">
+                        <Cloud className="size-3.5 shrink-0" aria-hidden="true" />
+                        <span className="truncate" title={location}>
+                          {location}
+                        </span>
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        className="text-ui-sm"
+                        disabled={!!working || !isDesktop}
+                        onClick={() => void restore(project)}
+                      >
+                        {working === project.id ? <Loader2 className="animate-spin" /> : null}
+                        {t("restore")}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </article>
             );

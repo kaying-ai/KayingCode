@@ -32,7 +32,9 @@ export function GameFeatureMainView({
   isDesktop: boolean;
   supportsEmbeddedBrowser: boolean;
   onNavigate: (page: GameFeaturePage) => void;
-  onOpenProject: (path: string) => void;
+  onOpenProject: (
+    target: import("./tapMakerProjectAssociation.js").TapMakerOpenProjectTarget,
+  ) => void;
   onBack: () => void;
 }) {
   const { intl } = useKayingCodeIntl();

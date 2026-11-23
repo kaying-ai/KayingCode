@@ -144,6 +144,19 @@ try {
   assert.equal(await page.getByTestId("plugin-content").isVisible(), true);
   await open("tapmaker-projects");
   await page.getByTestId("tapmaker-project-card").waitFor();
+  assert.equal(
+    await content.getByTestId("tapmaker-project-card").first().getAttribute("data-state"),
+    "remote",
+  );
+  assert.equal(
+    await page.evaluate(() =>
+      window.fixture.calls.some(
+        (call) =>
+          call.action === "list" && call.candidateDirectories.includes("C:/games/manual-project"),
+      ),
+    ),
+    true,
+  );
   await screenshot("zcode-tapmaker-list-light.png");
   await page.evaluate(() => {
     document.documentElement.classList.remove("theme-zai-light");
@@ -172,9 +185,22 @@ try {
   });
   await waitClosed();
   assert.deepEqual(await page.evaluate(() => window.fixture.opened), ["C:/games/restored-child"]);
+  // 恢复后草稿必须带上登记所得项目 ID，输入框项目选择器才能自动切到新项目。
+  assert.deepEqual(await page.evaluate(() => window.fixture.openedProjectIds), [
+    "project:C:/games/restored-child",
+  ]);
   assert.equal(
     await page.evaluate(() => window.fixture.tabs.getState().tabs[0].workspacePath),
     "C:/games/restored-child",
+  );
+  assert.deepEqual(
+    await page.evaluate(() =>
+      window.fixture.projectSaves.map((input) => ({
+        reuseExistingRoot: input.reuseExistingRoot,
+        roots: input.roots,
+      })),
+    ),
+    [{ reuseExistingRoot: true, roots: ["C:/games/restored-child"] }],
   );
   await page.evaluate(() => {
     window.fixture.projects = [];
@@ -211,9 +237,18 @@ try {
     ];
   });
   await content.getByRole("button", { name: "刷新", exact: true }).click();
-  await content.getByRole("button", { name: "打开本地项目", exact: true }).click();
+  await content.locator('[data-testid="tapmaker-project-card"][data-state="local"]').waitFor();
+  await screenshot("zcode-tapmaker-local-dark.png");
+  await content.getByRole("button", { name: "打开所在文件夹", exact: true }).click();
+  await page.waitForFunction(() => window.fixture.folders.length === 1);
+  assert.equal(await page.evaluate(() => window.fixture.folders.at(-1)), "C:/local-game");
+  await content.getByRole("button", { name: "在 Agent 中打开", exact: true }).click();
   await waitClosed();
   assert.equal(await page.evaluate(() => window.fixture.opened.at(-1)), "C:/local-game");
+  assert.equal(
+    await page.evaluate(() => window.fixture.openedProjectIds.at(-1)),
+    "project:C:/local-game",
+  );
   await open("tapmaker-projects");
   await page.evaluate(() => {
     window.fixture.projects[0].localDirectory = null;
@@ -297,14 +332,19 @@ try {
     await cards.first().getByRole("heading").getAttribute("title"),
     "名称很长的 TapMaker 游戏，用来验证卡片保持紧凑且完整名称可查看",
   );
-  const localButton = cards.first().getByRole("button", { name: "Open local project" });
-  assert.ok(await localButton.evaluate((button) => button.scrollWidth <= button.clientWidth));
+  for (const name of ["Open folder", "Open in Agent"]) {
+    const action = cards.first().getByRole("button", { name });
+    assert.ok(await action.evaluate((button) => button.scrollWidth <= button.clientWidth));
+  }
+  // 系统文件管理器入口只在桌面端可用。
+  assert.equal(await cards.first().getByRole("button", { name: "Open folder" }).isDisabled(), true);
+  // 本地卡片不再展示路径，只保留两个操作按钮。
   assert.equal(
     await cards
       .first()
-      .getByText("C:/games/a-very-long-directory-name/nested-path/project-folder")
-      .getAttribute("title"),
-    "C:/games/a-very-long-directory-name/nested-path/project-folder",
+      .getByText(/C:\/games\/a-very-long-directory-name/)
+      .count(),
+    0,
   );
   await screenshot("zcode-tapmaker-cards-mobile.png");
   await page.setViewportSize({ width: 1536, height: 900 });
