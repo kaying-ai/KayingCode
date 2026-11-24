@@ -31,7 +31,7 @@ export interface KayingCodeSkillInspection {
 export async function listKayingCodeSkills(
   options: ListKayingCodeSkillsOptions = {},
 ): Promise<SkillLoadOutcome> {
-  const discovery = createSkillDiscovery(options);
+  const discovery = await createSkillDiscovery(options);
   if (!discovery.enabled) {
     return {
       diagnostics: [],
@@ -48,7 +48,7 @@ export async function listKayingCodeSkills(
 export async function inspectKayingCodeSkill(
   options: InspectKayingCodeSkillOptions,
 ): Promise<KayingCodeSkillInspection> {
-  const discovery = createSkillDiscovery(options);
+  const discovery = await createSkillDiscovery(options);
   if (!discovery.enabled) {
     throw new Error("Skills are disabled.");
   }
@@ -75,7 +75,7 @@ export async function inspectKayingCodeSkill(
   };
 }
 
-function createSkillDiscovery(options: ListKayingCodeSkillsOptions):
+async function createSkillDiscovery(options: ListKayingCodeSkillsOptions): Promise<
   | {
       enabled: false;
       workingDirectory: string;
@@ -84,7 +84,8 @@ function createSkillDiscovery(options: ListKayingCodeSkillsOptions):
       enabled: true;
       skillPort: ReturnType<typeof createNodeSkillAdapter>;
       workingDirectory: string;
-    } {
+    }
+> {
   const workingDirectory = resolve(options.workingDirectory ?? process.cwd());
   const configResult = createConfig({
     env: options.env,
@@ -100,7 +101,7 @@ function createSkillDiscovery(options: ListKayingCodeSkillsOptions):
       workingDirectory,
     };
   }
-  const pluginOutcome = resolveKayingCodePlugins({
+  const pluginOutcome = await resolveKayingCodePlugins({
     configResult,
     env: options.env,
     logger: options.logger,

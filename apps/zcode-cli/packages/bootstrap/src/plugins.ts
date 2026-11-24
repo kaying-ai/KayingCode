@@ -15,14 +15,14 @@ import {
   updatePluginOptionsInFileConfig,
   type ConfigResult,
 } from "@zcode/adapters/config";
-import { removeStoredPluginSecrets, savePluginOptions } from "./plugin-secrets.js";
+import { removeStoredPluginSecrets, savePluginOptions, withPluginSecrets } from "./plugin-secrets.js";
 import {
   addMarketplace,
   comparePluginUpdate,
   describeMarketplacePlugin,
   enrichCachedClaudeMarketplaceIcons,
   ensureDefaultPluginMarketplaces,
-  discoverNodePluginsSync,
+  discoverNodePlugins,
   ensureMarketplaceManifestAvailable,
   getPluginSourceDiagnosticCode,
   getPluginDataDir,
@@ -50,6 +50,7 @@ import type {
   PluginHookDetail,
   PluginLoadOutcome,
   PluginMetadata,
+  PluginPort,
   PluginStoreListing,
 } from "@zcode/contracts";
 import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE, isOfficialMarketplaceId } from "@zcode/contracts";
@@ -64,17 +65,21 @@ import {
 } from "./app/official-plugin-definitions.js";
 import { getCliStorageRoot, getPluginStorageRoot } from "./app/paths.js";
 import { withPluginStorageLock } from "./lib/plugin-storage-lock.js";
+import { resolveWorkspacePluginDiscovery } from "./workspace-plugin-trust/index.js";
 
 export interface ResolveKayingCodePluginsOptions {
   configResult?: ConfigResult;
   env?: NodeJS.ProcessEnv;
   logger?: Logger;
   officialPluginRoots?: string[];
+  pluginDiscovery?: PluginPort;
   pluginStorageRoot?: string;
   projectConfigPath?: string;
+  remoteSessionId?: string;
   skipUserConfig?: boolean;
   userConfigPath?: string;
   workingDirectory?: string;
+  workspaceIdentity?: string;
 }
 
 export interface ListKayingCodePluginsOptions extends ResolveKayingCodePluginsOptions {}
@@ -254,33 +259,56 @@ function countVisibleMarketplacePlugins(
   return plugins.filter((entry) => entry.name !== OFFICIAL_NODE_REPL_HOST_PLUGIN_NAME).length;
 }
 
-export function resolveKayingCodePlugins(
+export async function resolveKayingCodePlugins(
   options: ResolveKayingCodePluginsOptions = {},
-): PluginLoadOutcome {
+): Promise<PluginLoadOutcome> {
   const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
+  // 敏感选项在私有文件里；按层叠加后再交给发现，运行时展开与协议投影读到的是同一份有效值。
+  const secrets = await withPluginSecrets(
+    configResult,
+    resolvePluginSecretsPath(pluginStorageRoot),
+    options.logger,
+  );
 
-  return discoverNodePluginsSync({
-    config: configResult.config.plugins,
+  const outcome = await (
+    options.pluginDiscovery
+      ? options.pluginDiscovery.discoverPlugins.bind(options.pluginDiscovery)
+      : discoverNodePlugins
+  )({
+    workspaceIdentity: options.workspaceIdentity,
+    remoteSessionId: options.remoteSessionId,
+    config: secrets.configResult.config.plugins,
     env: options.env ?? process.env,
-    officialPluginRoots: resolveOfficialPluginRoots({
+    officialPluginRoots: await resolveOfficialPluginRoots({
       extraRoots: options.officialPluginRoots,
       // cache 锁冲突已从 fatal 改为 degraded，普通插件入口也必须保留诊断日志。
       logger: options.logger,
       storageRoot: pluginStorageRoot,
-      suppressedBuiltins: new Set(configResult.config.plugins.suppressedBuiltins),
+      suppressedBuiltins: new Set(secrets.configResult.config.plugins.suppressedBuiltins),
     }),
     officialPluginsEnabledByDefault: DEFAULT_ENABLED_OFFICIAL_PLUGIN_IDS,
     storageRoot: pluginStorageRoot,
     workingDirectory,
+    // 项目目录插件按入口时刻的信任记录准入；会话运行中新增的信任不热加载。
+    workspacePlugins: await resolveWorkspacePluginDiscovery({
+      configResult: secrets.configResult,
+      env: options.env,
+      logger: options.logger,
+      workingDirectory,
+      workspaceIdentity: options.workspaceIdentity,
+    }),
   });
+  return secrets.diagnostics.length > 0
+    ? { ...outcome, diagnostics: [...outcome.diagnostics, ...secrets.diagnostics] }
+    : outcome;
 }
 
-export function getKayingCodePluginsOverview(
+export async function getKayingCodePluginsOverview(
   options: ResolveKayingCodePluginsOptions = {},
-): KayingCodePluginsOverviewData {
+): Promise<KayingCodePluginsOverviewData> {
   const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
   ensureDefaultPluginMarketplaces(pluginStorageRoot);
-  const outcome = resolveKayingCodePlugins({
+  const outcome = await resolveKayingCodePlugins({
     ...options,
     configResult,
     pluginStorageRoot,
@@ -420,10 +448,10 @@ export function enrichCachedClaudeMarketplaceIconsForOverview(
   );
 }
 
-export function listKayingCodePlugins(
+export async function listKayingCodePlugins(
   options: ListKayingCodePluginsOptions = {},
-): PluginLoadOutcome {
-  const outcome = resolveKayingCodePlugins(options);
+): Promise<PluginLoadOutcome> {
+  const outcome = await resolveKayingCodePlugins(options);
   const { pluginStorageRoot } = resolvePluginContext(options);
   return {
     ...outcome,
@@ -469,7 +497,7 @@ export async function setKayingCodePluginEnabled(
       skipUserConfig: options.skipUserConfig,
       userConfigPath: options.userConfigPath,
     });
-  const outcome = resolveKayingCodePlugins({
+  const outcome = await resolveKayingCodePlugins({
     ...options,
     configResult,
     workingDirectory,
@@ -673,7 +701,7 @@ export async function installKayingCodeMarketplacePlugin(
     // 否则同一 storageRoot 的 promise-chain lock 会等待自身而永久阻塞。
     await restoreBuiltinPluginCore({ ...options, configResult, pluginId });
     const fresh = resolvePluginContext({ ...options, configResult: undefined });
-    const outcome = resolveKayingCodePlugins({
+    const outcome = await resolveKayingCodePlugins({
       ...options,
       configResult: fresh.configResult,
       pluginStorageRoot: fresh.pluginStorageRoot,
@@ -807,7 +835,7 @@ export async function uninstallKayingCodeMarketplacePlugin(
     // 内置（官方）插件不在 installed_plugins.json 里，无法走 marketplace 卸载路径。
     // 卸载只改变 Runtime 抑制态并清理用户数据/config；Catalog 与不可变 cache 必须保留，
     // 这样详情页仍能离线读取组件，且恢复动作不依赖重新下载或重新构造目录。
-    const outcome = resolveKayingCodePlugins({
+    const outcome = await resolveKayingCodePlugins({
       ...options,
       configResult,
       pluginStorageRoot,
@@ -1061,7 +1089,7 @@ async function restoreBuiltinPluginCore(options: RestoreBuiltinPluginOptions): P
   // 不能复用 patch 前可能被传入的 configResult。
   const fresh = resolvePluginContext({ ...options, configResult: undefined });
   // 立即重新 seed，让插件即刻可用，无需等待下一次 resolve。
-  resolveOfficialPluginRoots({
+  await resolveOfficialPluginRoots({
     storageRoot: fresh.pluginStorageRoot,
     suppressedBuiltins: new Set(fresh.configResult.config.plugins.suppressedBuiltins),
   });
@@ -1078,7 +1106,7 @@ export async function configureKayingCodePlugin(
   const normalizedOptions = normalizePluginOptions(options.options);
   const clearOptionKeys = normalizePluginOptionKeys(options.clearOptionKeys);
   const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
-  const outcome = resolveKayingCodePlugins({
+  const outcome = await resolveKayingCodePlugins({
     ...options,
     configResult,
     pluginStorageRoot,

@@ -48,6 +48,7 @@ import type {
   KayingCodePluginsDescribeResult,
   KayingCodePluginsValidateResult,
   KayingCodePluginsSetEnabledResult,
+  KayingCodePluginsWorkspaceTrustResult,
   KayingCodePluginsCancelOperationResult,
   KayingCodePluginOperationProgressNotification,
   KayingCodeProviderTestModelConnectivityParams,
@@ -133,6 +134,7 @@ import type {
   KayingCodeAgentRemovePluginMarketplaceParams,
   KayingCodeAgentRestoreBuiltinPluginParams,
   KayingCodeAgentSetPluginEnabledParams,
+  KayingCodeAgentSetPluginWorkspaceTrustParams,
   KayingCodeAgentSetAutomationEnabledParams,
   KayingCodeAgentUninstallPluginParams,
   KayingCodeAgentUpdatePluginMarketplaceParams,
@@ -770,6 +772,9 @@ export interface IKayingCodeAgentService {
   setPluginEnabled(
     params: KayingCodeAgentSetPluginEnabledParams,
   ): Promise<KayingCodePluginsSetEnabledResult>;
+  setWorkspacePluginTrust(
+    params: KayingCodeAgentSetPluginWorkspaceTrustParams,
+  ): Promise<KayingCodePluginsWorkspaceTrustResult>;
   // ---- 定时任务(automation)管理 ----
   listAutomations(params: KayingCodeAgentWorkspaceTarget): Promise<KayingCodeAutomation[]>;
   listAllAutomations(): Promise<KayingCodeAutomation[]>;

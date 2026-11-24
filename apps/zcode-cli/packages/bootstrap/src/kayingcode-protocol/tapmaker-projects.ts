@@ -42,7 +42,7 @@ export async function manageTapMakerProjects(
   const logger = context.logger;
   if (!logger || !context.deps.mcpPort) throw new Error("TapMaker management runtime unavailable");
   const configResult = createConfig({ env: context.deps.env, workingDirectory });
-  const outcome = resolveStartupPlugins({
+  const outcome = await resolveStartupPlugins({
     cliStorageRoot: getCliStorageRoot(resolvePath(configResult.config.storage.dir)),
     configResult,
     env: context.deps.env,

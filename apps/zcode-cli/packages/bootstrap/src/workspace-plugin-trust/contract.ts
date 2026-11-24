@@ -1,6 +1,6 @@
 /**
  * workspace-plugin-trust 对外契约：项目目录插件信任记录的唯一 owner。
- * 规格：docs/plugins/workspace-plugin-dir-trust.md。
+ * 规格：apps/zcode-cli/packages/adapters/docs/workspace-plugin-dir-trust.md。
  */
 import type { ConfigResult } from "@zcode/adapters/config";
 import type { Logger, WorkspacePluginDiscovery } from "@zcode/contracts";

@@ -52,7 +52,7 @@ export async function listMcpServers(
     },
     startupNow(),
   );
-  const pluginOutcome = resolveStartupPlugins({
+  const pluginOutcome = await resolveStartupPlugins({
     cliStorageRoot,
     configResult,
     env: context.deps.env,
@@ -60,6 +60,7 @@ export async function listMcpServers(
     options: {},
     startupTimer,
     workingDirectory,
+    workspaceIdentity: params.workspace.workspaceIdentity,
   });
   const explicitMcpServersProvided = params.mcpServers !== undefined;
   const explicitRuntimeMcp = protocolMcpServersToRuntimeMcpConfig(params.mcpServers);

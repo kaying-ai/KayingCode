@@ -3131,6 +3131,21 @@ export type KayingCodePluginUserConfigOption = z.infer<
   typeof kayingcodePluginUserConfigOptionSchema
 >;
 
+/**
+ * 项目目录插件的信任状态。pending 时插件强制停用、不解析任何组件；
+ * trusted 表示用户域记录命中当前声明摘要，启停回到配置。
+ */
+export const kayingcodePluginWorkspaceTrustSchema = z
+  .object({
+    state: z.enum(["pending", "trusted"]),
+    pluginRoot: nonEmptyString,
+    declarationDigest: z.string().regex(/^[a-f0-9]{64}$/u),
+  })
+  .strict();
+export type KayingCodePluginWorkspaceTrust = z.infer<
+  typeof kayingcodePluginWorkspaceTrustSchema
+>;
+
 // 组件类型与详情弹窗/市场详情共用的分组顺序保持一致：agent / command / skill / hook / mcp。
 // 注意：这三个 schema 必须定义在 kayingcodePluginInfoSchema 之前，因为后者（.strict()）的 components 字段引用了它们。
 export const kayingcodePluginComponentKindSchema = z.enum([
@@ -3247,6 +3262,8 @@ export const kayingcodePluginInfoSchema = z
     dataPath: z.string().optional(),
     userConfig: z.record(z.string(), kayingcodePluginUserConfigOptionSchema).optional(),
     configuredOptions: z.record(z.string(), kayingcodePluginOptionValueSchema).optional(),
+    // 只有项目配置 plugins.dirs 声明的目录插件才有；pending 时 enabled 恒为 false。
+    workspaceTrust: kayingcodePluginWorkspaceTrustSchema.optional(),
     // 缺省表示 package 可用；missing 用于保留已声明但目标 Host 尚未物化的配置行。
     packageStatus: z.literal("missing").optional(),
     rootSource: kayingcodePluginScopeSchema.optional(),
@@ -3285,6 +3302,30 @@ export const kayingcodePluginsListResultSchema = z
   })
   .strict();
 export type KayingCodePluginsListResult = z.infer<typeof kayingcodePluginsListResultSchema>;
+
+// 项目目录插件信任：写入用户域记录；只影响之后新建的会话。
+export const kayingcodePluginsWorkspaceTrustParamsSchema = z
+  .object({
+    workspace: kayingcodeWorkspaceRefSchema,
+    pluginRoot: nonEmptyString,
+    declarationDigest: z.string().regex(/^[a-f0-9]{64}$/u),
+    trusted: z.boolean(),
+  })
+  .strict();
+export type KayingCodePluginsWorkspaceTrustParams = z.infer<
+  typeof kayingcodePluginsWorkspaceTrustParamsSchema
+>;
+export const kayingcodePluginsWorkspaceTrustResultSchema = z
+  .object({
+    accepted: z.boolean(),
+    reasonCode: z
+      .enum(["workspace_plugin_declaration_changed", "workspace_plugin_trust_unavailable"])
+      .optional(),
+  })
+  .strict();
+export type KayingCodePluginsWorkspaceTrustResult = z.infer<
+  typeof kayingcodePluginsWorkspaceTrustResultSchema
+>;
 
 // ── 插件 UI 面板入口──
 // 工作区级只读投影：已启用插件清单 `ui.surfaces[]` 的合法条目；插件启停后 host 重新拉取。
@@ -4609,6 +4650,7 @@ export const kayingcodeProtocolMethods = {
   workflowsForRun: "workflows/forRun",
   pluginsResolveSuggestedReference: "plugins/resolveSuggestedReference",
   pluginsSetEnabled: "plugins/setEnabled",
+  pluginsWorkspaceTrust: "plugins/workspaceTrust",
   pluginsOverview: "plugins/overview",
   pluginsLocalSourceAdd: "plugins/local-source/add",
   pluginsLocalSourceRemove: "plugins/local-source/remove",

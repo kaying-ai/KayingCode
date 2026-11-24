@@ -1,3 +1,4 @@
+import type { PluginMaterialReader } from "./helpers.js";
 import type {
   CustomCommandRoot,
   HookEventName,
@@ -19,11 +20,7 @@ export interface PluginCandidate {
 }
 
 export interface LoadedPlugin {
-  /** 项目插件声明摘要读取器；普通插件发现为 undefined。 */
-  materials?: {
-    fileExists(path: string): Promise<boolean>;
-    text(path: string): Promise<string>;
-  };
+  materials?: PluginMaterialReader;
   id: string;
   manifest: PluginManifest;
   manifestPath: string;

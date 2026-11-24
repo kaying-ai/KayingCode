@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
-import { discoverNodePluginsSync } from "@zcode/adapters/plugins";
+import { discoverNodePlugins } from "@zcode/adapters/plugins";
 import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE } from "@zcode/contracts";
 import { KAYINGCODE_PLUGIN_ID_ENV_KEY } from "@zcode/shared";
 import { resolveTapMakerManagementServer } from "../src/kayingcode-protocol/tapmaker-projects.js";
@@ -29,7 +29,7 @@ test("actual builtin Maker stdio has no official auth and remains selectable", a
       workingDirectory: root,
       env: {},
     };
-    const outcome = discoverNodePluginsSync(request);
+    const outcome = await discoverNodePlugins(request);
     const entry = resolveTapMakerManagementServer(outcome.mcpServers);
     assert.ok(entry);
     const [name, config] = entry;
@@ -38,12 +38,12 @@ test("actual builtin Maker stdio has no official auth and remains selectable", a
     assert.equal(config.env?.[KAYINGCODE_PLUGIN_ID_ENV_KEY], pluginId);
     assert.equal(config.source?.kind, "builtin");
 
-    const disabled = discoverNodePluginsSync({
+    const disabled = await discoverNodePlugins({
       ...request,
       config: { ...request.config, enabledPlugins: { [pluginId]: false } },
     });
     assert.equal(resolveTapMakerManagementServer(disabled.mcpServers), undefined);
-    const suppressed = discoverNodePluginsSync({
+    const suppressed = await discoverNodePlugins({
       ...request,
       config: { ...request.config, suppressedBuiltins: [pluginId] },
     });

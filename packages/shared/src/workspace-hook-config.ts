@@ -283,9 +283,10 @@ export async function readWorkspaceHookProjectSources(input: {
   return { sources, errors };
 }
 
-async function discoverWorkspaceHookConfigPathsAsync(input: {
+export async function discoverWorkspaceHookConfigPathsAsync(input: {
   workingDirectory: string;
   explicitProjectConfigPath?: string;
+  includeMissing?: boolean;
 }): Promise<WorkspaceHookConfigPathRef[]> {
   const start = resolve(input.workingDirectory);
   const candidates = buildWorkspaceHookCandidatePaths(
@@ -293,11 +294,13 @@ async function discoverWorkspaceHookConfigPathsAsync(input: {
   );
   const refs: WorkspaceHookConfigPathRef[] = [];
   for (const path of candidates) {
-    if (await pathExists(path)) refs.push({ path, explicitProjectConfig: false });
+    if (input.includeMissing || (await pathExists(path))) {
+      refs.push({ path, explicitProjectConfig: false });
+    }
   }
   if (input.explicitProjectConfigPath) {
     const explicitPath = resolve(input.explicitProjectConfigPath);
-    if (await pathExists(explicitPath)) {
+    if (input.includeMissing || (await pathExists(explicitPath))) {
       refs.push({ path: explicitPath, explicitProjectConfig: true });
     }
   }

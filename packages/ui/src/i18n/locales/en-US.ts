@@ -2693,6 +2693,14 @@ const enUS: Record<string, string> = {
   "settings.plugins.toggle.workspaceDisabled":
     "Disabled {plugin} in this workspace (overriding User default)",
   "settings.plugins.toggle.failed": "Couldn't update {plugin}. Try again.",
+  "settings.plugins.workspaceTrust.pending": "Pending trust",
+  "settings.plugins.workspaceTrust.pendingHint":
+    "This plugin comes from a project directory. Review and trust it before it can be enabled.",
+  "settings.plugins.workspaceTrust.trust": "Trust",
+  "settings.plugins.workspaceTrust.trusted": "Trusted {plugin}",
+  "settings.plugins.workspaceTrust.changed":
+    "{plugin} changed since review. Review it again before trusting.",
+  "settings.plugins.workspaceTrust.failed": "Couldn't trust {plugin}. Try again.",
   "settings.plugins.status.enabled": "Enabled",
   "settings.plugins.status.disabled": "Disabled",
   "settings.modelProviderDescription":

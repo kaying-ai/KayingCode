@@ -17,6 +17,11 @@ export interface ProjectConfigFile {
   hookCandidate?: WorkspaceHookSourceInput;
   loaded: boolean;
   path: string;
+  /**
+   * 项目 `plugins.dirs` 解析成的绝对目录，只是待信任候选，不在 config 里。
+   * 插件发现按用户域信任记录逐个准入（apps/zcode-cli/packages/adapters/docs/workspace-plugin-dir-trust.md）。
+   */
+  pluginDirCandidates?: string[];
 }
 
 export interface ProjectConfigDiscovery {
@@ -59,6 +64,11 @@ export function loadProjectConfigFile(
   const baseDir = getProjectConfigBaseDir(result.path);
   const diagnostics = [...result.diagnostics];
   const hooks = result.loaded ? result.config.hooks : undefined;
+  const pluginDirCandidates = result.loaded
+    ? (result.config.plugins?.dirs ?? []).map((dir) =>
+        isAbsolute(dir) ? resolve(dir) : resolve(baseDir, dir),
+      )
+    : [];
 
   if (hooks) {
     diagnostics.push({
@@ -91,6 +101,7 @@ export function loadProjectConfigFile(
       : {}),
     loaded: result.loaded,
     path: result.path,
+    ...(pluginDirCandidates.length > 0 ? { pluginDirCandidates } : {}),
   };
 }
 
@@ -133,7 +144,8 @@ export function normalizeProjectConfig(
     : { ...config };
 
   if (normalized.plugins?.dirs) {
-    // 工作区目录插件曾绕过用户安装直接注册 Hook/MCP；项目配置不能引入插件根目录。
+    // 工作区目录插件曾绕过用户安装直接注册 Hook/MCP；项目目录只作为待信任候选
+    // （ProjectConfigFile.pluginDirCandidates），可执行配置里永远没有项目插件根目录。
     const { dirs: _dirs, ...plugins } = normalized.plugins;
     normalized.plugins = plugins;
   }
@@ -154,7 +166,10 @@ export function normalizeProjectConfig(
   };
 }
 
-function normalizeProjectMcpServer(server: McpServerConfig, baseDir: string): McpServerConfig {
+export function normalizeProjectMcpServer(
+  server: McpServerConfig,
+  baseDir: string,
+): McpServerConfig {
   if (server.type !== "stdio") return server;
 
   const cwd = server.cwd ?? CURRENT_DIRECTORY;

@@ -1,6 +1,6 @@
 # workspace-plugin-trust
 
-项目 `plugins.dirs` 目录插件的用户域信任记录（规格：`docs/plugins/workspace-plugin-dir-trust.md`）。
+项目 `plugins.dirs` 目录插件的用户域信任记录（规格：`apps/zcode-cli/packages/adapters/docs/workspace-plugin-dir-trust.md`）。
 
 不变量：
 

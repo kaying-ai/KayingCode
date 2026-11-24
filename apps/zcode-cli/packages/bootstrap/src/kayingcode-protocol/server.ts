@@ -85,6 +85,7 @@ import {
   resetPluginConfig,
   restoreBuiltinPlugin,
   setPluginEnabled,
+  setPluginWorkspaceTrust,
   uninstallPlugin,
   updatePlugin,
   refreshLocalPluginSource,
@@ -892,6 +893,8 @@ export class KayingCodeProtocolAgentServer {
         return await this.withPluginOperationSignal(request, (signal) =>
           setPluginEnabled(this.context, request.params, signal),
         );
+      case kayingcodeProtocolMethods.pluginsWorkspaceTrust:
+        return await setPluginWorkspaceTrust(this.context, request.params);
       case kayingcodeProtocolMethods.pluginsOverview:
         return await getPluginsOverview(this.context, request.params);
       case kayingcodeProtocolMethods.processChildProcesses:

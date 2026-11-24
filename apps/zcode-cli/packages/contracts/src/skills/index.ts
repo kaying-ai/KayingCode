@@ -109,6 +109,20 @@ export interface SkillOperationOptions {
   context?: ExecutionContext;
 }
 
+/**
+ * 按名称找不到 skill（目录重读之后仍未命中）。Skill tool 按类型把它转成模型文字，不解析 message；
+ * message 保持 `Skill not found: <name>`，CLI 命令直接输出它。
+ */
+export class SkillNotFoundError extends Error {
+  readonly skillName: string;
+
+  constructor(skillName: string) {
+    super(`Skill not found: ${skillName}`);
+    this.name = "SkillNotFoundError";
+    this.skillName = skillName;
+  }
+}
+
 export interface SkillPort {
   discoverSkills(
     request: SkillDiscoverRequest,

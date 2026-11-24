@@ -24,8 +24,11 @@ import { createJimpImageProcessorAdapter } from "@zcode/adapters/image";
 import { createPopplerPdfDocumentAdapter } from "@zcode/adapters/pdf";
 import { createNodeSessionMailboxAdapter } from "@zcode/adapters/mailbox";
 import { createNodeContextSourceAdapter } from "@zcode/adapters/context";
-import { createNodeSkillAdapter } from "@zcode/adapters/skills";
 import { createMcpAdapter } from "@zcode/adapters/mcp";
+import type { CatalogSkillPort } from "@zcode/adapters/skills/catalog";
+import type { McpConfigurationSource } from "@zcode/contracts";
+import { createAppSkillPort } from "./dynamic-skill-catalog.js";
+import { createAppMcpConfigurationSource } from "./dynamic-mcp-config.js";
 import {
   AgentRuntime,
   normalizeAgentProfiles,
@@ -85,7 +88,6 @@ import { createSessionFacade } from "./session-facade.js";
 import { resolveAppRuntimeConfig, runtimeConfigLogContext } from "./runtime-config.js";
 import { resolveBundledSkillRoots } from "./bundled-skills.js";
 import { resolveMcpNodeFallbackProvider } from "./mcp-node-fallback.js";
-import { collectDynamicWorkflowDisabledSkillPaths } from "./dynamic-workflow-gate.js";
 import { createWorkspaceHookRuntimeSecurity } from "./workspace-hook-trust.js";
 import { createScriptWorkflowBridge } from "./script-workflow-methods.js";
 import {
@@ -119,7 +121,6 @@ import { resolveBuiltInNodeReplMcpServers } from "./built-in-node-repl.js";
 import { resolveKayingCodeCustomCommandPrompt } from "../custom-command-prompt.js";
 import { resolveKayingCodeBuiltinPromptCommandInvocation } from "../builtin-prompt-command.js";
 import { BUILTIN_WORKFLOW_COMMAND_NAME } from "../builtin-workflow-command.js";
-import { collectDisabledPaths } from "../skill-command-overrides.js";
 import {
   loadPluginAgentTemplates,
   resolvePluginAgentProfiles,
@@ -232,6 +233,8 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
   let nodeReplBrowserBroker: NodeReplBrowserBroker | undefined;
   let ownedNodeReplBrowserBroker: NodeReplBrowserBroker | undefined;
   let providerModelRuntime: ApiProviderModelRuntime | undefined;
+  let catalogSkillPort: CatalogSkillPort | undefined;
+  let mcpConfigSource: McpConfigurationSource | undefined;
   try {
     const storageRoot = resolvePath(configResult.config.storage.dir);
     const cliStorageRoot = getCliStorageRoot(storageRoot);
@@ -253,7 +256,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
           additionalDirectories: options.additionalDirectories,
         });
     const kayingcodeSubagentProfiles = kayingcodeSubagentProfileOutcome.profiles;
-    const pluginOutcome = resolveStartupPlugins({
+    const pluginOutcome = await resolveStartupPlugins({
       cliStorageRoot,
       configResult,
       env: options.env,
@@ -282,6 +285,18 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
     const builtInMcpServers = resolveBuiltInNodeReplMcpServers({
       pluginOutcome,
       workingDirectory,
+    });
+    // 配置源读取项目/用户配置、启用插件与私有选项；当前先取启动快照，实时 reconcile 随阶段 3 接入。
+    mcpConfigSource = await createAppMcpConfigurationSource({
+      options,
+      configResult,
+      runtimeFeatures: pluginRuntimeFeatures,
+      pluginOutcome,
+      builtInMcpServers,
+      cliStorageRoot,
+      workingDirectory,
+      getNodeReplBrowserBroker: () => nodeReplBrowserBroker,
+      logger,
     });
     // 用户目录已在 loader 前完成原地迁移；不能给项目/插件旧身份加内存兼容旁路。
     const subagentProfiles = [...kayingcodeSubagentProfiles, ...pluginSubagentProfiles];
@@ -376,6 +391,12 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
         workingDirectory,
         workspaceIdentity: options.runtimeConfig?.memory?.workspaceIdentity,
       });
+    // 实时配置源已按项目/用户/插件/私有选项合并；启动时以它的快照为准。
+    if (mcpConfigSource) {
+      const snapshot = mcpConfigSource.getSnapshot();
+      configuredMcpServers = snapshot.servers;
+      runtimeConfig.mcp = snapshot;
+    }
     if (process.env.KAYINGCODE_REVIEW_WORKSPACE_ROOT) {
       // 根因：仅在工具调用处禁止写入仍会让 SessionStart hooks 和 MCP 启动进程
       // 在连接审核设备前执行。专用 Bot 必须在 runtime 装配时整体去除这些能力。
@@ -962,6 +983,20 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
           workflowConcurrencyGovernor.observer(),
         )
       : undefined;
+    const catalogSkillPortEnabled =
+      configResult.config.features.skill && configResult.config.skills.enabled && !options.skillPort;
+    // 注入 skillPort（测试）时不建实时目录；否则读取配置、启用插件与 skill 文件的实时快照。
+    if (catalogSkillPortEnabled) {
+      catalogSkillPort = await createAppSkillPort({
+        options,
+        configResult,
+        pluginOutcome,
+        bundledSkillRoots,
+        cliStorageRoot,
+        workingDirectory,
+        logger,
+      });
+    }
     runtime = new AgentRuntime(sessionId, runtimeConfig, {
       ...(options.readSubagentRuntimeConfig
         ? {
@@ -1037,20 +1072,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
         options.contextSourcePort ?? createNodeContextSourceAdapter({ env: options.env }),
       skillPort:
         configResult.config.features.skill && configResult.config.skills.enabled
-          ? (options.skillPort ??
-            createNodeSkillAdapter({
-              additionalDirectories: options.additionalDirectories,
-              extraRoots: configResult.config.skills.roots,
-              extraResolvedRoots: [...pluginOutcome.skillRoots, ...bundledSkillRoots],
-              disabledPaths: [
-                ...collectDisabledPaths(configResult.config.skillOverrides),
-                // 动态工作流关闭时不提供 dynamic-workflows 技能：
-                // 十个工具都不在场，再让模型读到「怎么写工作流脚本」只会诱导它去调不存在的工具。
-                ...(runtimeConfig.dynamicWorkflowEnabled === false
-                  ? collectDynamicWorkflowDisabledSkillPaths(bundledSkillRoots)
-                  : []),
-              ],
-            }))
+          ? (options.skillPort ?? catalogSkillPort)
           : undefined,
       mcpPort,
       eventSink: options.eventSink,
@@ -1207,6 +1229,8 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       logger,
       loggerFactory,
       mcpPort,
+      closeMcpConfigSource: () => mcpConfigSource?.close(),
+      closeSkillCatalog: () => catalogSkillPort?.close(),
       ownsExecutionPort,
       ownsMcpPort,
       closeNodeReplBrowserBroker: async () => {
@@ -1647,6 +1671,8 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
     standaloneSessionControl?.attachRoot(app, standaloneRootProvenance);
     return app;
   } catch (error) {
+    mcpConfigSource?.close();
+    catalogSkillPort?.close();
     providerModelRuntime?.dispose();
     void modelTelemetry.shutdown().catch(() => undefined);
     void ownedNodeReplBrowserBroker?.close();

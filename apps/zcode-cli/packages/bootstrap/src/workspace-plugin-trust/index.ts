@@ -18,7 +18,7 @@ import type {
 export type { WorkspacePluginTrustContract, WorkspacePluginTrustReasonCode } from "./contract.js";
 
 // ============================================================
-// 项目目录插件信任（docs/plugins/workspace-plugin-dir-trust.md）。
+// 项目目录插件信任（apps/zcode-cli/packages/adapters/docs/workspace-plugin-dir-trust.md）。
 // 项目 `.kayingcode/config.json` 的 `plugins.dirs` 只产生候选；只有用户在设置页逐个信任、
 // 记录写进用户域存储后，插件发现才会启用它。记录键是 Trust identity（与 Hook 信任同一
 // resolver：远程用 workspaceIdentity，受管 worktree 归一到源仓库）+ 插件根相对路径 +

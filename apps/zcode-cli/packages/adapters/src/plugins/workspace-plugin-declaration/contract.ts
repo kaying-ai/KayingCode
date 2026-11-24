@@ -1,6 +1,6 @@
 /**
  * workspace-plugin-declaration 对外契约：项目目录插件的声明摘要与发现准入。
- * 规格：docs/plugins/workspace-plugin-dir-trust.md。
+ * 规格：apps/zcode-cli/packages/adapters/docs/workspace-plugin-dir-trust.md。
  */
 import type { PluginWorkspaceTrust, WorkspacePluginDiscovery } from "@zcode/contracts";
 

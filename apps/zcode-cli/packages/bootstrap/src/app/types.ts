@@ -1,4 +1,6 @@
 import type { AiSdkModelAdapter } from "@zcode/adapters/model";
+import type { McpConfigSourceRegistry } from "@zcode/adapters/mcp";
+import type { SkillCatalogSourceRegistry } from "@zcode/adapters/skills/catalog";
 import type { SessionControlBinding } from "@zcode/core/session-control";
 import type {
   AgentTelemetryRuntimeOwner,
@@ -45,6 +47,7 @@ import type {
   PermissionBrokerPort,
   PluginLoadOutcome,
   PluginMetadata,
+  PluginPort,
   PluginReferenceCatalog,
   ProviderEndpointRoutingPort,
   QueryId,
@@ -182,7 +185,13 @@ export interface KayingCodeAppOptions {
   providerRuntimeHeadersPort?: ProviderRuntimeHeadersPort;
   loggerFactory?: LoggerFactory;
   officialPluginRoots?: string[];
+  /** 测试/Host 注入的插件发现端口；缺省用 adapter 的 Node 实现。 */
+  pluginDiscovery?: PluginPort;
   pluginStorageRoot?: string;
+  /** 宿主注入的进程级 MCP 配置源 registry；缺省时每个 App 各建一份私有配置源。 */
+  mcpConfigSourceRegistry?: McpConfigSourceRegistry;
+  /** 宿主注入的进程级 Skill 实时目录 registry；缺省时每个 App 各建一份私有目录。 */
+  skillCatalogSourceRegistry?: SkillCatalogSourceRegistry;
   executionPort?: ExecutionPort;
   /**
    * 官方命令端点（技术方案 5.8）：返回本 session 的 Bash/tool 子进程要带的端点地址与 token。

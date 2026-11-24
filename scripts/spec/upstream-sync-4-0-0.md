@@ -562,10 +562,91 @@ P0-2 期间修正了品牌映射：产品保留上游 `@zcode/*` workspace 作�
 - plugin-secrets 已接入 configure/reset/uninstall：敏感/workspace 选项写私有文件；项目 `plugins.options` 不再参与合并；reset/uninstall 清理私密值。
 - 验证：adapters/contracts/bootstrap typecheck 通过；plugin load isolation **1/1**；根 typecheck、lint、architecture 通过。
 
+### 阶段 2 第二批：异步发现与 workspace trust（2026-11-24）
+
+目标：把插件发现切到上游 4.0.0 的异步 material-cache 唯一路径，并让项目 `plugins.dirs` 的声明摘要与用户域信任记录在启动/会话入口生效。
+
+状态所有者与事件顺序：
+
+```text
+createConfig
+  → withPluginSecrets(私有文件只读叠加)
+  → resolveWorkspacePluginDiscovery(候选 + 声明摘要 + 信任记录)
+  → discoverNodePlugins(material cache 读取清单/组件)
+      ├─ pending: 只投影 metadata + workspaceTrust，enabled=false，不解析 Hook/MCP/Skill/Command
+      └─ trusted: 按 config enabled 解析组件
+  → material.validate() 失败 → 按 scope 重建，最多 3 次
+  → 协议投影 / 启动会话
+```
+
+- **信任 owner**：`bootstrap/src/workspace-plugin-trust/index.ts` 的用户域存储是唯一写入方；adapter 只读 `PluginDiscoverRequest.workspacePlugins`，不写信任记录。
+- **material scope**：`resolve(workingDirectory)` + `workspaceIdentity || workingDirectory` + `remoteSessionId` + `storageRoot`；作用于同一批材料上计算声明摘要，指纹变化整批重建，避免半更新状态。
+- **待信任停用**：pending 插件不产出 MCP/Hook/Skill/Command；信任或声明变化后由下一次发现重新投影。
+- **私密选项**：发现前叠加私有文件；项目 `plugins.options` 不参与合并；写入只走 `savePluginOptions`/`removeStoredPluginSecrets`。
+- **协议/UI**：新增 `plugins/workspaceTrust` 操作，插件列表投影 `workspaceTrust`；桌面/手机仅在 workspace scope 展示 pending 标记与“信任”按钮。
+- **产品边界保留**：localrun 仍只接受本地 marketplace 源；`.zcode-plugin` 优先、`.kayingcode-plugin` 回退；游戏插件 listing、UI contributions、`kayingcode-plugins-official` 磁盘 id 与 KAYINGCODE_* 运行时 env 不变。
+
+验收：pending 目录插件启动时强制停用、信任后恢复组件；声明摘要变化重新 pending；私密选项参与发现且不落入项目配置；非本地 marketplace 源仍被拒绝；`pnpm run typecheck`、`lint`、定向测试与 `architecture:check --changed` 通过。规格见 [workspace-plugin-dir-trust.md](../../apps/zcode-cli/packages/adapters/docs/workspace-plugin-dir-trust.md)。
+
+执行结果（2026-11-24）：
+
+- 适配层：`plugins/helpers.ts`、`plugin-components.ts`、`hook-sources.ts`、`types.ts`、`atomic-directory.ts`、`markdown-frontmatter.ts`、`skills/scan.ts` 采用上游异步实现；`mcp.ts`、`official-marketplace.ts`、`marketplace.ts`、`plugins/index.ts` 保留产品补丁（双品牌 env、`kayingcode_official`、localrun 本地源、游戏 listing、UI contributions、`.kayingcode-plugin` 回退）。
+- bootstrap：`resolveKayingCodePlugins`/`getKayingCodePluginsOverview`/`listKayingCodePlugins` 异步化并接入 `withPluginSecrets` + `resolveWorkspacePluginDiscovery`；`startup-marks`、`plugin-facade` 与协议调用方传递 workspace identity/remote session。
+- 配置：项目 `plugins.dirs` 改为 `ProjectConfigFile.pluginDirCandidates`，只进 `sources.plugins.dirs.workspace`，不进入可执行 config；私密选项按 `optionLayers` 叠加。
+- 协议/UI：新增 `plugins/workspaceTrust` 协议、`KayingCodePluginInfo.workspaceTrust`、服务方法 `setWorkspacePluginTrust`；插件商店卡片/详情页展示待信任标记与信任按钮，pending 时锁定启停与试用入口。
+- 验证：`pnpm --filter @zcode/adapters typecheck`、`pnpm --filter @zcode/bootstrap typecheck`、根 `pnpm run typecheck`、`pnpm run lint`（0 errors / 133 既有 warnings）、`pnpm run source:check`、`pnpm run architecture:check --changed`（0 violations）通过；adapters 插件测试 9/9（含新增 trust 用例），bootstrap 新增 trust/私密选项用例 1/1。
+- 已知基线失败：`bootstrap/tests/workspace-mcp-trust.test.ts` 3 项与产品「workspace MCP 开箱即用」边界冲突，测试文件本轮未修改；剩余 28 项通过。未执行桌面/CLI 真实启动与远程 Host 联调。
+
 待完成（阶段 2 未完成）：
-- workspace declaration/trust 尚未接入 loader：需要把同步 discovery 改成 material-cache 异步流程，才能在同一批材料上算声明摘要并强制 pending 停用。
 - live inventory 尚未接入 MCP/Skill 配置加载；marketplace `regions` 与商店 UI 未迁移。
 - 内置插件清单/版本与 `config/official-plugins.json` 尚未按上游 definition 重新生成。
+
+### 阶段 2 第三批：Skill 实时目录（2026-11-24）
+
+目标：启用上游 `skills/catalog` 的进程级实时目录，让已打开会话在项目/用户配置、启用插件与 skill 文件变化后读到同一份快照，不再依赖会话启动时的一次性扫描。
+
+- **所有权**：`adapters/src/skills/catalog.ts` 持有进程级共享条目与 watcher；`SkillCatalogSourceRegistry` 由宿主按需注入，未注入时每个 App 建私有目录。App 只持有 view，`closeSkillCatalog` 释放引用。
+- **读取路径**：`createAppSkillPort` 用 `discoverWorkspaceHookConfigPathsAsync` 收集项目/用户配置路径，和 MCP 配置源同一组提交点；`live-inventory` 每次重读配置与已启用插件，`watched-source` 去抖后整批重建快照。
+- **插件边界**：只使用官方插件根与 `workspaceTrust === "trusted"` 的项目插件；插件 skill 根按上游扫描规则不跟随符号链接。`visualize` 等未提供内联宿主的插件通过 `excludedPluginIds` 排除。
+- **产品保留**：`.zcode-plugin` 优先、`.kayingcode-plugin` 回退；产品 home 目录为 `~/.kayingcode`；动态工作流关闭时继续禁用内置 dynamic-workflows 技能。
+- **验收**：项目/用户配置新增或修改 skill 根后，已打开会话的 `discoverSkills` 快照更新；禁用 skill 路径立即消失；插件启停后其 skill 出现/消失；`loadSkill` 未命中时 flush 后重读；App 关闭释放 watcher。
+
+执行结果（2026-11-24）：
+
+- 适配层：`skills/index.ts`、`roots.ts`、`skills/catalog.ts` 采用上游实现，`findWorktreeRoot`/`scanSkillRoot`/`readSkillContent`/`matchesSkillRequest` 随之上移；保留 `.zcode-plugin` 优先、`.kayingcode-plugin` 回退与 `~/.kayingcode` home。
+- 公共契约：`packages/shared` 导出 `discoverWorkspaceHookConfigPathsAsync`（支持 `includeMissing`），`@zcode/contracts` 新增 `SkillNotFoundError`；adapters 新增 `./skills/catalog` 包入口。
+- bootstrap：新增 `app/dynamic-skill-catalog.ts`，`create-app` 在注入 `skillPort` 之外构建实时目录并把 `closeSkillCatalog` 交给 session facade 释放；`KayingCodeAppOptions` 支持宿主注入 `skillCatalogSourceRegistry`。
+- 测试：新增 `adapters/tests/skill-catalog.test.ts`，覆盖初始快照、项目 skill 禁用、插件启停、`loadSkill` 与 unknown skill、bundled 根；adapters 插件/实时目录测试合计 11/11。
+- 验证：根 `pnpm run typecheck`、`pnpm run lint`（0 errors / 133 既有 warnings）、`pnpm run architecture:check --changed`（0 violations）、`pnpm run source:check` 通过；`SOURCE_PACKAGES.md` 已重新生成。
+- 未执行：真实 CLI/TUI 文件监听冒烟与远程 Host 联调。
+
+待完成（阶段 2 未完成，更新）：
+- MCP 配置源已落地启动快照；打开会话的实时 reconcile 仍待阶段 3 接入 core `mcp/runtime`。
+- marketplace `regions` 与商店 UI 未迁移。
+- 内置插件清单/版本与 `config/official-plugins.json` 尚未按上游 definition 重新生成。
+
+### 阶段 3 前置：MCP 配置源（2026-11-24）
+
+目标：先落地上游 MCP 配置加载/监听层，让启动快照与后续实时 reconcile 共用同一份配置事实，不再维护启动期的临时合并逻辑。
+
+- **适配层**：新增 `adapters/mcp/config-loader.ts`、`config-source.ts`。加载器每次重读项目/用户配置、启用插件、插件私有选项与 `.agents/mcp.json` 回退；配置源用 `watched-source` 去抖、引用计数 view 与 `prepare` 按会话整形。
+- **契约**：`@zcode/contracts` 新增 `mcpConfigKey`、`McpConfigurationSnapshot`、`McpConfigurationSource`；adapters `./mcp` 入口导出 loader/source/registry。
+- **Bootstrap**：新增 `app/dynamic-mcp-config.ts`，`create-app` 在构造 MCP port 前获取配置源快照，覆盖原 `pluginMcpServers + config + builtIn` 合并；`session-facade` 新增 `closeMcpConfigSource` 释放 watcher。宿主可通过 `mcpConfigSourceRegistry` 注入进程级共享源。
+- **保留产品边界**：项目配置仍经 `normalizeProjectMcpServer`；CUA 退役 server 清理、built-in node_repl 与 broker 注入保持原行为；`.kayingcode/config.json` 与 `.agents/mcp.json` 作为产品 fallback 路径。
+- **未完成**：core `AgentRuntime` 尚未消费 `McpConfigurationSource.subscribe`；打开会话在配置变化后仍不会自动 reconcile，属于阶段 3。
+
+验收：MCP 配置源在配置/插件/私有选项变化时发布新快照；启动快照与用户/项目/插件来源标记正确；`pnpm run typecheck`、`lint`、定向测试与 `architecture:check --changed` 通过。
+
+执行结果（2026-11-24）：
+
+- `adapters/mcp/config-loader.ts`、`config-source.ts` 采用上游实现；`config/project-config.adapter.ts` 导出 `normalizeProjectMcpServer` 供加载器复用。
+- `bootstrap/src/mcp-config.ts` 新增 `resolveEffectiveMcpConfiguration`；`app/dynamic-mcp-config.ts` 按项目/用户配置、插件根、显式 servers、built-in servers 与 broker 构造 `prepare`。
+- `create-app` 在 MCP port 创建前获取快照并覆盖 `configuredMcpServers`/`runtimeConfig.mcp`；启动失败与 session 关闭都会释放配置源。
+- 测试：新增 `adapters/tests/mcp-config-source.test.ts`（用户/项目/插件来源标记、配置变化发布新快照）；adapters 定向套件 13/13。
+- 验证：adapters/bootstrap/根 `typecheck`、`pnpm run lint`（0 errors / 133 既有 warnings）、`architecture:check --changed`（0 violations）、`source:check` 通过。
+- 已知基线：`bootstrap/tests/workspace-mcp-trust.test.ts` 仍为 27 通过 / 3 失败（上游测试与产品「workspace MCP 开箱即用」边界冲突，测试文件未修改）。
+
+待完成（阶段 3 未完成）：
 
 ## 验证记录
 

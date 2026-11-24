@@ -107,6 +107,21 @@ export interface McpSseServerConfig extends McpServerConfigBase {
 
 export type McpServerConfig = McpStdioServerConfig | McpHttpServerConfig | McpSseServerConfig;
 
+/**
+ * MCP 配置的唯一身份：键排序、丢弃 undefined 字段后序列化。连接池 key、adapter 复用判断与
+ * 配置变化判断共用；避免 `{ timeoutMs: undefined }` 与 `{}` 被判成不同配置。
+ */
+export function mcpConfigKey(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(mcpConfigKey).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .toSorted()
+    .filter((key) => record[key] !== undefined)
+    .map((key) => `${JSON.stringify(key)}:${mcpConfigKey(record[key])}`)
+    .join(",")}}`;
+}
+
 export type McpServerStatusKind =
   | "connecting"
   | "connected"
@@ -446,6 +461,18 @@ export interface McpElicitationPort {
     request: McpElicitationRequest,
     options?: { signal?: AbortSignal },
   ): Promise<McpElicitationResult>;
+}
+
+export interface McpConfigurationSnapshot {
+  enabled: boolean;
+  servers: Record<string, McpServerConfig>;
+  trustedOfficialCuaServerNames?: readonly string[];
+}
+
+export interface McpConfigurationSource {
+  getSnapshot(): McpConfigurationSnapshot;
+  subscribe(listener: () => void): () => void;
+  close(): void;
 }
 
 export interface McpPort {

@@ -422,6 +422,8 @@ export interface PluginLoadOutcome {
 }
 
 export interface PluginDiscoverRequest {
+  workspaceIdentity?: string;
+  remoteSessionId?: string;
   config: PluginConfig;
   env?: Record<string, string | undefined>;
   // bootstrap 可以把"安全到默认就开"的 official plugin id 列表传进来,
@@ -442,6 +444,8 @@ export interface PluginOperationOptions {
 }
 
 export interface PluginPort {
+  /** 管理写入完成后清除可复用材料；无缓存实现可省略。 */
+  invalidate?(): void;
   discoverPlugins(
     request: PluginDiscoverRequest,
     options?: PluginOperationOptions,

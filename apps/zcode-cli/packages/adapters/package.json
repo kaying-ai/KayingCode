@@ -93,6 +93,10 @@
     "./memory-diagnostics": {
       "types": "./dist/memory-diagnostics/index.d.ts",
       "import": "./dist/memory-diagnostics/index.js"
+    },
+    "./skills/catalog": {
+      "types": "./dist/skills/catalog.d.ts",
+      "import": "./dist/skills/catalog.js"
     }
   },
   "scripts": {

@@ -249,6 +249,17 @@ export {
   type McpTelemetryTracker,
   type McpTrackedProcess,
 } from "./telemetry.js";
+export {
+  createMcpConfigurationLoader,
+  type McpConfigurationLoaderOptions,
+} from "./config-loader.js";
+export {
+  createDynamicMcpConfigSource,
+  createMcpConfigSourceRegistry,
+  MCP_CONFIG_EVENT_DEBOUNCE_MS,
+  type McpConfigSourceRegistry,
+  type McpConfigurationSourceOptions,
+} from "./config-source.js";
 
 /** elicitation 模式白名单（MCP form 与 兼容别名）。 */
 const SUPPORTED_ELICITATION_MODES = new Set(["form", "openai/form", "openaiForm"]);

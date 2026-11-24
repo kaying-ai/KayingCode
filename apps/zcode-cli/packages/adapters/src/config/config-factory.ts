@@ -241,7 +241,9 @@ export function createConfig(options: ConfigFactoryOptions = {}): ConfigResult {
   const merged = mergeConfigs(...configs);
   const pluginConfigSources = resolvePluginConfigSources({
     projectConfig: projectConfigResult.config,
+    projectFiles: projectConfigFiles,
     projectPath: projectConfigResult.path,
+    skipUserConfig: options.skipUserConfig === true,
     userConfig: userConfigResult.config,
     userPath: userConfigResult.path,
   });
@@ -298,7 +300,9 @@ export function createConfig(options: ConfigFactoryOptions = {}): ConfigResult {
 
 function resolvePluginConfigSources(input: {
   projectConfig: RuntimeConfigPatch;
+  projectFiles: readonly ProjectConfigFile[];
   projectPath: string | undefined;
+  skipUserConfig: boolean;
   userConfig: RuntimeConfigPatch;
   userPath: string;
 }): PluginConfigSources {
@@ -330,26 +334,30 @@ function resolvePluginConfigSources(input: {
   return {
     dirs: {
       user: input.userConfig.plugins?.dirs ?? [],
-      workspace: input.projectConfig.plugins?.dirs ?? [],
+      // 项目目录只是待信任候选；config.plugins.dirs 不含它们，发现时按信任记录准入。
+      workspace: [
+        ...new Set(input.projectFiles.flatMap((file) => file.pluginDirCandidates ?? [])),
+      ],
     },
     enabled,
     marketplaces,
     options,
     optionLayers: [
-      {
-        scope: "user",
-        path: input.userPath,
-        options: input.userConfig.plugins?.options ?? {},
-      },
-      ...(input.projectPath
-        ? [
+      ...(input.skipUserConfig
+        ? []
+        : [
             {
-              scope: "workspace" as const,
-              path: input.projectPath,
-              options: input.projectConfig.plugins?.options ?? {},
+              scope: "user" as const,
+              path: input.userPath,
+              options: input.userConfig.plugins?.options ?? {},
             },
-          ]
-        : []),
+          ]),
+      ...input.projectFiles.map((file) => ({
+        scope: "workspace" as const,
+        path: file.path,
+        workspaceRoot: file.baseDir,
+        options: file.config.plugins?.options ?? {},
+      })),
     ],
     paths: {
       user: input.userPath,

@@ -31,6 +31,8 @@ import {
   PluginStoreInstallButton,
   PluginStoreItemMenu,
   PluginStorePaidPlanBadge,
+  PluginStoreTrustButton,
+  PluginStoreTrustPendingBadge,
   type PluginStoreActions,
 } from "@/settings/PluginStoreCard.js";
 import {
@@ -143,10 +145,12 @@ export function PluginStoreDetailView({
               {displayName}
             </h1>
             <PluginStorePaidPlanBadge item={item} />
+            <PluginStoreTrustPendingBadge item={item} />
           </div>
           <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
             {item.installed ? (
               <>
+                <PluginStoreTrustButton item={item} actions={actions} size="lg" />
                 <PluginStoreEnabledControl item={item} actions={actions} />
                 <PluginStoreItemMenu
                   item={item}
@@ -154,18 +158,21 @@ export function PluginStoreDetailView({
                   triggerVariant="outline"
                   triggerSize="icon-lg"
                 />
-                {/* 顶部试用与示例提示词共用同一 canonical 构造；空 prompt 表示只预填 Plugin mention。 */}
-                <Button
-                  type="button"
-                  variant="default"
-                  size="lg"
-                  data-testid="plugin-store-try-now"
-                  data-plugin-id={item.id}
-                  onClick={() => onUsePrompt(item, "")}
-                >
-                  <MessagesSquare className="size-3.5" aria-hidden="true" />
-                  {intl.formatMessage({ id: "settings.plugins.store.tryNow" })}
-                </Button>
+                {/* 顶部试用与示例提示词共用同一 canonical 构造；空 prompt 表示只预填 Plugin mention。
+                    pending 信任的插件被服务端强制停用，试用入口先隐藏，避免打开后无法解析组件。 */}
+                {item.info?.workspaceTrust?.state === "pending" ? null : (
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="lg"
+                    data-testid="plugin-store-try-now"
+                    data-plugin-id={item.id}
+                    onClick={() => onUsePrompt(item, "")}
+                  >
+                    <MessagesSquare className="size-3.5" aria-hidden="true" />
+                    {intl.formatMessage({ id: "settings.plugins.store.tryNow" })}
+                  </Button>
+                )}
               </>
             ) : (
               <>

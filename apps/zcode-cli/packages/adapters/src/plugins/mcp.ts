@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { findOfficialMcpReservedHeaders } from "@zcode/shared";
 import type {
@@ -12,32 +12,43 @@ import type {
 import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE } from "@zcode/contracts";
 import { KAYINGCODE_PLUGIN_ID_ENV_KEY, ZCODE_PLUGIN_ID_ENV_KEY } from "@zcode/shared";
 import type { LoadedPlugin } from "./types.js";
-import { isNotFoundError, isPluginOptionValue, isRecord, resolveInside } from "./helpers.js";
+import {
+  isNotFoundError,
+  isPluginOptionValue,
+  isRecord,
+  resolveInside,
+  rethrowPluginMaterialInterrupt,
+} from "./helpers.js";
 import { buildOfficialProvenance, parseKayingCodeOfficialAuth } from "./mcp-official-auth.js";
 
 const SUPPORTED_MCP_TYPES = new Set(["stdio", "http", "sse"]);
 const TEMPLATE_PATTERN = /\$\{([^}]+)\}/g;
 const ENVIRONMENT_VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-export function loadPluginMcpServerDefinitions(input: {
+export async function loadPluginMcpServerDefinitions(input: {
   diagnostics: PluginDiagnostic[];
   loaded: LoadedPlugin;
-}): Record<string, unknown> {
-  const fromFile = loadMcpServersFromFile(join(input.loaded.rootPath, ".mcp.json"), input);
-  const fromManifest = loadMcpServersFromSpec(input.loaded.manifest.mcpServers, input);
-  return { ...fromFile, ...fromManifest };
+}): Promise<Record<string, unknown>> {
+  const servers: Record<string, unknown> = {};
+  // 按声明顺序串行读取，后声明的同名 server 覆盖先声明的。
+  for (const source of pluginMcpSources(input))
+    Object.assign(
+      servers,
+      typeof source === "string" ? await loadMcpServersFromFile(source, input) : source,
+    );
+  return servers;
 }
 
 export function resolvePluginMcpServers(input: {
   dataPath: string;
-  definitions?: Record<string, unknown>;
+  definitions: Record<string, unknown>;
   diagnostics: PluginDiagnostic[];
   env: Record<string, string | undefined>;
   loaded: LoadedPlugin;
   options: PluginOptionValues;
   workingDirectory: string;
 }): Record<string, McpServerConfig> {
-  const merged = input.definitions ?? loadPluginMcpServerDefinitions(input);
+  const merged = input.definitions;
   const context = createVariableContext(input);
   const result: Record<string, McpServerConfig> = {};
 
@@ -68,14 +79,25 @@ function toNamespacedServerName(loaded: LoadedPlugin, serverName: string): strin
   return `plugin:${loaded.manifest.name}:${serverName}`;
 }
 
-function loadMcpServersFromSpec(
+/** 插件发现与 MCP 配置加载共用声明顺序和路径校验，读取方式由调用方决定。 */
+export function pluginMcpSources(input: {
+  diagnostics: PluginDiagnostic[];
+  loaded: LoadedPlugin;
+}): Array<string | Record<string, unknown>> {
+  return [
+    join(input.loaded.rootPath, ".mcp.json"),
+    ...mcpSourcesFromSpec(input.loaded.manifest.mcpServers, input),
+  ];
+}
+
+function mcpSourcesFromSpec(
   spec: unknown,
   input: {
     diagnostics: PluginDiagnostic[];
     loaded: LoadedPlugin;
   },
-): Record<string, unknown> {
-  if (spec === undefined) return {};
+): Array<string | Record<string, unknown>> {
+  if (spec === undefined) return [];
   if (typeof spec === "string") {
     const path = resolveInside(input.loaded.rootPath, spec);
     if (!path) {
@@ -86,26 +108,32 @@ function loadMcpServersFromSpec(
         pluginId: input.loaded.id,
         severity: "error",
       });
-      return {};
+      return [];
     }
-    return loadMcpServersFromFile(path, input);
+    return [path];
   }
   if (Array.isArray(spec)) {
-    return Object.assign({}, ...spec.map((item) => loadMcpServersFromSpec(item, input)));
+    return spec.flatMap((item) => mcpSourcesFromSpec(item, input));
   }
-  return normalizeMcpServersShape(spec, input);
+  return [normalizeMcpServersShape(spec, input)];
 }
 
-function loadMcpServersFromFile(
+async function loadMcpServersFromFile(
   path: string,
   input: {
     diagnostics: PluginDiagnostic[];
     loaded: LoadedPlugin;
   },
-): Record<string, unknown> {
+): Promise<Record<string, unknown>> {
   try {
-    return normalizeMcpServersShape(JSON.parse(readFileSync(path, "utf8")), input);
+    return normalizeMcpServersShape(
+      input.loaded.materials
+        ? await input.loaded.materials.json(path)
+        : JSON.parse(await readFile(path, "utf8")),
+      input,
+    );
   } catch (error) {
+    rethrowPluginMaterialInterrupt(error);
     if (isNotFoundError(error)) return {};
     input.diagnostics.push({
       code: "plugin_mcp_read_failed",
@@ -118,7 +146,7 @@ function loadMcpServersFromFile(
   }
 }
 
-function normalizeMcpServersShape(
+export function normalizeMcpServersShape(
   value: unknown,
   input: {
     diagnostics: PluginDiagnostic[];
@@ -237,8 +265,8 @@ function resolveMcpServerConfig(
       { allowSensitive: true },
     );
     // 插件 manifest 可自定义 env，但插件身份必须由 resolver 权威写入（loaded.id 来自本地 plugin
-    // registry，不是可序列化配置），不能让第三方伪造 official kayingcode-cua 身份后获得只应定向注入给
-    // 内置插件的 broker 凭据。manifest env spread 之后覆写，确保 user/manifest 无法覆盖。
+    // registry，不是可序列化配置），不能让第三方伪造 official kayingcode-cua 身份后获得只应定向
+    // 注入给内置插件的 broker 凭据。manifest env spread 之后覆写，确保 user/manifest 无法覆盖。
     env[KAYINGCODE_PLUGIN_ID_ENV_KEY] = context.loaded.id;
     env[ZCODE_PLUGIN_ID_ENV_KEY] = context.loaded.id;
     return {
@@ -449,7 +477,7 @@ function resolveTemplate(
       }
       return String(configValue);
     }
-    if (name.startsWith("KAYINGCODE_") || name.startsWith("ZCODE_")) {
+    if (name.startsWith("ZCODE_")) {
       const envValue = context.env[name];
       if (envValue === undefined)
         throw new PluginVariableError(`Missing environment variable: ${name}`);

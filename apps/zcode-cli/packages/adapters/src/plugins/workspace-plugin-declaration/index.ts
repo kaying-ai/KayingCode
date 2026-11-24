@@ -15,7 +15,7 @@ import type { LoadedPlugin, PluginCandidate } from "../types.js";
 import type { WorkspacePluginTextReader } from "./contract.js";
 
 // ============================================================
-// 项目目录插件的声明摘要（docs/plugins/workspace-plugin-dir-trust.md）。
+// 项目目录插件的声明摘要（apps/zcode-cli/packages/adapters/docs/workspace-plugin-dir-trust.md）。
 // 摘要覆盖插件清单与 Hook/MCP 声明文件的原文；这些文件任一变化，用户域信任记录就不再命中，
 // 插件回到「待信任」。脚本、技能正文等其它文件不进入摘要。
 // 启动发现、打开会话里的实时目录与设置页信任写入共用本文件，保证三处对同一插件算出同一摘要。
@@ -25,6 +25,7 @@ const DIGEST_VERSION = 1;
 const MCP_DECLARATION_PATH = ".mcp.json";
 /** 与插件发现相同的 manifest 查找顺序：第一个存在的生效。 */
 const MANIFEST_PATHS = [
+  join(".zcode-plugin", "plugin.json"),
   join(".kayingcode-plugin", "plugin.json"),
   join(".claude-plugin", "plugin.json"),
   join(".codex-plugin", "plugin.json"),

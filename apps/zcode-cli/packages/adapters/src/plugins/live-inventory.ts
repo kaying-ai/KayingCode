@@ -34,7 +34,12 @@ import { installedPluginPath, normalizeInstalledPluginsState } from "./marketpla
 // ============================================================
 
 /** 插件 manifest 的固定查找顺序，与启动时的插件发现一致。 */
-const PLUGIN_MANIFEST_DIRECTORIES = [".kayingcode-plugin", ".claude-plugin", ".codex-plugin"];
+const PLUGIN_MANIFEST_DIRECTORIES = [
+  ".zcode-plugin",
+  ".kayingcode-plugin",
+  ".claude-plugin",
+  ".codex-plugin",
+];
 const INSTALLED_PLUGINS_FILE = "installed_plugins.json";
 
 type LiveWarning = [message: string, context: Record<string, unknown>];

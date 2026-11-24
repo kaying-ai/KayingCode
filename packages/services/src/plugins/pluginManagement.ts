@@ -22,6 +22,7 @@ import type {
   KayingCodePluginsSetEnabledResult,
   KayingCodePluginsUninstallResult,
   KayingCodePluginsValidateResult,
+  KayingCodePluginsWorkspaceTrustResult,
 } from "@zcode/shared";
 import { ServiceChannels } from "@zcode/shared";
 import { createServiceDescriptor } from "../descriptors.js";
@@ -39,6 +40,7 @@ import type {
   KayingCodeAgentRemovePluginMarketplaceParams,
   KayingCodeAgentRestoreBuiltinPluginParams,
   KayingCodeAgentSetPluginEnabledParams,
+  KayingCodeAgentSetPluginWorkspaceTrustParams,
   KayingCodeAgentUninstallPluginParams,
   KayingCodeAgentUpdatePluginMarketplaceParams,
   KayingCodeAgentUpdatePluginParams,
@@ -90,6 +92,10 @@ export interface IPluginManagementService {
   validatePlugin(params: KayingCodeAgentValidatePluginParams): Promise<KayingCodePluginsValidateResult>;
   describePlugin(params: KayingCodeAgentDescribePluginParams): Promise<KayingCodePluginsDescribeResult>;
   setPluginEnabled(params: KayingCodeAgentSetPluginEnabledParams): Promise<KayingCodePluginsSetEnabledResult>;
+  /** 项目目录插件信任：写入用户域记录，只影响之后新建的会话。 */
+  setWorkspacePluginTrust(
+    params: KayingCodeAgentSetPluginWorkspaceTrustParams,
+  ): Promise<KayingCodePluginsWorkspaceTrustResult>;
 }
 
 export const IPluginManagementService = createServiceDescriptor<IPluginManagementService>(

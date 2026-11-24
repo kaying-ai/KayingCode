@@ -73,6 +73,7 @@ import {
   kayingcodePluginOperationProgressNotificationSchema,
   kayingcodePluginsRestoreBuiltinResultSchema,
   kayingcodePluginsSetEnabledResultSchema,
+  kayingcodePluginsWorkspaceTrustResultSchema,
   kayingcodePluginsCancelOperationResultSchema,
   kayingcodePluginsUninstallResultSchema,
   kayingcodePluginsValidateResultSchema,
@@ -198,6 +199,7 @@ import type {
   KayingCodeAgentSetModeParams,
   KayingCodeAgentSetModelParams,
   KayingCodeAgentSetPluginEnabledParams,
+  KayingCodeAgentSetPluginWorkspaceTrustParams,
   KayingCodeAgentSetThoughtLevelParams,
   KayingCodeAgentPluginMentionItemsParams,
   KayingCodeAgentPluginReferenceCatalogParams,
@@ -4597,6 +4599,21 @@ export function createKayingCodeAgentService(
           ...(params.scope ? { scope: params.scope } : {}),
         },
         kayingcodePluginsSetEnabledResultSchema,
+        { timeoutMs: PLUGIN_MANAGEMENT_REQUEST_TIMEOUT_MS },
+      );
+    },
+
+    async setWorkspacePluginTrust(params: KayingCodeAgentSetPluginWorkspaceTrustParams) {
+      const client = await getPluginManagementClient();
+      return client.request(
+        kayingcodeProtocolMethods.pluginsWorkspaceTrust,
+        {
+          workspace: buildWorkspaceRef(params),
+          pluginRoot: params.pluginRoot,
+          declarationDigest: params.declarationDigest,
+          trusted: params.trusted,
+        },
+        kayingcodePluginsWorkspaceTrustResultSchema,
         { timeoutMs: PLUGIN_MANAGEMENT_REQUEST_TIMEOUT_MS },
       );
     },

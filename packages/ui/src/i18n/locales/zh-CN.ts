@@ -2541,6 +2541,13 @@ const zhCN: Record<string, string> = {
   "settings.plugins.toggle.workspaceEnabled": "已在当前工作区启用 {plugin}（覆盖 User 默认）",
   "settings.plugins.toggle.workspaceDisabled": "已在当前工作区停用 {plugin}（覆盖 User 默认）",
   "settings.plugins.toggle.failed": "无法更新 {plugin}，请重试。",
+  "settings.plugins.workspaceTrust.pending": "待信任",
+  "settings.plugins.workspaceTrust.pendingHint":
+    "该插件来自项目目录，需确认信任后才能启用。",
+  "settings.plugins.workspaceTrust.trust": "信任",
+  "settings.plugins.workspaceTrust.trusted": "已信任 {plugin}",
+  "settings.plugins.workspaceTrust.changed": "{plugin} 的声明在审核后发生变化，请重新确认。",
+  "settings.plugins.workspaceTrust.failed": "无法信任 {plugin}，请重试。",
   "settings.plugins.status.enabled": "已启用",
   "settings.plugins.status.disabled": "已停用",
   "settings.modelProviderDescription": "管理自定义模型供应商，配置后可在聊天时选择使用。",

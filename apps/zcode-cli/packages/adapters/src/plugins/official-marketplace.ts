@@ -1,5 +1,7 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { readFile } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { writePluginTextIfChanged } from "./helpers.js";
+import { withFileLock } from "@zcode/shared/node";
 import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE } from "@zcode/contracts";
 
 const BUNDLED_PARTITION_FILE = "bundled-marketplace.json";
@@ -11,44 +13,61 @@ interface BundledMarketplacePartition {
   version: 1;
 }
 
-export function writeBundledOfficialMarketplacePartitionSync(input: {
+export async function writeBundledOfficialMarketplacePartition(input: {
   manifest: Record<string, unknown>;
   storageRoot: string;
-}): Record<string, unknown> {
+}): Promise<Record<string, unknown>> {
   assertOfficialManifest(input.manifest);
-  writeJsonFileSync(partitionPath(input.storageRoot, BUNDLED_PARTITION_FILE), {
-    manifest: input.manifest,
-    version: 1,
-  } satisfies BundledMarketplacePartition);
-  return rebuildOfficialMarketplaceSync(input.storageRoot);
+  return publishPartition(input.storageRoot, async () => {
+    await writeJsonFile(partitionPath(input.storageRoot, BUNDLED_PARTITION_FILE), {
+      manifest: input.manifest,
+      version: 1,
+    } satisfies BundledMarketplacePartition);
+  });
 }
 
-export function writeCdnOfficialMarketplacePartitionSync(input: {
+export async function writeCdnOfficialMarketplacePartition(input: {
   manifest: Record<string, unknown>;
   storageRoot: string;
-}): Record<string, unknown> {
+}): Promise<Record<string, unknown>> {
   assertOfficialManifest(input.manifest);
-  writeJsonFileSync(partitionPath(input.storageRoot, CDN_PARTITION_FILE), input.manifest);
-  return rebuildOfficialMarketplaceSync(input.storageRoot);
+  return publishPartition(input.storageRoot, async () => {
+    await writeJsonFile(partitionPath(input.storageRoot, CDN_PARTITION_FILE), input.manifest);
+  });
+}
+
+async function publishPartition(
+  storageRoot: string,
+  write: () => Promise<void>,
+): Promise<Record<string, unknown>> {
+  // 启动 seed 和商店刷新可来自不同进程。分片写入和合并发布同属一次事务，
+  // 使用目录文件本身的锁，不递归获取外层安装锁，也不会锁住普通查询。
+  return withFileLock(partitionPath(storageRoot, MERGED_MARKETPLACE_FILE), async () => {
+    await write();
+    return rebuildOfficialMarketplace(storageRoot);
+  });
+}
+
+export async function loadBundledOfficialPluginRoots(
+  storageRoot: string,
+): Promise<string[] | undefined> {
+  return parseBundledOfficialPluginRoots(await readBundledPartition(storageRoot), storageRoot);
 }
 
 export function bundledOfficialMarketplacePath(storageRoot: string): string {
   return partitionPath(storageRoot, BUNDLED_PARTITION_FILE);
 }
 
-/** 插件发现与 MCP 配置加载共用：从 bundled 分片内容解析官方插件缓存目录。 */
+/** 插件发现与 MCP 配置加载共用：从 bundled 分片内容解析当前官方插件的缓存目录。 */
 export function parseBundledOfficialPluginRoots(
   value: unknown,
   storageRoot: string,
 ): string[] | undefined {
   if (!isRecord(value) || value.version !== 1 || !isRecord(value.manifest)) return undefined;
+  const bundledPartition = { manifest: value.manifest };
 
-  const officialCacheRoot = resolve(
-    storageRoot,
-    "cache",
-    KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE,
-  );
-  return readPluginEntries(value.manifest).flatMap((plugin) => {
+  const officialCacheRoot = resolve(storageRoot, "cache", KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE);
+  return readPluginEntries(bundledPartition.manifest).flatMap((plugin) => {
     const name = readPluginName(plugin);
     const cachePath = typeof plugin.cachePath === "string" ? plugin.cachePath : undefined;
     if (!name || !cachePath) return [];
@@ -65,18 +84,9 @@ export function parseBundledOfficialPluginRoots(
   });
 }
 
-export function loadBundledOfficialPluginRootsSync(
-  storageRoot: string,
-): string[] | undefined {
-  return parseBundledOfficialPluginRoots(
-    readJsonRecord(bundledOfficialMarketplacePath(storageRoot)),
-    storageRoot,
-  );
-}
-
-function rebuildOfficialMarketplaceSync(storageRoot: string): Record<string, unknown> {
-  const bundledPartition = readBundledPartition(storageRoot);
-  const cdnManifest = readJsonRecord(partitionPath(storageRoot, CDN_PARTITION_FILE));
+async function rebuildOfficialMarketplace(storageRoot: string): Promise<Record<string, unknown>> {
+  const bundledPartition = await readBundledPartition(storageRoot);
+  const cdnManifest = await readJsonRecord(partitionPath(storageRoot, CDN_PARTITION_FILE));
   const bundledManifest = bundledPartition?.manifest;
   const cdnPlugins = readPluginEntries(cdnManifest);
   const cdnPluginNames = new Set(cdnPlugins.map(readPluginName).filter(isDefined));
@@ -95,12 +105,14 @@ function rebuildOfficialMarketplaceSync(storageRoot: string): Record<string, unk
     name: KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE,
     plugins: [...cdnPlugins, ...bundledPlugins],
   };
-  writeJsonFileSync(partitionPath(storageRoot, MERGED_MARKETPLACE_FILE), merged);
+  await writeJsonFile(partitionPath(storageRoot, MERGED_MARKETPLACE_FILE), merged);
   return merged;
 }
 
-function readBundledPartition(storageRoot: string): BundledMarketplacePartition | undefined {
-  const value = readJsonRecord(partitionPath(storageRoot, BUNDLED_PARTITION_FILE));
+async function readBundledPartition(
+  storageRoot: string,
+): Promise<BundledMarketplacePartition | undefined> {
+  const value = await readJsonRecord(partitionPath(storageRoot, BUNDLED_PARTITION_FILE));
   if (!value || value.version !== 1 || !isRecord(value.manifest)) return undefined;
   return {
     manifest: value.manifest,
@@ -144,27 +156,17 @@ function partitionPath(storageRoot: string, fileName: string): string {
   return join(storageRoot, "marketplaces", KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE, fileName);
 }
 
-function readJsonRecord(path: string): Record<string, unknown> | undefined {
+async function readJsonRecord(path: string): Promise<Record<string, unknown> | undefined> {
   try {
-    const value = JSON.parse(readFileSync(path, "utf8")) as unknown;
+    const value = JSON.parse(await readFile(path, "utf8")) as unknown;
     return isRecord(value) ? value : undefined;
   } catch {
     return undefined;
   }
 }
 
-function writeJsonFileSync(path: string, value: unknown): void {
-  const contents = `${JSON.stringify(value, null, 2)}\n`;
-  mkdirSync(dirname(path), { recursive: true });
-  try {
-    // 官方目录在每次启动都会重建；同内容反复写盘会增加 Windows 上
-    // marketplace 文件被杀毒/索引器占用的概率。只跳过字节完全相同的单文件写入，
-    // 读取失败或内容变化仍执行写入并保留原有失败语义。
-    if (readFileSync(path, "utf8") === contents) return;
-  } catch {
-    // 文件不存在或暂时不可读时继续写，让真实更新失败继续向调用方暴露。
-  }
-  writeFileSync(path, contents, "utf8");
+async function writeJsonFile(path: string, value: unknown): Promise<void> {
+  await writePluginTextIfChanged(path, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

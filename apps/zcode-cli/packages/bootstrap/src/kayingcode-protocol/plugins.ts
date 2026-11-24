@@ -14,6 +14,7 @@ import {
   kayingcodePluginsValidateParamsSchema,
   kayingcodePluginsDescribeParamsSchema,
   kayingcodePluginsRestoreBuiltinParamsSchema,
+  kayingcodePluginsWorkspaceTrustParamsSchema,
   type KayingCodeAvailablePluginSummary,
   type KayingCodeInstalledPluginSummary,
   type KayingCodePluginComponentGroup,
@@ -30,6 +31,7 @@ import {
   type KayingCodePluginsSetEnabledResult,
   type KayingCodePluginsUninstallResult,
   type KayingCodePluginsValidateResult,
+  type KayingCodePluginsWorkspaceTrustResult,
 } from "@zcode/shared";
 import { readPluginUiSurfaces } from "../plugin-ui-surface-metadata.js";
 import type { PluginDiagnostic, PluginMetadata } from "@zcode/contracts";
@@ -55,6 +57,7 @@ import { withPluginStorageLock } from "../lib/plugin-storage-lock.js";
 import { getCliStorageRoot, getPluginStorageRoot } from "../app/paths.js";
 import { resolveOfficialPluginHostMcpServerNames } from "../app/official-plugin-definitions.js";
 import { createConfig, resolvePath, type ConfigResult } from "@zcode/adapters/config";
+import { setWorkspacePluginTrust } from "../workspace-plugin-trust/index.js";
 import { parseParams, type KayingCodeProtocolAgentServerContext } from "./server-types.js";
 
 // 把 CLI 的 PluginMetadata 投影成协议可序列化的 KayingCodePluginInfo (只保留 UI 需要的字段)。
@@ -106,6 +109,7 @@ function toPluginInfo(plugin: PluginMetadata, configResult?: ConfigResult): Kayi
     rootPath: plugin.rootPath,
     ...(plugin.dataPath ? { dataPath: plugin.dataPath } : {}),
     ...(plugin.userConfig ? { userConfig: plugin.userConfig } : {}),
+    ...(plugin.workspaceTrust ? { workspaceTrust: plugin.workspaceTrust } : {}),
     ...(Object.keys(configuredOptions).length > 0 ? { configuredOptions } : {}),
     ...(rootSource ? { rootSource } : {}),
     ...(enabledSource ? { enabledSource } : {}),
@@ -223,10 +227,11 @@ export async function listPlugins(
     params.workspace.workspacePath,
     params.configScope,
   );
-  const outcome = resolveKayingCodePlugins({
+  const outcome = await resolveKayingCodePlugins({
     configResult,
     logger: context.logger,
     workingDirectory: params.workspace.workspacePath,
+    workspaceIdentity: params.workspace.workspaceIdentity,
   });
   const plugins = outcome.plugins.map((plugin) =>
     toPluginInfo(plugin, configResult),
@@ -268,6 +273,30 @@ export async function setPluginEnabled(
   };
 }
 
+export async function setPluginWorkspaceTrust(
+  context: KayingCodeProtocolAgentServerContext,
+  rawParams: unknown,
+): Promise<KayingCodePluginsWorkspaceTrustResult> {
+  const params = parseParams(kayingcodePluginsWorkspaceTrustParamsSchema, rawParams);
+  const result = await setWorkspacePluginTrust({
+    workingDirectory: params.workspace.workspacePath,
+    workspaceIdentity: params.workspace.workspaceIdentity,
+    env: context.deps.env,
+    pluginRoot: params.pluginRoot,
+    declarationDigest: params.declarationDigest,
+    trusted: params.trusted,
+  });
+  // 信任记录只影响之后新建的会话；已打开会话按启动时的快照继续，不在这里热刷新插件。
+  context.logger?.info("Workspace plugin trust decided", {
+    event: "plugins.workspaceTrust.decided",
+    workspaceKey: params.workspace.workspaceKey,
+    pluginRoot: params.pluginRoot,
+    accepted: result.accepted,
+    ...(result.reasonCode ? { reasonCode: result.reasonCode } : {}),
+  });
+  return result;
+}
+
 export async function getPluginsOverview(
   context: KayingCodeProtocolAgentServerContext,
   rawParams: unknown,
@@ -277,7 +306,7 @@ export async function getPluginsOverview(
     logger: context.logger,
     workingDirectory: params.workspace.workspacePath,
   });
-  const overview = getKayingCodePluginsOverview({
+  const overview = await getKayingCodePluginsOverview({
     configResult: createPluginConfigView(
       context,
       params.workspace.workspacePath,
@@ -285,6 +314,7 @@ export async function getPluginsOverview(
     ),
     logger: context.logger,
     workingDirectory: params.workspace.workspacePath,
+    workspaceIdentity: params.workspace.workspaceIdentity,
   });
   return {
     marketplaces: overview.marketplaces.map(toMarketplaceSummary),
