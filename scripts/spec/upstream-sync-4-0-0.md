@@ -688,6 +688,8 @@ createConfig
 - Subagent：前台等待期间可被认领转后台；task abort 控制器在抢占 + wait 时不取消 child；Agent 工具透传 `inputPreemption`。
 - Agent 工具：支持 `alwaysBackground`（缺省 true）；描述、handler 与 `subagents.alwaysBackground` 配置一致；runtime 统一经 `resolveRuntimeAgentAlwaysBackground` 取值。
 - 测试：`input-preemption-slot.test.ts`（默认 cancel、wait 等待、无接管取消、abort reason 判别）。
+- Windows `cmd.exe` 只读判定：恢复 `tool/cmd-readonly` 契约与 `bash-cmd-readonly-policy`；前台 Bash 在 `cmd`/Windows `legacy-shell` 下改按 CMD 语法判定；Memory executor 同样按实际 shell 选择分流。
+- 测试：移植上游 `bash-cmd-readonly-policy.test.ts`（126 例）与 `cmd-readonly/contract.test.ts`。
 
 待完成（阶段 4 未完成，更新）：
 - turn/loop 状态与请求构建、executor 剩余新端口、子代理冷恢复/compact 策略。
