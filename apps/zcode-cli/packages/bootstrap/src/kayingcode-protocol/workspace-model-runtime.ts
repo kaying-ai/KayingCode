@@ -2,14 +2,18 @@
 import { createInMemorySessionEventStore } from "@zcode/adapters/storage";
 import type { ModelSelection } from "@zcode/contracts";
 import {
+  kayingcodeProtocolMethods,
   kayingcodeProviderTestModelConnectivityParamsSchema,
+  kayingcodeSessionReadReplyLanguageResultSchema,
   kayingcodeWorkspaceReadPresentationParamsSchema,
+  KAYINGCODE_REPLY_LANGUAGE_REQUEST_TIMEOUT_MS,
   type KayingCodeWorkspaceRef,
 } from "@zcode/shared";
 import type { KayingCodeApp, KayingCodeAppOptions } from "../app/types.js";
 import { listProtocolSlashCommands } from "./slash-commands.js";
 import {
   parseParams,
+  protocolTraceFromTraceContext,
   type KayingCodeProtocolAgentServerContext,
   type KayingCodeProtocolSessionRecord,
 } from "./server-types.js";
@@ -75,6 +79,7 @@ export async function createWorkspaceKayingCodeApp(
 ): Promise<KayingCodeApp> {
   const providerRuntimeHeadersPort =
     options.providerRuntimeHeadersPort ?? createProviderRuntimeHeadersPort(context, workspace);
+  const readReplyLanguage = options.readReplyLanguage ?? createReplyLanguageReader(context);
   return context.deps.createKayingCodeApp({
     ...options,
     onOffPeakLifecycleEvent: (event) =>
@@ -85,6 +90,7 @@ export async function createWorkspaceKayingCodeApp(
     includeVisualize: true,
     platform: context.deps.platform,
     providerRuntimeHeadersPort,
+    readReplyLanguage,
     runtimeConfig: {
       ...options.runtimeConfig,
       // createKayingCodeApp 会把 workingDirectory 规范化为执行 cwd。把协议入口的
@@ -107,6 +113,29 @@ export async function createWorkspaceKayingCodeApp(
       modelStreaming: options.runtimeConfig?.modelStreaming ?? "on",
     },
   });
+}
+
+/**
+ * 回复语言的独立反向请求（docs/i18n/agent-reply-language.md）：Host 从内存同步应答，
+ * 单独的方法与短超时让这次读取的耗时可控，不受其他反向请求排队影响。
+ * 只做传输：失败原样抛出，由 core 统一跳过本次公告。
+ */
+function createReplyLanguageReader(
+  context: KayingCodeProtocolAgentServerContext,
+): NonNullable<KayingCodeAppOptions["readReplyLanguage"]> {
+  return async ({ sessionId, signal, traceContext }) => {
+    const result = await context.requestClient(
+      kayingcodeProtocolMethods.sessionReadReplyLanguage,
+      { sessionId },
+      kayingcodeSessionReadReplyLanguageResultSchema,
+      {
+        signal,
+        trace: protocolTraceFromTraceContext(traceContext),
+        timeoutMs: KAYINGCODE_REPLY_LANGUAGE_REQUEST_TIMEOUT_MS,
+      },
+    );
+    return result.language;
+  };
 }
 
 export function hasSessionModelProvider(

@@ -362,6 +362,15 @@ export interface AgentRuntimeDeps {
   resolveEffectiveModelSelection?: (selection: ModelSelection) => EffectiveModelSelectionResult;
   modelIoDir?: string;
   providerRuntimeHeadersPort?: ProviderRuntimeHeadersPort;
+  /**
+   * 回复语言来源：Host 的回复语言设置，只给主线程注入；没有设置时为 null（runtime 发清除公告），
+   * 读取失败时 reject（runtime 跳过本次公告）。见 docs/i18n/agent-reply-language.md。
+   */
+  readReplyLanguage?: (input: {
+    sessionId: SessionId;
+    signal?: AbortSignal;
+    traceContext: TraceContext;
+  }) => Promise<string | null>;
   permissionService?: PermissionService;
   permissionBroker?: PermissionBrokerPort;
   toolScheduler?: ToolScheduler;

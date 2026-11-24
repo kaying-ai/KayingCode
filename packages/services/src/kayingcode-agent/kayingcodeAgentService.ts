@@ -109,6 +109,7 @@ import {
   kayingcodeSessionEventSchema,
   kayingcodeSessionSendResultSchema,
   kayingcodeSessionRequestRuntimePreferencesParamsSchema,
+  kayingcodeSessionReadReplyLanguageParamsSchema,
   kayingcodeSessionRuntimePreferencesResultSchema,
   kayingcodeSessionStateSnapshotSchema,
   kayingcodeSessionSubscribeResultSchema,
@@ -902,6 +903,8 @@ interface CreateKayingCodeAgentServiceOptions extends Omit<
   authorizeLocalMediaPreviewPath?: (path: string) => Promise<string>;
   modelSelectionReadinessSource?: ModelSelectionReadinessSource;
   sessionRuntimePreferencesAuthority?: "local" | "external";
+  /** Agent 回复语言（同步、只读内存，null 为未设置），应答 CLI 的 session/readReplyLanguage。 */
+  resolveReplyLanguage?: () => string | null;
   /**
    * 新会话创建前的 Host 归属预留；返回本次创建固化的执行目录。
    * 缺省表示该装配不提供项目服务：调用方携带 projectId 时必须显式失败
@@ -2193,6 +2196,23 @@ export function createKayingCodeAgentService(
         }
       }),
       client.onRequest((request) => {
+        // 回复语言是 Host 级的值，不按 workspace 路由；从内存同步应答，不做 IO。
+        if (request.method === kayingcodeProtocolMethods.sessionReadReplyLanguage) {
+          if (!kayingcodeSessionReadReplyLanguageParamsSchema.safeParse(request.params).success) {
+            void client
+              .respondError(request.id, {
+                code: -32602,
+                message: "Invalid reply language request",
+              })
+              .catch(() => {});
+            return;
+          }
+          // 注入的值已在 Host 收消息时按 replyLanguageSchema 校验，这里不再重复。
+          void client
+            .respond(request.id, { language: options?.resolveReplyLanguage?.() ?? null })
+            .catch(() => {});
+          return;
+        }
         if (appControl?.handle(request)) return;
         if (request.method === kayingcodeProtocolMethods.sessionRequestRuntimePreferences) {
           const reportResponseFailure = (error: unknown): void => {

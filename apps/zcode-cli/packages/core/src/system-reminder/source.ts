@@ -21,6 +21,7 @@ export const SYSTEM_REMINDER_PERSISTED_SOURCES = [
   "environment",
   "model",
   "output_style_instructions",
+  "language",
   "date",
   "skills_listing",
   "gen_ui_state",
@@ -112,6 +113,8 @@ const SYSTEM_REMINDER_DESCRIPTORS: Record<SystemReminderSource, DescriptorShape>
     true,
     "sr.output_style_instructions",
   ),
+  // 回复语言：Host 的回复语言设置变化时宣告一次；compaction 后按最近一次重述。
+  language: descriptor("current_turn", "resume_history", true, "sr.language"),
   date: descriptor("current_turn", "resume_history", true, "sr.date"),
   agent_listing_delta: descriptor("current_turn", "resume_history", true, "sr.agent_listing_delta"),
   incoming_message: descriptor("mid_turn_event", "mid_turn_event", true, "sr.incoming_message"),

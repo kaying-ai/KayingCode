@@ -93,6 +93,7 @@ export interface AgentRuntimeInternal
   modelFactory: AgentRuntimeDeps["modelFactory"];
   modelIoDir?: string;
   providerRuntimeHeadersPort?: ProviderRuntimeHeadersPort;
+  readReplyLanguage?: AgentRuntimeDeps["readReplyLanguage"];
   browserControlPort?: AgentRuntimeDeps["browserControlPort"];
   modelRequestAdmission?: AgentRuntimeDeps["modelRequestAdmission"];
   sessionModelSelection: ModelSelection | undefined;

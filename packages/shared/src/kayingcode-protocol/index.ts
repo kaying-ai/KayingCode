@@ -102,7 +102,10 @@ import {
 import { browserClientModeSchema, browserCommandSchema } from "../browser-use/commands.js";
 import { browserCommandResultSchema } from "../browser-use/result.js";
 import { appToolSearchModeSchema } from "../app-runtime-preferences.js";
-import { integratedTerminalShellSelectionSchema } from "../validationAppSettings.js";
+import {
+  integratedTerminalShellSelectionSchema,
+  replyLanguageSchema,
+} from "../validationAppSettings.js";
 import { kayingcodeTaskModeSchema } from "../kayingcode-task-mode-schema.js";
 import {
   OFFICIAL_AUTH_CONSUMER_KINDS,
@@ -2215,6 +2218,16 @@ export {
 } from "../subagent-runtime-config.js";
 export const kayingcodeSubagentsReadRuntimeConfigParamsSchema = z
   .object({ sessionId: nonEmptyString, workspace: kayingcodeWorkspaceRefSchema.optional() })
+  .strict();
+
+// session/readReplyLanguage：CLI 收集输入附件时读取 Agent 回复语言设置（docs/i18n/agent-reply-language.md）。
+// Host 从内存同步应答；没有设置或不支持该设置的 Host（远端、Web）回答 null。值是 Host 级的，不带 workspace。
+export const KAYINGCODE_REPLY_LANGUAGE_REQUEST_TIMEOUT_MS = 2_000;
+export const kayingcodeSessionReadReplyLanguageParamsSchema = z
+  .object({ sessionId: nonEmptyString })
+  .strict();
+export const kayingcodeSessionReadReplyLanguageResultSchema = z
+  .object({ language: replyLanguageSchema.nullable() })
   .strict();
 
 export const KAYINGCODE_SESSION_RUNTIME_PREFERENCES_REQUEST_TIMEOUT_MS = 15_000;
@@ -4566,6 +4579,7 @@ export const kayingcodeProtocolMethods = {
   sessionList: "session/list",
   sessionSubagents: "session/subagents",
   sessionRequestRuntimePreferences: "session/requestRuntimePreferences",
+  sessionReadReplyLanguage: "session/readReplyLanguage",
   subagentsReadRuntimeConfig: "subagents/readRuntimeConfig",
   sessionRead: "session/read",
   sessionMessages: "session/messages",

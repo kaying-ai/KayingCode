@@ -346,6 +346,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
             configuredDefaultModelSelection: options.configuredDefaultModelSelection,
             providerEndpointRoutingPort: options.providerEndpointRoutingPort,
             providerRuntimeHeadersPort: options.providerRuntimeHeadersPort,
+            readReplyLanguage: options.readReplyLanguage,
             modelAdapter: options.modelAdapter,
             env: options.env,
             skipUserConfig: options.skipUserConfig,
@@ -1086,6 +1087,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       modelFactory,
       modelIoDir,
       providerRuntimeHeadersPort: options.providerRuntimeHeadersPort,
+      readReplyLanguage: options.readReplyLanguage,
       resolveEffectiveModelSelection: options.resolveEffectiveModelSelection,
       isRemoteWorkspace: () =>
         isRemoteWorkspaceIdentity(runtimeConfig.memory?.workspaceIdentity ?? ""),

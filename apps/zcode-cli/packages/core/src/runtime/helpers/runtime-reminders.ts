@@ -369,6 +369,36 @@ export function buildRuntimeOutputStyleReminderBody(
   return `${outputStyle.name} output style is active. Remember to follow the specific guidelines for this style.`;
 }
 
+/** 回复语言设置被清空时的清除公告；与 output style 的重置同一形态。 */
+export const LANGUAGE_CLEARED_REMINDER =
+  "The language preference was cleared. Match the user's language.";
+
+const LANGUAGE_REMINDER_HEAD = "# Language\nAlways respond in ";
+
+/**
+ * 回复语言公告正文；language 是用户在设置里输入的原文（docs/i18n/agent-reply-language.md）。
+ * 插入前转义：用户输入不能破坏 <system-reminder> 标签，也不能换行插入额外的段落。
+ */
+export function buildLanguageReminderBody(language: string): string {
+  return languageReminderBody(escapeLanguage(language));
+}
+
+// & < > 转命名实体，控制字符（\p{Cc} 即 U+0000–U+001F、U+007F–U+009F）与 U+2028/2029 转数字实体；引号不转。
+function escapeLanguage(language: string): string {
+  return language
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replace(/[\p{Cc}\u2028\u2029]/gu, (char) => `&#${char.charCodeAt(0)};`);
+}
+
+function languageReminderBody(language: string): string {
+  return [
+    `${LANGUAGE_REMINDER_HEAD}${language}. Use ${language} for all explanations, comments, and communications with the user. Technical terms and code identifiers should remain in their original form.`,
+    `Maintain full orthographic correctness for ${language}, including all required diacritical marks, accents, and special characters. Never substitute accented characters with their ASCII equivalents (e.g., never write "nao" for "não", "fur" for "für", or "loeschen" for "löschen").`,
+  ].join("\n");
+}
+
 function formatTodoListForReminder(todos: readonly TodoItem[]): string[] {
   return todos.map((todo, index) => `${index + 1}. [${todo.status}] ${todo.content}`);
 }

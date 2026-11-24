@@ -78,6 +78,7 @@ import type {
 import type {
   AgentRuntime,
   AgentRuntimeConfig,
+  AgentRuntimeDeps,
   AmendWorkflowRunSettingsInput,
   AmendWorkflowRunSettingsResult,
   ExecuteTurnOptions,
@@ -184,6 +185,8 @@ export interface KayingCodeAppOptions {
    * runtime 取派生实例。
    */
   providerRuntimeHeadersPort?: ProviderRuntimeHeadersPort;
+  /** 回复语言来源：协议 Host 注入，只给主线程读；缺省时不产生语言公告。 */
+  readReplyLanguage?: AgentRuntimeDeps["readReplyLanguage"];
   loggerFactory?: LoggerFactory;
   officialPluginRoots?: string[];
   /** 测试/Host 注入的插件发现端口；缺省用 adapter 的 Node 实现。 */
