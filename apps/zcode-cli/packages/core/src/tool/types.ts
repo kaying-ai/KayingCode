@@ -15,6 +15,8 @@ import type {
   DynamicWorkflowSnippetPort,
   EmbeddedSearchBackend,
   ExecutionPort,
+  InputPreemptionControl,
+  InputPreemptionHandling,
   ExecutionShellSelection,
   FileSystemPort,
   HttpClientPort,
@@ -151,7 +153,14 @@ export interface McpServerWaitPort {
   ): Promise<WaitForMcpServersOutput>;
 }
 
+/** executor 侧的输入抢占接管点：工具经 `register` 注册判断函数，executor 用 `decide` 取结果。 */
+export interface InputPreemptionSlot extends InputPreemptionControl {
+  /** 没有注册判断函数时返回 `cancel`。 */
+  decide(): InputPreemptionHandling;
+}
+
 export interface ToolExecutionContext {
+  inputPreemption?: InputPreemptionControl;
   toolSearch?: ToolSearchExecutionContext;
   toolCallId: string;
   /**

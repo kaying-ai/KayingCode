@@ -8,6 +8,7 @@ import {
   AgentErrorCode,
   CoreErrorType,
   DEFAULT_MODEL_STREAM_IDLE_TIMEOUT_MS,
+  INPUT_PREEMPTION_ABORT_REASON_KIND,
   SessionEventType,
   createChildTraceContext,
   createCoreError,
@@ -17,12 +18,14 @@ import {
   getModelUsageTotalTokens,
   hasModelUsage,
   isCoreError,
+  isInputPreemptionAbortReason,
   traceContextToLogContext,
   withAgentFailureHandback,
   type AgentBackgroundedOutput,
   type BackgroundResultOriginMeta,
   type AgentCompletedOutput,
   type AgentOutput,
+  type InputPreemptionHandling,
   type Logger,
   type ModelUsage,
   type SessionEvent,
@@ -190,6 +193,18 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
     ): Promise<AgentOutput> {
       const { profile, request } = resolveAgentProfileForRequest(getProfiles(), rawRequest);
       const executionRequest = toSubagentExecutionRequest(request);
+      const startBackground = () =>
+        port.start(executionRequest, {
+          signal: launchOptions?.signal,
+          ...(launchOptions?.model ? { model: launchOptions.model } : {}),
+          ...(launchOptions?.modelOverride ? { modelOverride: launchOptions.modelOverride } : {}),
+        });
+      // Agent 总在后台运行：本次执行禁止后台时改为前台运行，不报错。
+      if (rawRequest.alwaysBackground === true) {
+        return launchOptions?.modelOverride?.background === "deny"
+          ? port.run(executionRequest, launchOptions)
+          : startBackground();
+      }
       const backgroundRequested =
         rawRequest.runInBackground === true || profile.background === true;
       if (backgroundRequested) {
@@ -243,12 +258,31 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
         throw error;
       }
 
+      const hasForegroundModelOverride = runOptions?.modelOverride?.background === "deny";
+      // 立即发送抢占时的唯一判断：executor 调用它；前台等待中本 run 也在同一次 abort 里调用。
+      // 只有前台等待期间才认领；转后台后 executor 等本 run 返回启动结果。
+      let claimable = false;
+      const decideInputPreemption = (): InputPreemptionHandling => {
+        if (!claimable) return "cancel";
+        if (registry.get(lifecycle.agentId)?.isBackgrounded === true) return "wait";
+        if (!registry.requestBackground(lifecycle.agentId)) return "cancel";
+        options.logger?.info("Foreground subagent moved to background", {
+          ...traceContextToLogContext(lifecycle.runTraceContext),
+          agentId: lifecycle.agentId,
+          event: "subagent.foreground.backgrounded",
+          module: "core.subagent",
+          parentToolCallId: request.parentToolCallId,
+          trigger: INPUT_PREEMPTION_ABORT_REASON_KIND,
+        });
+        return "wait";
+      };
+      runOptions?.inputPreemption?.register(decideInputPreemption);
       const taskAbort = createSubagentTaskAbortController(
         abortControllers,
         lifecycle.agentId,
         runOptions?.signal,
+        runOptions?.inputPreemption ? decideInputPreemption : undefined,
       );
-      const hasForegroundModelOverride = runOptions?.modelOverride?.background === "deny";
       if (hasForegroundModelOverride) {
         borrowedForegroundAgentIds.add(lifecycle.agentId);
       }
@@ -359,16 +393,27 @@ export function createExploreSubagentPort(options: ExploreSubagentPortOptions): 
                 kind: task ? ("backgrounded" as const) : ("ignored" as const),
               }))
           : undefined;
-        const winner = await Promise.race([
-          guardedCompletionPromise.then((completed) => ({
-            completed,
-            kind: "completed" as const,
-          })),
-          ...(backgroundRequestPromise ? [backgroundRequestPromise] : []),
-          ...(autoBackgroundTimer ? [autoBackgroundTimer.promise] : []),
-        ]);
+        const winner = await (async () => {
+          claimable = !hasForegroundModelOverride;
+          try {
+            return await Promise.race([
+              guardedCompletionPromise.then((completed) => ({
+                completed,
+                kind: "completed" as const,
+              })),
+              ...(backgroundRequestPromise ? [backgroundRequestPromise] : []),
+              ...(autoBackgroundTimer ? [autoBackgroundTimer.promise] : []),
+            ]);
+          } finally {
+            claimable = false;
+          }
+        })();
+        // 转后台与 child 完成几乎同时发生时，以 registry 为准走后台分支。
+        const movedToBackground =
+          winner.kind === "backgrounded" ||
+          (!hasForegroundModelOverride && registry.get(lifecycle.agentId)?.isBackgrounded === true);
 
-        if (winner.kind === "backgrounded") {
+        if (movedToBackground) {
           taskAbort.detachParent();
           activityWatchdog.stop();
           void track(
@@ -814,11 +859,15 @@ function createSubagentTaskAbortController(
   abortControllers: Map<string, AbortController>,
   agentId: string,
   parentSignal?: AbortSignal,
+  decideInputPreemption?: () => InputPreemptionHandling,
 ): SubagentTaskAbortHandle {
   const controller = new AbortController();
   abortControllers.set(agentId, controller);
   const onParentAbort = (): void => {
-    controller.abort(parentSignal?.reason ?? new Error(`Subagent task aborted: ${agentId}`));
+    const reason = parentSignal?.reason;
+    // 立即发送抢占且判断为 wait：child 已转后台，不随父级取消。
+    if (isInputPreemptionAbortReason(reason) && decideInputPreemption?.() === "wait") return;
+    controller.abort(reason ?? new Error(`Subagent task aborted: ${agentId}`));
   };
   if (parentSignal?.aborted) {
     onParentAbort();

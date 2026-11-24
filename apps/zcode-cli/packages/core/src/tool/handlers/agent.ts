@@ -89,6 +89,7 @@ const AGENT_TOOL_OUTPUT_SCHEMA = {
  */
 function buildAgentProviderDescription(
   options: {
+    alwaysBackground?: boolean;
     dynamicWorkflowEnabled?: boolean;
   } = {},
 ): string {
@@ -106,8 +107,10 @@ function buildAgentProviderDescription(
     "- The agent's final report is not shown to the user — relay what matters.",
     "- Use SendMessage with the agent's ID to continue a previously spawned agent with its context intact; a new Agent call starts fresh.",
     "- Each agent type's model, reasoning effort, and tools come from its definition (`.kayingcode/agents/*.md` frontmatter).",
-    // KayingCode 默认前台运行；后台说明只写这一行，并要求不编造未到达的结果。
-    "- `run_in_background: true` runs the agent asynchronously; you'll be notified when it completes. Never fabricate or predict a pending agent's results — the notification is never something you write yourself; if the user asks before it arrives, say it's still running.",
+    // 总在后台时没有 run_in_background 参数；关闭开关时默认前台，后台说明只写这一行。
+    options.alwaysBackground === false
+      ? "- `run_in_background: true` runs the agent asynchronously; you'll be notified when it completes. Never fabricate or predict a pending agent's results — the notification is never something you write yourself; if the user asks before it arrives, say it's still running."
+      : "- Subagents run in the background; you'll be notified when one completes. Never fabricate or predict a pending agent's results — the notification is never something you write yourself; if the user asks before it arrives, say it's still running.",
     // 只保留「用户点名工作流」这一种情形：工作流一律由用户显式请求触发，与系统提示词其余
     // 部分一致。不能把「结果层层喂给下一步的多代理编排」也划给 CreateWorkflow，
     // 那等于让模型在用户没开口时自行选择工作流。
@@ -180,9 +183,10 @@ function formatAgentOutputForModel(output: unknown): string {
   ].join("\n");
 }
 
-const agentHandler: ToolHandler = async (input, context) => {
-  const parsed = AgentInputSchema.parse(input) as AgentInput;
-  const agentType = parsed.subagent_type ?? AgentType.GeneralPurpose;
+function createAgentHandler(alwaysBackground: boolean): ToolHandler {
+  return async (input, context) => {
+    const parsed = AgentInputSchema.parse(input) as AgentInput;
+    const agentType = parsed.subagent_type ?? AgentType.GeneralPurpose;
 
   if (!context.subagentPort) {
     throw createCoreError(
@@ -220,15 +224,24 @@ const agentHandler: ToolHandler = async (input, context) => {
   return context.subagentPort.launch(
     {
       ...request,
-      runInBackground: parsed.run_in_background === true,
+      ...(alwaysBackground
+        ? { alwaysBackground: true }
+        : { runInBackground: parsed.run_in_background === true }),
     },
     {
       signal: context.abortSignal,
       ...(context.model ? { model: context.model } : {}),
       ...(context.subagentModelOverride ? { modelOverride: context.subagentModelOverride } : {}),
+      // 立即发送时由 runner 判断转后台还是取消；executor 读同一个判断。
+      ...(context.inputPreemption ? { inputPreemption: context.inputPreemption } : {}),
     },
   );
-};
+  };
+}
+
+const ALWAYS_BACKGROUND_AGENT_HANDLER = createAgentHandler(true);
+const OPTIONAL_BACKGROUND_AGENT_HANDLER = createAgentHandler(false);
+const agentHandler = OPTIONAL_BACKGROUND_AGENT_HANDLER;
 
 export const agentToolEntry: ToolEntry = {
   capability: "Launch a profile-backed subagent; background execution is runtime-configured",
@@ -329,21 +342,26 @@ function createTaskToolEntryFromAgent(entry: ToolEntry): ToolEntry {
 
 export function createAgentToolEntry(
   options: {
+    /** Agent 是否总在后台运行；产品默认 false，显式开启。 */
+    alwaysBackground?: boolean;
     /** 见 buildAgentProviderDescription：缺省 true，只有灰度显式关闭时才去掉工作流那一行。 */
     dynamicWorkflowEnabled?: boolean;
   } = {},
 ): ToolEntry {
+  const alwaysBackground = options.alwaysBackground === true;
   return {
     ...agentToolEntry,
     metadata: {
       ...agentToolEntry.metadata,
       description: buildAgentProviderDescription(options),
     },
+    handler: alwaysBackground ? ALWAYS_BACKGROUND_AGENT_HANDLER : OPTIONAL_BACKGROUND_AGENT_HANDLER,
   };
 }
 
 export function createTaskToolEntry(
   options: {
+    alwaysBackground?: boolean;
     /** Task 是 Agent 的兼容别名，描述整段内嵌 Agent 的，因此同一道门一起传下去。 */
     dynamicWorkflowEnabled?: boolean;
   } = {},

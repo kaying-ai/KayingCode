@@ -206,6 +206,8 @@ interface RegisterBuiltInToolsOptions {
   includeOffPeak?: boolean;
   /** 注入了 topicResourcePort（App 托管会话）才注册 ReadTopicResource；机器人授权在调用时校验。 */
   includeTopicResource?: boolean;
+  /** Agent 是否总在后台运行；缺省 true。 */
+  agentAlwaysBackground?: boolean;
   /**
    * 动态工作流灰度门。**只有显式 false
    * 才下架** DYNAMIC_WORKFLOW_TOOL_NAMES：缺席代表调用方不参与灰度（TUI、headless、
@@ -356,11 +358,13 @@ function resolveBuiltInToolEntryForBranch(
   // options.includeDynamicWorkflow，所以首次装配与分支刷新产出的描述必然一致。
   if (entry.metadata.name === "Agent") {
     return createAgentToolEntry({
+      alwaysBackground: options.agentAlwaysBackground,
       dynamicWorkflowEnabled: options.includeDynamicWorkflow !== false,
     });
   }
   if (entry.metadata.name === "Task") {
     return createTaskToolEntry({
+      alwaysBackground: options.agentAlwaysBackground,
       dynamicWorkflowEnabled: options.includeDynamicWorkflow !== false,
     });
   }

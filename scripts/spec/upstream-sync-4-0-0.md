@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-24）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试）；阶段 4 进行中（存储 0025/0026、ReadTopicResource、browser-state 已落地；turn/loop、InputPreemption、协议 v4 剩余项待做）。
+状态：实施中（2026-11-24）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试）；阶段 4 进行中（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption 已落地；turn/loop、协议 v4 剩余项待做）；阶段 5 已开始游戏插件兼容验收，非游戏上游能力待补齐。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -681,10 +681,18 @@ createConfig
 - 测试：`session-migrations.test.ts`、`browser-storage-state.test.ts`、`topic-resource-tool-registration.test.ts`。
 - 验证：adapters/core/cli/bootstrap/根 typecheck、`lint`、`architecture:check --changed`、`source:check` 通过。
 
-待完成（阶段 4 未完成）：
-- turn/loop 状态与请求构建、executor 新端口、`InputPreemptionControl`、子代理 always-background/同步子代理/冷恢复、compact 策略。
+### 阶段 4 第二批：输入抢占与 Agent always-background（2026-11-24）
+
+- 契约：新增 `InputPreemptionAbortReason`/`createInputPreemptionAbortReason`/`isInputPreemptionAbortReason`、`InputPreemptionControl`/`InputPreemptionHandling`；`SubagentRunOptions.inputPreemption` 与 `SubagentLaunchRequest.alwaysBackground`。
+- Executor：每次工具调用创建 `InputPreemptionSlot`；立即发送抢占到达时，工具注册的判断为 wait 则不取消，等 handler 返回。
+- Subagent：前台等待期间可被认领转后台；task abort 控制器在抢占 + wait 时不取消 child；Agent 工具透传 `inputPreemption`。
+- Agent 工具：支持 `alwaysBackground`（缺省 true）；描述、handler 与 `subagents.alwaysBackground` 配置一致；runtime 统一经 `resolveRuntimeAgentAlwaysBackground` 取值。
+- 测试：`input-preemption-slot.test.ts`（默认 cancel、wait 等待、无接管取消、abort reason 判别）。
+
+待完成（阶段 4 未完成，更新）：
+- turn/loop 状态与请求构建、executor 剩余新端口、子代理冷恢复/compact 策略。
 - lifecycle hooks 上下文、`createConfigWithPluginMigrations`、`pluginDiscoveryUi` 增量公告、批量删除预检、活动摘要、`readReplyLanguage`。
-- `--total-tokens-reminder`、`--agent-always-background`、`cmd-readonly` 策略、plugin host 进程名等剩余上游 CLI 对齐。
+- `--total-tokens-reminder`、`--agent-always-background` CLI 开关、cmd-readonly 策略、plugin host 进程名。
 - marketplace `regions`/商店 UI；官方插件清单重生成。
 
 待完成（阶段 3 未完成）：
@@ -692,6 +700,13 @@ createConfig
 - `WaitForMcpServers` 之外的 `ToolSearch` 关闭时连接中公告与 `runModelTextRequest` 集成。
 - HTTP transport 重试/401 step-up：会话过期与连接关闭已接入 `isRetryableCallError`，401 step-up 仍沿用既有授权恢复路径。
 - pool 租约化与 transport 错误收敛的上游完整形态；marketplace `regions`/商店 UI；官方插件清单重生成。
+
+### 阶段 5 第一批：游戏插件兼容验收（2026-11-24）
+
+- 新增 `adapters/tests/game-plugins-upstream-loader.test.ts`：用上游 loader 发现 blender、kaying-for-taptap、kaying-game-playtest、computer-use 四个内置游戏插件，验证 `source=official`、启用、skill 根与 MCP servers 均正常。
+- 游戏插件仍使用 `.zcode-plugin` manifest；新 loader 的 `.zcode-plugin` 优先/`.kayingcode-plugin` 回退、workspace trust、plugin-secrets 与 MCP 解析均已覆盖。
+- 未执行：游戏插件全链路 E2E（真实 Blender/TapTap/Playtest 运行时）、CUA 对齐评估、非游戏上游能力（preinstalled-tools/managed-worktree/voice-input/selection-comment/composer-edit-mode/settings-search/remote context-composition）。
+- 旧 loader 兼容分支仍保留在游戏插件/产品装配中；确认新路径稳定后再删除。
 
 ## 验证记录
 

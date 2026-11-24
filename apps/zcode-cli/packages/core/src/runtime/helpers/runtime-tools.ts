@@ -18,6 +18,7 @@ import { sessionControlForRuntime } from "../../tool/session-control/contract.js
 import { shouldSuppressSealedSubagentBashNotification } from "../../runtime-task/notification-policy.js";
 import {
   resolveBuiltInToolAllowlist,
+  resolveRuntimeAgentAlwaysBackground,
   resolveRuntimeDisallowedTools,
   resolveRuntimeDynamicWorkflowToolsIncluded,
 } from "./tool-allowlist.js";
@@ -82,6 +83,7 @@ function registerRuntimeBuiltInTools(runtime: AgentRuntimeInternal, deps: AgentR
     // 修复原因：browserControlPort 只是宿主能力，不应隐式暴露高权限 node_repl。
     // node_repl/browser-use 由 KayingCode 官方 browser-use 插件启停推导出的 runtimeFeatures 控制。
     includeNodeRepl: nodeReplEnabled,
+    agentAlwaysBackground: resolveRuntimeAgentAlwaysBackground(runtime.config),
     includeWaitForMcpServers: Boolean(deps.mcpPort),
     includeTopicResource: Boolean(deps.topicResourcePort),
     includeBrowserUse: browserUseEnabled,

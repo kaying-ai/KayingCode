@@ -153,6 +153,8 @@ export interface AgentRuntimeConfig {
     inactivityTimeoutMs?: number;
     autoBackgroundMs?: number;
     backgroundBashMaxMs?: number;
+    /** Agent 是否总在后台运行；缺省 true（上游 4.0 行为）。 */
+    alwaysBackground?: boolean;
     /** 后台 Agent 无进展多久后第一次提醒父会话；之后每次间隔加倍。默认 15 分钟。 */
     backgroundStallNotifyMs?: number;
     /** 无进展提醒的最大间隔。默认 4 小时。 */

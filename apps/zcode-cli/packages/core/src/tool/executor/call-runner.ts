@@ -42,6 +42,7 @@ import { createMcpToolDisplay, createToolResultDisplay } from "./result-display.
 import { serializeOutput } from "./result-serialization.js";
 import {
   ToolDeadline,
+  createInputPreemptionSlot,
   executeWithTimeout,
   linkAbortSignal,
   observeToolAdmissionClock,
@@ -488,7 +489,9 @@ async function executeToolCallImpl(
       const embeddedSearchDecision = resolveEmbeddedSearchBranchCapability({
         bashAvailable: deps.registry.has("Bash"),
       });
+      const inputPreemption = createInputPreemptionSlot();
       const context: ToolExecutionContext = {
+        inputPreemption,
         toolCallId: canonicalToolCall.id,
         toolSearch: options?.toolSearch,
         telemetry,
@@ -576,6 +579,7 @@ async function executeToolCallImpl(
         deadline,
         executionAbortController,
         entry,
+        inputPreemption,
       );
       const durationMs = Date.now() - startTime;
       if (isToolHandlerFailure(output)) {
