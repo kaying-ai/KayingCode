@@ -512,3 +512,16 @@ export async function resolveAtomicReadPath(targetPath: string): Promise<string>
   // 恢复内部会再检查一次活跃事务：异步检查之后才启动的 writer 不会被抢走 backup。
   return recoverAtomicTargetSync(targetPath);
 }
+
+/**
+ * 异步发现只读入口：返回可读路径与是否稳定。
+ * 兼容层先复用现有 resolveAtomicReadPath；完整事务判定在后续 atomic-directory 对齐时替换。
+ */
+export async function readAtomicTarget(targetPath: string): Promise<{
+  path: string;
+  stable: boolean;
+  files: string[];
+}> {
+  const path = await resolveAtomicReadPath(targetPath);
+  return { path, stable: path === targetPath, files: [targetPath, path] };
+}

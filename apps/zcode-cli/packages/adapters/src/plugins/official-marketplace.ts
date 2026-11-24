@@ -32,18 +32,23 @@ export function writeCdnOfficialMarketplacePartitionSync(input: {
   return rebuildOfficialMarketplaceSync(input.storageRoot);
 }
 
-export function loadBundledOfficialPluginRootsSync(
+export function bundledOfficialMarketplacePath(storageRoot: string): string {
+  return partitionPath(storageRoot, BUNDLED_PARTITION_FILE);
+}
+
+/** 插件发现与 MCP 配置加载共用：从 bundled 分片内容解析官方插件缓存目录。 */
+export function parseBundledOfficialPluginRoots(
+  value: unknown,
   storageRoot: string,
 ): string[] | undefined {
-  const bundledPartition = readBundledPartition(storageRoot);
-  if (!bundledPartition) return undefined;
+  if (!isRecord(value) || value.version !== 1 || !isRecord(value.manifest)) return undefined;
 
   const officialCacheRoot = resolve(
     storageRoot,
     "cache",
     KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE,
   );
-  return readPluginEntries(bundledPartition.manifest).flatMap((plugin) => {
+  return readPluginEntries(value.manifest).flatMap((plugin) => {
     const name = readPluginName(plugin);
     const cachePath = typeof plugin.cachePath === "string" ? plugin.cachePath : undefined;
     if (!name || !cachePath) return [];
@@ -58,6 +63,15 @@ export function loadBundledOfficialPluginRootsSync(
     }
     return [resolvedCachePath];
   });
+}
+
+export function loadBundledOfficialPluginRootsSync(
+  storageRoot: string,
+): string[] | undefined {
+  return parseBundledOfficialPluginRoots(
+    readJsonRecord(bundledOfficialMarketplacePath(storageRoot)),
+    storageRoot,
+  );
 }
 
 function rebuildOfficialMarketplaceSync(storageRoot: string): Record<string, unknown> {

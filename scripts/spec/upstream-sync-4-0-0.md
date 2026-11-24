@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-24）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 未开始。
+状态：实施中（2026-11-24）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 进行中（manifest 统一解析 + 单插件加载隔离已完成）。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -549,6 +549,23 @@ P0-2 期间修正了品牌映射：产品保留上游 `@zcode/*` workspace 作�
 - 桌面/UI 登录入口：上游 `WelcomeScreen` 730 行 + `useOAuth`/credential recovery 组件，产品当前 WelcomeScreen 仅 162 行且为 API Key 登录；需要单独 UI 批次，不在本轮强行替换。
 - 真实端点登录、token 刷新与 staging 部署：需要官方测试端点与 Cloudflare staging 权限；代码与 mock 已就绪，联调标记为待外部条件。
 - TUI `/login` 交互接线：CLI `login/logout` 已可用，TUI 面板入口留到 UI 批次。
+
+## 阶段 2 执行记录（2026-11-24，进行中）
+
+已完成插件体系第一批：manifest 统一解析 + 单插件加载隔离。
+
+- 新增 `apps/zcode-cli/packages/adapters/src/plugins/discovery/`（上游 CONTRACT/contract/index/module），统一 `parsePluginManifest` 与 `userConfig` 已知字段 strip。
+- 产品 loader 的 `readManifest` 改用统一解析；保留 `.zcode-plugin` → `.kayingcode-plugin` → `.claude-plugin` → `.codex-plugin` 回退顺序。
+- 单插件组件准备改为 try/catch：失败只产生 `plugin_load_failed` 诊断并跳过该插件，已准备的 MCP/hook/skill/command 不再泄漏进会话。
+- 新增 `plugin-load-isolation.test.ts`：坏插件的 MCP server 不进入结果，good 插件仍加载。
+- 补齐共享/适配层基础设施：`shared/plugin-discovery`、`plugin-store-visibility`、protocol v4 `pluginInstall`、`adapters/watch`、`plugins/live-inventory`、`plugins/workspace-plugin-declaration`、`config/plugin-secrets.adapter`、`bootstrap/plugin-secrets`、`bootstrap/workspace-plugin-trust`。
+- plugin-secrets 已接入 configure/reset/uninstall：敏感/workspace 选项写私有文件；项目 `plugins.options` 不再参与合并；reset/uninstall 清理私密值。
+- 验证：adapters/contracts/bootstrap typecheck 通过；plugin load isolation **1/1**；根 typecheck、lint、architecture 通过。
+
+待完成（阶段 2 未完成）：
+- workspace declaration/trust 尚未接入 loader：需要把同步 discovery 改成 material-cache 异步流程，才能在同一批材料上算声明摘要并强制 pending 停用。
+- live inventory 尚未接入 MCP/Skill 配置加载；marketplace `regions` 与商店 UI 未迁移。
+- 内置插件清单/版本与 `config/official-plugins.json` 尚未按上游 definition 重新生成。
 
 ## 验证记录
 

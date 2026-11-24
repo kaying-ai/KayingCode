@@ -114,12 +114,15 @@ export function summarizeProjectConfigs(files: ProjectConfigFile[]): ProjectConf
   };
 }
 
-function getProjectConfigBaseDir(path: string): string {
+export function getProjectConfigBaseDir(path: string): string {
   const configDirectory = dirname(path);
   return basename(configDirectory) === ".kayingcode" ? dirname(configDirectory) : configDirectory;
 }
 
-function normalizeProjectConfig(config: RuntimeConfigPatch, baseDir: string): RuntimeConfigPatch {
+export function normalizeProjectConfig(
+  config: RuntimeConfigPatch,
+  baseDir: string,
+): RuntimeConfigPatch {
   const normalized: RuntimeConfigPatch = config.hooks
     ? (() => {
         const { hooks: _hooks, ...safeConfig } = config;

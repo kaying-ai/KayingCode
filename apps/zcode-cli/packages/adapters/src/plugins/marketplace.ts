@@ -713,14 +713,22 @@ export async function listInstalledPluginRecordsAsync(
   return normalizeInstalledPluginsState(parsed).plugins;
 }
 
+/** 安装记录对应的插件根目录：记录没有 installPath 时按缓存目录规则推出。 */
+export function installedPluginPath(
+  storageRoot: string,
+  record: InstalledPluginRecord,
+): string {
+  return (
+    record.installPath ||
+    getPluginCacheDir(storageRoot, record.marketplace, record.name, record.version)
+  );
+}
+
 export function resolveInstalledPluginRoot(
   storageRoot: string,
   record: InstalledPluginRecord,
 ): string {
-  const root =
-    record.installPath ||
-    getPluginCacheDir(storageRoot, record.marketplace, record.name, record.version);
-  return recoverAtomicTargetSync(root);
+  return recoverAtomicTargetSync(installedPluginPath(storageRoot, record));
 }
 
 export async function resolveInstalledPluginRootAsync(
@@ -1959,7 +1967,7 @@ function defaultMarketplaceSourceFromString(source: string): MarketplaceSource {
   return { source: "file", path: "builtin://local" };
 }
 
-function normalizeInstalledPluginsState(value: unknown): InstalledPluginsState {
+export function normalizeInstalledPluginsState(value: unknown): InstalledPluginsState {
   if (!isRecord(value)) return { version: 1, plugins: [] };
   const rawPlugins = value.plugins;
   if (isRecord(rawPlugins)) {

@@ -110,10 +110,19 @@ export interface PluginConfigSources {
   enabled: Record<string, PluginConfigScope>;
   marketplaces: Record<string, PluginConfigScope>;
   options: Record<string, Record<string, PluginConfigScope>>;
+  /** 插件选项原始层，敏感选项按层叠加私有文件时使用。 */
+  optionLayers: PluginOptionLayer[];
   paths: {
     user: string;
     workspace: string | undefined;
   };
+}
+
+export interface PluginOptionLayer {
+  scope: PluginConfigScope;
+  path: string;
+  workspaceRoot?: string;
+  options: Record<string, Record<string, string | number | boolean>>;
 }
 
 /**
@@ -326,6 +335,22 @@ function resolvePluginConfigSources(input: {
     enabled,
     marketplaces,
     options,
+    optionLayers: [
+      {
+        scope: "user",
+        path: input.userPath,
+        options: input.userConfig.plugins?.options ?? {},
+      },
+      ...(input.projectPath
+        ? [
+            {
+              scope: "workspace" as const,
+              path: input.projectPath,
+              options: input.projectConfig.plugins?.options ?? {},
+            },
+          ]
+        : []),
+    ],
     paths: {
       user: input.userPath,
       workspace: input.projectPath,
@@ -463,4 +488,17 @@ function summarizeOptionalProjectConfig(files: ProjectConfigFile[]): OptionalPat
     path,
     loaded: true,
   };
+}
+
+/**
+ * workspace 的 Hook/插件信任 identity。
+ * 产品当前没有受管 worktree 归一层，沿用 workspaceIdentity 优先、workspacePath 兜底。
+ */
+export async function resolveWorkspaceHookTrustIdentityForWorkspace(input: {
+  workspacePath: string;
+  workspaceIdentity?: string;
+  env?: Record<string, string | undefined>;
+}): Promise<string> {
+  void input.env;
+  return input.workspaceIdentity?.trim() || input.workspacePath;
 }

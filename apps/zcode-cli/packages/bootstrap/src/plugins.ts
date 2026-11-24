@@ -10,10 +10,12 @@ import {
   removePluginEnabledFromFileConfig,
   removePluginFromFileConfig,
   removeSuppressedBuiltinInFileConfig,
+  resolvePluginSecretsPath,
   updatePluginEnabledInFileConfig,
   updatePluginOptionsInFileConfig,
   type ConfigResult,
 } from "@zcode/adapters/config";
+import { removeStoredPluginSecrets, savePluginOptions } from "./plugin-secrets.js";
 import {
   addMarketplace,
   comparePluginUpdate,
@@ -793,6 +795,11 @@ export async function uninstallKayingCodeMarketplacePlugin(
       });
       if (!removed) return null;
       await removePluginFromFileConfig(configResult.sources.user.path, removed.id);
+      await removeStoredPluginSecrets(
+        resolvePluginSecretsPath(pluginStorageRoot),
+        removed.id,
+        "all",
+      );
       await removeSuppressedBuiltinInFileConfig(configResult.sources.user.path, removed.id);
       return toInstalledPluginData(removed, false);
     }
@@ -1079,19 +1086,25 @@ export async function configureKayingCodePlugin(
   });
   const plugin = resolvePluginSelector(options.pluginId, outcome.plugins);
   if (options.dryRun === true) return;
-  await updatePluginOptionsInFileConfig(
-    resolvePluginConfigPath(options, configResult, workingDirectory),
-    plugin.id,
-    normalizedOptions,
+  await savePluginOptions({
     clearOptionKeys,
-  );
+    configPath: resolvePluginConfigPath(options, configResult, workingDirectory),
+    options: normalizedOptions,
+    plugin,
+    // workspace 配置固定写 <workingDirectory>/.kayingcode/config.json，其 baseDir 即 workingDirectory。
+    scope:
+      options.scope === "workspace"
+        ? { kind: "workspace", root: workingDirectory }
+        : { kind: "user" },
+    secretsPath: resolvePluginSecretsPath(pluginStorageRoot),
+  });
 }
 
 /** 删除指定 scope 的 Plugin 配置键，使 Workspace scope 回退到 User。 */
 export async function resetKayingCodePluginConfig(
   options: ResetKayingCodePluginConfigOptions,
 ): Promise<{ path: string; pluginId: string }> {
-  const { configResult, workingDirectory } = resolvePluginContext(options);
+  const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
   const path = resolvePluginConfigPath(options, configResult, workingDirectory);
   if (options.scope === "workspace") {
     // “恢复继承”只删除 Workspace 的 enable override。options 是独立配置维度，
@@ -1099,6 +1112,11 @@ export async function resetKayingCodePluginConfig(
     await removePluginEnabledFromFileConfig(path, options.pluginId);
   } else {
     await removePluginFromFileConfig(path, options.pluginId);
+    await removeStoredPluginSecrets(
+      resolvePluginSecretsPath(pluginStorageRoot),
+      options.pluginId,
+      { kind: "user" },
+    );
   }
   return { path, pluginId: options.pluginId };
 }

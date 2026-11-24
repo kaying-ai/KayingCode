@@ -319,7 +319,8 @@ const projectConfigFileSchema = KayingCodeConfigFileSchema.pick({
   command: true,
 })
   .extend({
-    plugins: pluginsSchema.pick({ enabledPlugins: true, options: true }).optional(),
+    // 项目 plugins.options 不再参与合并；目录只作为待信任候选。
+    plugins: pluginsSchema.pick({ enabledPlugins: true, dirs: true }).optional(),
     skills: z
       .preprocess(
         (value) =>

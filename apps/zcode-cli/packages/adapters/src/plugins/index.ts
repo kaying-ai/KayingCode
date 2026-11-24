@@ -26,6 +26,7 @@ import {
   KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE,
   parsePluginUiContributions,
 } from "@zcode/contracts";
+import { parsePluginManifest } from "./discovery/index.js";
 import {
   directoryExists,
   fileExists,
@@ -103,15 +104,15 @@ export {
   comparePluginVersions,
   type PluginUpdateStatus,
 } from "./version-compare.js";
+export { parsePluginManifest, pluginManifestName } from "./discovery/index.js";
+export { inspectWorkspacePluginRoot, workspacePluginRootKey } from "./workspace-plugin-declaration/index.js";
 
 const ZCODE_MANIFEST_PATH = join(".zcode-plugin", "plugin.json");
 const KAYINGCODE_MANIFEST_PATH = join(".kayingcode-plugin", "plugin.json");
 const CLAUDE_MANIFEST_PATH = join(".claude-plugin", "plugin.json");
 const CODEX_MANIFEST_PATH = join(".codex-plugin", "plugin.json");
-const DEFAULT_VERSION = "0.0.0";
 const FIRST_PLUGIN_PRIORITY = 1_000;
 const PRIORITY_STEP = 10;
-const PLUGIN_NAME_PATTERN = /^[a-z0-9][a-z0-9._-]{0,127}$/;
 const UNSUPPORTED_COMPONENT_KEYS = ["channels", "lspServers", "outputStyles", "settings"] as const;
 const SUPPORTED_HOOK_EVENTS = new Set<string>(Object.values(HookEventNameValue));
 
@@ -173,59 +174,55 @@ export class NodePluginAdapter implements PluginPort {
         continue;
       }
       seen.add(loaded.id);
-      warnUnsupportedComponents(loaded, diagnostics);
-      const uiContributionResult = parsePluginUiContributions(loaded.manifest.uiContributions);
-      for (const message of uiContributionResult.errors) {
-        diagnostics.push({
-          code: "plugin_ui_contribution_invalid",
-          message,
-          path: loaded.manifestPath,
-          pluginId: loaded.id,
-          severity: "error",
+      try {
+        warnUnsupportedComponents(loaded, diagnostics);
+        const uiContributionResult = parsePluginUiContributions(loaded.manifest.uiContributions);
+        for (const message of uiContributionResult.errors) {
+          diagnostics.push({
+            code: "plugin_ui_contribution_invalid",
+            message,
+            path: loaded.manifestPath,
+            pluginId: loaded.id,
+            severity: "error",
+          });
+        }
+
+        // candidate.defaultEnabled 在 candidate 构造时无法访问 plugin id,
+        // 这里再叠加 bootstrap 提供的 "默认开" 名单 (按 `<name>@<marketplace>` 匹配)。
+        const candidateDefaultEnabled =
+          candidate.defaultEnabled ||
+          (request.officialPluginsEnabledByDefault?.has(loaded.id) ?? false);
+        const enabled = resolveEnabled(request.config, loaded.id, candidateDefaultEnabled);
+        const dataPath = join(dataRoot, sanitizePluginId(loaded.id));
+        // 只从启用后解析出的 component.mcpServers 生成 mcpServerNames，
+        // 未启用插件的内置 MCP 就会在管理页完全不可见。这里先读取声明名给 UI 只读展示，
+        // 实际 runtime 注入仍只使用 enabled 分支解析出的 component.mcpServers。
+        const mcpServerDefinitions = loadPluginMcpServerDefinitions({ diagnostics, loaded });
+        const hooksRunnable = canRunPluginHooks(loaded);
+        const hookInspection = inspectPluginHooks({
+          dataPath,
+          diagnostics,
+          loaded,
+          runnable: hooksRunnable,
         });
-      }
+        const component = enabled
+          ? resolveEnabledComponents({
+              dataPath,
+              diagnostics,
+              env: request.env ?? {},
+              hookEvents: hooksRunnable ? hookInspection.events : {},
+              hookDetails: hookInspection.details,
+              loaded,
+              mcpServerDefinitions,
+              options: request.config.options[loaded.id] ?? {},
+              priority,
+              workingDirectory: request.workingDirectory,
+            })
+          : emptyComponents(hookInspection.details);
+        priority += PRIORITY_STEP;
 
-      // candidate.defaultEnabled 在 candidate 构造时无法访问 plugin id,
-      // 这里再叠加 bootstrap 提供的 "默认开" 名单 (按 `<name>@<marketplace>` 匹配)。
-      const candidateDefaultEnabled =
-        candidate.defaultEnabled ||
-        (request.officialPluginsEnabledByDefault?.has(loaded.id) ?? false);
-      const enabled = resolveEnabled(request.config, loaded.id, candidateDefaultEnabled);
-      const dataPath = join(dataRoot, sanitizePluginId(loaded.id));
-      // 只从启用后解析出的 component.mcpServers 生成 mcpServerNames，
-      // 未启用插件的内置 MCP 就会在管理页完全不可见。这里先读取声明名给 UI 只读展示，
-      // 实际 runtime 注入仍只使用 enabled 分支解析出的 component.mcpServers。
-      const mcpServerDefinitions = loadPluginMcpServerDefinitions({ diagnostics, loaded });
-      const hooksRunnable = canRunPluginHooks(loaded);
-      const hookInspection = inspectPluginHooks({
-        dataPath,
-        diagnostics,
-        loaded,
-        runnable: hooksRunnable,
-      });
-      const component = enabled
-        ? resolveEnabledComponents({
-            dataPath,
-            diagnostics,
-            env: request.env ?? {},
-            hookEvents: hooksRunnable ? hookInspection.events : {},
-            hookDetails: hookInspection.details,
-            loaded,
-            mcpServerDefinitions,
-            options: request.config.options[loaded.id] ?? {},
-            priority,
-            workingDirectory: request.workingDirectory,
-          })
-        : emptyComponents(hookInspection.details);
-      priority += PRIORITY_STEP;
-
-      Object.assign(mcpServers, component.mcpServers);
-      mergeHookEvents(hooks, component.hooks);
-      skillRoots.push(...component.skillRoots);
-      commandRoots.push(...component.commandRoots);
-      const declaredMcpServerNames = Object.keys(mcpServerDefinitions);
-      plugins.push(
-        createPluginMetadata(
+        const declaredMcpServerNames = Object.keys(mcpServerDefinitions);
+        const metadata = createPluginMetadata(
           loaded,
           component,
           dataPath,
@@ -237,8 +234,24 @@ export class NodePluginAdapter implements PluginPort {
           enabled ? uiContributionResult.contributions : undefined,
           // 插件 UI 面板入口（A5）：与启用态无关地解析，禁用插件的入口由 listUiSurfaces 过滤。
           parsePluginUiSurfaces({ loaded, declaredMcpServerNames, diagnostics }),
-        ),
-      );
+        );
+        // 元数据准备成功后才合并组件；否则坏插件会在抛错前把 MCP/hook/skill 泄漏进会话。
+        Object.assign(mcpServers, component.mcpServers);
+        mergeHookEvents(hooks, component.hooks);
+        skillRoots.push(...component.skillRoots);
+        commandRoots.push(...component.commandRoots);
+        plugins.push(metadata);
+      } catch (error) {
+        throwIfAborted(options);
+        diagnostics.push({
+          code: "plugin_load_failed",
+          message: `Plugin load failed: ${error instanceof Error ? error.message : String(error)}`,
+          path: loaded.rootPath,
+          pluginId: loaded.id,
+          severity: "error",
+        });
+        priority += PRIORITY_STEP;
+      }
     }
 
     pruneAmbiguousUiContributions(plugins, diagnostics);
@@ -1002,14 +1015,7 @@ function findManifest(rootPath: string): string | null {
 function readManifest(path: string, diagnostics: PluginDiagnostic[]): PluginManifest | null {
   try {
     const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
-    if (!isRecord(parsed)) throw new Error("Manifest must be a JSON object");
-    const name = typeof parsed.name === "string" ? parsed.name.trim() : "";
-    if (!PLUGIN_NAME_PATTERN.test(name)) throw new Error(`Invalid plugin name: ${name}`);
-    return {
-      ...parsed,
-      name,
-      version: typeof parsed.version === "string" ? parsed.version : DEFAULT_VERSION,
-    } as PluginManifest;
+    return parsePluginManifest(parsed);
   } catch (error) {
     diagnostics.push({
       code: "plugin_manifest_invalid",

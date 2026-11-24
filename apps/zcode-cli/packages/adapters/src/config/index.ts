@@ -471,6 +471,7 @@ export {
   removePluginEnabledFromFileConfig,
   updatePluginOptionsInFileConfig,
   removePluginFromFileConfig,
+  readPluginOptionsFromFileConfig,
   addSuppressedBuiltinInFileConfig,
   removeSuppressedBuiltinInFileConfig,
   updateUiLocaleInFileConfig,
@@ -485,7 +486,11 @@ export { KayingCodeConfigFileSchema, type KayingCodeConfigFile } from "./schema.
 export { mergeConfigs, createPrioritizedConfig, getScopePriority } from "./config-merger.js";
 export {
   createConfig,
+  resolveWorkspaceHookTrustIdentityForWorkspace,
   resolveWorkspaceStorageDir,
   type ConfigFactoryOptions,
   type ConfigResult,
+  type PluginConfigSources,
+  type PluginOptionLayer,
 } from "./config-factory.js";
+export * from "./plugin-secrets.adapter.js";
