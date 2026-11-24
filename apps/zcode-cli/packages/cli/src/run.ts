@@ -466,6 +466,17 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     return 1;
   }
   const toolsearchMode = parsedToolsearchMode.data;
+  const agentAlwaysBackgroundOption = parsed.values["agent-always-background"];
+  if (
+    agentAlwaysBackgroundOption !== undefined &&
+    agentAlwaysBackgroundOption !== "on" &&
+    agentAlwaysBackgroundOption !== "off"
+  ) {
+    ctx.stderr.write("--agent-always-background must be one of on, off.\n");
+    return 1;
+  }
+  // 产品默认前台；显式 on 才启用上游 4.0 的总后台形态。
+  const agentAlwaysBackground = agentAlwaysBackgroundOption === "on";
   const forceMcs = parsed.values["force-mcs"] === true;
   let targetRequest: CliTargetRequest | undefined;
   try {
@@ -478,6 +489,20 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
 
   if (targetRequest && typeof parsed.values.prompt === "string") {
     ctx.stderr.write(`${TARGET_CONFLICTS_WITH_PROMPT_ERROR}\n`);
+    return 1;
+  }
+
+  if (
+    agentAlwaysBackgroundOption !== undefined &&
+    !isForceMcsSupportedInvocation({
+      positionals: parsed.positionals,
+      prompt: parsed.values.prompt as string | undefined,
+      targetRequest,
+    })
+  ) {
+    ctx.stderr.write(
+      "--agent-always-background can only be used with --prompt, --target, or tui.\n",
+    );
     return 1;
   }
 
@@ -617,6 +642,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       toolsearchMode,
       presentationSurface,
       workflowMode,
+      agentAlwaysBackground,
     );
   }
 
@@ -635,6 +661,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       toolsearchMode,
       presentationSurface,
       workflowMode,
+      agentAlwaysBackground,
     );
   }
 
@@ -696,6 +723,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
         forceMcs,
         toolsearchMode,
         workflowMode,
+        agentAlwaysBackground,
       );
     default:
       ctx.stderr.write(`Unknown command: ${commandName(parsed.positionals)}\n\n`);

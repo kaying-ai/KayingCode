@@ -59,6 +59,7 @@ export function createTuiSubmitPrompt(
   browserExecutable?: GlobalOptions["browserExecutable"],
   browserState?: GlobalOptions["browserState"],
   workflowMode: DynamicWorkflowMode = DEFAULT_CLI_WORKFLOW_MODE,
+  agentAlwaysBackground = false,
 ): TuiPromptHandler {
   let app: Awaited<ReturnType<NonNullable<RunDependencies["createKayingCodeApp"]>>> | undefined;
   let activeUiLocale = uiLocale;
@@ -172,6 +173,7 @@ export function createTuiSubmitPrompt(
           ...resolveWorkflowModeRuntimeConfig(workflowMode),
           modelStreaming: "on",
           titleGeneration: TUI_TITLE_GENERATION_CONFIG,
+          subagents: { alwaysBackground: agentAlwaysBackground },
           workingDirectory,
         },
         permissionBroker,

@@ -689,6 +689,7 @@ createConfig
 - Agent 工具：支持 `alwaysBackground`（缺省 true）；描述、handler 与 `subagents.alwaysBackground` 配置一致；runtime 统一经 `resolveRuntimeAgentAlwaysBackground` 取值。
 - 测试：`input-preemption-slot.test.ts`（默认 cancel、wait 等待、无接管取消、abort reason 判别）。
 - Windows `cmd.exe` 只读判定：恢复 `tool/cmd-readonly` 契约与 `bash-cmd-readonly-policy`；前台 Bash 在 `cmd`/Windows `legacy-shell` 下改按 CMD 语法判定；Memory executor 同样按实际 shell 选择分流。
+- CLI `--agent-always-background <on|off>`：仅 `--prompt`/`--target`/TUI 可用（默认 off）；透传到 App runtimeConfig `subagents.alwaysBackground`，与 Agent 工具描述/handler 门一致。
 - 测试：移植上游 `bash-cmd-readonly-policy.test.ts`（126 例）与 `cmd-readonly/contract.test.ts`。
 
 待完成（阶段 4 未完成，更新）：

@@ -33,6 +33,7 @@ Options:
   --browser-executable <path> Chrome/Chromium executable for headless Browser Use
   --browser-state <path> Playwright storage state injected into headless Browser Use sessions
   --no-browser-state Skip the default browser state file (~/.kayingcode/cli/browser-state.json)
+  --agent-always-background <on|off> Always run subagents in the background for --prompt, --target, or TUI (default: off; this launch only)
   --attach <path>  Attach a local file to --prompt; repeat for multiple files
   --cwd <path>     Run this command from the given directory
   --disallowed-tools, --disallowedTools <tools...>

@@ -33,6 +33,7 @@ export const zhCN: KayingCodeCopy = {
   --browser-executable <path> headless Browser Use 使用的 Chrome/Chromium 路径
   --browser-state <path> 注入 headless Browser Use 会话的 Playwright 登录态文件
   --no-browser-state 不加载默认登录态文件（~/.kayingcode/cli/browser-state.json）
+  --agent-always-background <on|off> --prompt、--target 与 TUI 的子代理总在后台运行（默认 off，仅本次启动）
   --attach <path>  给 --prompt 附加本地文件；可重复传入
   --cwd <path>     从指定目录运行命令
   --disallowed-tools, --disallowedTools <tools...>

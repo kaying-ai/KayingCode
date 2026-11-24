@@ -80,6 +80,7 @@ export const runPrompt = async (
   toolsearchMode: ToolSearchMode = "off",
   presentationSurface: PresentationSurface = "terminal",
   workflowMode: DynamicWorkflowMode = DEFAULT_CLI_WORKFLOW_MODE,
+  agentAlwaysBackground = false,
 ): Promise<number> => {
   if (prompt.trim().length === 0) {
     ctx.stderr.write(`${EMPTY_PROMPT_ERROR}\n`);
@@ -265,6 +266,7 @@ export const runPrompt = async (
         memory: { extractionEnabled: options.memoryBench === true },
         modelStreaming: "on",
         presentationSurface,
+        subagents: { alwaysBackground: agentAlwaysBackground },
         workingDirectory,
       },
       sessionId,
