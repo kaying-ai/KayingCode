@@ -36,8 +36,8 @@ export const EditInputSchema = z.object({
    * Replace all occurrences of old_string (default false)
    */
   replace_all: semanticBoolean()
-    .optional()
     .default(false)
+    .optional()
     .describe("Replace all occurrences of old_string (default false)"),
 });
 
@@ -191,7 +191,7 @@ export const EditErrorCode = {
 
 export type EditErrorCode = (typeof EditErrorCode)[keyof typeof EditErrorCode];
 
-function semanticBoolean(): z.ZodEffects<z.ZodBoolean, boolean, unknown> {
+function semanticBoolean(): z.ZodPreprocess<z.ZodBoolean> {
   return z.preprocess((value) => {
     if (typeof value === "boolean") return value;
     if (typeof value === "number") {

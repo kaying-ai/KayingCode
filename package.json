@@ -54,7 +54,12 @@
     "source:plugins": "node scripts/generate-official-plugin-catalog.mjs",
     "source:plugins:check": "node scripts/generate-official-plugin-catalog.mjs --check",
     "source:map": "node scripts/generate-source-map.mjs",
-    "source:map:check": "node scripts/generate-source-map.mjs --check"
+    "source:map:check": "node scripts/generate-source-map.mjs --check",
+    "upstream:protocol:inventory": "node scripts/upstream-protocol-inventory.mjs",
+    "upstream:protocol:merge": "node scripts/upstream-protocol-merge.mjs",
+    "upstream:architecture:inventory": "node scripts/upstream-architecture-policy-inventory.mjs",
+    "upstream:architecture:merge": "node scripts/upstream-architecture-policy-merge.mjs",
+    "upstream:parity": "node scripts/check-upstream-parity.mjs"
   },
   "dependencies": {
     "d3-path": "^3.1.0",

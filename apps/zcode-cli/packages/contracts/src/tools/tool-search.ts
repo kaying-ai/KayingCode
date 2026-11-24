@@ -1,6 +1,4 @@
 import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import type { JsonSchema } from "../model/index.js";
 import { toToolJsonSchema } from "./json-schema.js";
 
 export const TOOL_SEARCH_NAME = "ToolSearch";
@@ -58,12 +56,8 @@ export const ToolSearchOutputSchema = z.object({
   query: z.string(),
   total_deferred_tools: z.number(),
 });
-export const ToolSearchInputJsonSchema = {
-  ...toToolJsonSchema(ToolSearchInputSchema),
-  // 转换器会把带默认值的字段视为可选；模型侧要求显式传入，执行侧仍先补默认值。
-  required: ["query", "max_results"],
-};
-export const ToolSearchOutputJsonSchema = zodToJsonSchema(ToolSearchOutputSchema) as JsonSchema;
+export const ToolSearchInputJsonSchema = toToolJsonSchema(ToolSearchInputSchema);
+export const ToolSearchOutputJsonSchema = toToolJsonSchema(ToolSearchOutputSchema);
 export interface ToolSearchCapability {
   readonly protocolSupported: boolean;
   readonly defaultEnabled: boolean;

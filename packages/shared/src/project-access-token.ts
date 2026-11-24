@@ -71,7 +71,22 @@ export class ProjectAccessTokenError extends Error {
 export type ProjectAccessTokenRequestFailure =
   | { readonly kind: "network" }
   | { readonly kind: "timeout" }
-  | { readonly kind: "http"; readonly status: number };
+  | { readonly kind: "http"; readonly status: number; readonly retryAfterMs?: number };
+
+/** 只保留限流等待量，不把响应头原文带入错误或日志。 */
+export function projectAccessTokenRetryAfterMs(
+  value: string | null | undefined,
+  now = Date.now(),
+): number | undefined {
+  const text = value?.trim();
+  if (!text) return undefined;
+  if (/^\d+(?:\.\d+)?$/.test(text)) {
+    const milliseconds = Number(text) * SECOND_MS;
+    return Number.isFinite(milliseconds) ? milliseconds : undefined;
+  }
+  const timestamp = Date.parse(text);
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - now) : undefined;
+}
 
 /** I/O adapter 确认的临时故障；不携带原始响应、URL、Token 或 cause。 */
 export class ProjectAccessTokenTransientError extends Error {

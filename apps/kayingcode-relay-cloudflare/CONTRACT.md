@@ -2,6 +2,8 @@
 
 公开边界是 `contract.ts`。Worker 将 `/api/v1/remote/*`、`/api/v1/account/*` 和 `/readyz` 发给 `WEB_REMOTE.idFromName("upstream-v2")`，静态页面经 ASSETS 提供。协议使用 `@zcode/shared/web-remote-relay`。
 
+`/api/v1/client/configs`、`/api/v1/client/scenes` 由 `src/clientApi.ts` 处理：`KAYINGCODE_API_MODE=mock` 返回共享 fixtures，`proxy` 按精确路径转发到 `KAYINGCODE_API_UPSTREAM_ORIGIN`；未配置模式保持 404。`/api/v1/oauth/cli/*`、`/api/v1/oauth/profile` 由 `src/oauthApi.ts` 在 `mock` 模式返回固定 flow/用户，`proxy` 模式关闭。两个模块都不写 Durable Object、不持久化业务状态、不转发 Authorization/Cookie。
+
 唯一持久所有者为 `WebRemoteRelayObject`：账号、凭据摘要、默认一次性邀请、一次性 relay token 和设备。邀请默认五分钟、单次领取；受控部署可用 Worker 变量调整邀请 TTL、同一邀请领取次数和终端凭据 TTL，默认值不变。Hibernation WebSocket attachment 保存角色、账号、SID 与 lease；换代关闭旧连接，迟到帧不能覆盖新 lease。凭据响应不缓存，日志不输出凭据。任务、正文、队列和业务快照不进入 Relay。
 
 Desktop device 与 Web terminal 的角色隔离，auth_init/ack 校验 SID；每次连接重新申请 token。网络断开不重放 data，业务恢复由现有 Host 的 `web-remote-replayable` 负责。Desktop 原有 `desktop-continuous` 不变。

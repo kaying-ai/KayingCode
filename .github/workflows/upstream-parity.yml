@@ -1,0 +1,35 @@
+name: Upstream parity
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 每周一 01:00 UTC 检查上游协议是否前进；失败表示需要重新评估 4.0.0 基线。
+    - cron: "0 1 * * 1"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  protocol:
+    name: Protocol parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "24.14.0"
+          package-manager-cache: false
+      - name: Fetch upstream parity refs
+        run: |
+          git fetch --no-tags https://github.com/zai-org/ZCode.git main:refs/remotes/upstream/main
+          git fetch --no-tags https://github.com/zai-org/ZCode.git fec975905a2abd4c07e35c40d51fa097a2258ec9:refs/remotes/upstream/base
+      - name: Check protocol parity
+        run: node scripts/check-upstream-parity.mjs

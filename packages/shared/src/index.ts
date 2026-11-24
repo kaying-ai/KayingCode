@@ -360,6 +360,9 @@ export * from "./plugin-browser-compare.js";
 export { API_KEY_USAGE_SCENE, type ApiKeyCreationUsageScene } from "./api-key-usage-scene.js";
 export {
   projectAccessTokenFingerprint,
+  projectAccessTokenRetryAfterMs,
+  ProjectAccessTokenError,
+  ProjectAccessTokenHttpStatusError,
   ProjectAccessTokenTransientError,
 } from "./project-access-token.js";
 export {

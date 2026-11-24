@@ -1,5 +1,7 @@
 export interface ApiRequestInit extends RequestInit {
   timeoutMs?: number;
+  /** OAuth 等调用方自行处理 401；API client 不得触发关联凭据刷新或登出。 */
+  authFailurePolicy?: "caller-handled";
 }
 
 export interface ApiClient {

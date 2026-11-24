@@ -34,6 +34,8 @@ Worker serves HTTP and assets; WebRemoteRelayObject manages device identity, cre
 | /remote/v4         | Mobile workbench using the complete Desktop-generated link |
 | /api/v1/account/\* | Automatic client identity and browser authorization        |
 | /api/v1/remote/\*  | Device and connection management                           |
+| /api/v1/client/\*  | Public configs/scenes staging mock or proxy                |
+| /api/v1/oauth/\*   | CLI login mock (mock mode only)                            |
 | /healthz / /readyz | Service liveness / storage-read checks                     |
 
 HTTP /api/v1, Relay V2 and the /remote/v4 page version different layers; their numbers need not match. See the implementation guide.

@@ -1,0 +1,40 @@
+{
+  "upstream": "upstream/main",
+  "base": "fec975905a2abd4c07e35c40d51fa097a2258ec9",
+  "upstreamFiles": 242,
+  "minParity": 132,
+  "maxPatch": 84,
+  "allowedMissing": [
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/cua-permission-observation.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/materialization/CONTRACT.md",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/materialization/contract.example.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/materialization/contract.test.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/materialization/contract.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/materialization/index.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol-v4/materialization/module.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-ui/callRaces.test.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-ui/contract.test.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-ui/instances.test.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/mcp-ui/samplingCalls.test.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/plugin-discovery-port.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/plugin-install-interaction.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/plugin-mention-items.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/plugin-user-options.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/session-data/permanent-deletion.ts",
+    "apps/zcode-cli/packages/bootstrap/src/zcode-protocol/transport.test.ts",
+    "packages/shared/src/zcode-protocol-v4/context-composition/CONTRACT.md",
+    "packages/shared/src/zcode-protocol-v4/context-composition/contract.example.ts",
+    "packages/shared/src/zcode-protocol-v4/context-composition/module.ts",
+    "packages/shared/src/zcode-protocol-v4/cuaPermission.ts",
+    "packages/shared/src/zcode-protocol-v4/pluginInstall.ts",
+    "packages/shared/src/zcode-protocol/plugin-host-queries/CONTRACT.md",
+    "packages/shared/src/zcode-protocol/plugin-host-queries/contract.example.ts",
+    "packages/shared/src/zcode-protocol/plugin-host-queries/contract.ts",
+    "packages/shared/src/zcode-protocol/plugin-host-queries/module.ts"
+  ],
+  "allowedProductOnly": [
+    "apps/zcode-cli/packages/bootstrap/src/kayingcode-protocol-v4/local-ttft.ts",
+    "apps/zcode-cli/packages/bootstrap/src/kayingcode-protocol/tapmaker-projects.ts",
+    "packages/shared/src/kayingcode-protocol-v4/mobile-model-catalog.ts"
+  ]
+}

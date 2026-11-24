@@ -125,7 +125,9 @@ export function createRemoteWorkspaceServiceCollection(params: {
   });
   const localBroadcastService = createBroadcastService(params.parentPort);
   // KayingCode.localrun：无账号凭据仓库 / 登出清理。
-  let handleOAuthProviderLogout: ((provider: never) => Promise<void>) | null = null;
+  let handleOAuthProviderLogout:
+    | ((provider: string, accountIdentity?: string | null) => Promise<void>)
+    | null = null;
   const localOAuthCredentialRepo = {
     loadTokenSet: async (_providerId?: string) =>
       null as { accessToken: string; kayingcodeJwtToken?: string | null } | null,
@@ -316,6 +318,7 @@ export function createRemoteWorkspaceServiceCollection(params: {
     .register(
       IOAuthService,
       createOAuthService(localCredentialService, {
+        captureCredentialGuard: () => localCredentialService.captureRecoveryGuard(),
         apiClient: localApiClient,
         onProviderLogout: handleOAuthProviderLogout,
       }),

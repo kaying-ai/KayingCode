@@ -108,3 +108,22 @@ export type {
 
 // 嵌入式调用复用产品请求装配，避免来源头与网络配置漂移。
 export { createRuntimeAiSdkModelExecutionConfig } from "./model-config.js";
+
+// CLI 登录/登出：与 Desktop OAuth 共用端点与凭据存储，不在 CLI 另建账号链路。
+export {
+  loginKayingCodeCli,
+  loginBigmodelCodingPlan,
+  logoutKayingCodeCli,
+  configureCodingPlanApiKey,
+  hasConfiguredStandaloneCodingPlan,
+  KayingCodeCliLoginError,
+} from "./auth-login.js";
+export type {
+  CodingPlanProviderId,
+  LoginKayingCodeCliOptions,
+  LoginKayingCodeCliResult,
+  LogoutKayingCodeCliOptions,
+  LogoutKayingCodeCliResult,
+  ConfigureCodingPlanApiKeyOptions,
+  ConfigureCodingPlanApiKeyResult,
+} from "./auth-login.js";

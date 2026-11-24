@@ -407,6 +407,8 @@ import { createTaskGroupService, groupTaskKey, ITaskGroupService } from "./task-
 import { createRemoteProjectService, IRemoteProjectService } from "./remote-projects/index.js";
 import type { SessionMessageSendRequested } from "#src/session/sessionMailbox.js";
 import { createFileWatcherService } from "./fileWatcher/fileWatcherService.js";
+import { createOAuthProviderLogoutHandler } from "./oauth/oauthProviderLogout.js";
+import { OAuthCredentialRepo } from "./oauth/repo/oauthCredentialRepo.js";
 import { createOAuthService } from "./oauth/oauthService.js";
 import { readLegacyKayingCodeConfigProviders } from "./model-provider/legacyKayingCodeConfigProviderReader.js";
 import { createAccountProviderCredentialStore } from "./model-provider/accountProviderCredentialStore.js";
@@ -761,8 +763,13 @@ export function createLocalServices(options: {
   const provisioningOAuthKeys = new Set<string>(PROVIDER_PROVISIONING_OAUTH_CREDENTIAL_KEYS);
   const credentialService = createCredentialService({
     cipherProvider: options.credentialCipherProvider,
-    onDidMutate: ({ key }) => {
-      if (provisioningOAuthKeys.has(key) || isProviderProvisioningAccountCredentialKey(key)) {
+    onDidMutate: ({ keys }) => {
+      if (
+        keys.some(
+          (key) =>
+            provisioningOAuthKeys.has(key) || isProviderProvisioningAccountCredentialKey(key),
+        )
+      ) {
         options.onProviderProvisioningSourceChanged?.("credential");
       }
     },
@@ -802,15 +809,10 @@ export function createLocalServices(options: {
     loadUserId: async () => (await oauthCredentialRepo.loadActiveUserProfile())?.id ?? null,
   });
   // KayingCode.localrun：无账号凭据仓库 / 登出清理。
-  let handleOAuthProviderLogout: ((provider: never) => Promise<void>) | null = null;
-  const oauthCredentialRepo = {
-    loadTokenSet: async (_providerId?: string) =>
-      null as { accessToken: string; kayingcodeJwtToken?: string | null } | null,
-    loadUserProfile: async (_providerId?: string) => null as { id?: string } | null,
-    loadActiveUserProfile: async () => null as { id?: string } | null,
-    loadLoginAttribution: async () => null as unknown,
-  };
-  void credentialService;
+  let handleOAuthProviderLogout:
+    | ((provider: string, accountIdentity?: string | null) => Promise<void>)
+    | null = null;
+  const oauthCredentialRepo = new OAuthCredentialRepo(credentialService);
   // KayingCode.localrun：无账号 API Key 自动获取；仅读本地缓存。
   const accountProviderCredentialService = createAccountProviderCredentialService({
     credentialStore: accountProviderCredentialStore,
@@ -986,7 +988,10 @@ export function createLocalServices(options: {
       accountProviderConfigSource.dispose();
     },
   });
-  handleOAuthProviderLogout = async () => undefined;
+  handleOAuthProviderLogout = createOAuthProviderLogoutHandler({
+    accountProviderCredentialStore,
+    refreshAccountProviders: (reason: string) => accountProviderConfigSource.refresh(reason),
+  });
   // 官方 Server MCP 的凭证解析源。MCP 调用的身份头与 MCP 额度查询（/api/v1/mcp/usage）
   // 必须共用这一份实现，否则两处对"当前选中的 Coding Plan 连接"的判定会分叉。
   // 额度侧注入的是凭证解析而非 resolveHeaders：归属校验需要 providerFamily，
@@ -1322,6 +1327,7 @@ export function createLocalServices(options: {
       })
     : undefined;
   const oauthService = createOAuthService(credentialService, {
+    captureCredentialGuard: () => credentialService.captureRecoveryGuard(),
     apiClient,
     onProviderLogout: handleOAuthProviderLogout,
   });

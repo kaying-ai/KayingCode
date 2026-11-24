@@ -11,6 +11,9 @@ import {
 const args = process.argv.slice(2);
 const command = args[0] ?? "check";
 const cwd = process.cwd();
+const policyIndex = args.indexOf("--policy");
+const policyPath = policyIndex >= 0 ? args[policyIndex + 1] : "architecture-policy.yaml";
+if (policyIndex >= 0 && !policyPath) throw new Error("用法: --policy <path>");
 
 if (command === "context") {
   const moduleId = args[1];
@@ -20,7 +23,7 @@ if (command === "context") {
 }
 
 const changed = args.includes("--changed") ? await changedFilesFromGit(cwd) : null;
-const result = await checkArchitecture({ cwd, changedFiles: changed });
+const result = await checkArchitecture({ cwd, changedFiles: changed, policyPath });
 
 if (command === "baseline:update") {
   await updateBaseline({ cwd, violations: result.violations });

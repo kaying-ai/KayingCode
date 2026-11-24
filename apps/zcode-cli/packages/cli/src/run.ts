@@ -27,6 +27,7 @@ import { isPluginHostInvocation, runPluginHostCommand } from "./plugin-host-comm
 import { isDwfChildInvocation, runDwfChildCommand } from "./dwf-child-command.js";
 import { runPrompt } from "./prompt-command.js";
 import { runPluginsCommand, type PluginsCommandFlags } from "./plugins-command.js";
+import { runLoginCommand, runLogoutCommand } from "./login-command.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
 import {
@@ -617,12 +618,15 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     case "doctor":
       return runDoctor(ctx, options, workingDirectory);
     case "login":
-    case "logout":
-      // KayingCode.localrun：无账号登录；保留命令名只为兼容旧脚本，明确提示走模型 Key。
-      ctx.stdout.write(
-        "KayingCode has no account login. Configure a model API key or custom endpoint in settings.\n",
+      return await runLoginCommand(
+        ctx,
+        options,
+        commandDeps,
+        parsed.values["no-browser"] === true,
+        parsed.positionals.slice(1),
       );
-      return 0;
+    case "logout":
+      return await runLogoutCommand(ctx, options, commandDeps);
     case "skills":
       return await runSkillsCommand(ctx, options, commandDeps, parsed.positionals.slice(1));
     case "commands":

@@ -55,6 +55,11 @@ export function getAppConfigDir(): string {
   return join(getKayingCodeDataRootDir(), "v2");
 }
 
+/** {appConfigDir}/credentials.json */
+export function getCredentialsFilePath(): string {
+  return join(getAppConfigDir(), "credentials.json");
+}
+
 /**
  * Agent 侧用户级默认指令（个性化）文件的 home 解析。
  * 必须与 CLI adapter（apps/zcode-cli/packages/adapters/src/context/index.ts 的
