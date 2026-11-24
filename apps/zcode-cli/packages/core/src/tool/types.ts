@@ -54,6 +54,7 @@ import type {
   TraceContext,
   TraceId,
   TurnId,
+  WaitForMcpServersOutput,
   WorkflowEscalatePort,
   WorkflowPort,
   WorkflowSubmitPort,
@@ -139,6 +140,17 @@ export interface BackgroundTaskControlPort {
   ): Promise<BackgroundTaskControlStopResult>;
 }
 
+/**
+ * WaitForMcpServers 的运行时端口。会话视图是唯一状态来源：端口只按名称选目标、等待离开连接状态并分类，
+ * 不发起连接或授权。servers 缺省时等全部 pending；没有 pending 时报告失败的 server。
+ */
+export interface McpServerWaitPort {
+  waitForServers(
+    servers: readonly string[] | undefined,
+    signal?: AbortSignal,
+  ): Promise<WaitForMcpServersOutput>;
+}
+
 export interface ToolExecutionContext {
   toolSearch?: ToolSearchExecutionContext;
   toolCallId: string;
@@ -193,6 +205,8 @@ export interface ToolExecutionContext {
   dynamicWorkflowSnippetPort?: DynamicWorkflowSnippetPort;
   /** 模型目录端口；缺席则 ListModels 报能力缺席，CreateWorkflow 的 subagent_model 被拒。 */
   modelCatalogPort?: ModelCatalogPort;
+  /** WaitForMcpServers 的端口；缺席则该工具报能力缺席。 */
+  mcpServerWaitPort?: McpServerWaitPort;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   readFileState?: ReadFileStateMap;
   recordReadFileStateMetadata?: (metadata: PersistedReadFileStateMetadata) => void;
@@ -287,6 +301,7 @@ export interface ToolInputResolutionContext {
    * 不静默放行一个宿主解不了的字符串。
    */
   modelCatalogPort?: ModelCatalogPort;
+  mcpServerWaitPort?: McpServerWaitPort;
   sessionId?: string;
   /**
    * 「这个会话此刻加载着某个技能吗」的探针（handlers/workflow-skill-gate.ts）。由 runtime 用

@@ -12,6 +12,7 @@ import type {
   McpServerToolSnapshot,
   McpToolCallResult,
   McpToolDescriptor,
+  McpWaitForServerOptions,
 } from "@zcode/contracts";
 import { randomUUID } from "node:crypto";
 import type { McpTelemetryTracker } from "./telemetry.js";
@@ -177,6 +178,10 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
     const leaseId = `${++leaseSequence}:${leaseOptions.leaseId ?? "lease"}`;
     const sessionId = leaseOptions.sessionId?.trim() || undefined;
     const leased = new Map<string, string>();
+    const snapshotListeners = new Set<() => void>();
+    const notifySnapshot = () => {
+      for (const listener of Array.from(snapshotListeners)) listener();
+    };
     const configuredServers = new Map<string, McpServerConfig>();
     const appListeners = new Map<string, Set<{ listener: () => void; off: () => void }>>();
     const invalidateApps = (serverName: string) => {
@@ -300,6 +305,7 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
           serverName,
           workingDirectory: connectOptions.workingDirectory,
         });
+        adapter.onSnapshotChanged?.(notifySnapshot);
         // 连接归 pool，不能继承第一个 session 的关闭信号，否则会连带中止其他 lease。
         const controller = new AbortController();
         entry = {
@@ -579,6 +585,24 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
       },
       async listTools(): Promise<McpToolDescriptor[]> {
         return (await snapshot()).tools;
+      },
+      onSnapshotChanged(listener: () => void): () => void {
+        snapshotListeners.add(listener);
+        return () => {
+          snapshotListeners.delete(listener);
+        };
+      },
+      async waitForServer(
+        serverName: string,
+        waitOptions: McpWaitForServerOptions,
+      ): Promise<{ timedOut: boolean }> {
+        waitOptions.signal?.throwIfAborted();
+        const key = leased.get(serverName);
+        const entry = key ? entries.get(key) : undefined;
+        if (!entry) return { timedOut: false };
+        return (
+          (await entry.adapter.waitForServer?.(serverName, waitOptions)) ?? { timedOut: false }
+        );
       },
       toolListRevision(): number {
         let revision = 0;

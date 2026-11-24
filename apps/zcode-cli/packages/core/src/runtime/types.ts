@@ -87,6 +87,7 @@ import type {
   SkillPort,
   McpConfigurationSource,
   McpPort,
+  McpToolCatalogPort,
   McpServerConfig,
   SubagentPort,
   ToolArtifactStorePort,
@@ -374,6 +375,8 @@ export interface AgentRuntimeDeps {
   pdfDocumentPort?: PdfDocumentPort;
   skillPort?: SkillPort;
   mcpPort?: McpPort;
+  /** 进程级 MCP 工具目录；用于连接期间复用其他会话已发布的工具声明。 */
+  mcpToolCatalogPort?: McpToolCatalogPort;
   /** 宿主注入的实时 MCP 配置源；变化时 runtime 重连并重注册工具。 */
   mcpConfigurationSource?: McpConfigurationSource;
   subagentPort?: SubagentPort;

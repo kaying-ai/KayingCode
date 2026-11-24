@@ -1,5 +1,6 @@
 import type { AiSdkModelAdapter } from "@zcode/adapters/model";
 import type { McpConfigSourceRegistry } from "@zcode/adapters/mcp";
+import type { McpToolCatalogPort } from "@zcode/contracts";
 import type { SkillCatalogSourceRegistry } from "@zcode/adapters/skills/catalog";
 import type { SessionControlBinding } from "@zcode/core/session-control";
 import type {
@@ -190,6 +191,8 @@ export interface KayingCodeAppOptions {
   pluginStorageRoot?: string;
   /** 宿主注入的进程级 MCP 配置源 registry；缺省时每个 App 各建一份私有配置源。 */
   mcpConfigSourceRegistry?: McpConfigSourceRegistry;
+  /** 宿主注入的进程级 MCP 工具目录；缺省时每个 App 建一份内存目录。 */
+  mcpToolCatalogPort?: McpToolCatalogPort;
   /** 宿主注入的进程级 Skill 实时目录 registry；缺省时每个 App 各建一份私有目录。 */
   skillCatalogSourceRegistry?: SkillCatalogSourceRegistry;
   executionPort?: ExecutionPort;

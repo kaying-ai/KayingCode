@@ -24,7 +24,7 @@ import { createJimpImageProcessorAdapter } from "@zcode/adapters/image";
 import { createPopplerPdfDocumentAdapter } from "@zcode/adapters/pdf";
 import { createNodeSessionMailboxAdapter } from "@zcode/adapters/mailbox";
 import { createNodeContextSourceAdapter } from "@zcode/adapters/context";
-import { createMcpAdapter } from "@zcode/adapters/mcp";
+import { createInMemoryMcpToolCatalog, createMcpAdapter } from "@zcode/adapters/mcp";
 import type { CatalogSkillPort } from "@zcode/adapters/skills/catalog";
 import type { McpConfigurationSource } from "@zcode/contracts";
 import { createAppSkillPort } from "./dynamic-skill-catalog.js";
@@ -298,6 +298,8 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       getNodeReplBrowserBroker: () => nodeReplBrowserBroker,
       logger,
     });
+    const mcpToolCatalogPort =
+      options.mcpToolCatalogPort ?? createInMemoryMcpToolCatalog({ env: options.env });
     // 用户目录已在 loader 前完成原地迁移；不能给项目/插件旧身份加内存兼容旁路。
     const subagentProfiles = [...kayingcodeSubagentProfiles, ...pluginSubagentProfiles];
     const ownsSessionStore = options.sessionStore === undefined;
@@ -1076,6 +1078,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
           : undefined,
       mcpPort,
       mcpConfigurationSource: mcpConfigSource,
+      mcpToolCatalogPort,
       eventSink: options.eventSink,
       onOffPeakLifecycleEvent: options.onOffPeakLifecycleEvent
         ? (event) => options.onOffPeakLifecycleEvent!({ ...event, sessionId })

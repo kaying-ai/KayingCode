@@ -51,6 +51,8 @@ import type {
   PdfDocumentPort,
   McpConnectionSnapshot,
   McpConfigurationSource,
+  McpToolCatalogPort,
+  McpToolCatalogPublication,
   SkillLoadOutcome,
   SkillPort,
   McpPort,
@@ -214,6 +216,9 @@ export class AgentRuntime {
   private skillPort?: SkillPort;
   private mcpPort?: McpPort;
   private mcpConfigurationSource?: McpConfigurationSource;
+  private mcpToolCatalogPort?: McpToolCatalogPort;
+  private mcpCatalogPublication?: McpToolCatalogPublication;
+  private mcpSnapshotUnsubscribe?: () => void;
   private mcpConfigurationGeneration = 0;
   private mcpConfigUnsubscribe?: () => void;
   private mcpStartupPromise?: Promise<McpConnectionSnapshot>;
@@ -390,6 +395,17 @@ export class AgentRuntime {
       this.contextInitialized = true;
     }
     runtime.startMcpStartup(this.rootTraceContext);
+    this.mcpToolCatalogPort = deps.mcpToolCatalogPort;
+    if (this.mcpToolCatalogPort && this.mcpPort) {
+      this.mcpCatalogPublication = this.mcpToolCatalogPort.prepare({
+        servers: this.config.mcp?.servers ?? {},
+        workingDirectory: this.workingDirectory,
+        workspaceIdentity: this.config.workspaceIdentity?.toString(),
+      });
+      this.mcpSnapshotUnsubscribe = this.mcpPort.onSnapshotChanged?.(() => {
+        this.mcpCatalogPublication?.publish(this.mcpPort?.getToolSnapshot() ?? {});
+      });
+    }
     this.mcpConfigurationSource = deps.mcpConfigurationSource;
     if (this.mcpConfigurationSource && this.mcpPort) {
       this.mcpConfigUnsubscribe = this.mcpConfigurationSource.subscribe(() => {
@@ -496,6 +512,8 @@ export class AgentRuntime {
   }
 
   beginShutdown(): void {
+    this.mcpSnapshotUnsubscribe?.();
+    this.mcpSnapshotUnsubscribe = undefined;
     this.mcpConfigUnsubscribe?.();
     this.mcpConfigUnsubscribe = undefined;
     this.mcpConfigurationGeneration += 1;

@@ -45,6 +45,7 @@ import type { ToolSchedule } from "../scheduler.js";
 import type {
   BackgroundTaskControlPort,
   ExecutableToolCall,
+  McpServerWaitPort,
   ReadFileStateMap,
   ToolBatchEvent,
   ToolExecutionResult,
@@ -122,6 +123,7 @@ export interface ToolExecutorOptions {
   dynamicWorkflowSnippetPort?: DynamicWorkflowSnippetPort;
   /** 模型目录端口；缺席则 ListModels 报能力缺席，CreateWorkflow 的 subagent_model 被拒。 */
   modelCatalogPort?: ModelCatalogPort;
+  mcpServerWaitPort?: McpServerWaitPort;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   readFileState?: ReadFileStateMap;
   /** 技能门的探针（ToolInputResolutionContext.hasLoadedSkill）；runtime 按 provider 可见历史回答。 */
@@ -251,6 +253,7 @@ export interface ToolExecutorDeps {
   dynamicWorkflowSnippetPort?: DynamicWorkflowSnippetPort;
   /** 模型目录端口；缺席则 ListModels 报能力缺席，CreateWorkflow 的 subagent_model 被拒。 */
   modelCatalogPort?: ModelCatalogPort;
+  mcpServerWaitPort?: McpServerWaitPort;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   readFileState: ReadFileStateMap;
   /** 文件读取快照的下一个序号；执行器持有计数器，只增不减。 */

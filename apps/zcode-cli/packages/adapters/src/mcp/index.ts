@@ -37,6 +37,7 @@ import type {
   McpServerToolSnapshot,
   McpToolCallResult,
   McpToolDescriptor,
+  McpWaitForServerOptions,
   OfficialMcpAuthFailureReason,
   OfficialMcpAuthHeadersPort,
   OfficialMcpTrustedOriginRegistry,
@@ -60,6 +61,7 @@ import {
   type SharedKayingCodeCredentialStore,
 } from "../auth/shared-credentials.js";
 import { normalizeMcpToolDescriptor } from "./descriptor.js";
+import { isRetryableCallError } from "./transport-errors.js";
 import {
   buildMcpStdioEnv,
   createMcpTransportFetch,
@@ -263,6 +265,17 @@ export {
   type McpConfigSourceRegistry,
   type McpConfigurationSourceOptions,
 } from "./config-source.js";
+export {
+  createInMemoryMcpToolCatalog,
+  type InMemoryMcpToolCatalogOptions,
+} from "./tool-catalog-cache.js";
+export {
+  classifyTransportError,
+  countNetworkFailures,
+  isRetryableCallError,
+  MCP_TERMINAL_NETWORK_FAILURE_LIMIT,
+  type McpTransportErrorKind,
+} from "./transport-errors.js";
 
 /** elicitation 模式白名单（MCP form 与 兼容别名）。 */
 const SUPPORTED_ELICITATION_MODES = new Set(["form", "openai/form", "openaiForm"]);
@@ -314,6 +327,7 @@ class NodeMcpAdapter implements McpPort {
   /** tools/list_changed 累计次数，runtime 按此判断是否需要重注册。 */
   private toolListRevisionCounter = 0;
   private toolsVersionCounter = 0;
+  private readonly snapshotListeners = new Set<() => void>();
   /** 每个 server 当前正在执行的工具调用 trace；elicitation 借此归属到会话 / 工具行。 */
   private readonly activeCallTraces = new Map<string, McpElicitationTrace>();
 
@@ -375,6 +389,7 @@ class NodeMcpAdapter implements McpPort {
 
     const statuses = await this.status();
     const tools = await this.listTools();
+    this.notifySnapshotChanged();
     const statusCounts = Object.values(statuses).reduce<Record<string, number>>(
       (counts, status) => {
         counts[status.status] = (counts[status.status] ?? 0) + 1;
@@ -479,6 +494,7 @@ class NodeMcpAdapter implements McpPort {
       status,
       tools: [],
     });
+    this.notifySnapshotChanged();
     return status;
   }
 
@@ -552,6 +568,42 @@ class NodeMcpAdapter implements McpPort {
     return result;
   }
 
+  onSnapshotChanged(listener: () => void): () => void {
+    this.snapshotListeners.add(listener);
+    return () => {
+      this.snapshotListeners.delete(listener);
+    };
+  }
+
+  private notifySnapshotChanged(): void {
+    for (const listener of Array.from(this.snapshotListeners)) listener();
+  }
+
+  async waitForServer(
+    name: string,
+    options: McpWaitForServerOptions,
+  ): Promise<{ timedOut: boolean }> {
+    options.signal?.throwIfAborted();
+    const record = this.records.get(name);
+    // 授权 pending 的等待由授权交互结束；这里只等已有启动任务，不重连。
+    if (!record?.connecting || record.status.authorization) return { timedOut: false };
+    try {
+      await withTimeout(
+        record.connecting.then(
+          () => undefined,
+          () => undefined,
+        ),
+        options.timeoutMs,
+        `MCP server ${name} startup wait timed out after ${options.timeoutMs}ms`,
+        options.signal,
+      );
+      return { timedOut: false };
+    } catch (error) {
+      if (error instanceof McpTimeoutError) return { timedOut: true };
+      throw error;
+    }
+  }
+
   async listTools(): Promise<McpToolDescriptor[]> {
     // 收到 notifications/tools/list_changed 的 server 在下一次 listTools 时重新拉取
     // （runtime 只在回合开始前调用，回合内工具表不变）。
@@ -571,6 +623,7 @@ class NodeMcpAdapter implements McpPort {
         record.status = { ...record.status, toolCount: record.tools.length };
         record.toolsVersion = this.nextToolsVersion();
         record.toolsStale = false;
+        this.notifySnapshotChanged();
         this.logger?.info("MCP tool list refreshed after list_changed", {
           event: "mcp.tools.refreshed",
           mcpServerName: name,
@@ -880,8 +933,17 @@ class NodeMcpAdapter implements McpPort {
         });
       }
       // 防 onclose 尚未派发的竞态：SDK 在 transport 已断时抛裸 "Not connected"。
-      // 只对这一种确定的断连错误重连重试一次，其余错误原样冒泡。
-      if (!(error instanceof Error) || error.message !== "Not connected") throw error;
+      // 另含 Streamable HTTP 的会话过期/连接关闭重试；其余错误原样冒泡。
+      const hadSessionId = Boolean(
+        (record.transport as { sessionId?: string } | undefined)?.sessionId,
+      );
+      if (
+        !(error instanceof Error) ||
+        (!isRetryableCallError(error, { type: record.config.type, hadSessionId }) &&
+          error.message !== "Not connected")
+      ) {
+        throw error;
+      }
       try {
         await waitWithinMcpDeadline(
           this.reconnectForCall(request.serverName, record.config),
@@ -1674,6 +1736,7 @@ class NodeMcpAdapter implements McpPort {
         toolsVersion: this.nextToolsVersion(),
         transport,
       });
+      this.notifySnapshotChanged();
       // A3：重连（同一 adapter 实例）后按登记表重放订阅；首次连接登记表为空，直接跳过。
       await this.replayResourceSubscriptions(name, client);
       const mcpTransportPid = getStdioTransportPid(transport);

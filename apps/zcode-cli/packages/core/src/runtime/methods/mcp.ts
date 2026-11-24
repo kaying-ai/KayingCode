@@ -1,8 +1,22 @@
 import { KAYINGCODE_CUA_OFFICIAL_PLUGIN_ID, KAYINGCODE_PLUGIN_ID_ENV_KEY } from "@zcode/shared";
 import { registerMcpTools, traceContextToLogContext } from "../deps.js";
-import type { McpConnectionSnapshot, McpServerConfig, TraceContext } from "../deps.js";
+import type {
+  McpConnectionSnapshot,
+  McpServerConfig,
+  TraceContext,
+} from "../deps.js";
 import type { AgentRuntimeInternal } from "../internal.js";
-import type { McpToolDescriptor, PluginReferenceCatalog } from "@zcode/contracts";
+import type {
+  McpToolDescriptor,
+  PluginReferenceCatalog,
+  WaitForMcpServersOutput,
+} from "@zcode/contracts";
+import type { McpServerWaitPort } from "../../tool/types.js";
+import {
+  classifyServer,
+  type McpServerClass,
+} from "../../mcp/runtime/session.js";
+import { toMcpToolName, toModelVisibleMcpNamePart } from "../../mcp/name.js";
 
 const MCP_SESSION_OAUTH_AUTHORIZATION_TIMEOUT_MS = 15_000;
 
@@ -45,6 +59,89 @@ export function computeOfficialCuaServerNames(
     names.add(name);
   }
   return names;
+}
+
+const MCP_SERVER_WAIT_MS = 5_000;
+
+function matchesMcpServerName(serverName: string, requested: string): boolean {
+  const part = toModelVisibleMcpNamePart(requested);
+  return serverName === requested || toModelVisibleMcpNamePart(serverName) === part;
+}
+
+/**
+ * WaitForMcpServers 的运行时端口：目标只按名称匹配；没有指定时取全部 pending，
+ * 没有 pending 时报告失败的 server。只等已有启动任务（≤5s），不发起连接或授权。
+ */
+export function createMcpServerWaitPort(runtime: AgentRuntimeInternal): McpServerWaitPort {
+  return {
+    async waitForServers(servers, signal): Promise<WaitForMcpServersOutput> {
+      const mcpPort = runtime.mcpPort;
+      if (!mcpPort) {
+        const unknown = [...(servers ?? [])];
+        return {
+          ready: unknown.length === 0,
+          connected: [],
+          failed: [],
+          stillPending: [],
+          needsAuth: [],
+          disabled: [],
+          unknown,
+          isError: unknown.length > 0,
+        };
+      }
+      const initial = mcpPort.getToolSnapshot();
+      const names = [
+        ...new Set([...Object.keys(runtime.config.mcp?.servers ?? {}), ...Object.keys(initial)]),
+      ];
+      const classOf = (name: string) =>
+        classifyServer(runtime.config.mcp ?? {}, name, initial[name]?.status);
+      const requested = servers?.length ? servers : undefined;
+      const pending = names.filter((name) => classOf(name) === "pending");
+      const targets = requested
+        ? names.filter((name) => requested.some((value) => matchesMcpServerName(name, value)))
+        : pending.length
+          ? pending
+          : names.filter((name) => classOf(name) === "failed");
+      await Promise.all(
+        targets
+          .filter((name) => pending.includes(name))
+          .map((name) => mcpPort.waitForServer?.(name, { timeoutMs: MCP_SERVER_WAIT_MS, signal })),
+      );
+      const current = mcpPort.getToolSnapshot();
+      const result = {
+        connected: [] as string[],
+        failed: [] as string[],
+        stillPending: [] as string[],
+        needsAuth: [] as string[],
+        disabled: [] as string[],
+        unknown: [] as string[],
+      };
+      const groupOf: Record<McpServerClass, string[]> = {
+        connected: result.connected,
+        pending: result.stillPending,
+        needs_auth: result.needsAuth,
+        disabled: result.disabled,
+        not_configured: result.unknown,
+        // 没有连接记录的已配置 server 归入失败。
+        absent: result.failed,
+        failed: result.failed,
+      };
+      for (const name of targets) {
+        groupOf[classifyServer(runtime.config.mcp ?? {}, name, current[name]?.status)].push(name);
+      }
+      for (const value of requested ?? []) {
+        if (!targets.some((name) => matchesMcpServerName(name, value))) result.unknown.push(value);
+      }
+      const ready =
+        result.stillPending.length +
+          result.failed.length +
+          result.needsAuth.length +
+          result.disabled.length +
+          result.unknown.length ===
+        0;
+      return { ready, ...result, isError: !ready };
+    },
+  };
 }
 
 export function startMcpStartup(
@@ -144,6 +241,14 @@ export async function reconcileMcpConfiguration(
   const generation = ++this.mcpConfigurationGeneration;
   const snapshot = source.getSnapshot();
   this.config.mcp = snapshot;
+  if (this.mcpToolCatalogPort) {
+    // 配置变化后 server 集合与 cache key 都会变；重新 prepare 才能命中新 server。
+    this.mcpCatalogPublication = this.mcpToolCatalogPort.prepare({
+      servers: snapshot.servers ?? {},
+      workingDirectory: this.workingDirectory,
+      workspaceIdentity: this.config.workspaceIdentity?.toString(),
+    });
+  }
   if (!this.mcpInitialized) return;
   const servers = snapshot.enabled === false ? {} : (snapshot.servers ?? {});
   try {
@@ -166,6 +271,7 @@ export async function reconcileMcpConfiguration(
   }
   // 迟到的 reconcile 不能覆盖更新一代的连接与工具表。
   if (this.shuttingDown || generation !== this.mcpConfigurationGeneration) return;
+  this.mcpCatalogPublication?.publish(mcpPort.getToolSnapshot());
   if (!this.mcpToolsRegistered) return;
   // 强制下一次刷新读取当前端口目录；签名不变时 refresh 不会重注册。
   this.mcpToolListRevision = -1;
@@ -189,7 +295,17 @@ export async function initializeMcp(
     await refreshWorkspaceTrustAdmission(this, traceContext);
     const snapshot = await startup;
     this.shutdownSignal.throwIfAborted();
-    const registered = registerMcpTools(this.registry, mcpPort, snapshot.tools, {
+    this.mcpCatalogPublication?.publish(mcpPort.getToolSnapshot());
+    const liveNames = new Set(snapshot.tools.map(toMcpToolName));
+    const catalogTools = Object.entries(this.mcpCatalogPublication?.lookup.byServer ?? {}).flatMap(
+      ([serverName, tools]) =>
+        tools.map((tool) => ({ ...tool, serverName, catalogOnly: true as const })),
+    );
+    const descriptors = [
+      ...snapshot.tools,
+      ...catalogTools.filter((tool) => !liveNames.has(toMcpToolName(tool))),
+    ];
+    const registered = registerMcpTools(this.registry, mcpPort, descriptors, {
       allowedTools: this.config.toolAllowlist,
       disallowedTools: this.config.toolDisallowlist,
       officialCuaServerNames: computeOfficialCuaServerNames(
@@ -204,7 +320,7 @@ export async function initializeMcp(
     }
     // A7：记住注册集合与签名，回合边界 refreshMcpToolsIfChanged 据此判断是否重注册。
     this.registeredMcpToolNames = registered;
-    this.mcpToolsSignature = mcpToolsSignature(snapshot.tools);
+    this.mcpToolsSignature = mcpToolsSignature(descriptors);
     this.mcpToolListRevision = mcpPort.toolListRevision?.();
     this.logger?.info("MCP tools registered", {
       ...traceContextToLogContext(traceContext),

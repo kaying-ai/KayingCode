@@ -25,6 +25,8 @@ import type {
   PdfDocumentPort,
   McpConnectionSnapshot,
   McpConfigurationSource,
+  McpToolCatalogPort,
+  McpToolCatalogPublication,
   SkillLoadOutcome,
   SkillPort,
   McpPort,
@@ -133,6 +135,8 @@ export interface AgentRuntimeInternal
   skillPort?: SkillPort;
   mcpPort?: McpPort;
   mcpConfigurationSource?: McpConfigurationSource;
+  mcpToolCatalogPort?: McpToolCatalogPort;
+  mcpCatalogPublication?: McpToolCatalogPublication;
   mcpConfigurationGeneration: number;
   mcpStartupPromise?: Promise<McpConnectionSnapshot>;
   residencyBlockingWorkCount: number;

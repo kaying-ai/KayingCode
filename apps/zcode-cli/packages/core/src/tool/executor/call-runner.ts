@@ -536,6 +536,7 @@ async function executeToolCallImpl(
         dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort,
         dynamicWorkflowSnippetPort: deps.dynamicWorkflowSnippetPort,
         modelCatalogPort: deps.modelCatalogPort,
+        mcpServerWaitPort: deps.mcpServerWaitPort,
         runtimeTaskRegistry: deps.runtimeTaskRegistry,
         readFileState: deps.readFileState,
         recordReadFileStateMetadata: (metadata) => {

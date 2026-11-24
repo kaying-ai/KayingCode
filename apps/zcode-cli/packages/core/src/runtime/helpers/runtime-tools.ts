@@ -11,6 +11,7 @@ import type { HookRunner, SessionId, ToolExecutor, TraceContext } from "../deps.
 import type { AgentRuntimeInternal } from "../internal.js";
 import type { AgentRuntimeDeps } from "../types.js";
 import { resolveRuntimeEmbeddedSearchEnabled } from "../methods/embedded-search-branch.js";
+import { createMcpServerWaitPort } from "../methods/mcp.js";
 import { getSessionShellSelectionFromConfig } from "../methods/session-shell-environment.js";
 import { createRuntimeSessionModePort } from "../session-mode-port.js";
 import { sessionControlForRuntime } from "../../tool/session-control/contract.js";
@@ -81,6 +82,7 @@ function registerRuntimeBuiltInTools(runtime: AgentRuntimeInternal, deps: AgentR
     // 修复原因：browserControlPort 只是宿主能力，不应隐式暴露高权限 node_repl。
     // node_repl/browser-use 由 KayingCode 官方 browser-use 插件启停推导出的 runtimeFeatures 控制。
     includeNodeRepl: nodeReplEnabled,
+    includeWaitForMcpServers: Boolean(deps.mcpPort),
     includeBrowserUse: browserUseEnabled,
     embeddedSearchEnabled: resolveRuntimeEmbeddedSearchEnabled(runtime),
     allowedTools: resolveBuiltInToolAllowlist(runtime.config),
@@ -208,6 +210,7 @@ function createRuntimeToolExecutor(
     dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort,
     dynamicWorkflowSnippetPort: deps.dynamicWorkflowSnippetPort,
     modelCatalogPort: deps.modelCatalogPort,
+    ...(deps.mcpPort === undefined ? {} : { mcpServerWaitPort: createMcpServerWaitPort(runtime) }),
     runtimeTaskRegistry: runtime.runtimeTaskRegistry,
     registerResidencyBlockingWork: (work) => {
       void runtime.trackResidencyBlockingWork(work).catch(() => undefined);

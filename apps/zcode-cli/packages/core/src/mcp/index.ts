@@ -47,6 +47,16 @@ export {
 
 export { resolveMcpWorkspaceKey, resolveMcpWorkspacePath } from "./workspace-scope.js";
 
+export interface ResolvedMcpTool {
+  descriptor: McpToolDescriptor;
+  /** 权限或 hook 等待之后复查目标；返回不可用原因，仍可调用时返回 undefined。 */
+  checkTarget(): string | undefined;
+  /** 调用失败后复查：server 正等待或需要用户授权时返回固定原因，否则返回 undefined。 */
+  authorizationReason(): string | undefined;
+}
+
+export type McpToolResolution = ResolvedMcpTool | { unavailableReason: string };
+
 const MCP_TOOL_TIMEOUT_MS = 30_000;
 const OFFICIAL_CUA_PERMISSION_CAPABILITY_GROUP = "official_cua" satisfies PermissionCapabilityGroup;
 const CUA_USER_TITLE_SCHEMA = {

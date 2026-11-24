@@ -662,10 +662,21 @@ createConfig
 - 测试：新增 `core/tests/mcp-configuration-reconcile.test.ts`（配置源发布后按新 server map 重连）。
 - 仍待完成：上游 `mcp/runtime/session` 的可用性分类与执行准入、`McpToolCatalogPort`、`WaitForMcpServers`、pool 租约化与 transport 错误收敛。
 
+### 阶段 3 第三批：MCP 工具目录与 WaitForMcpServers（2026-11-24）
+
+- 契约：新增 `McpToolCatalogPort/Publication/Scope/LookupResult`、`McpToolDefinition`、`McpWaitForServerOptions`、`WaitForMcpServers` 输入/输出 schema；`McpPort.getToolSnapshot()` 转为必需，`waitForServer?` / `onSnapshotChanged?` 可选。
+- 适配器：新增 `tool-catalog-cache.ts`（LRU + TTL + 字节上限 + 配置 key）与 `transport-errors.ts`；`callTool` 的重连条件扩展为 Streamable HTTP 会话过期/连接关闭 + 既有 `Not connected`；adapter 在连接/断开/列表刷新时通知快照监听，`waitForServer` 复用已有启动 Promise；pool 透传快照、监听与等待，并在版本号上拼连接 id。
+- Core：新增 `core/src/mcp/runtime`（contract/session/CONTRACT）提供可用性分类、不可用原因与 session view；`WaitForMcpServers` 工具按 MCP 端口门注册，端口只等 pending、不发起连接/授权。
+- Runtime：`mcpToolCatalogPort` 接入构造；初始化时合并 catalog-only 工具，配置 reconcile 时按新 server 集合重新 prepare 并发布快照。
+- Bootstrap：缺省创建进程内 `createInMemoryMcpToolCatalog`，宿主可注入共享目录。
+- 测试：`mcp-tool-catalog.test.ts`、`mcp-server-wait.test.ts`、`mcp-wait-tool-registration.test.ts`、`mcp-configuration-reconcile.test.ts`、`mcp-tool-snapshot.test.ts`。
+- 验证：core/adapters/bootstrap typecheck、根 `typecheck`、`lint`（0 errors / 133 既有 warnings）、`architecture:check --changed`（0 violations）、`source:check` 通过；bootstrap `workspace-mcp-trust` 仍为 27 通过 / 3 既有失败。
+
 待完成（阶段 3 未完成）：
-- core `mcp/runtime`：`McpToolCatalogPort`、`getToolSnapshot` 统一投影、`WaitForMcpServers`、pool 租约化与 transport 错误收敛。
-- `McpConfigurationSource` 的执行期可用性分类/撤销原因与工具目录精确撤销。
-- marketplace `regions` 与商店 UI 迁移；官方插件清单按上游 definition 重生成。
+- 完整 `McpSessionView` 接入：执行期按 `classifyServer` 做工具准入/撤销、`resolve` 等待与 MCP App 打开语义仍沿用产品现有路径。
+- `WaitForMcpServers` 之外的 `ToolSearch` 关闭时连接中公告与 `runModelTextRequest` 集成。
+- HTTP transport 重试/401 step-up：会话过期与连接关闭已接入 `isRetryableCallError`，401 step-up 仍沿用既有授权恢复路径。
+- pool 租约化与 transport 错误收敛的上游完整形态；marketplace `regions`/商店 UI；官方插件清单重生成。
 
 ## 验证记录
 
