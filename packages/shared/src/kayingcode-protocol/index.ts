@@ -2988,6 +2988,8 @@ export type KayingCodeProviderRuntimeHeadersCancelled = z.infer<
 
 // 标准 JSON-RPC error 保留旧版 schema 兼容，不向严格校验的 response 增加字段。
 export const KAYINGCODE_PROVIDER_CONFIG_NETWORK_ERROR = -32032;
+// 项目 Token 换证只抛出固定传输故障码时用该错误应答，Agent 才能并入 network_error 重试预算。
+export const KAYINGCODE_PROVIDER_PROJECT_TOKEN_NETWORK_ERROR = -32033;
 
 export const kayingcodeProviderRuntimeHeadersErrorCode = {
   configNetwork: "request_verification_config_network",

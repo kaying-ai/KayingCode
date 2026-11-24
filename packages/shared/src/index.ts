@@ -359,11 +359,13 @@ export * from "./plugin-browser-compare.js";
 
 export { API_KEY_USAGE_SCENE, type ApiKeyCreationUsageScene } from "./api-key-usage-scene.js";
 export {
+  isProjectTokenTransportFailureCode,
   projectAccessTokenFingerprint,
   projectAccessTokenRetryAfterMs,
   ProjectAccessTokenError,
   ProjectAccessTokenHttpStatusError,
   ProjectAccessTokenTransientError,
+  type ProjectAccessTokenRequestFailure,
 } from "./project-access-token.js";
 export {
   ProjectAccessTokenClient,

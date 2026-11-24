@@ -46,6 +46,8 @@ import {
   KAYINGCODE_AGENT_PROVIDER_NOT_READY_CODE,
   KAYINGCODE_AGENT_PROVIDER_NOT_READY_REASON,
   KAYINGCODE_MODEL_REASONING_SEPARATOR,
+  KAYINGCODE_PROVIDER_PROJECT_TOKEN_NETWORK_ERROR,
+  isProjectTokenTransportFailureCode,
   isRemoteWorkspaceIdentity,
   KAYINGCODE_PROTOCOL_NAME,
   KAYINGCODE_PROTOCOL_VERSION,
@@ -1327,17 +1329,29 @@ export function createKayingCodeAgentService(
       });
     } catch (error) {
       if (pendingProviderRuntimeHeaders.get(params.key) !== params.pending) return;
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(undefined, "KayingCode provider runtime headers 应用失败", {
         modelId: params.pending.request.modelSelection.modelId,
         providerId: params.pending.request.providerId,
         requestId: params.pending.request.requestId,
         sessionId: params.pending.request.sessionId,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
         workspaceKey: resolveWorkspaceKey(params.pending.request.workspace),
       });
+      // 修复原因（ZCT-2122890271808978944 等）：冷缓存换证遇到断网/超时原先只回
+      // headersApplied:false，Agent 视为不可重试，整轮在首次模型尝试前结束。
+      // 换证客户端只抛固定码（见 ProjectAccessTokenClient），这里仅把两个传输故障码
+      // 改用结构化 RPC 错误码，交给 Agent 的 network_error 预算；其它失败保持原应答。
+      if (isProjectTokenTransportFailureCode(errorMessage)) {
+        await params.pending.client.respondError(params.pending.protocolRequestId, {
+          code: KAYINGCODE_PROVIDER_PROJECT_TOKEN_NETWORK_ERROR,
+          message: errorMessage,
+        });
+        return;
+      }
       await params.pending.client.respond(params.pending.protocolRequestId, {
         headersApplied: false,
-        errorMessage: error instanceof Error ? error.message : String(error),
+        errorMessage,
       });
     } finally {
       if (pendingProviderRuntimeHeaders.get(params.key) === params.pending) {
