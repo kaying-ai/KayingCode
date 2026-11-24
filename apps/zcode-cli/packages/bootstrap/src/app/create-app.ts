@@ -1075,6 +1075,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
           ? (options.skillPort ?? catalogSkillPort)
           : undefined,
       mcpPort,
+      mcpConfigurationSource: mcpConfigSource,
       eventSink: options.eventSink,
       onOffPeakLifecycleEvent: options.onOffPeakLifecycleEvent
         ? (event) => options.onOffPeakLifecycleEvent!({ ...event, sessionId })

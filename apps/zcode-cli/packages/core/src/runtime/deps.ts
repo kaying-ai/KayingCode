@@ -217,6 +217,7 @@ export type {
   SkillPort,
   SyntheticUserMessageSource,
   McpConnectionSnapshot,
+  McpConfigurationSource,
   McpPort,
   McpServerConfig,
   SubagentPort,

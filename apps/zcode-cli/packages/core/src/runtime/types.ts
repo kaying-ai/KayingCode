@@ -85,6 +85,7 @@ import type {
   PdfDocumentPort,
   HooksRuntimeConfig,
   SkillPort,
+  McpConfigurationSource,
   McpPort,
   McpServerConfig,
   SubagentPort,
@@ -373,6 +374,8 @@ export interface AgentRuntimeDeps {
   pdfDocumentPort?: PdfDocumentPort;
   skillPort?: SkillPort;
   mcpPort?: McpPort;
+  /** 宿主注入的实时 MCP 配置源；变化时 runtime 重连并重注册工具。 */
+  mcpConfigurationSource?: McpConfigurationSource;
   subagentPort?: SubagentPort;
   coordinatorResponsePort?: CoordinatorResponsePort;
   /** 工作流 actor 提交终态结果的端口；存在即作为 submit_result 工具的注册门。 */

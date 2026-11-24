@@ -50,6 +50,7 @@ import type {
   ImageProcessorPort,
   PdfDocumentPort,
   McpConnectionSnapshot,
+  McpConfigurationSource,
   SkillLoadOutcome,
   SkillPort,
   McpPort,
@@ -212,6 +213,9 @@ export class AgentRuntime {
   private contextSourcePort?: ContextSourcePort;
   private skillPort?: SkillPort;
   private mcpPort?: McpPort;
+  private mcpConfigurationSource?: McpConfigurationSource;
+  private mcpConfigurationGeneration = 0;
+  private mcpConfigUnsubscribe?: () => void;
   private mcpStartupPromise?: Promise<McpConnectionSnapshot>;
   private residencyBlockingWorkCount = 0;
   private readonly residencyBlockingWork = new Set<Promise<unknown>>();
@@ -386,6 +390,18 @@ export class AgentRuntime {
       this.contextInitialized = true;
     }
     runtime.startMcpStartup(this.rootTraceContext);
+    this.mcpConfigurationSource = deps.mcpConfigurationSource;
+    if (this.mcpConfigurationSource && this.mcpPort) {
+      this.mcpConfigUnsubscribe = this.mcpConfigurationSource.subscribe(() => {
+        if (this.shuttingDown) return;
+        void runtime.reconcileMcpConfiguration(this.rootTraceContext).catch((error: unknown) => {
+          this.logger?.warn("MCP configuration reconcile failed", {
+            error: error instanceof Error ? error.message : String(error),
+            event: "mcp.configuration.reconcile.failed",
+          });
+        });
+      });
+    }
   }
 
   get shutdownSignal(): AbortSignal {
@@ -480,6 +496,9 @@ export class AgentRuntime {
   }
 
   beginShutdown(): void {
+    this.mcpConfigUnsubscribe?.();
+    this.mcpConfigUnsubscribe = undefined;
+    this.mcpConfigurationGeneration += 1;
     // ExecutionPort.close() 会把后台 Bash 收口为 cancelled；若允许
     // teardown terminal event 再唤醒模型，并与随后关闭的 session store 竞态。
     this.shuttingDown = true;

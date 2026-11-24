@@ -130,11 +130,52 @@ export function startMcpStartup(
   return this.mcpStartupPromise;
 }
 
-export async function initializeMcp(
+/**
+ * 实时配置源变化：更新会话配置，按新 server map 重连，再按新工具表重注册。
+ * 只在首次 MCP 初始化之后生效；初始化前的变化由 startMcpStartup 读取最新 config。
+ */
+export async function reconcileMcpConfiguration(
   this: AgentRuntimeInternal,
   traceContext: TraceContext,
 ): Promise<void> {
-  if (this.mcpToolsRegistered) return;
+  const source = this.mcpConfigurationSource;
+  const mcpPort = this.mcpPort;
+  if (!source || !mcpPort || this.shuttingDown) return;
+  const generation = ++this.mcpConfigurationGeneration;
+  const snapshot = source.getSnapshot();
+  this.config.mcp = snapshot;
+  if (!this.mcpInitialized) return;
+  const servers = snapshot.enabled === false ? {} : (snapshot.servers ?? {});
+  try {
+    await mcpPort.connectConfiguredServers(servers, {
+      signal: this.shutdownSignal,
+      oauthAuthorizationTimeoutMs: MCP_SESSION_OAUTH_AUTHORIZATION_TIMEOUT_MS,
+      trace: traceContext,
+      workingDirectory: this.workingDirectory,
+      workspaceIdentity: this.config.workspaceIdentity?.toString(),
+    });
+  } catch (error) {
+    this.logger?.warn("MCP configuration reconnect failed", {
+      ...traceContextToLogContext(traceContext),
+      error: error instanceof Error ? error.message : String(error),
+      event: "mcp.configuration.reconnect.failed",
+      module: "core.runtime",
+      status: "failed",
+    });
+    return;
+  }
+  // 迟到的 reconcile 不能覆盖更新一代的连接与工具表。
+  if (this.shuttingDown || generation !== this.mcpConfigurationGeneration) return;
+  if (!this.mcpToolsRegistered) return;
+  // 强制下一次刷新读取当前端口目录；签名不变时 refresh 不会重注册。
+  this.mcpToolListRevision = -1;
+  await this.refreshMcpToolsIfChanged(traceContext);
+}
+
+export async function initializeMcp(
+  this: AgentRuntimeInternal,
+  traceContext: TraceContext,
+): Promise<void> {  if (this.mcpToolsRegistered) return;
 
   const startup = this.startMcpStartup(traceContext);
   const mcpPort = this.mcpPort;

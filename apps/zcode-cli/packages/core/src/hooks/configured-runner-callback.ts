@@ -181,7 +181,8 @@ function parseHookStdout(stdout: string, event: HookEventName): HookJSONOutput |
       "Hook stdout failed HookJSONOutput schema validation",
       {
         context: {
-          errors: validation.error.errors.slice(0, 20),
+          // zod 4 不再提供 ZodError.errors，统一读 issues。
+          errors: validation.error.issues.slice(0, 20),
           hookEventName: event,
         },
         recoverable: true,

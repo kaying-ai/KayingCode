@@ -654,9 +654,17 @@ createConfig
 - 测试：新增 `adapters/tests/mcp-tool-snapshot.test.ts`（连接后快照、确认空列表与未列出的区分）。
 - 未完成：core `AgentRuntime` 尚未调用 `getToolSnapshot` / 订阅配置源；阶段 3 的 session reconcile 仍待实现。
 
+### 阶段 3 第二批：AgentRuntime 实时 MCP reconcile（2026-11-24）
+
+- `AgentRuntimeDeps` 新增 `mcpConfigurationSource`；构造时订阅，`beginShutdown` 退订并递增 generation。
+- 配置变化时 `reconcileMcpConfiguration`：更新 `config.mcp` → `connectConfiguredServers` 重连/断开 → 强制刷新并重注册工具（签名不变则不重注册）；迟到结果按 generation 丢弃。
+- 前置修复 core 既有 zod4 迁移遗留：`ZodError.errors` → `issues`，`Edit.replace_all` 可选按 `false` 处理，core 恢复可构建。
+- 测试：新增 `core/tests/mcp-configuration-reconcile.test.ts`（配置源发布后按新 server map 重连）。
+- 仍待完成：上游 `mcp/runtime/session` 的可用性分类与执行准入、`McpToolCatalogPort`、`WaitForMcpServers`、pool 租约化与 transport 错误收敛。
+
 待完成（阶段 3 未完成）：
-- core `mcp/runtime`：`McpToolCatalogPort`、`getToolSnapshot` 订阅、`WaitForMcpServers`、pool 租约化与 transport 错误收敛。
-- 打开会话对 `McpConfigurationSource` 的实时 reconcile 与工具目录撤销/重发。
+- core `mcp/runtime`：`McpToolCatalogPort`、`getToolSnapshot` 统一投影、`WaitForMcpServers`、pool 租约化与 transport 错误收敛。
+- `McpConfigurationSource` 的执行期可用性分类/撤销原因与工具目录精确撤销。
 - marketplace `regions` 与商店 UI 迁移；官方插件清单按上游 definition 重生成。
 
 ## 验证记录

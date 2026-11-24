@@ -24,6 +24,7 @@ import type {
   ImageProcessorPort,
   PdfDocumentPort,
   McpConnectionSnapshot,
+  McpConfigurationSource,
   SkillLoadOutcome,
   SkillPort,
   McpPort,
@@ -131,6 +132,8 @@ export interface AgentRuntimeInternal
   contextSourcePort?: ContextSourcePort;
   skillPort?: SkillPort;
   mcpPort?: McpPort;
+  mcpConfigurationSource?: McpConfigurationSource;
+  mcpConfigurationGeneration: number;
   mcpStartupPromise?: Promise<McpConnectionSnapshot>;
   residencyBlockingWorkCount: number;
   residencyBlockingWork: Set<Promise<unknown>>;
