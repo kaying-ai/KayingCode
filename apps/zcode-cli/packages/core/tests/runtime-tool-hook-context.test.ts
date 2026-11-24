@@ -108,6 +108,8 @@ describe.each([true, false])("tool hook context after the tool batch (MCS=%s)", 
         {
           mode: "yolo",
           titleGeneration: { enabled: false },
+          // 该文件断言工具批次后的额度提醒，必须显式开启 4.0 的提醒开关。
+          totalTokensReminder: { enabled: true },
           workingDirectory: root,
           workspacePath: root,
         },

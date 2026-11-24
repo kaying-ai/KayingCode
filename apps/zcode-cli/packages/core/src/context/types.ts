@@ -146,6 +146,8 @@ export interface ContextBuilderConfig {
   agentProfiles?: readonly AgentProfile[];
   embeddedSearchEnabled?: boolean;
   skillMetadataBudget?: number;
+  /** 是否在 system 末尾加入总额度固定行；与 runtime 的提醒开关保持同一来源。 */
+  totalTokensReminder?: boolean;
   customSystemPrompt?: string;
   /**
    * 动态工作流子代理（workflow child）的身份输入。在场即走 builder 的第三条路径：

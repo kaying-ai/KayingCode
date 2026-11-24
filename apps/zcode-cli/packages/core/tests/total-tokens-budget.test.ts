@@ -4,6 +4,7 @@ import {
   consumeTotalTokensBudget,
   createTotalTokensBudgetState,
   decideTotalTokensReminder,
+  isTotalTokensReminderEnabled,
   reanchorTotalTokensBudget,
   rollOverTotalTokensBudget,
 } from "../src/runtime/helpers/total-tokens-budget.js";
@@ -52,5 +53,13 @@ describe("total tokens budget", () => {
     expect(formatTotalTokensReminder(TOTAL_TOKENS_BUDGET)).toBe(
       `<total_tokens>${TOTAL_TOKENS_BUDGET} tokens left</total_tokens>`,
     );
+  });
+
+  it("keeps the reminder off unless explicitly enabled", () => {
+    // 上游 4.0 起提醒是显式开关；缺省、false 与空配置都不产出 system 行或附件。
+    expect(isTotalTokensReminderEnabled({})).toBe(false);
+    expect(isTotalTokensReminderEnabled({ totalTokensReminder: {} })).toBe(false);
+    expect(isTotalTokensReminderEnabled({ totalTokensReminder: { enabled: false } })).toBe(false);
+    expect(isTotalTokensReminderEnabled({ totalTokensReminder: { enabled: true } })).toBe(true);
   });
 });

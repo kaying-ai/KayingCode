@@ -466,6 +466,16 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     return 1;
   }
   const toolsearchMode = parsedToolsearchMode.data;
+  const totalTokensReminderOption = parsed.values["total-tokens-reminder"];
+  if (
+    totalTokensReminderOption !== undefined &&
+    totalTokensReminderOption !== "on" &&
+    totalTokensReminderOption !== "off"
+  ) {
+    ctx.stderr.write("--total-tokens-reminder must be one of on, off.\n");
+    return 1;
+  }
+  const totalTokensReminder = totalTokensReminderOption === "on";
   const agentAlwaysBackgroundOption = parsed.values["agent-always-background"];
   if (
     agentAlwaysBackgroundOption !== undefined &&
@@ -503,6 +513,18 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     ctx.stderr.write(
       "--agent-always-background can only be used with --prompt, --target, or tui.\n",
     );
+    return 1;
+  }
+
+  if (
+    totalTokensReminderOption !== undefined &&
+    !isForceMcsSupportedInvocation({
+      positionals: parsed.positionals,
+      prompt: parsed.values.prompt as string | undefined,
+      targetRequest,
+    })
+  ) {
+    ctx.stderr.write("--total-tokens-reminder can only be used with --prompt, --target, or tui.\n");
     return 1;
   }
 
@@ -643,6 +665,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       presentationSurface,
       workflowMode,
       agentAlwaysBackground,
+      totalTokensReminder,
     );
   }
 
@@ -662,6 +685,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       presentationSurface,
       workflowMode,
       agentAlwaysBackground,
+      totalTokensReminder,
     );
   }
 
@@ -724,6 +748,7 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
         toolsearchMode,
         workflowMode,
         agentAlwaysBackground,
+        totalTokensReminder,
       );
     default:
       ctx.stderr.write(`Unknown command: ${commandName(parsed.positionals)}\n\n`);

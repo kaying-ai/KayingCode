@@ -68,6 +68,7 @@ export const parseGlobalArgs = (argv: string[]) =>
         type: "boolean",
       },
       "toolsearch-mode": { type: "string" },
+      "total-tokens-reminder": { type: "string" },
       "agent-always-background": { type: "string" },
       "force-mcs": {
         type: "boolean",

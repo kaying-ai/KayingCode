@@ -170,7 +170,8 @@ export class ContextBuilder {
 
       // Context Management
       sections.push(buildContextManagementSection());
-      sections.push(buildTotalTokensSection());
+      const totalTokensSection = buildTotalTokensSection(this.config.totalTokensReminder === true);
+      if (totalTokensSection) sections.push(totalTokensSection);
 
       const gitSystemContextSection = buildGitSystemContextSection(this.config.envInfo);
       if (gitSystemContextSection) {

@@ -144,6 +144,8 @@ export interface AgentRuntimeConfig {
   permissionTimeoutMs?: number;
   compact?: AutoCompactPolicyConfig;
   targetCompletionVerification?: { enabled?: boolean };
+  /** 是否在请求中追加总额度倒数提醒；缺省关闭（由 CLI 参数或 App 设置在创建 runtime 时决定）。 */
+  totalTokensReminder?: { enabled?: boolean };
   midConversationSystem?: {
     mode?: "auto" | "force";
   };

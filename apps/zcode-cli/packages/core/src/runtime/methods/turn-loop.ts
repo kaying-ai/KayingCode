@@ -41,6 +41,7 @@ import { isRealUserPrompt } from "../helpers/provider-entry-origins.js";
 import {
   consumeTotalTokensBudget,
   decideTotalTokensReminder,
+  isTotalTokensReminderEnabled,
   reanchorTotalTokensBudget,
   type InputAttachmentCollectionReason,
 } from "../helpers/total-tokens-budget.js";
@@ -404,6 +405,8 @@ async function appendTotalTokensReminder(
   reason: InputAttachmentCollectionReason,
   fromUser: boolean,
 ): Promise<void> {
+  // 上游 4.0：提醒改为显式开关，缺省不产生附件；关闭时 compaction 前后也不重述。
+  if (!isTotalTokensReminderEnabled(runtime.config)) return;
   const entries = state.turnRequestState.entries;
   const decision = decideTotalTokensReminder({
     reason,

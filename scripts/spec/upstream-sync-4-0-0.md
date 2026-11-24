@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-24）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试）；阶段 4 进行中（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption 已落地；turn/loop、协议 v4 剩余项待做）；阶段 5 已开始游戏插件兼容验收，非游戏上游能力待补齐。
+状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试）；阶段 4 进行中（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption、项目 Token 传输错误 -32033、`--total-tokens-reminder` 已落地；turn/loop 请求构建、`readReplyLanguage` 等协议 v4 剩余项待做）；阶段 5 已开始游戏插件兼容验收，非游戏上游能力待补齐。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -692,10 +692,21 @@ createConfig
 - CLI `--agent-always-background <on|off>`：仅 `--prompt`/`--target`/TUI 可用（默认 off）；透传到 App runtimeConfig `subagents.alwaysBackground`，与 Agent 工具描述/handler 门一致。
 - 测试：移植上游 `bash-cmd-readonly-policy.test.ts`（126 例）与 `cmd-readonly/contract.test.ts`。
 
+### 阶段 4 第三批：项目 Token 传输错误与额度提醒开关（2026-11-25）
+
+- `packages/shared/src/project-access-token.ts`：恢复 `PROJECT_TOKEN_NETWORK_ERROR_CODE`/`PROJECT_TOKEN_TIMEOUT_CODE` 与 `isProjectTokenTransportFailureCode`；`ProjectAccessTokenCache.resolve` 的 `issue` 回调新增 `hasValidFallback()`，由缓存 owner 按当前有效期实时判断，不冻结请求开始时的布尔值。
+- `project-access-token-client.ts`：首签临时失败（network/timeout/429/5xx）在同一 pending 内重试一次；429 按 `Retry-After`（上限 1s）退避；已有可用 PAT 时直接降级，不多等一轮超时。品牌字段保持 `kayingcode`/`KAYINGCODE_VERSION`。
+- 协议：新增 `KAYINGCODE_PROVIDER_PROJECT_TOKEN_NETWORK_ERROR = -32033`；Host 账号鉴权路径把两个传输故障码改用该 RPC 错误应答，Agent 才能并入 `network_error` 重试预算。
+- 适配层：`RuntimeHeadersRefreshError` 区分 `configNetwork` 与项目 Token 传输失败，两者都可重试；失败分类只在配置读取失败时使用 `ModelRequestVerificationConfigNetwork`，项目 Token 传输失败按普通网络错误展示。旧 `headersApplied:false` 形态与其它失败码仍不可重试。
+- `totalTokensReminder` 开关：`AgentRuntimeConfig.totalTokensReminder`、`ContextBuilderConfig`/子代理 builder 同一来源；关闭时主/子代理 system 不再追加固定预算行，工具批次/用户输入的倒数附件也不产生。
+- CLI：新增 `--total-tokens-reminder <on|off>`（默认 off，仅 `--prompt`/`--target`/TUI），透传 runtimeConfig；帮助文案同步 en-US/zh-CN。
+- 测试：`packages/shared/test/projectAccessTokenCache.test.ts`、`adapters/tests/runtime-headers-retry.test.ts`、`core/tests/total-tokens-budget.test.ts` 开关用例；既有上下文顺序/工具批次用例显式开启提醒。
+- 验证：shared/adapters/core/cli typecheck、上述定向测试、根 `pnpm run typecheck`、`pnpm run lint`、`pnpm run architecture:check --changed`、`pnpm run source:check`。
+
 待完成（阶段 4 未完成，更新）：
-- turn/loop 状态与请求构建、executor 剩余新端口、子代理冷恢复/compact 策略。
+- turn/loop 状态与请求构建（`normalInputPreparationPending`、`pluginReferenceInput`、`McpSessionView` 回合准备）、executor 剩余新端口、子代理冷恢复/compact 策略。
 - lifecycle hooks 上下文、`createConfigWithPluginMigrations`、`pluginDiscoveryUi` 增量公告、批量删除预检、活动摘要、`readReplyLanguage`。
-- `--total-tokens-reminder`、`--agent-always-background` CLI 开关、cmd-readonly 策略、plugin host 进程名。
+- Runtime prefs 的 `totalTokensReminderEnabled`/`agentAlwaysBackgroundEnabled` 回包与 Desktop/Web 设置页；plugin host 进程名。
 - marketplace `regions`/商店 UI；官方插件清单重生成。
 
 待完成（阶段 3 未完成）：

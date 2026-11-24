@@ -60,6 +60,7 @@ export function createTuiSubmitPrompt(
   browserState?: GlobalOptions["browserState"],
   workflowMode: DynamicWorkflowMode = DEFAULT_CLI_WORKFLOW_MODE,
   agentAlwaysBackground = false,
+  totalTokensReminder = false,
 ): TuiPromptHandler {
   let app: Awaited<ReturnType<NonNullable<RunDependencies["createKayingCodeApp"]>>> | undefined;
   let activeUiLocale = uiLocale;
@@ -168,6 +169,7 @@ export function createTuiSubmitPrompt(
           ...(modeState.override ? { mode: modeState.override } : {}),
           ...(toolDisallowlist ? { toolDisallowlist } : {}),
           toolSearch: { mode: toolsearchMode },
+          totalTokensReminder: { enabled: totalTokensReminder },
           ...(forceMcs ? { midConversationSystem: { mode: "force" as const } } : {}),
           // 首个 app 与 /new、/resume、fork 都经这里创建，mode 因此在进程内一致。
           ...resolveWorkflowModeRuntimeConfig(workflowMode),

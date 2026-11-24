@@ -67,7 +67,14 @@ function createRuntime(
   });
   return createTestAgentRuntime(
     sessionId,
-    { mode: "yolo", compact: { enabled: false }, titleGeneration: { enabled: false }, ...config },
+    {
+      mode: "yolo",
+      compact: { enabled: false },
+      titleGeneration: { enabled: false },
+      // 本文件覆盖额度行的收集顺序与 compaction 行为，显式开启 4.0 的提醒开关。
+      totalTokensReminder: { enabled: true },
+      ...config,
+    },
     {
       eventStore: createTestSessionEventStore(),
       sessionStore: store as never,
