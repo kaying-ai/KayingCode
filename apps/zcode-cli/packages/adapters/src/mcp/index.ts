@@ -34,6 +34,7 @@ import type {
   McpResourceSubscriptionRequest,
   McpServerConfig,
   McpServerStatus,
+  McpServerToolSnapshot,
   McpToolCallResult,
   McpToolDescriptor,
   OfficialMcpAuthFailureReason,
@@ -185,6 +186,8 @@ interface McpServerRecord {
   config: McpServerConfig;
   status: McpServerStatus;
   tools: McpToolDescriptor[];
+  /** 成功拿到 tools/list 后递增；缺失表示尚未拿到过列表（与空列表区分）。 */
+  toolsVersion?: string;
   /** 收到 tools/list_changed 后置位，下一次 listTools 重拉。 */
   toolsStale?: boolean;
   transport?: McpTransport;
@@ -310,6 +313,7 @@ class NodeMcpAdapter implements McpPort {
   private readonly resourceSubscriptions = new McpResourceSubscriptionRegistry();
   /** tools/list_changed 累计次数，runtime 按此判断是否需要重注册。 */
   private toolListRevisionCounter = 0;
+  private toolsVersionCounter = 0;
   /** 每个 server 当前正在执行的工具调用 trace；elicitation 借此归属到会话 / 工具行。 */
   private readonly activeCallTraces = new Map<string, McpElicitationTrace>();
 
@@ -529,6 +533,25 @@ class NodeMcpAdapter implements McpPort {
     return this.toolListRevisionCounter;
   }
 
+  private nextToolsVersion(): string {
+    this.toolsVersionCounter += 1;
+    return `${Date.now().toString(36)}-${this.toolsVersionCounter}`;
+  }
+
+  /** 只读内存快照；不等待连接、不触发 tools/list。 */
+  getToolSnapshot(): Record<string, McpServerToolSnapshot> {
+    const result: Record<string, McpServerToolSnapshot> = {};
+    for (const [name, record] of this.records) {
+      result[name] = {
+        status: record.status,
+        ...(record.toolsVersion
+          ? { tools: record.tools, toolsVersion: record.toolsVersion }
+          : {}),
+      };
+    }
+    return result;
+  }
+
   async listTools(): Promise<McpToolDescriptor[]> {
     // 收到 notifications/tools/list_changed 的 server 在下一次 listTools 时重新拉取
     // （runtime 只在回合开始前调用，回合内工具表不变）。
@@ -546,6 +569,7 @@ class NodeMcpAdapter implements McpPort {
           ),
         );
         record.status = { ...record.status, toolCount: record.tools.length };
+        record.toolsVersion = this.nextToolsVersion();
         record.toolsStale = false;
         this.logger?.info("MCP tool list refreshed after list_changed", {
           event: "mcp.tools.refreshed",
@@ -1381,6 +1405,7 @@ class NodeMcpAdapter implements McpPort {
       }),
       // 运行期工具已经向 core 广告；恢复期间保留 descriptor，避免设置页/借用端口误判工具消失。
       tools: input.record.tools,
+      ...(input.record.toolsVersion ? { toolsVersion: input.record.toolsVersion } : {}),
     };
     this.records.set(input.name, recoveryRecord);
     const connecting = this.runToolCallAuthorizationRecovery({
@@ -1646,6 +1671,7 @@ class NodeMcpAdapter implements McpPort {
         config,
         status,
         tools,
+        toolsVersion: this.nextToolsVersion(),
         transport,
       });
       // A3：重连（同一 adapter 实例）后按登记表重放订阅；首次连接登记表为空，直接跳过。

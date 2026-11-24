@@ -9,6 +9,7 @@ import type {
   McpReadResourceResult,
   McpServerConfig,
   McpServerStatus,
+  McpServerToolSnapshot,
   McpToolCallResult,
   McpToolDescriptor,
 } from "@zcode/contracts";
@@ -585,6 +586,23 @@ export function createMcpConnectionPool(options: McpConnectionPoolOptions): McpC
           revision += entries.get(key)?.adapter.toolListRevision?.() ?? 0;
         }
         return revision;
+      },
+      getToolSnapshot(): Record<string, McpServerToolSnapshot> {
+        const result: Record<string, McpServerToolSnapshot> = {};
+        for (const [serverName, key] of leased) {
+          const entry = entries.get(key);
+          if (!entry) continue;
+          const current = entry.adapter.getToolSnapshot?.()[serverName];
+          if (!current) continue;
+          // 版本号带连接 ID：同名 server 换成新的池化连接后，版本不会与旧连接撞号。
+          result[serverName] = current.toolsVersion
+            ? {
+                ...current,
+                toolsVersion: `${entry.connectionContext.mcpConnectionId}:${current.toolsVersion}`,
+              }
+            : current;
+        }
+        return result;
       },
       async pingServer(serverName: string, pingOptions?: { timeoutMs?: number }): Promise<boolean> {
         const key = leased.get(serverName);

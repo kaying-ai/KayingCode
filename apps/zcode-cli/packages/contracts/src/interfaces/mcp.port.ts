@@ -147,6 +147,19 @@ export interface McpServerStatus {
   };
 }
 
+/**
+ * 单个 server 的内存快照：只读当前连接层状态，不发起网络/进程 I/O。
+ * `tools` / `toolsVersion` 只在该 server 曾经成功拿到 tools/list 时出现；
+ * 空数组表示"已确认没有工具"，与"还没拿到列表"（undefined）严格区分。
+ * 断线后保留最后一次成功列表与版本，展示保留；执行前仍要重新取 live 连接。
+ */
+export interface McpServerToolSnapshot {
+  status: McpServerStatus;
+  tools?: McpToolDescriptor[];
+  /** 不透明版本号；同一 server 列表每次成功替换都会变化。 */
+  toolsVersion?: string;
+}
+
 export interface McpToolAnnotations {
   readOnlyHint?: boolean;
   destructiveHint?: boolean;
@@ -503,6 +516,11 @@ export interface McpPort {
    */
   pingServer?(name: string, options?: { timeoutMs?: number }): Promise<boolean>;
   status(): Promise<Record<string, McpServerStatus>>;
+  /**
+   * 同步读取每个 server 的内存快照（请求准备阶段用，不等待任何 server）。
+   * 只读内存、不发起 I/O：list_changed 标脏的 server 由通知触发后台刷新，本次返回旧列表。
+   */
+  getToolSnapshot?(): Record<string, McpServerToolSnapshot>;
   listTools(): Promise<McpToolDescriptor[]>;
   /**
    * 自端口创建以来收到 `notifications/tools/list_changed` 的累计次数。

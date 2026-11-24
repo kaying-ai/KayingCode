@@ -646,7 +646,18 @@ createConfig
 - 验证：adapters/bootstrap/根 `typecheck`、`pnpm run lint`（0 errors / 133 既有 warnings）、`architecture:check --changed`（0 violations）、`source:check` 通过。
 - 已知基线：`bootstrap/tests/workspace-mcp-trust.test.ts` 仍为 27 通过 / 3 失败（上游测试与产品「workspace MCP 开箱即用」边界冲突，测试文件未修改）。
 
+### 阶段 3 第一批：MCP 工具内存快照（2026-11-24）
+
+- 契约：新增 `McpServerToolSnapshot`（status + 可选 tools/toolsVersion），`McpPort.getToolSnapshot?()` 为可选方法，兼容现有 mock port。
+- 适配器：`NodeMcpAdapter` 在首次 `tools/list` 与 list_changed 刷新成功后生成版本号；快照只读内存、不等待连接、不触发列表。连接恢复期间沿用旧 descriptor 与版本。
+- 连接池：按 leased server 聚合各 adapter 快照，版本号拼上 `mcpConnectionId`，避免同名 server 换代后版本撞号。
+- 测试：新增 `adapters/tests/mcp-tool-snapshot.test.ts`（连接后快照、确认空列表与未列出的区分）。
+- 未完成：core `AgentRuntime` 尚未调用 `getToolSnapshot` / 订阅配置源；阶段 3 的 session reconcile 仍待实现。
+
 待完成（阶段 3 未完成）：
+- core `mcp/runtime`：`McpToolCatalogPort`、`getToolSnapshot` 订阅、`WaitForMcpServers`、pool 租约化与 transport 错误收敛。
+- 打开会话对 `McpConfigurationSource` 的实时 reconcile 与工具目录撤销/重发。
+- marketplace `regions` 与商店 UI 迁移；官方插件清单按上游 definition 重生成。
 
 ## 验证记录
 
