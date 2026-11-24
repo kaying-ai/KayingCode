@@ -95,8 +95,18 @@ export function normalizeSettingsPatch(patch: Partial<AppSettings>): Partial<App
     // 退出/解绑当前 provider family 时需要清空运行域。
     // RPC 传输会吞掉 undefined，这里把空串归一成 undefined，避免旧选择继续影响 registry 过滤。
     const trimmedProviderFamilyDomain = normalizedPatch.providerFamilyDomain.trim();
+    // 入参已由 appSettingsPatchSchema 限定为 zai/bigmodel 或空串；这里只做类型收窄。
     normalizedPatch.providerFamilyDomain =
-      trimmedProviderFamilyDomain.length > 0 ? normalizedPatch.providerFamilyDomain : undefined;
+      trimmedProviderFamilyDomain.length > 0
+        ? (trimmedProviderFamilyDomain as NonNullable<AppSettings["providerFamilyDomain"]>)
+        : undefined;
+  }
+
+  if ("replyLanguage" in normalizedPatch && typeof normalizedPatch.replyLanguage === "string") {
+    // 清空输入表示删除用户覆盖，Agent 恢复跟随对话语言；空串不能落盘成非法设置。
+    const trimmedReplyLanguage = normalizedPatch.replyLanguage.trim();
+    normalizedPatch.replyLanguage =
+      trimmedReplyLanguage.length > 0 ? trimmedReplyLanguage : undefined;
   }
 
   return normalizedPatch;

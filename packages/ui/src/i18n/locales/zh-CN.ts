@@ -1979,6 +1979,10 @@ const zhCN: Record<string, string> = {
   "settings.systemDescription": "这些设置会影响当前窗口的显示与交互。",
   "settings.locale": "界面语言",
   "settings.localeDescription": "选择应用 UI 的显示语言。",
+  "settings.replyLanguage": "回复语言",
+  "settings.replyLanguageDescription": "Agent 用这个语言回复。留空时跟随对话语言。",
+  "settings.replyLanguagePlaceholder": "例如：简体中文、English、日本語",
+  "settings.replyLanguageSavedHint": "回复语言已保存",
   "settings.terminalProfile": "继承系统终端 Profile",
   "settings.terminalProfileDescription":
     "启动内置终端时尽量继承登录 shell 环境、代理、Kube 变量和本机终端字体。",

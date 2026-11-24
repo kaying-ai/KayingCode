@@ -285,6 +285,8 @@ export interface AppSettings {
   shortcutBindings?: Record<string, string[]>;
   /** 界面语言偏好；locale 保存偏好解析后的实际语言，供 main/menu/远控等非浏览器上下文使用。 */
   localePreference?: LocalePreference;
+  /** Agent 回复语言；留空跟随对话语言。写入后由 Main 推送给 Host，CLI 每轮读取。 */
+  replyLanguage?: string;
   /** 是否尽量继承系统终端 profile、shell 环境和字体 */
   terminalInheritSystemProfile?: boolean;
   /** 用户显式覆盖的终端字体；为空时从系统终端配置自动探测 */

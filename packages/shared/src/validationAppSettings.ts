@@ -542,6 +542,7 @@ const appSettingsObjectSchema = z.object({
   // 快捷键用户覆盖（语义校验在 ui/src/shortcuts 生效表阶段容错，schema 只管形状）
   shortcutBindings: z.record(z.string(), z.array(z.string())).optional(),
   localePreference: localePreferenceSchema.default("system"),
+  replyLanguage: replyLanguageSchema.optional(),
   terminalInheritSystemProfile: z.boolean().default(true),
   terminalFontFamily: nonEmptyStringSchema.optional(),
   integratedTerminalShell: integratedTerminalShellSelectionSchema.optional(),
@@ -644,6 +645,8 @@ export const appSettingsPatchSchema = z.object({
   locale: localeSchema.optional(),
   shortcutBindings: z.record(z.string(), z.array(z.string())).optional(),
   localePreference: localePreferenceSchema.optional(),
+  // 空串是「清除回复语言、跟随时对话语言」的哨兵；normalizeSettingsPatch 归一成删除。
+  replyLanguage: z.union([replyLanguageSchema, z.literal("")]).optional(),
   terminalInheritSystemProfile: z.boolean().optional(),
   terminalFontFamily: nonEmptyStringSchema.optional(),
   integratedTerminalShell: integratedTerminalShellSelectionSchema.optional(),

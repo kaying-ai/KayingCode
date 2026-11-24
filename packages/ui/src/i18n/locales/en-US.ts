@@ -2086,6 +2086,11 @@ const enUS: Record<string, string> = {
   "settings.systemDescription": "These preferences affect the current window experience.",
   "settings.locale": "Language",
   "settings.localeDescription": "Choose the display language used by the application UI.",
+  "settings.replyLanguage": "Reply language",
+  "settings.replyLanguageDescription":
+    "The Agent replies in this language. Leave empty to follow the conversation language.",
+  "settings.replyLanguagePlaceholder": "For example: English, 简体中文, 日本語",
+  "settings.replyLanguageSavedHint": "Reply language saved",
   "settings.terminalProfile": "Inherit system terminal profile",
   "settings.terminalProfileDescription":
     "When launching the built-in terminal, inherit login shell environment, proxy, Kubernetes variables, and local terminal font when possible.",

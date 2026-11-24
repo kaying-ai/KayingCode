@@ -67,6 +67,7 @@ export function GeneralSectionContent({
   httpProxy = "",
   httpProxyNoProxy = "",
   httpProxyCaCertPath = "",
+  replyLanguage = "",
   defaultHomeDir,
   isDesktop,
   isWindowsDesktop,
@@ -94,6 +95,7 @@ export function GeneralSectionContent({
   onHttpProxyChange = async () => {},
   onHttpProxyNoProxyChange = async () => {},
   onHttpProxyCaCertPathChange = async () => {},
+  onReplyLanguageChange = async () => {},
   onTaskAutoArchiveEnabledChange,
   onTaskAutoArchiveOlderThanDaysChange,
   onCloseToTrayOnWindowsChange,
@@ -131,6 +133,7 @@ export function GeneralSectionContent({
   httpProxy?: string;
   httpProxyNoProxy?: string;
   httpProxyCaCertPath?: string;
+  replyLanguage?: string;
   defaultHomeDir: string;
   isDesktop?: boolean;
   isWindowsDesktop?: boolean;
@@ -159,6 +162,7 @@ export function GeneralSectionContent({
   onHttpProxyChange?: (httpProxy: string) => Promise<void>;
   onHttpProxyNoProxyChange?: (noProxy: string) => Promise<void>;
   onHttpProxyCaCertPathChange?: (caCertPath: string) => Promise<void>;
+  onReplyLanguageChange?: (language: string) => Promise<void>;
   onTaskAutoArchiveEnabledChange: (enabled: boolean) => Promise<void>;
   onTaskAutoArchiveOlderThanDaysChange: (days: number) => Promise<void>;
   onCloseToTrayOnWindowsChange: (enabled: boolean) => Promise<void>;
@@ -281,6 +285,19 @@ export function GeneralSectionContent({
     await onHttpProxyCaCertPathChange(normalizedHttpProxyCaCertPath);
   }, [normalizedHttpProxyCaCertPath, onHttpProxyCaCertPathChange]);
 
+  const [localReplyLanguage, setLocalReplyLanguage] = useState(replyLanguage);
+
+  useEffect(() => {
+    setLocalReplyLanguage(replyLanguage);
+  }, [replyLanguage]);
+
+  const normalizedReplyLanguage = localReplyLanguage.trim();
+  const isReplyLanguageDirty = normalizedReplyLanguage !== replyLanguage.trim();
+
+  const handleReplyLanguageSave = useCallback(async () => {
+    await onReplyLanguageChange(normalizedReplyLanguage);
+  }, [normalizedReplyLanguage, onReplyLanguageChange]);
+
   return (
     <div className="space-y-4">
       <SettingsGroupCard>
@@ -320,6 +337,36 @@ export function GeneralSectionContent({
                 </SelectItem>
               </SelectContent>
             </Select>
+          }
+        />
+        <SettingsRow
+          label={intl.formatMessage({ id: "settings.replyLanguage" })}
+          description={intl.formatMessage({ id: "settings.replyLanguageDescription" })}
+          control={
+            <Button
+              type="button"
+              size="lg"
+              disabled={!isReplyLanguageDirty}
+              onClick={() => void handleReplyLanguageSave()}
+            >
+              {intl.formatMessage({ id: "settings.dataBaseDirSave" })}
+            </Button>
+          }
+          detail={
+            <Input
+              size="lg"
+              value={localReplyLanguage}
+              placeholder={intl.formatMessage({ id: "settings.replyLanguagePlaceholder" })}
+              onChange={(event) => {
+                setLocalReplyLanguage(event.currentTarget.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && isReplyLanguageDirty) {
+                  void handleReplyLanguageSave();
+                }
+              }}
+              className="max-w-[520px]"
+            />
           }
         />
       </SettingsGroupCard>

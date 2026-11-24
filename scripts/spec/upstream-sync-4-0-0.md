@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试）；阶段 4 进行中（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption、项目 Token 传输错误 -32033、`--total-tokens-reminder`、`session/readReplyLanguage` 协议与 core 公告已落地；turn/loop 请求构建、Desktop 回复语言设置待做）；阶段 5 已开始游戏插件兼容验收，非游戏上游能力待补齐。
+状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试）；阶段 4 进行中（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption、项目 Token 传输错误 -32033、`--total-tokens-reminder`、回复语言协议/core/Desktop 设置已落地；turn/loop 请求构建待做）；阶段 5 已开始游戏插件兼容验收，非游戏上游能力待补齐。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -708,14 +708,15 @@ createConfig
 - 协议：新增 `session/readReplyLanguage` 方法、`kayingcodeSessionReadReplyLanguageParamsSchema` 与 result schema（`language: replyLanguageSchema.nullable()`），超时 2s；`replyLanguageSchema` 复用 `validationAppSettings`（trim、1–256 字符）。
 - Core：`AgentRuntimeDeps.readReplyLanguage` 只给主线程注入；输入附件收集时与当前环境并行读取，值变化才追加 `language` 公告，`null` 在已有公告后发一次清除公告，读取失败只记 debug 并跳过本次（不当作清除）。`language` 进入 persisting system reminder source，compaction 后按最近一次公告重述，最近一次是清除公告时不重述。语言正文对 `& < >`、控制字符与 U+2028/2029 转义，避免破坏 `<system-reminder>`。
 - Bootstrap：`KayingCodeAppOptions.readReplyLanguage` 贯穿主 runtime 与嵌套 app；`createWorkspaceKayingCodeApp` 缺省创建反向 RPC reader，Host 未实现该方法时按读取失败处理，本轮不影响既有会话。
-- Host/services：`CreateKayingCodeAgentServiceOptions.resolveReplyLanguage` 同步只读应答；未注入的远端/Web Host 回答 `null`。Desktop Main 的设置存储与 UI 尚未接线，因此当前所有 Host 均返回 `null`，功能保持惰性。
-- 测试：`core/tests/runtime-context-announcements.test.ts` 新增 6 例（变更公告/顺序、转义、失败跳过、清除一次、子代理不读、compact 重述）。
-- 验证：core/bootstrap/根 typecheck、core 定向测试 53 例通过。
+- Host/services：`CreateKayingCodeAgentServiceOptions.resolveReplyLanguage` 同步只读应答；`createLocalServices` 透传到 Agent service。
+- Desktop：`AppSettings.replyLanguage`（空串哨兵，`normalizeSettingsPatch` 归一成删除）；Main 在 bootstrap 读入内存，设置 patch 后向所有窗口 Host 推送 `reply-language-changed`，InitLocal 携带初值；Host 同步持有并注入 `resolveReplyLanguage`；设置页“界面语言”卡片新增回复语言输入（保存/清空、Enter 提交，en-US/zh-CN 文案）。
+- 测试：`core/tests/runtime-context-announcements.test.ts` 新增 6 例（变更公告/顺序、转义、失败跳过、清除一次、子代理不读、compact 重述）；`services/test/normalizeSettingsPatch.test.ts` 覆盖空串删除与 trim。
+- 验证：core/bootstrap/根 typecheck、core 定向测试 53 例、services 定向测试、lint（0 errors）、architecture/source 检查通过。
 
 待完成（阶段 4 未完成，更新）：
 - turn/loop 状态与请求构建（`normalInputPreparationPending`、`pluginReferenceInput`、`McpSessionView` 回合准备、执行期 `resolveLiveDescriptor`）、executor 剩余新端口、子代理冷恢复/compact 策略。
 - lifecycle hooks 上下文、`createConfigWithPluginMigrations`、`pluginDiscoveryUi` 增量公告、批量删除预检、活动摘要。
-- 回复语言 Desktop：AppSettings `replyLanguage`、Main 持有/推送 `reply-language-changed`、Host 注入与设置页；Runtime prefs 的 `totalTokensReminderEnabled`/`agentAlwaysBackgroundEnabled` 回包与设置页；plugin host 进程名。
+- Runtime prefs 的 `totalTokensReminderEnabled`/`agentAlwaysBackgroundEnabled` 回包与设置页；plugin host 进程名；回复语言设置仅 Desktop 本机 Host 生效，远端/Web Host 仍回答 null。
 - marketplace `regions`/商店 UI；官方插件清单重生成。
 
 待完成（阶段 3 未完成）：

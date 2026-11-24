@@ -356,6 +356,8 @@ const linuxDesktopIntegrationIconPath =
       : join(import.meta.dirname, "../../build/icons/512x512.png")
     : iconPath;
 let currentApplicationLocale: Locale = DEFAULT_LOCALE;
+/** Host 级 Agent 回复语言；null 为未设置。只由设置 patch 更新并同步到所有窗口 Host。 */
+let currentReplyLanguage: string | null = null;
 let closeToTrayOnWindows = true;
 // CR-01：托盘实例创建结果（模块级，关窗分支读取）。DBus 能力探测通过不等于 Electron
 // Tray 创建成功；隐藏窗口前必须确认最终用户入口真实存在，否则隐藏即失联。
@@ -1254,6 +1256,17 @@ function syncImmediateAppSettings(patch: ReturnType<typeof appSettingsPatchSchem
       logger.warn("[settings] suspend web remote control after relay origin change failed", error);
     });
   }
+
+  if ("replyLanguage" in patch) {
+    // 落盘已完成；Host 只持内存值，变更消息与 InitLocal 同端口按序到达。
+    currentReplyLanguage = patch.replyLanguage ?? null;
+    for (const child of windowHostProcessMap.values()) {
+      child.postMessage({
+        type: HostMessageTypes.ReplyLanguageChanged,
+        replyLanguage: currentReplyLanguage,
+      });
+    }
+  }
 }
 
 async function getAutoUpdatePreferences() {
@@ -2119,6 +2132,7 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
     initialDesktopZoomLevel: currentDesktopZoomLevel,
     initialWindowSize: currentDesktopWindowSize,
     currentApplicationLocale: () => currentApplicationLocale,
+    currentReplyLanguage: () => currentReplyLanguage,
     resolveBrowserViewOwner: (webContentsId) =>
       browserGuestManager.getTabOwnerByWebContentsId(webContentsId) ?? undefined,
     persistWindowSize: async (state) => {
@@ -2234,6 +2248,7 @@ app.whenReady().then(async () => {
       loadedBootstrapLocale = true;
       currentApplicationLocale = bootstrapSettings.locale;
     }
+    currentReplyLanguage = bootstrapSettings.replyLanguage?.trim() || null;
     // Linux 默认值归位迁移（spec：docs/desktop/linux-close-to-tray.md）：shared 迁移无平台
     // 概念、曾把存量 Linux 用户归为 true，但 Linux 此前无设置入口，存量 true 非用户显式
     // 选择；首次启动强制归位为默认关并落标记，之后尊重用户选择。

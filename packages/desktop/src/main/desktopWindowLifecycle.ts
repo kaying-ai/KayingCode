@@ -62,6 +62,8 @@ export function createWindow(options: {
   initialDesktopZoomLevel?: number;
   initialWindowSize?: DesktopWindowSize;
   currentApplicationLocale?: () => Locale;
+  /** spawn 时刻 Main 持有的 Agent 回复语言；后续变化由 reply-language-changed 推送。 */
+  currentReplyLanguage?: () => string | null;
   persistWindowSize?: (state: DesktopWindowSize) => Promise<void>;
   /** Main 模块初始化期已开始的异步环境采集；通常在 renderer dom-ready 前完成。 */
   runtimeProcessEnvPatchPromise?: Promise<Record<string, string>>;
@@ -217,6 +219,10 @@ export function createWindow(options: {
         remoteAssets: options.remoteAssets,
         // Host 的 X-Client-Language 以 Main 的实时界面语言为准；与后续变更消息同端口按序到达。
         ...(options.currentApplicationLocale ? { locale: options.currentApplicationLocale() } : {}),
+        // 回复语言与 InitLocal 同端口按序到达；变更后由 reply-language-changed 覆盖。
+        ...(options.currentReplyLanguage
+          ? { replyLanguage: options.currentReplyLanguage() }
+          : {}),
       });
       options.windowHostProcessMap.set(wcId, child);
       options.onHostProcessReady?.(wcId);

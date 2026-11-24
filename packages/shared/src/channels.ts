@@ -653,6 +653,8 @@ export const HostMessageTypes = {
   NetworkCapture: "network-capture",
   /** main → host：Main 的实时界面语言变化（Host 用于 ZCode endpoint 的 X-Client-Language） */
   ApplicationLocaleChanged: "application-locale-changed",
+  /** main → host：Agent 回复语言变化（Host 内存持有，应答 CLI 的 session/readReplyLanguage） */
+  ReplyLanguageChanged: "reply-language-changed",
 } as const;
 
 /** host process → main process 的反馈消息类型 */

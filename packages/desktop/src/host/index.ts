@@ -1920,6 +1920,8 @@ console.error = (...args: unknown[]) => {
 let databaseStartup: ReturnType<typeof createHostDatabaseStartup> | undefined;
 const pendingStartupAttachments = new Map<string, () => void>();
 let activeServices: ServiceCollection | null = null;
+/** Agent 回复语言（null 为未设置），应答 CLI 的 session/readReplyLanguage；由 Main 推送。 */
+let replyLanguage: string | null = null;
 let activeHostApiNetworkTransport: HostApiNetworkTransport | null = null;
 /** 桌面本机 Host 的扩展门面；只在本机 Host 注册，不进远程合同与手机白名单。 */
 let windowHostExtensions: WindowHostExtensions | null = null;
@@ -3163,6 +3165,14 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
   }
 
   const msg = result.data;
+  // InitLocal 与变更消息同端口按序到达：先同步赋值，初值不会覆盖较新的变更。
+  if (msg.type === HostMessageTypes.InitLocal) {
+    replyLanguage = msg.replyLanguage ?? null;
+  }
+  if (msg.type === HostMessageTypes.ReplyLanguageChanged) {
+    replyLanguage = msg.replyLanguage;
+    return;
+  }
   const port = e.ports[0];
   // 私有凭据回复先结束等待；其余消息继续走原 port 守卫。
   if (msg.type === HostMessageTypes.CredentialCipherResult) {
@@ -3927,6 +3937,7 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
               prepareLegacyAccountConnections,
               hostApiNetworkTransport,
               authorizeLocalMediaPreviewPath,
+              resolveReplyLanguage: () => replyLanguage,
               runtimeProcessEnvPatch: msg.runtimeProcessEnvPatch,
               agentRuntimeContext: {
                 getDeviceMid: () => msg.deviceMid,

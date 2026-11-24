@@ -420,6 +420,7 @@ export function SettingsPage({
   const [httpProxy, setHttpProxy] = useState("");
   const [httpProxyNoProxy, setHttpProxyNoProxy] = useState("");
   const [httpProxyCaCertPath, setHttpProxyCaCertPath] = useState("");
+  const [replyLanguage, setReplyLanguage] = useState("");
   const [embeddedBrowserAllowInsecureCertificates, setEmbeddedBrowserAllowInsecureCertificates] =
     useState(false);
   const [taskAutoArchiveEnabled, setTaskAutoArchiveEnabled] = useState(false);
@@ -480,6 +481,7 @@ export function SettingsPage({
         setHttpProxy(settings.httpProxy ?? "");
         setHttpProxyNoProxy(settings.httpProxyNoProxy ?? "");
         setHttpProxyCaCertPath(settings.httpProxyCaCertPath ?? "");
+        setReplyLanguage(settings.replyLanguage ?? "");
         setEmbeddedBrowserAllowInsecureCertificates(
           settings.embeddedBrowserAllowInsecureCertificates ?? false,
         );
@@ -668,6 +670,25 @@ export function SettingsPage({
       });
       setHttpProxy(normalizedProxy);
       toast(intl.formatMessage({ id: "settings.httpProxySavedHint" }));
+    },
+    [services.settingService, intl],
+  );
+  const handleReplyLanguageChange = useCallback(
+    async (language: string) => {
+      const normalized = language.trim();
+      await runSettingsActionAsync({
+        featureId: "settings.locale",
+        action: "save_reply_language",
+        trigger: "button",
+        operation: () =>
+          services.settingService.update({
+            // 空串表示清除回复语言；服务层归一成删除，Agent 回到跟随对话语言。
+            replyLanguage: normalized,
+          }),
+        completed: { resultSource: "setting_service", configured: normalized.length > 0 },
+      });
+      setReplyLanguage(normalized);
+      toast(intl.formatMessage({ id: "settings.replyLanguageSavedHint" }));
     },
     [services.settingService, intl],
   );
@@ -1418,6 +1439,7 @@ export function SettingsPage({
                             httpProxy={httpProxy}
                             httpProxyNoProxy={httpProxyNoProxy}
                             httpProxyCaCertPath={httpProxyCaCertPath}
+                            replyLanguage={replyLanguage}
                             defaultHomeDir={defaultHomeDir}
                             showIntegratedTerminalShell={hostPlatform === "win32"}
                             setLocalePreference={handleFooterLocaleChange}
@@ -1494,6 +1516,7 @@ export function SettingsPage({
                             onHttpProxyChange={handleHttpProxyChange}
                             onHttpProxyNoProxyChange={handleHttpProxyNoProxyChange}
                             onHttpProxyCaCertPathChange={handleHttpProxyCaCertPathChange}
+                            onReplyLanguageChange={handleReplyLanguageChange}
                             onTaskAutoArchiveEnabledChange={handleTaskAutoArchiveEnabledChange}
                             onTaskAutoArchiveOlderThanDaysChange={
                               handleTaskAutoArchiveOlderThanDaysChange
