@@ -31,6 +31,8 @@ Options:
   --browser-use <mode> Enable Browser Use backend (supported: headless)
   --surface <surface>  Presentation surface for headless prompts/app-server: terminal or desktop
   --browser-executable <path> Chrome/Chromium executable for headless Browser Use
+  --browser-state <path> Playwright storage state injected into headless Browser Use sessions
+  --no-browser-state Skip the default browser state file (~/.kayingcode/cli/browser-state.json)
   --attach <path>  Attach a local file to --prompt; repeat for multiple files
   --cwd <path>     Run this command from the given directory
   --disallowed-tools, --disallowedTools <tools...>

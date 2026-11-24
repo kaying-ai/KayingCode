@@ -57,6 +57,7 @@ export function createTuiSubmitPrompt(
   toolsearchMode: ToolSearchMode = "off",
   browserUse?: GlobalOptions["browserUse"],
   browserExecutable?: GlobalOptions["browserExecutable"],
+  browserState?: GlobalOptions["browserState"],
   workflowMode: DynamicWorkflowMode = DEFAULT_CLI_WORKFLOW_MODE,
 ): TuiPromptHandler {
   let app: Awaited<ReturnType<NonNullable<RunDependencies["createKayingCodeApp"]>>> | undefined;
@@ -141,7 +142,10 @@ export function createTuiSubmitPrompt(
       workingDirectory,
     } = await prepareTuiAppRuntime(deps, version, request, processRuntime);
     const providerEndpointRoutingPort = processRuntime.providerEndpointRoutingPort;
-    const browserRuntime = createCliHeadlessBrowserRuntime({ browserExecutable, browserUse }, deps);
+    const browserRuntime = createCliHeadlessBrowserRuntime(
+      { browserExecutable, browserState, browserUse },
+      deps,
+    );
     let createdApp: Awaited<ReturnType<NonNullable<RunDependencies["createKayingCodeApp"]>>>;
     try {
       createdApp = await createAppFactory({

@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-24）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试）；完整 `McpSessionView` 执行准入、marketplace `regions`/商店 UI 与官方清单重生成待后续。
+状态：实施中（2026-11-24）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试）；阶段 4 进行中（存储 0025/0026、ReadTopicResource、browser-state 已落地；turn/loop、InputPreemption、协议 v4 剩余项待做）。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -671,6 +671,21 @@ createConfig
 - Bootstrap：缺省创建进程内 `createInMemoryMcpToolCatalog`，宿主可注入共享目录。
 - 测试：`mcp-tool-catalog.test.ts`、`mcp-server-wait.test.ts`、`mcp-wait-tool-registration.test.ts`、`mcp-configuration-reconcile.test.ts`、`mcp-tool-snapshot.test.ts`。
 - 验证：core/adapters/bootstrap typecheck、根 `typecheck`、`lint`（0 errors / 133 既有 warnings）、`architecture:check --changed`（0 violations）、`source:check` 通过；bootstrap `workspace-mcp-trust` 仍为 27 通过 / 3 既有失败。
+
+### 阶段 4 第一批：存储迁移、ReadTopicResource、browser-state（2026-11-24）
+
+- 存储：补齐 `0025_session_permanent_deletion`（session_purge/session_runtime_presence、删除期触发器，artifacts 使用 `kayingcode-artifact://`）与 `0026_dwf_run_parent_session_index`。
+- Core：新增 `ReadTopicResource` 工具与 `tool/topic-resource` 契约/reader；仅在注入 `topicResourcePort` 时注册，授权从当前会话可信输入意图读取。
+- Browser：恢复 Playwright storage state（`adapters/browser/storage-state.ts`、browser runtime `storageStatePath`），CLI 新增 `--browser-state` / `--no-browser-state`，默认路径为 `~/.kayingcode/cli/browser-state.json`。
+- CLI：修复插件命令对异步 bootstrap API 的缺失 `await`（list/overview/install/disable-all）。
+- 测试：`session-migrations.test.ts`、`browser-storage-state.test.ts`、`topic-resource-tool-registration.test.ts`。
+- 验证：adapters/core/cli/bootstrap/根 typecheck、`lint`、`architecture:check --changed`、`source:check` 通过。
+
+待完成（阶段 4 未完成）：
+- turn/loop 状态与请求构建、executor 新端口、`InputPreemptionControl`、子代理 always-background/同步子代理/冷恢复、compact 策略。
+- lifecycle hooks 上下文、`createConfigWithPluginMigrations`、`pluginDiscoveryUi` 增量公告、批量删除预检、活动摘要、`readReplyLanguage`。
+- `--total-tokens-reminder`、`--agent-always-background`、`cmd-readonly` 策略、plugin host 进程名等剩余上游 CLI 对齐。
+- marketplace `regions`/商店 UI；官方插件清单重生成。
 
 待完成（阶段 3 未完成）：
 - 完整 `McpSessionView` 接入：执行期按 `classifyServer` 做工具准入/撤销、`resolve` 等待与 MCP App 打开语义仍沿用产品现有路径。

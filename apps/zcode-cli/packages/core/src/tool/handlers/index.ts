@@ -63,6 +63,7 @@ import { resolveWorkflowQuestionToolEntry } from "./resolve-workflow-question.js
 import { fillWorkflowHoleToolEntry } from "./fill-workflow-hole.js";
 import { taskOutputToolEntry } from "./task-output.js";
 import { taskStopToolEntry } from "./task-stop.js";
+import { readTopicResourceToolEntry } from "./read-topic-resource.js";
 import { waitForMcpServersToolEntry } from "./wait-for-mcp-servers.js";
 import { readSessionContextToolEntry } from "./read-session-context.js";
 import { amendWorkflowToolEntry } from "./amend-workflow.js";
@@ -117,6 +118,7 @@ export const builtInTools: ToolEntry[] = [
   escalateToolEntry,
   taskOutputToolEntry,
   taskStopToolEntry,
+  readTopicResourceToolEntry,
   waitForMcpServersToolEntry,
   readSessionContextToolEntry,
   // 渠道回复等待插件入口接入；仅注释默认注册，保留完整实现。
@@ -202,6 +204,8 @@ interface RegisterBuiltInToolsOptions {
   includeAutomation?: boolean;
   /** Off-Peak 会话内创建工具面；由 host 的 offPeakToolEnabled flag（灰度/远程门）驱动。 */
   includeOffPeak?: boolean;
+  /** 注入了 topicResourcePort（App 托管会话）才注册 ReadTopicResource；机器人授权在调用时校验。 */
+  includeTopicResource?: boolean;
   /**
    * 动态工作流灰度门。**只有显式 false
    * 才下架** DYNAMIC_WORKFLOW_TOOL_NAMES：缺席代表调用方不参与灰度（TUI、headless、
@@ -269,6 +273,12 @@ export function registerBuiltInTools(
     if (
       entry.metadata.name === WAIT_FOR_MCP_SERVERS_TOOL_NAME &&
       options.includeWaitForMcpServers !== true
+    ) {
+      continue;
+    }
+    if (
+      entry.metadata.name === readTopicResourceToolEntry.metadata.name &&
+      options.includeTopicResource !== true
     ) {
       continue;
     }

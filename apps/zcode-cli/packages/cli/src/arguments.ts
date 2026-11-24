@@ -27,6 +27,12 @@ export const parseGlobalArgs = (argv: string[]) =>
       "browser-executable": {
         type: "string",
       },
+      "browser-state": {
+        type: "string",
+      },
+      "no-browser-state": {
+        type: "boolean",
+      },
       prompt: {
         short: "p",
         type: "string",

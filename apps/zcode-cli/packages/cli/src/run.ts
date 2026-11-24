@@ -28,6 +28,10 @@ import { isDwfChildInvocation, runDwfChildCommand } from "./dwf-child-command.js
 import { runPrompt } from "./prompt-command.js";
 import { runPluginsCommand, type PluginsCommandFlags } from "./plugins-command.js";
 import { runLoginCommand, runLogoutCommand } from "./login-command.js";
+import {
+  resolveBrowserStateSelection,
+  validateBrowserStateFlags,
+} from "./browser-state-option.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
 import {
@@ -415,6 +419,17 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     ctx.stderr.write(`${BROWSER_EXECUTABLE_REQUIRES_HEADLESS_ERROR}\n`);
     return 1;
   }
+  const browserStateExplicitPath = parsed.values["browser-state"] as string | undefined;
+  const browserStateDisabled = parsed.values["no-browser-state"] === true;
+  const browserStateFlagError = validateBrowserStateFlags({
+    browserUse,
+    explicitPath: browserStateExplicitPath,
+    disabled: browserStateDisabled,
+  });
+  if (browserStateFlagError) {
+    ctx.stderr.write(`${browserStateFlagError}\n`);
+    return 1;
+  }
 
   const resumeRequest: CliResumeRequest = {
     continueSession: parsed.values.continue === true,
@@ -562,6 +577,30 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       return dotenvResult;
     },
   };
+
+  if (browserUse === "headless") {
+    const browserState = await resolveBrowserStateSelection({
+      explicitPath: browserStateExplicitPath,
+      disabled: browserStateDisabled,
+      launchCwd: commandDeps.cwd ? commandDeps.cwd() : process.cwd(),
+      env,
+      platform: process.platform,
+    });
+    if (!browserState.ok) {
+      ctx.stderr.write(`${browserState.error}\n`);
+      return 1;
+    }
+    for (const notice of browserState.notices) ctx.stderr.write(`${notice}\n`);
+    if (browserState.selection) {
+      options.browserState = browserState.selection;
+    }
+    if (browserState.logFields) {
+      commandDeps.logger?.debug?.("Browser state resolved", {
+        ...browserState.logFields,
+        event: "cli.browser_state.resolved",
+      });
+    }
+  }
 
   if (typeof parsed.values.prompt === "string") {
     return await runPrompt(

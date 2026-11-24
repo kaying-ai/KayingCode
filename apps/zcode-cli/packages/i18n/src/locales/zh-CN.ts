@@ -31,6 +31,8 @@ export const zhCN: KayingCodeCopy = {
   --browser-use <mode> 启用 Browser Use backend（当前支持：headless）
   --surface <surface>  设置无头 prompt/app-server 的呈现面：terminal 或 desktop
   --browser-executable <path> headless Browser Use 使用的 Chrome/Chromium 路径
+  --browser-state <path> 注入 headless Browser Use 会话的 Playwright 登录态文件
+  --no-browser-state 不加载默认登录态文件（~/.kayingcode/cli/browser-state.json）
   --attach <path>  给 --prompt 附加本地文件；可重复传入
   --cwd <path>     从指定目录运行命令
   --disallowed-tools, --disallowedTools <tools...>

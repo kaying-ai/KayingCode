@@ -83,6 +83,7 @@ function registerRuntimeBuiltInTools(runtime: AgentRuntimeInternal, deps: AgentR
     // node_repl/browser-use 由 KayingCode 官方 browser-use 插件启停推导出的 runtimeFeatures 控制。
     includeNodeRepl: nodeReplEnabled,
     includeWaitForMcpServers: Boolean(deps.mcpPort),
+    includeTopicResource: Boolean(deps.topicResourcePort),
     includeBrowserUse: browserUseEnabled,
     embeddedSearchEnabled: resolveRuntimeEmbeddedSearchEnabled(runtime),
     allowedTools: resolveBuiltInToolAllowlist(runtime.config),
