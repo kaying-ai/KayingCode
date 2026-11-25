@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import {
   addMarketplace,
   comparePluginUpdate,
@@ -143,8 +143,12 @@ test("updateMarketplace 跳过 builtin://local 虚拟源且不报错", async () 
       ],
     });
     const refreshed = await updateMarketplace({ storageRoot });
-    assert.equal(refreshed.length, 1);
-    assert.equal(refreshed[0]?.lastRefreshFailure, undefined);
+    // ensureDefaultPluginMarketplaces 会补齐其它默认市场（claude-plugins-official），
+    // 所以这里断言 builtin 记录仍是唯一一条、且不因 builtin://local 产生刷新失败。
+    const builtin = refreshed.filter((record) => record.id === "kayingcode-plugins-official");
+    assert.equal(builtin.length, 1);
+    assert.equal(builtin[0]?.lastRefreshFailure, undefined);
+    assert.ok(refreshed.every((record) => record.lastRefreshFailure === undefined));
   } finally {
     cleanup();
   }

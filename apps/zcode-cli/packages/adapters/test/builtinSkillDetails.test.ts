@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import { kayingcodePluginStoreListingSchema } from "@zcode/shared";
 import { enumeratePluginComponents } from "../src/plugins/plugin-components.js";
 import { parseEntryStoreListing } from "../src/plugins/marketplace.js";
@@ -19,9 +19,11 @@ test("every shipped skill has matching display metadata and cannot be invented b
           .then(JSON.parse)
           .catch(() => null),
       );
+    // 组件枚举已改为异步 material loader；这里必须 await 后再按 kind 取分组。
     const skills =
-      enumeratePluginComponents(pluginRoot, manifest).find((group) => group.kind === "skill")
-        ?.items ?? [];
+      (await enumeratePluginComponents(pluginRoot, manifest)).find(
+        (group) => group.kind === "skill",
+      )?.items ?? [];
     const listing = parseEntryStoreListing(plugin.listing ?? {});
     const details = listing?.skillDetails ?? [];
     assert.deepEqual(
