@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入）；阶段 4 主链完成（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption、-32033、额度提醒开关、回复语言、runtime prefs、live MCP 工具晚绑定）；阶段 5 游戏插件兼容验收与 CUA 对齐评估已完成，剩余非游戏上游能力待排期。
+状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`，当前 HEAD `f8bbbdab`，已推送远端。阶段 0 完成；阶段 1 基本完成（Desktop 登录 UI/真实端点/staging 待做）；阶段 2 完成；阶段 3 主链完成（剩余 ToolSearch 关闭公告、可选 401 step-up、pool 完整租约）；阶段 4 主链完成（剩余 MCP background/deniedTools/ToolSearch 交付与少数增强）；阶段 5 游戏插件验收与 CUA 对齐评估完成，非游戏上游能力待排期。`UPSTREAM_BASE.json` 仍保持 3.18.2，待阶段 5 验收完整后再更新。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -19,6 +19,81 @@
 - 产品侧自 3.18.2 基线起改动 14,829 个文件（含生成物），其中 1,092 个与上游 4.0.0 改动重叠。
 - 版本与工具链：`4.0.0`，Node `>=24`、pnpm `10.33.2` 与基线一致；无新增/删除 workspace 包。
 - 上游新增 12 个带 `CONTRACT.md` + `contract.ts` + `module.ts` 的受管模块（见“机制变更总览”），并新增 preinstalled-tools 文档工具链与 `packages/desktop/native/windows-preinstalled-entry-shim`。
+
+## 当前实施状态盘点（2026-11-25）
+
+### 分支与提交
+
+- 分支：`feat/upstream-sync-4-0-0`，HEAD `f8bbbdab`，已推送 `origin`，工作区干净。
+- 本轮关键提交（按时间）：
+  - `01cb03b1` 4.0 协议基线/账号机制；`f36df010` 异步插件 + workspace trust + live catalog；`3a4c196e`/`ead9c72a`/`a165d052` MCP 工具快照/reconcile/WaitForMcpServers。
+  - `123d1c65` 存储 0025/0026、ReadTopicResource、browser-state；`19afaa1e` InputPreemption + Agent 后台；`85a330c6` Windows cmd 只读；`2e7ae67c` agent-always-background CLI。
+  - `88719fde` 项目 Token 传输重试 `-32033`；`c64c573e` 额度提醒开关；`13f96c11` 回复语言协议/core；`269d054c` Desktop 回复语言设置。
+  - `73aa5811` 旧测试迁移 vitest；`37f96b90` runtime prefs；`b11290dc` MCP 执行准入。
+  - `bfe6f6f9` MCP 晚到解析/实时 ToolSearch；`b0936de5` 商店 regions；`7f26496f` 测试 helper；`f8bbbdab` 本文档记录。
+- `UPSTREAM_BASE.json` 仍为 3.18.2（`fec97590`）；阶段 5 完整验收前不更新。
+
+### 阶段完成度
+
+| 阶段 | 状态 | 已落地 | 主要缺口 |
+| --- | --- | --- | --- |
+| 0 规划/基线 | 完成 | 差异评估、目标修订、文件边界 | — |
+| 1 账号/OAuth/凭据 | 基本完成 | 上游协议基线、凭据 enc:v2、CLI 登录入口、localrun mock | Desktop 登录 UI、真实端点联调、staging |
+| 2 插件/技能 | 完成 | 异步 material loader、workspace trust、私密选项、Skill 实时目录、MCP 配置源 | marketplace 远端源按产品边界保持关闭 |
+| 3 MCP | 完成 | 工具快照/目录缓存、配置 reconcile、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入 | ToolSearch 关闭时连接公告、可选 401 step-up、pool 完整租约 |
+| 4 CLI 运行时/跨层 | 主链完成 | 存储迁移、ReadTopicResource、browser-state、InputPreemption、cmd 只读、`-32033`、额度提醒、回复语言、runtime prefs、live tool 晚绑定、商店 regions | MCP background/deniedTools、ToolSearch 增量交付、lifecycle hooks、pluginDiscoveryUi、活动摘要/批量删除预检、plugin host 进程名 |
+| 5 游戏/上游补齐 | 部分完成 | 游戏插件 loader 验收、CUA 对齐评估、旧测试 helper 恢复 | 非游戏上游能力、真实游戏 E2E、旧 loader 兼容层清理 |
+
+### 本轮已落地能力（4.0.0）
+
+- 插件：统一 async discovery + material cache + 指纹校验/重试；项目 `plugins.dirs` 只作候选，用户域 trust store 准入，pending 强制停用；私密选项与项目选项隔离；`.zcode-plugin` 优先、`.kayingcode-plugin` 回退。
+- Skill/MCP：Skill 实时目录；MCP 配置源/watch/工具目录快照；McpSessionView 启动/投影/reconcile；执行期 live descriptor、断线重连、配置 key/工具存在性校验；未注册工具晚到解析、不可用诊断、实时 ToolSearch、WaitForMcpServers 锁存。
+- 回合/提醒：`totalTokensReminder` 显式开关；`InputPreemption` 立即发送与前台子代理转后台；Agent `alwaysBackground` 产品默认关闭；回复语言公告/清除/compaction 重述；runtime prefs 两开关贯通 schema/Host/bootstrap/设置页。
+- 存储/工具：0025/0026 迁移、ReadTopicResource、browser storage state、Windows cmd 只读、项目 Token 传输重试 `-32033`。
+- 商店/桌面：listing `regions` 与浏览过滤（locale 推导）；回复语言设置持久化与 Main→Host 推送。
+- 测试：恢复 3 个上游测试 helper；旧 `adapters/test` 迁移 vitest；新增 MCP 晚到解析、live ToolSearch、regions、runtime prefs、reply language、runtime headers 等用例。
+
+### 验证矩阵（2026-11-25 最终）
+
+| 范围 | 命令 | 结果 | 说明 |
+| --- | --- | --- | --- |
+| 根类型 | `pnpm run typecheck` | 通过 | 含 shared/services/ui/desktop/web/mobile/server |
+| CLI 包 | contracts/core build；adapters/bootstrap/cli `typecheck` | 通过 | 顺序按依赖构建 |
+| core | `vitest run` | 474/480 | 6 例既有 Windows `/tmp` 路径/临时目录问题 |
+| adapters | `vitest run` | 242/257，9 skipped | 5 例 live/cold 投影缺口；1 例 Windows 并发 flake |
+| bootstrap | `vitest run` | 137/146 | 9 例 `BrowserGuestManager.getBackendIdentity` 源码缺口 |
+| shared | `test` | 136/136 | — |
+| UI | `test` | 184/184 | 另 1 个 `node:test` 文件未被 vitest 收集 |
+| services | `test`（上一轮） | 94/96 | 2 例 Windows sqlite WAL EBUSY |
+| 治理 | `lint` / `architecture:check --changed` / `source:check` | 0 errors / OK / OK | source 含 plugins/map 校验 |
+
+### 已知失败判定
+
+- core 6 例：`post-compact-file-restore`、`subagent-explore-permission-mode`、`tool-executor-read-deny-probe`，均为 Windows 路径或临时目录名问题，改动前已复现。
+- adapters 5 例 `provider-builtin-tool-rounds`：live 与 cold-resume 的 `message.content`/`blockIndex`/text 块合并形态不一致，属 core message-history/hydrator/compact 投影未同步，不放宽断言。
+- adapters 1 例 `mcp-node-fallback`：Windows 并发临时目录 `EPERM/ECONNRESET` flake。
+- bootstrap 9 例 `browser-control-scope-owner`：产品 `BrowserGuestManager` 无窗口级稳定 `getBackendIdentity`，测试按上游契约保留失败证据。
+- UI 1 个文件无 suite：`imageComposerTarget.node.test.ts` 是 `node:test`，未被 vitest 收集。
+- services 2 例：Windows sqlite WAL `EBUSY` 清理竞态。
+
+### 产品决策登记
+
+- **CUA**：保留 `kaying-computer-use-plugin` native MCP 插件，不恢复上游 in-process broker/PiP/SEA CUA 资产（阶段 5 第二批）。
+- **子代理后台**：产品默认关闭（模型自行选择，默认前台），不采用上游 `true` 缺省。
+- **额度提醒**：产品默认关闭，由 CLI `--total-tokens-reminder` 或 App 设置显式开启。
+- **workspace MCP**：产品边界为开箱即用，project 声明默认 trusted 并自动连接；protocol 逐项审核只在协议装配路径。
+- **商店地区**：暂无登录区域事实源，暂按 locale 推导；接入真实登录区域时只替换 `resolvePluginStoreRegion` 输入。
+- **旧 loader 兼容层**：保留到游戏插件全链路 E2E 通过后再删除。
+
+### 剩余工作与优先级
+
+- **P0（MCP 收尾）**：`mcpStartupPolicy/background`、`mcpServerStatusFacts.deniedTools` 消费方、ToolSearch 关闭时连接中公告与 `runModelTextRequest`、ToolSearch 增量交付 schema。
+- **P0（测试/源码缺口）**：同步 core message-history/hydrator/compact 投影（解锁 5 例）；补 `BrowserGuestManager` 窗口身份与 `getBackendIdentity`；清理 `node:test` 文件收集方式。
+- **P1（阶段 4 增强）**：lifecycle hooks 上下文、`createConfigWithPluginMigrations`、`pluginDiscoveryUi` 增量公告、批量删除预检、活动摘要、plugin host 进程名、回复语言远端/Web Host 支持。
+- **P2（阶段 5）**：preinstalled-tools、managed-worktree、voice-input、selection-comment、composer-edit-mode、settings-search、remote context-composition；真实 Blender/TapTap/Playtest E2E；旧 loader 兼容层清理；更新 `UPSTREAM_BASE.json`。
+- **交付/运维**：PR 与远端 CI、桌面/CLI 真实启动、三平台 E2E、staging/真实端点联调、Desktop 登录 UI。
+
+
 
 ## 结论（先行）
 
@@ -733,7 +808,7 @@ createConfig
    - 未修复（不在测试层）：`tests/provider-builtin-tool-rounds` 的 live/cold `blockIndex` 投影差异、`tests/model-session-features-wire`/`runner-stream-timing-wire` 缺失的 `test-provider-config` helper。
 4. 主 agent：验收清单、跨包签名修复、全量 typecheck/lint/architecture/source 与定向测试后再提交。
 
-（结果与验证数据在子任务完成后补录）
+验收结果见各子项与“当前实施状态盘点”。
 
 验收标准：
 - MCP：未提供 live 解析的工具行为不变；MCP 工具在 server 断线/重连、配置变更后执行期能得到正确准入或可重试错误；turn-loop 新输入的 plugin reference 仍与工具视图一致；WaitForMcpServers 与 catalog-only 不回归。
@@ -807,4 +882,10 @@ createConfig
 
 - 2026-11-24：完成 4.0.0 差异评估与目标修订。基于 `upstream/main a4b44451` 与产品 `main a4efa81d` 的源码 diff、协议/插件/MCP/CLI 四路分析；未执行编译、测试或运行时验证。
 - 2026-11-24：按“游戏场景优先、其余上游优先、账号/API 保留机制 + 网络 mock、现有机制向新架构迁移”的目标重写升级路径；尚未开始实施。
-- 各阶段完成后在此追加实际执行结果、失败项与环境限制。
+- 2026-11-25：完成项目 Token 传输故障重试（`-32033`、`hasValidFallback`、首签重试）与 `totalTokensReminder` 显式开关；新增 shared/adapters/core 定向测试，根 typecheck/lint/architecture/source 通过。
+- 2026-11-25：完成回复语言协议、core 公告、Desktop 持久化/推送/设置页；core 53 例、services 2 例通过，仅做类型与定向测试，未做桌面渲染 E2E。
+- 2026-11-25：第一轮并行（MCP 执行准入、runtime prefs、旧测试迁移）。MCP core 451/457、adapters 215/230；prefs shared/UI/services 定向通过；`adapters/test` 7 文件 14 例全绿。
+- 2026-11-25：第二轮并行（MCP 晚到解析/实时 ToolSearch、商店 regions、测试 helper）。新增 MCP 23 例、regions 11 例；bootstrap 提升到 137/146，adapters 242/257，shared 136/136，UI 184/184。
+- 2026-11-25：完成 CUA 对齐评估，决策保留产品 native 插件（不恢复 broker/PiP/SEA CUA 资产），原因与边界见“阶段 5 第二批”。
+- 2026-11-25：最终验证：根 `pnpm run typecheck`、contracts/core build、adapters/bootstrap/cli typecheck、`lint`（0 errors）、`architecture:check --changed`、`source:check` 通过；测试失败均为既有 Windows 环境/源码缺口，详见“当前实施状态盘点”。
+- 环境限制：未执行 PR/远端 CI、桌面/CLI 真实启动、三平台 E2E、真实端点/staging 联调；`fmt:check` 在 CRLF 检出下对未改动文件也报差异，未作为门禁。
