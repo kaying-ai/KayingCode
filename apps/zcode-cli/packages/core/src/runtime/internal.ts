@@ -25,8 +25,6 @@ import type {
   PdfDocumentPort,
   McpConnectionSnapshot,
   McpConfigurationSource,
-  McpToolCatalogPort,
-  McpToolCatalogPublication,
   SkillLoadOutcome,
   SkillPort,
   McpPort,
@@ -69,6 +67,7 @@ import type { ProjectMemoryExtractionScheduler } from "./helpers/project-memory-
 import type { ProjectMemoryUpdate } from "./helpers/project-memory-dream.js";
 import type { RuntimeTelemetryFacade } from "../telemetry/runtime-telemetry.js";
 import type { WorkspaceHookRuntimeAdmissionPort } from "../hooks/workspace-hook-runtime-admission.js";
+import type { McpSession } from "../mcp/runtime/session.js";
 
 export interface AgentRuntimeInternal
   extends AgentRuntimeCoreMethods, AgentRuntimeTurnMethods, AgentRuntimeHookMethods {
@@ -135,19 +134,19 @@ export interface AgentRuntimeInternal
   contextSourcePort?: ContextSourcePort;
   skillPort?: SkillPort;
   mcpPort?: McpPort;
+  /** 配置订阅、连接收敛与视图投影的唯一所有者。 */
+  mcpSession?: McpSession;
   mcpConfigurationSource?: McpConfigurationSource;
-  mcpToolCatalogPort?: McpToolCatalogPort;
-  mcpCatalogPublication?: McpToolCatalogPublication;
-  mcpConfigurationGeneration: number;
   mcpStartupPromise?: Promise<McpConnectionSnapshot>;
   residencyBlockingWorkCount: number;
   residencyBlockingWork: Set<Promise<unknown>>;
   mcpInitialized: boolean;
+  /** 首输入的 workspace trust admission 只读取一次。 */
+  mcpTrustAdmissionRead: boolean;
   mcpToolsRegistered: boolean;
   /** 初始化 / 上次刷新时注册的 MCP 工具名与集合签名。 */
   registeredMcpToolNames?: string[];
   mcpToolsSignature?: string;
-  mcpToolListRevision?: number;
   subagentPort?: SubagentPort;
   getAgentDefinitions: NonNullable<AgentRuntimeDeps["getAgentDefinitions"]>;
   prepareAgentDefinitions: (input: {

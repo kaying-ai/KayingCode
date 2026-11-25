@@ -87,6 +87,11 @@ export function createMcpSession(options: {
   borrowed?: boolean;
   configuration?: Configuration;
   source?: McpConfigurationSource;
+  /**
+   * runtime 自己持有配置源订阅、再经 reconcileConfiguration 驱动会话时置 false；
+   * 同一配置只有一个订阅者，避免两条 reconcile 写入路径。
+   */
+  subscribeToSource?: boolean;
   catalog?: McpToolCatalogPort;
   connectOptions: McpConnectOptions;
   logger?: Logger;
@@ -180,28 +185,38 @@ export function createMcpSession(options: {
     return startup;
   }
 
+  /** 单一订阅者把最新配置交给 session；generation 与迟到保护仍由 reconcile 内部持有。 */
+  function apply(next: Configuration): Promise<McpConnectionSnapshot> {
+    if (closed) return startup ?? Promise.resolve({ statuses: {}, tools: [] });
+    const previous = configuration.servers ?? {};
+    const changed = Object.keys(previous).filter(
+      (name) =>
+        !next.enabled || mcpConfigKey(previous[name]) !== mcpConfigKey(next.servers?.[name]),
+    );
+    publication?.invalidate?.(changed);
+    configuration = next;
+    return reconcile();
+  }
+
   return {
     get startup() {
       return startup;
     },
+    /** 当前配置周期的目录发布；runtime 用它补 catalog-only 工具，不另建第二份缓存。 */
+    get publication() {
+      return publication;
+    },
     read,
+    reconcileConfiguration: apply,
     start(): Promise<McpConnectionSnapshot> {
       if (startup) return startup;
       if (catalog && port.onSnapshotChanged)
         subscriptions.push(port.onSnapshotChanged(publishCatalog));
-      if (source)
+      if (source && options.subscribeToSource !== false)
         subscriptions.push(
           source.subscribe(() => {
             if (closed) return;
-            const next = source.getSnapshot();
-            const previous = configuration.servers ?? {};
-            const changed = Object.keys(previous).filter(
-              (name) =>
-                !next.enabled || mcpConfigKey(previous[name]) !== mcpConfigKey(next.servers[name]),
-            );
-            publication?.invalidate?.(changed);
-            configuration = next;
-            void reconcile();
+            void apply(source.getSnapshot());
           }),
         );
       return reconcile();

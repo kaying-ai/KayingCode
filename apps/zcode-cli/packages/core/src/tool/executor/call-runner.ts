@@ -62,6 +62,7 @@ import { validateInitialModelToolInput, validateInput, validateOutput } from "./
 import type { ExecutableToolCall } from "../types.js";
 import { resolveEmbeddedSearchBranchCapability } from "../../embedded-search/capability.js";
 import { resolveToolEntryModelContract } from "../model-contract.js";
+import { resolveLiveToolEntry } from "./live-entry-resolution.js";
 
 const UNDISCOVERED_TOOL_SCHEMA_EXPLANATION =
   "\n\nThis tool's schema was not sent to the API — it was not in the discovered-tool set derived from message history. " +
@@ -121,10 +122,9 @@ async function executeToolCallImpl(
   const emptyToolName = isEmptyToolName(toolCall.name);
   const registeredEntry = emptyToolName ? undefined : deps.registry.get(toolCall.name);
   const model = options?.model ?? deps.model;
-  const entry = registeredEntry
-    ? resolveToolEntryModelContract(registeredEntry, {
-        model,
-      })
+  const modelContractContext = { model };
+  let entry = registeredEntry
+    ? resolveToolEntryModelContract(registeredEntry, modelContractContext)
     : undefined;
   const pluginId = entry?.metadata.mcpPresentation?.pluginId;
   const canonicalToolCall =
@@ -222,6 +222,38 @@ async function executeToolCallImpl(
       );
       telemetry?.finishCancelled("abort_signal");
       return result;
+    }
+
+    if (entry.resolveForExecution) {
+      const resolution = await resolveLiveToolEntry(
+        entry.resolveForExecution,
+        canonicalToolCall,
+        options?.signal,
+      );
+      if (resolution.status === "failed") {
+        const result = createErrorResult(canonicalToolCall, resolution.error);
+        await emitToolCallError(
+          deps,
+          canonicalToolCall.id,
+          traceContext,
+          turnId,
+          result.error,
+          undefined,
+          pluginId,
+        );
+        if (resolution.cancelled) {
+          telemetry?.finishCancelled("abort_signal");
+        } else {
+          telemetry?.finishFailed(
+            "lookup",
+            "configuration",
+            resolution.cause ?? result.error,
+          );
+        }
+        return result;
+      }
+      // 切换为 live entry 后必须重新套用本轮模型契约投影，否则会绕过 resolveModelContract。
+      entry = resolveToolEntryModelContract(resolution.entry, modelContractContext);
     }
 
     const preparedInitialInput = prepareInitialToolExecutionInput({

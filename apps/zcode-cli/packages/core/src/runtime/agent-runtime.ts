@@ -10,6 +10,7 @@ import {
 } from "@zcode/shared";
 import type { BackgroundBashOutputResult } from "@zcode/shared";
 import type { ModelRequestSessionFeature } from "@zcode/contracts";
+import { createMcpSession, type McpSession } from "../mcp/runtime/session.js";
 import {
   createDenyPermissionBroker,
   createRootTraceContext,
@@ -51,8 +52,6 @@ import type {
   PdfDocumentPort,
   McpConnectionSnapshot,
   McpConfigurationSource,
-  McpToolCatalogPort,
-  McpToolCatalogPublication,
   SkillLoadOutcome,
   SkillPort,
   McpPort,
@@ -157,6 +156,9 @@ import type { WorkspaceHookRuntimeAdmissionPort } from "../hooks/workspace-hook-
 import { disposeNodeReplSession } from "../tool/handlers/node-repl.js";
 import { cloneModelSelection } from "./model-selection.js";
 
+/** session 启动等待 OAuth 授权的上限；设置页授权入口不受此预算限制。 */
+const MCP_SESSION_OAUTH_WAIT_MS = 15_000;
+
 // oxlint-disable typescript-eslint/no-unsafe-declaration-merging
 export class AgentRuntime {
   controlOffPeakExecution(
@@ -216,11 +218,8 @@ export class AgentRuntime {
   private contextSourcePort?: ContextSourcePort;
   private skillPort?: SkillPort;
   private mcpPort?: McpPort;
+  private mcpSession?: McpSession;
   private mcpConfigurationSource?: McpConfigurationSource;
-  private mcpToolCatalogPort?: McpToolCatalogPort;
-  private mcpCatalogPublication?: McpToolCatalogPublication;
-  private mcpSnapshotUnsubscribe?: () => void;
-  private mcpConfigurationGeneration = 0;
   private mcpConfigUnsubscribe?: () => void;
   private mcpStartupPromise?: Promise<McpConnectionSnapshot>;
   private residencyBlockingWorkCount = 0;
@@ -231,10 +230,10 @@ export class AgentRuntime {
   private retirement?: Promise<void>;
   private readonly workChanged = new Set<() => void>();
   private mcpInitialized = false;
+  private mcpTrustAdmissionRead = false;
   private mcpToolsRegistered = false;
   private registeredMcpToolNames?: string[];
   private mcpToolsSignature?: string;
-  private mcpToolListRevision?: number;
   private subagentPort?: SubagentPort;
   private readonly getAgentDefinitions: GetAgentDefinitions;
   private readonly prepareAgentDefinitions: ReturnType<
@@ -396,20 +395,30 @@ export class AgentRuntime {
       runtime.initializeMessageHistoryFromContext(this.contextBuilder, this.rootTraceContext);
       this.contextInitialized = true;
     }
+    if (deps.mcpPort)
+      this.mcpSession = createMcpSession({
+        port: deps.mcpPort,
+        // 借用端口（子代理）由 config.mcp.servers 缺席自动识别为只读已有连接；这里不设置 borrowed。
+        configuration: this.config.mcp,
+        source: deps.mcpConfigurationSource,
+        // 配置订阅由 runtime 持有并只调用一次 reconcileConfiguration，避免同一变化两条 reconcile 路径。
+        subscribeToSource: false,
+        catalog: runtime.isRemoteWorkspace() ? undefined : deps.mcpToolCatalogPort,
+        connectOptions: {
+          // 会话关闭只取消本会话的 MCP 等待与调用，共享连接仍由 pool 与其余 lease 持有。
+          signal: this.shutdownSignal,
+          oauthAuthorizationTimeoutMs: MCP_SESSION_OAUTH_WAIT_MS,
+          trace: this.rootTraceContext,
+          workingDirectory: this.workingDirectory,
+          workspaceIdentity: this.config.workspaceIdentity?.toString(),
+        },
+        trackStartup: (promise) => runtime.trackResidencyBlockingWork(promise),
+      });
     runtime.startMcpStartup(this.rootTraceContext);
-    this.mcpToolCatalogPort = deps.mcpToolCatalogPort;
-    if (this.mcpToolCatalogPort && this.mcpPort) {
-      this.mcpCatalogPublication = this.mcpToolCatalogPort.prepare({
-        servers: this.config.mcp?.servers ?? {},
-        workingDirectory: this.workingDirectory,
-        workspaceIdentity: this.config.workspaceIdentity?.toString(),
-      });
-      this.mcpSnapshotUnsubscribe = this.mcpPort.onSnapshotChanged?.(() => {
-        this.mcpCatalogPublication?.publish(this.mcpPort?.getToolSnapshot() ?? {});
-      });
-    }
+    // 配置订阅由 runtime 持有并只调用一次 reconcileConfiguration；会话据此收敛连接与目录，
+    // 这个订阅同时让 runtime.config.mcp 跟随同一份配置源，避免读取 config.mcp 的路径看到过期集合。
     this.mcpConfigurationSource = deps.mcpConfigurationSource;
-    if (this.mcpConfigurationSource && this.mcpPort) {
+    if (this.mcpConfigurationSource) {
       this.mcpConfigUnsubscribe = this.mcpConfigurationSource.subscribe(() => {
         if (this.shuttingDown) return;
         void runtime.reconcileMcpConfiguration(this.rootTraceContext).catch((error: unknown) => {
@@ -514,11 +523,10 @@ export class AgentRuntime {
   }
 
   beginShutdown(): void {
-    this.mcpSnapshotUnsubscribe?.();
-    this.mcpSnapshotUnsubscribe = undefined;
     this.mcpConfigUnsubscribe?.();
     this.mcpConfigUnsubscribe = undefined;
-    this.mcpConfigurationGeneration += 1;
+    // session 是配置订阅与 reconcile 的所有者：关闭后不再投影新视图或发布目录。
+    this.mcpSession?.close();
     // ExecutionPort.close() 会把后台 Bash 收口为 cancelled；若允许
     // teardown terminal event 再唤醒模型，并与随后关闭的 session store 竞态。
     this.shuttingDown = true;

@@ -8,6 +8,7 @@ import {
   KAYINGCODE_MCP_ERROR_PRESENTATION_META_KEY,
   type JsonSchema,
   type McpPort,
+  type McpToolDefinition,
   type McpToolDescriptor,
   type ModelToolSideEffectScope,
   type PermissionCapabilityGroup,
@@ -57,6 +58,15 @@ export interface ResolvedMcpTool {
 
 export type McpToolResolution = ResolvedMcpTool | { unavailableReason: string };
 
+/** 执行准入与 handler 共用的不可用文本；不带原因时只报工具名。 */
+function unavailableToolMessage(name: string, reason?: string): string {
+  return `MCP tool is unavailable in the current session: ${name}${reason ? `. ${reason}` : ""}`;
+}
+
+function unavailableToolError(name: string, reason: string): Error {
+  return new Error(unavailableToolMessage(name, reason));
+}
+
 const MCP_TOOL_TIMEOUT_MS = 30_000;
 const OFFICIAL_CUA_PERMISSION_CAPABILITY_GROUP = "official_cua" satisfies PermissionCapabilityGroup;
 const CUA_USER_TITLE_SCHEMA = {
@@ -78,6 +88,11 @@ export interface RegisterMcpToolsOptions {
    * 不投影官方 CUA 规范名，也不挂载 provider 拼写别名。
    */
   officialCuaServerNames?: ReadonlySet<string>;
+  /** advertisement cache 命中时，执行前解析当前 session 的 live descriptor。 */
+  resolveLiveDescriptor?: (
+    descriptor: McpToolDefinition,
+    signal?: AbortSignal,
+  ) => Promise<McpToolResolution | undefined>;
   /**
    * namespaced server 名 → 插件稳定 id，来自 session 冻结的 PluginReferenceCatalog。
    * 只用于 display.ui 的归属投影；缺失时该 server 的工具不投影 UI。
@@ -88,7 +103,7 @@ export interface RegisterMcpToolsOptions {
 export function registerMcpTools(
   registry: ToolRegistry,
   mcpPort: McpPort,
-  descriptors: readonly McpToolDescriptor[],
+  descriptors: readonly McpToolDefinition[],
   options: RegisterMcpToolsOptions = {},
 ): string[] {
   const allowed = options.allowedTools ? new Set(options.allowedTools) : undefined;
@@ -105,9 +120,16 @@ export function registerMcpTools(
     if (allowed && !allowed.has(name) && !allowed.has(descriptorName)) continue;
     if (disallowed?.has(name) || disallowed?.has(descriptorName)) continue;
     registry.register(
-      createMcpToolEntry(name, descriptor, mcpPort, officialCuaAuthorityVerified, {
-        pluginId: options.pluginIdByServerName?.get(descriptor.serverName),
-      }),
+      createMcpToolEntry(
+        name,
+        descriptor,
+        mcpPort,
+        officialCuaAuthorityVerified,
+        {
+          pluginId: options.pluginIdByServerName?.get(descriptor.serverName),
+        },
+        options.resolveLiveDescriptor,
+      ),
     );
     registered.push(name);
   }
@@ -116,7 +138,7 @@ export function registerMcpTools(
 }
 
 function toRegisteredMcpToolName(
-  descriptor: McpToolDescriptor,
+  descriptor: McpToolDefinition,
   officialCuaAuthorityVerified: boolean,
 ): string {
   if (
@@ -133,13 +155,17 @@ function toRegisteredMcpToolName(
 
 export function createMcpToolEntry(
   name: string,
-  descriptor: McpToolDescriptor,
+  descriptor: McpToolDefinition,
   mcpPort: McpPort,
   officialCuaAuthorityVerified: boolean,
   presentation: { pluginId?: string } = {},
+  resolveLiveDescriptor?: RegisterMcpToolsOptions["resolveLiveDescriptor"],
+  target?: ResolvedMcpTool,
 ): ToolEntry {
   const readOnly = descriptor.annotations?.readOnlyHint === true;
-  const destructive = descriptor.annotations?.destructiveHint === true;
+  // 缓存未携带执行注解，必须按可能破坏性调度，不能把未知当成 false。
+  const destructive =
+    descriptor.catalogOnly === true || descriptor.annotations?.destructiveHint === true;
   // 插件 UI：visibility 不含 "model" 的工具只供 UI 回调（mcp/uiCallTool），
   // 仍进 registry 以复用元数据，但不进 provider contracts（registry.toContracts 已过滤 providerVisible=false）。
   // 修复：之前只看 ui.visibility，没有 resourceUri 的 app-only 数据工具会被当成模型可见。
@@ -188,7 +214,7 @@ export function createMcpToolEntry(
           preview: { direction: "head" as const },
         };
 
-  return {
+  const entry: ToolEntry = {
     // 因精确查找直接返回 Tool not found。只在不可伪造的官方 authority 门成立且内部
     // serverName 仍是官方 namespaced 名时挂单向别名；provider 继续只看规范名称。
     aliases: officialCuaProviderSpellingAliases(name, descriptor, officialCuaAuthorityVerified),
@@ -254,6 +280,10 @@ export function createMcpToolEntry(
       recordOutput: "summary",
     },
     handler: async (input, context) => {
+      // 权限/hook 可异步等待；准入之后配置被替换、连接不可用或工具已下线时不能继承这次授权。
+      if (descriptor.catalogOnly === true) throw new Error(`MCP tool is unavailable: ${name}`);
+      const unavailable = target?.checkTarget();
+      if (unavailable) throw unavailableToolError(name, unavailable);
       const startedAt = Date.now();
       const result = await mcpPort.callTool(
         {
@@ -290,9 +320,19 @@ export function createMcpToolEntry(
                   );
                 },
               }
-            : {}),
+              : {}),
         },
-      );
+      )
+        .catch((error: unknown) => {
+          // 修复原因：调用期 401 由 adapter 发起授权，链接发布后以原始错误结束这次调用；原始错误
+          // 不告诉模型需要用户授权。此时 server 已是 needs-auth，改用与执行准入相同的固定文本。
+          // 用户取消不改写；其他失败（含恢复耗尽）仍返回原始错误。
+          const authorization = context.abortSignal?.aborted
+            ? undefined
+            : target?.authorizationReason();
+          if (authorization) throw unavailableToolError(name, authorization);
+          throw error;
+        });
       const first = result.content[0];
       const message = first?.type === "text" && typeof first.text === "string" ? first.text : "";
       // 固定上游把这些失败作为正常文本返回，交付进度应以实际工具结果为准。
@@ -318,6 +358,58 @@ export function createMcpToolEntry(
     },
     formatModelContent: (output) => formatMcpToolResult(output),
   };
+  if (resolveLiveDescriptor) {
+    entry.resolveForExecution = async ({ signal }) => {
+      const resolved = await resolveLiveDescriptor(descriptor, signal);
+      if (resolved && "unavailableReason" in resolved)
+        return {
+          status: "unavailable",
+          message: unavailableToolMessage(name, resolved.unavailableReason),
+        };
+      const liveDescriptor = resolved?.descriptor;
+      // live 名称必须走同一套官方 CUA 投影规则，否则缓存命中的 CUA 工具在执行时会被误判为不可用。
+      if (
+        !liveDescriptor ||
+        toRegisteredMcpToolName(liveDescriptor, officialCuaAuthorityVerified) !== name
+      ) {
+        return {
+          status: "unavailable",
+          message: unavailableToolMessage(name),
+        };
+      }
+      const liveEntry = createMcpToolEntry(
+        name,
+        liveDescriptor,
+        mcpPort,
+        officialCuaAuthorityVerified,
+        presentation,
+        undefined,
+        resolved,
+      );
+      // 调度（提前执行、并发分组、可见性）按注册时定义做出；live 定义更严格时，
+      // 本次不调用 handler，也不在旧并发组内重试，下一次请求会拿到新定义。
+      const stricter = findStricterLiveConstraint(entry, liveEntry);
+      if (stricter) {
+        return {
+          status: "unavailable",
+          message: `MCP tool ${name} now has a stricter live ${stricter} constraint than its registered definition; it was not called. Call it again in the next request.`,
+        };
+      }
+      return { status: "ready", entry: liveEntry };
+    };
+  }
+  return entry;
+}
+
+// 直接比较两份 entry metadata：未声明 destructiveHint 的注册定义按非破坏性调度，live 改为 true 同样算收紧。
+function findStricterLiveConstraint(registered: ToolEntry, live: ToolEntry): string | undefined {
+  if (registered.metadata.readOnly && !live.metadata.readOnly) return "readOnly";
+  if (registered.metadata.concurrentSafe && !live.metadata.concurrentSafe) return "concurrency";
+  if (!registered.metadata.destructive && live.metadata.destructive) return "destructive";
+  if (registered.metadata.providerVisible !== false && live.metadata.providerVisible === false) {
+    return "visibility";
+  }
+  return undefined;
 }
 
 function createMcpProgressEvent(
@@ -348,7 +440,7 @@ function createMcpProgressEvent(
 
 function officialCuaProviderSpellingAliases(
   name: string,
-  descriptor: McpToolDescriptor,
+  descriptor: McpToolDefinition,
   officialCuaAuthorityVerified: boolean,
 ): readonly string[] | undefined {
   if (
@@ -409,7 +501,7 @@ function normalizeInputSchema(schema: JsonSchema | undefined): JsonSchema {
 }
 
 function createModelFacingMcpInputSchema(
-  descriptor: McpToolDescriptor,
+  descriptor: McpToolDefinition,
   isCuaAppObservation: boolean,
 ): JsonSchema {
   const schema = normalizeInputSchema(descriptor.inputSchema);

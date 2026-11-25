@@ -43,6 +43,8 @@ import type {
 import type { ContextCompositionQuery } from "./context-composition/query.js";
 import type { ContextUsageSnapshot } from "./methods/context-usage.js";
 import type { RuntimeMessageEntry } from "../agent/message-history.js";
+import type { McpSessionView } from "../mcp/runtime/session.js";
+import type { TurnRequestState } from "./methods/turn-loop-state.js";
 import type {
   ActiveTurnInfo,
   AcquireForegroundPromotionLeaseResult,
@@ -273,12 +275,16 @@ export interface AgentRuntimeCoreMethods {
   injectPluginReferenceReminderFromTurn(
     userInput: string,
     traceContext: TraceContext,
+    requestState: TurnRequestState,
+    mcpView: McpSessionView | undefined,
     toolDisallowlist?: readonly string[],
   ): Promise<void>;
   startMcpStartup(traceContext: TraceContext): Promise<McpConnectionSnapshot> | undefined;
-  initializeMcp(traceContext: TraceContext): Promise<void>;
+  initializeMcp(
+    traceContext: TraceContext,
+    options?: { background?: boolean },
+  ): Promise<McpSessionView | undefined>;
   reconcileMcpConfiguration(traceContext: TraceContext): Promise<void>;
-  refreshMcpToolsIfChanged(traceContext: TraceContext): Promise<void>;
   discoverSkillsForContext(traceContext: TraceContext): Promise<SkillLoadOutcome | undefined>;
   createConfigOnlyContextSnapshot(workingDirectory: string): ContextSourceSnapshot;
   initializeMessageHistoryFromContext(

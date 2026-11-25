@@ -99,9 +99,21 @@ export async function runRegularTurnLoop(
     }
 
     const finishMcp = beginLocalTurnPreparation(state.turnTraceContext, "mcp");
-    await this.initializeMcp(state.turnTraceContext);
-    // tools/list_changed 只在回合开始前生效。
-    await this.refreshMcpToolsIfChanged(state.turnTraceContext);
+    // 只有正常新请求才应用最新 MCP 列表；断流重试、准入重试、续写等恢复请求沿用原请求的工具列表。
+    if (state.inputAttachmentCollectionPending) {
+      const mcpView = await this.initializeMcp(state.turnTraceContext);
+      if (state.pluginReferenceInput !== undefined) {
+        const pluginReferenceInput = state.pluginReferenceInput;
+        state.pluginReferenceInput = undefined;
+        await this.injectPluginReferenceReminderFromTurn(
+          pluginReferenceInput,
+          state.turnTraceContext,
+          state.turnRequestState,
+          mcpView,
+          state.toolDisallowlist,
+        );
+      }
+    }
     finishMcp();
     throwIfTurnAborted(state.turnAbortSignal);
     const finishTools = beginLocalTurnPreparation(state.turnTraceContext, "tools");

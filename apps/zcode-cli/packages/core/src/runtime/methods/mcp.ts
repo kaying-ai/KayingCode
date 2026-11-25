@@ -7,7 +7,7 @@ import type {
 } from "../deps.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import type {
-  McpToolDescriptor,
+  McpToolDefinition,
   PluginReferenceCatalog,
   WaitForMcpServersOutput,
 } from "@zcode/contracts";
@@ -15,6 +15,7 @@ import type { McpServerWaitPort } from "../../tool/types.js";
 import {
   classifyServer,
   type McpServerClass,
+  type McpSessionView,
 } from "../../mcp/runtime/session.js";
 import { toMcpToolName, toModelVisibleMcpNamePart } from "../../mcp/name.js";
 
@@ -151,40 +152,16 @@ export function startMcpStartup(
   if (this.mcpInitialized) return this.mcpStartupPromise;
   this.mcpInitialized = true;
 
-  if (!this.mcpPort || this.config.mcp?.enabled === false) {
+  const session = this.mcpSession;
+  if (!session) {
     this.mcpToolsRegistered = true;
     return undefined;
   }
 
-  const servers = this.config.mcp?.servers ?? {};
-  if (Object.keys(servers).length === 0) {
-    const startup = Promise.all([this.mcpPort.status(), this.mcpPort.listTools()])
-      .then(([statuses, tools]) => ({ statuses, tools }))
-      .catch((error) => {
-        this.logger?.warn("MCP existing tool discovery failed", {
-          ...traceContextToLogContext(traceContext),
-          error: error instanceof Error ? error.message : String(error),
-          event: "mcp.existing_tools.failed",
-          module: "core.runtime",
-          status: "failed",
-        });
-        return { statuses: {}, tools: [] };
-      });
-    this.mcpStartupPromise = this.trackResidencyBlockingWork(startup);
-    return this.mcpStartupPromise;
-  }
-
+  const serverCount = Object.keys(this.config.mcp?.servers ?? {}).length;
   const startedAt = Date.now();
-  const startup = this.mcpPort
-    .connectConfiguredServers(servers, {
-      // authorization_code MCP 无人完成浏览器授权时，session 启动过去会等默认 5 分钟，
-      // 导致模型请求迟迟不发出；session 只等 15s，授权入口由设置页 mcp/list 展示。
-      signal: this.shutdownSignal,
-      oauthAuthorizationTimeoutMs: MCP_SESSION_OAUTH_AUTHORIZATION_TIMEOUT_MS,
-      trace: traceContext,
-      workingDirectory: this.workingDirectory,
-      workspaceIdentity: this.config.workspaceIdentity?.toString(),
-    })
+  const startup = session
+    .start()
     .then((snapshot) => {
       const statusCounts = Object.values(snapshot.statuses).reduce<Record<string, number>>(
         (counts, status) => {
@@ -198,7 +175,7 @@ export function startMcpStartup(
         durationMs: Date.now() - startedAt,
         event: "mcp.startup.completed",
         module: "core.runtime",
-        serverCount: Object.keys(servers).length,
+        serverCount,
         status: "completed",
         statusCounts,
         toolCount: snapshot.tools.length,
@@ -216,120 +193,103 @@ export function startMcpStartup(
       });
       return { statuses: {}, tools: [] };
     });
-  this.mcpStartupPromise = this.trackResidencyBlockingWork(startup);
+  this.mcpStartupPromise = startup;
   this.logger?.debug("MCP startup scheduled", {
     ...traceContextToLogContext(traceContext),
     event: "mcp.startup.scheduled",
     module: "core.runtime",
-    serverCount: Object.keys(servers).length,
+    serverCount,
     status: "started",
   });
   return this.mcpStartupPromise;
 }
 
 /**
- * 实时配置源变化：更新会话配置，按新 server map 重连，再按新工具表重注册。
- * 只在首次 MCP 初始化之后生效；初始化前的变化由 startMcpStartup 读取最新 config。
+ * 配置源发布后同步 runtime 的配置视图，再把最新配置交给 mcpSession 收敛连接与目录。
+ * 订阅只有这一个入口；session 的 generation 保证迟到的 reconcile 不会覆盖新一代连接。
  */
 export async function reconcileMcpConfiguration(
   this: AgentRuntimeInternal,
-  traceContext: TraceContext,
+  _traceContext: TraceContext,
 ): Promise<void> {
   const source = this.mcpConfigurationSource;
-  const mcpPort = this.mcpPort;
-  if (!source || !mcpPort || this.shuttingDown) return;
-  const generation = ++this.mcpConfigurationGeneration;
+  if (!source || this.shuttingDown) return;
   const snapshot = source.getSnapshot();
   this.config.mcp = snapshot;
-  if (this.mcpToolCatalogPort) {
-    // 配置变化后 server 集合与 cache key 都会变；重新 prepare 才能命中新 server。
-    this.mcpCatalogPublication = this.mcpToolCatalogPort.prepare({
-      servers: snapshot.servers ?? {},
-      workingDirectory: this.workingDirectory,
-      workspaceIdentity: this.config.workspaceIdentity?.toString(),
-    });
-  }
-  if (!this.mcpInitialized) return;
-  const servers = snapshot.enabled === false ? {} : (snapshot.servers ?? {});
-  try {
-    await mcpPort.connectConfiguredServers(servers, {
-      signal: this.shutdownSignal,
-      oauthAuthorizationTimeoutMs: MCP_SESSION_OAUTH_AUTHORIZATION_TIMEOUT_MS,
-      trace: traceContext,
-      workingDirectory: this.workingDirectory,
-      workspaceIdentity: this.config.workspaceIdentity?.toString(),
-    });
-  } catch (error) {
-    this.logger?.warn("MCP configuration reconnect failed", {
-      ...traceContextToLogContext(traceContext),
-      error: error instanceof Error ? error.message : String(error),
-      event: "mcp.configuration.reconnect.failed",
-      module: "core.runtime",
-      status: "failed",
-    });
-    return;
-  }
-  // 迟到的 reconcile 不能覆盖更新一代的连接与工具表。
-  if (this.shuttingDown || generation !== this.mcpConfigurationGeneration) return;
-  this.mcpCatalogPublication?.publish(mcpPort.getToolSnapshot());
-  if (!this.mcpToolsRegistered) return;
-  // 强制下一次刷新读取当前端口目录；签名不变时 refresh 不会重注册。
-  this.mcpToolListRevision = -1;
-  await this.refreshMcpToolsIfChanged(traceContext);
+  await this.mcpSession?.reconcileConfiguration(snapshot);
 }
 
+/**
+ * 普通 step 的工具面只由 session 视图投影：view.tools 是 live 目录与目录缓存的唯一合并结果，
+ * 注册签名不变时不重注册，恢复/续写请求因而沿用原工具列表。
+ */
 export async function initializeMcp(
   this: AgentRuntimeInternal,
   traceContext: TraceContext,
-): Promise<void> {  if (this.mcpToolsRegistered) return;
-
-  const startup = this.startMcpStartup(traceContext);
+  options: { background?: boolean } = {},
+): Promise<McpSessionView | undefined> {
+  const session = this.mcpSession;
   const mcpPort = this.mcpPort;
-  if (!startup || !mcpPort) {
+  if (!session || !mcpPort) {
     this.mcpToolsRegistered = true;
-    return;
+    return undefined;
   }
-  const serverCount = Object.keys(this.config.mcp?.servers ?? {}).length;
+  // 首输入的准入读取随首次初始化完成；修复前改为每步准备视图后漏掉了这次读取，
+  // 工作区待审核提示要等第二条输入才出现。之后的读取由 turn / steering 的真实新输入触发。
+  if (!this.mcpTrustAdmissionRead) {
+    this.mcpTrustAdmissionRead = true;
+    await refreshWorkspaceTrustAdmission(this, traceContext);
+  }
 
   try {
-    await refreshWorkspaceTrustAdmission(this, traceContext);
-    const snapshot = await startup;
-    this.shutdownSignal.throwIfAborted();
-    this.mcpCatalogPublication?.publish(mcpPort.getToolSnapshot());
-    const liveNames = new Set(snapshot.tools.map(toMcpToolName));
-    const catalogTools = Object.entries(this.mcpCatalogPublication?.lookup.byServer ?? {}).flatMap(
-      ([serverName, tools]) =>
-        tools.map((tool) => ({ ...tool, serverName, catalogOnly: true as const })),
+    await session.prepare(options.background === true);
+    if (this.shuttingDown) return undefined;
+    const view = session.read();
+    const liveNames = new Set(view.tools.map(toMcpToolName));
+    // 产品差异：目录缓存里的展示定义也进 provider 工具面（catalogOnly），保证断线/授权期间
+    // 工具仍然可见，执行时由 resolveForExecution 解析回 live 定义。
+    const catalogTools = Object.entries(session.publication?.lookup.byServer ?? {}).flatMap(
+      ([serverName, tools]): McpToolDefinition[] =>
+        tools.map((tool) => ({ ...tool, serverName, catalogOnly: true })),
     );
-    const descriptors = [
-      ...snapshot.tools,
+    const descriptors: McpToolDefinition[] = [
+      ...view.tools,
       ...catalogTools.filter((tool) => !liveNames.has(toMcpToolName(tool))),
     ];
+    const officialCuaServerNames = computeOfficialCuaServerNames(
+      view.configuration.servers ?? {},
+      new Set(view.configuration.trustedOfficialCuaServerNames ?? []),
+    );
+    // 官方 CUA 授权集合变化会改变模型可见名称与权限能力组，必须进入注册签名。
+    const signature = mcpToolsSignature(descriptors, officialCuaServerNames);
+    this.mcpToolsRegistered = true;
+    if (signature === this.mcpToolsSignature) return view;
+
+    // 单写路径：先撤销上一代注册，再整体注册本次视图；不保留额外的增量注册通道。
+    for (const name of this.registeredMcpToolNames ?? []) this.registry.unregister(name);
     const registered = registerMcpTools(this.registry, mcpPort, descriptors, {
       allowedTools: this.config.toolAllowlist,
       disallowedTools: this.config.toolDisallowlist,
-      officialCuaServerNames: computeOfficialCuaServerNames(
-        this.config.mcp?.servers ?? {},
-        new Set(this.config.mcp?.trustedOfficialCuaServerNames ?? []),
-      ),
+      officialCuaServerNames,
       // 插件 UI：display.ui 需要 server → pluginId 的归属；catalog 是 session 冻结的唯一权威。
       pluginIdByServerName: buildPluginIdByServerName(this.config.pluginReferenceCatalog),
+      // 执行期晚绑定当前连接：配置未变、server 已连接且仍提供该工具时才允许调用。
+      resolveLiveDescriptor: (descriptor, signal) => session.resolve(descriptor, signal),
     });
+    this.registeredMcpToolNames = registered;
+    this.mcpToolsSignature = signature;
     if (registered.length > 0) {
       this.invalidateToolCache();
     }
-    // A7：记住注册集合与签名，回合边界 refreshMcpToolsIfChanged 据此判断是否重注册。
-    this.registeredMcpToolNames = registered;
-    this.mcpToolsSignature = mcpToolsSignature(descriptors);
-    this.mcpToolListRevision = mcpPort.toolListRevision?.();
     this.logger?.info("MCP tools registered", {
       ...traceContextToLogContext(traceContext),
       event: "mcp.tools.registered",
       module: "core.runtime",
       registeredToolCount: registered.length,
-      serverCount,
+      serverCount: Object.keys(view.servers).length,
       status: "completed",
     });
+    return view;
   } catch (error) {
     this.mcpToolsRegistered = true;
     this.logger?.warn("MCP initialization failed", {
@@ -339,8 +299,8 @@ export async function initializeMcp(
       module: "core.runtime",
       status: "failed",
     });
+    return undefined;
   }
-  this.mcpToolsRegistered = true;
 }
 
 /**
@@ -357,55 +317,15 @@ function buildPluginIdByServerName(
   return map;
 }
 
-function mcpToolsSignature(descriptors: readonly McpToolDescriptor[]): string {
-  return descriptors
-    .map((tool) => `${tool.serverName}\u0001${tool.toolName}\u0001${tool.description ?? ""}`)
-    .sort()
-    .join("\n");
-}
-
-/**
- * 回合开始前刷新 MCP 工具表。只有端口报告 tools/list_changed 计数变化时才重新 listTools
- * （adapter 对收到通知的 server 重拉），再比较工具签名，变了就注销旧的、注册新的并失效工具缓存。
- * 不实现 toolListRevision 的端口（mock / 静态 server）永远不刷新；回合内也不刷新（已拍板）。
- */
-export async function refreshMcpToolsIfChanged(
-  this: AgentRuntimeInternal,
-  traceContext: TraceContext,
-): Promise<void> {
-  const mcpPort = this.mcpPort;
-  if (!mcpPort || !this.mcpToolsRegistered) return;
-  const revision = mcpPort.toolListRevision?.();
-  if (revision === undefined || revision === this.mcpToolListRevision) return;
-  let descriptors: McpToolDescriptor[];
-  try {
-    descriptors = await mcpPort.listTools();
-  } catch {
-    return;
-  }
-  this.mcpToolListRevision = revision;
-  const signature = mcpToolsSignature(descriptors);
-  if (this.mcpToolsSignature === signature) return;
-  const previous = new Set(this.registeredMcpToolNames ?? []);
-  for (const name of previous) this.registry.unregister(name);
-  const registered = registerMcpTools(this.registry, mcpPort, descriptors, {
-    allowedTools: this.config.toolAllowlist,
-    disallowedTools: this.config.toolDisallowlist,
-    officialCuaServerNames: computeOfficialCuaServerNames(
-      this.config.mcp?.servers ?? {},
-      new Set(this.config.mcp?.trustedOfficialCuaServerNames ?? []),
-    ),
-    pluginIdByServerName: buildPluginIdByServerName(this.config.pluginReferenceCatalog),
-  });
-  this.registeredMcpToolNames = registered;
-  this.mcpToolsSignature = signature;
-  this.invalidateToolCache();
-  this.logger?.info("MCP tools re-registered after list_changed", {
-    ...traceContextToLogContext(traceContext),
-    event: "mcp.tools.reregistered",
-    module: "core.runtime",
-    removedToolCount: previous.size,
-    registeredToolCount: registered.length,
-    status: "completed",
-  });
+function mcpToolsSignature(
+  descriptors: readonly McpToolDefinition[],
+  officialCuaServerNames: ReadonlySet<string>,
+): string {
+  return [
+    `official:${[...officialCuaServerNames].sort().join(",")}`,
+    ...descriptors
+      // 名称不变的 schema、权限注解和暴露策略变化同样必须替换定义。
+      .map((tool) => JSON.stringify(tool))
+      .sort(),
+  ].join("\n");
 }

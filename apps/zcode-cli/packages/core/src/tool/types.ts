@@ -355,6 +355,13 @@ export interface ToolEntry extends ToolContractDeclaration {
   resultArtifactContentType?: string;
   metadata: ToolMetadata;
   /**
+   * provider contract 已冻结后，把 advertisement entry 原子切换为当前 live execution entry。
+   * 该步骤发生在输入校验、Hook 和权限判断之前，不能改变 provider-visible contracts。
+   */
+  resolveForExecution?: (input: {
+    signal?: AbortSignal;
+  }) => Promise<{ status: "ready"; entry: ToolEntry } | { status: "unavailable"; message: string }>;
+  /**
    * 只由宿主验证后的可信来源写入；不能从模型可见的 MCP 名称或 descriptor 推导。
    */
   permissionCapabilityGroup?: PermissionCapabilityGroup;

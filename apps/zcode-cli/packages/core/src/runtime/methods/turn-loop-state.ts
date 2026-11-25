@@ -120,6 +120,11 @@ export interface RegularTurnLoopState {
   completedRealToolResultBatch: boolean;
   /** 下一次 loop 迭代要收集输入附件时记录原因：轮首、完整工具批次之后、文本回复后续上 guide。 */
   inputAttachmentCollectionPending: InputAttachmentCollectionReason | false;
+  /**
+   * 本轮真实新输入里待注入 plugin_reference reminder 的 canonical 文本。
+   * 与 MCP 视图在同一处取用，保证 reminder 的 server 能力与本次工具投影同源。
+   */
+  pluginReferenceInput?: string;
   /** 工具批次结算时本轮已被停止；决定中断标记用工具阶段的文字。 */
   interruptedDuringToolBatch?: boolean;
   reactiveCompactAttemptedInCurrentModelStep: boolean;

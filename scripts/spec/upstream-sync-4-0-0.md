@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试）；阶段 4 进行中（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption、项目 Token 传输错误 -32033、`--total-tokens-reminder`、回复语言协议/core/Desktop 设置已落地；turn/loop 请求构建待做）；阶段 5 已开始游戏插件兼容验收，非游戏上游能力待补齐。
+状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入）；阶段 4 主链完成（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption、-32033、额度提醒开关、回复语言、runtime prefs、live MCP 工具晚绑定）；剩余为未注册工具晚到解析、MCP background 启动策略、lifecycle hooks/pluginDiscoveryUi/活动摘要等增强项；阶段 5 已开始游戏插件兼容验收，非游戏上游能力待补齐。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -713,17 +713,43 @@ createConfig
 - 测试：`core/tests/runtime-context-announcements.test.ts` 新增 6 例（变更公告/顺序、转义、失败跳过、清除一次、子代理不读、compact 重述）；`services/test/normalizeSettingsPatch.test.ts` 覆盖空串删除与 trim。
 - 验证：core/bootstrap/根 typecheck、core 定向测试 53 例、services 定向测试、lint（0 errors）、architecture/source 检查通过。
 
+### 阶段 4 第五批（并行）：MCP 执行准入、runtime prefs、旧测试修复（2026-11-25）
+
+本轮采用主 agent 规划 + 3 个并行子任务，文件边界互斥，主 agent 统一验收：
+
+1. **MCP SessionView 执行准入**（contracts/core/adapters）：McpSession 视图与启动、执行期 `resolveForExecution`/live descriptor 晚绑定、checkTarget 配置校验、MCP 状态事实与 deniedTools，turn-loop 新输入时用 view 注入 plugin reference；保留 WaitForMcpServers、catalog-only、官方 CUA 与插件 UI 元数据。
+   - 已落地：`McpToolDescriptor.catalogOnly?: false` 判别；`ToolEntry.resolveForExecution` + `live-entry-resolution`；executor 在输入校验/Hook/权限前解析 live entry，失败输出 retryable `ToolExecutionFailed`/`ToolCancelled`；MCP 工具执行前 `waitForServer(reconnect/reauthorize)` → `classifyServer` → live tool → `checkTarget`；`initializeMcp` 返回 `McpSessionView`，从 `view.tools` + publication 合并 catalog-only 并单路径注册；runtime 创建/持有/关闭 McpSession，配置源订阅只保留 runtime 一处；turn-loop 仅在新输入准备时初始化并把 view 传入 plugin reference，reminder 经 `commitTurnRequestEntries` 进入本轮请求并落库；Manual compaction 才应用最新 MCP 列表。
+   - 保留产品差异：WaitForMcpServers 端口、catalog-only 工具面、官方 CUA 名称/authority、Blender/node_repl 预算、plugin UI metadata。
+   - 验证：contracts/core build、core/adapters typecheck 通过；core MCP 5 文件 15 例、adapters MCP/游戏插件 11 文件 22 例通过；core 全量 451/457（6 例为既有 Windows 路径/临时目录问题）；adapters 全量 215/230（剩余为 `provider-builtin-tool-rounds` 6 例与两个缺失 helper 的旧套件）。
+   - 未完成：未注册工具晚到解析（`resolveUnregisteredTool`/`describeUnavailableTool`）与 ToolSearch 实时 MCP 目录；`mcpStartupPolicy/background`；`mcpServerStatusFacts/deniedTools` 消费方。
+2. **runtime prefs 两开关**（shared/services/desktop/ui/bootstrap）：`totalTokensReminderEnabled`（默认 false）与 `agentAlwaysBackgroundEnabled`（产品默认 false）进入 schema、Host resolver、启动偏好与 runtimeConfig，并在设置页提供开关；旧 Host 缺字段走 schema 默认。
+   - 已落地：`kayingcodeSessionRuntimePreferencesResultSchema` 两字段默认 false；`AppSettings`/完整 schema/patch schema 同步；local Host 与 remote workspace resolver 均用 `=== true`；bootstrap `SessionStartupPreferences`（含 inherit）、`createRecord` 的 `totalTokensReminder`/`subagents.alwaysBackground` 与 session record 两字段；设置页“通用 → 对话”两个 Switch（仅新建/恢复会话生效）。
+   - 产品决策：`agentAlwaysBackgroundEnabled` 显式保持 false 缺省，不采用上游 true；旧 Host 回退也返回 false。
+   - 验证：`tsc -b packages/shared packages/services packages/ui packages/desktop`、bootstrap `tsc --noEmit` 通过；shared runtime-prefs 4 例、mobile relay 2 例、services normalize 2 例、UI settings 11 例通过；改动文件 oxlint 0 errors。
+   - 未覆盖：bootstrap 无 runtime preferences 单测夹具；设置页渲染/E2E 待补。
+3. **adapters 旧测试修复**（仅 `adapters/test/**`）：把同步插件 API 用法迁移到异步 material loader，恢复 `test/` 套件可执行性；源码缺陷只报告不改。
+   - 已修复 7 个文件、14 个用例：7 个文件原为 `node:test`，vitest 无法收集；统一改为 vitest 导入（断言仍用 `node:assert/strict`），同时补 `enumeratePluginComponents` 的 `await`、Windows 数据根改用 `mkdtempSync`、默认市场断言改为“builtin 记录唯一且无刷新失败”。
+   - 验证：`pnpm exec vitest run test/<7 files>` → 7/7 文件、14/14 用例通过；`adapters/spec/plugin-ui-contributions.md` 的回归入口同步改为 vitest。
+   - 未修复（不在测试层）：`tests/provider-builtin-tool-rounds` 的 live/cold `blockIndex` 投影差异、`tests/model-session-features-wire`/`runner-stream-timing-wire` 缺失的 `test-provider-config` helper。
+4. 主 agent：验收清单、跨包签名修复、全量 typecheck/lint/architecture/source 与定向测试后再提交。
+
+（结果与验证数据在子任务完成后补录）
+
+验收标准：
+- MCP：未提供 live 解析的工具行为不变；MCP 工具在 server 断线/重连、配置变更后执行期能得到正确准入或可重试错误；turn-loop 新输入的 plugin reference 仍与工具视图一致；WaitForMcpServers 与 catalog-only 不回归。
+- prefs：旧 Host 缺字段时默认值保持产品行为（额度提醒关、子代理前台）；新设置保存后无需重启，下个新建会话生效；schema/服务/bootstrap/UI 类型一致。
+- tests：`adapters/test` 从失败恢复到全绿或只剩已记录的源码缺陷；不放宽断言。
+
 待完成（阶段 4 未完成，更新）：
-- turn/loop 状态与请求构建（`normalInputPreparationPending`、`pluginReferenceInput`、`McpSessionView` 回合准备、执行期 `resolveLiveDescriptor`）、executor 剩余新端口、子代理冷恢复/compact 策略。
+- turn/loop 剩余：未注册 MCP 工具晚到解析（`resolveUnregisteredTool`/`describeUnavailableTool`）、ToolSearch 实时 MCP 目录、`mcpStartupPolicy/background`、`mcpServerStatusFacts/deniedTools` 消费方；子代理冷恢复/compact 策略。
 - lifecycle hooks 上下文、`createConfigWithPluginMigrations`、`pluginDiscoveryUi` 增量公告、批量删除预检、活动摘要。
-- Runtime prefs 的 `totalTokensReminderEnabled`/`agentAlwaysBackgroundEnabled` 回包与设置页；plugin host 进程名；回复语言设置仅 Desktop 本机 Host 生效，远端/Web Host 仍回答 null。
+- plugin host 进程名；回复语言设置仅 Desktop 本机 Host 生效，远端/Web Host 仍回答 null。
 - marketplace `regions`/商店 UI；官方插件清单重生成。
 
 待完成（阶段 3 未完成）：
-- 完整 `McpSessionView` 接入：执行期按 `classifyServer` 做工具准入/撤销、`resolve` 等待与 MCP App 打开语义仍沿用产品现有路径。
 - `WaitForMcpServers` 之外的 `ToolSearch` 关闭时连接中公告与 `runModelTextRequest` 集成。
 - HTTP transport 重试/401 step-up：会话过期与连接关闭已接入 `isRetryableCallError`，401 step-up 仍沿用既有授权恢复路径。
-- pool 租约化与 transport 错误收敛的上游完整形态；marketplace `regions`/商店 UI；官方插件清单重生成。
+- pool 租约化与 transport 错误收敛的上游完整形态；adapter 按需重连尚未包含 `retainTools` 与内建 server 重启上限。
 
 ### 阶段 5 第一批：游戏插件兼容验收（2026-11-24）
 

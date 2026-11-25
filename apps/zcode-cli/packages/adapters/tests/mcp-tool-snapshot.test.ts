@@ -68,3 +68,27 @@ it("distinguishes a confirmed empty tool list from not listed yet", async () => 
     await adapter.close();
   }
 });
+
+it("reconnects an explicitly disconnected server only when execution admission asks", async () => {
+  const f = await fixture([{ name: "probe", inputSchema: { type: "object" } }]);
+  const adapter = createMcpAdapter();
+  try {
+    await adapter.connectServer("probe", f.config);
+    await adapter.disconnectServer("probe");
+    expect(adapter.getToolSnapshot!().probe?.status.status).toBe("disconnected");
+
+    // 普通等待不重连：ToolSearch 等只观察现有启动任务。
+    await adapter.waitForServer!("probe", { timeoutMs: 5_000 });
+    expect(adapter.getToolSnapshot!().probe?.status.status).toBe("disconnected");
+
+    const waited = await adapter.waitForServer!("probe", {
+      timeoutMs: 10_000,
+      reconnect: true,
+    });
+    expect(waited.timedOut).toBe(false);
+    expect(adapter.getToolSnapshot!().probe?.status.status).toBe("connected");
+    expect(adapter.getToolSnapshot!().probe?.tools?.[0]?.name).toBe("mcp__probe__probe");
+  } finally {
+    await adapter.close();
+  }
+});

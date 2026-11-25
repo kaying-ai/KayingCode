@@ -801,13 +801,9 @@ export async function executeTurnCommand(
         // 根因：input 可能已经被自定义命令展开，解析它会让命令模板里的 plugin://
         // 凭空获得“用户引用”语义；这里只解析真实持久化的 canonical displayInput。
         // runtime 内部的 model-only continuation 不代表新的用户意图，不重复解析。
-        if (options?.inputVisibility !== "model-only") {
-          await this.injectPluginReferenceReminderFromTurn(
-            displayInput,
-            turnTraceContext,
-            options?.toolDisallowlist,
-          );
-        }
+        // 注入移到 turn loop 的新输入准备处，与本次 MCP 视图同源；文本只在这里冻结。
+        const pluginReferenceInput =
+          options?.inputVisibility !== "model-only" ? displayInput : undefined;
 
         this.messageHistory.setCacheMiss();
         const loopModel = submissionModel ?? admittedModel;
@@ -836,6 +832,7 @@ export async function executeTurnCommand(
           workflowResultConsumed: options?.workflowResultConsumed === true,
           completedRealToolResultBatch: false,
           inputAttachmentCollectionPending: "turn_input",
+          ...(pluginReferenceInput !== undefined ? { pluginReferenceInput } : {}),
           currentUserMessageId: userMessageId,
           events,
           input,

@@ -330,6 +330,10 @@ class NodeMcpAdapter implements McpPort {
   private readonly snapshotListeners = new Set<() => void>();
   /** 每个 server 当前正在执行的工具调用 trace；elicitation 借此归属到会话 / 工具行。 */
   private readonly activeCallTraces = new Map<string, McpElicitationTrace>();
+  /** waitForServer 的授权边界 waiter：启动转为 OAuth pending 时由 onAuthorizationRequired 唤醒。 */
+  private readonly authorizationWaiters = new Map<string, Set<() => void>>();
+  /** 执行准入触发的按需重连；同一 server 单飞，避免并发工具调用各自重建连接。 */
+  private readonly reconnectTasks = new Map<string, Promise<McpServerStatus>>();
 
   constructor(options: CreateMcpAdapterOptions) {
     this.clientName = options.clientName ?? "kayingcode";
@@ -585,14 +589,23 @@ class NodeMcpAdapter implements McpPort {
   ): Promise<{ timedOut: boolean }> {
     options.signal?.throwIfAborted();
     const record = this.records.get(name);
-    // 授权 pending 的等待由授权交互结束；这里只等已有启动任务，不重连。
-    if (!record?.connecting || record.status.authorization) return { timedOut: false };
+    // 修复原因：MCP App 打开也传 reconnect，过去会走授权失败重连并发起交互授权；授权只挂在执行准入上。
+    const connecting = options.reconnect
+      ? (this.connectionTask(name) ??
+        (options.reauthorize ? this.reconnectAfterAuthorizationFailure(name) : undefined))
+      : record?.connecting;
+    if (!connecting || record?.status.authorization) return { timedOut: false };
+    const authorization = this.watchAuthorizationLink(name);
     try {
+      // 复用同一个启动 Promise；成功、失败或转为授权 pending 都代表"本次等待结束"，结果由调用方读快照。
       await withTimeout(
-        record.connecting.then(
-          () => undefined,
-          () => undefined,
-        ),
+        Promise.race([
+          connecting.then(
+            () => undefined,
+            () => undefined,
+          ),
+          authorization.published,
+        ]),
         options.timeoutMs,
         `MCP server ${name} startup wait timed out after ${options.timeoutMs}ms`,
         options.signal,
@@ -601,7 +614,77 @@ class NodeMcpAdapter implements McpPort {
     } catch (error) {
       if (error instanceof McpTimeoutError) return { timedOut: true };
       throw error;
+    } finally {
+      authorization.dispose();
     }
+  }
+
+  /** 授权链接发布时结束等待；只登记 waiter，不取消授权或共享连接。 */
+  private watchAuthorizationLink(name: string): { published: Promise<void>; dispose(): void } {
+    let resolvePublished: () => void = () => {};
+    const published = new Promise<void>((resolve) => {
+      resolvePublished = resolve;
+    });
+    const waiters = this.authorizationWaiters.get(name) ?? new Set<() => void>();
+    this.authorizationWaiters.set(name, waiters);
+    waiters.add(resolvePublished);
+    return {
+      published,
+      dispose: () => {
+        waiters.delete(resolvePublished);
+        if (waiters.size === 0 && this.authorizationWaiters.get(name) === waiters) {
+          this.authorizationWaiters.delete(name);
+        }
+      },
+    };
+  }
+
+  /**
+   * 执行准入与 MCP App 打开时调用：复用已有任务；显式断开或 stdio 意外断连的记录重新连接。
+   * 产品差异：没有内建 server 的后台恢复任务，这里按需重连一次；目录缓存仍由 runtime 的
+   * catalog-only 工具面兜住，重连期间不额外保留旧执行注解。
+   */
+  private connectionTask(name: string): Promise<McpServerStatus> | undefined {
+    const record = this.records.get(name);
+    if (!record || record.connecting) return record?.connecting;
+    if (
+      record.status.status === "disconnected" ||
+      record.status.failureKind === "unexpected_disconnect"
+    ) {
+      return this.startReconnect(name, record.config);
+    }
+    return undefined;
+  }
+
+  /**
+   * 授权未完成就结束（到期、失败）的记录保留了目录；执行准入时按普通连接重连一次，单飞靠 record.connecting。
+   * 期间已在别处完成授权就用最新凭据直接连上；仍需授权则发起交互授权，链接发布后等待方立即结束。
+   * 只在执行准入（reauthorize）时触发，MCP App 打开不触发。
+   */
+  private reconnectAfterAuthorizationFailure(name: string): Promise<McpServerStatus> | undefined {
+    const record = this.records.get(name);
+    if (
+      !record ||
+      record.connecting ||
+      record.status.failureKind !== "oauth_authorization_failed" ||
+      record.toolsVersion === undefined
+    )
+      return undefined;
+    return this.startReconnect(name, record.config);
+  }
+
+  /** 同一 server 的按需重连单飞；并发工具调用共享同一次连接尝试。 */
+  private startReconnect(name: string, config: McpServerConfig): Promise<McpServerStatus> {
+    const existing = this.reconnectTasks.get(name);
+    if (existing) return existing;
+    let task: Promise<McpServerStatus>;
+    task = this.connectServer(name, config, {
+      workingDirectory: this.workingDirectory,
+    }).finally(() => {
+      if (this.reconnectTasks.get(name) === task) this.reconnectTasks.delete(name);
+    });
+    this.reconnectTasks.set(name, task);
+    return task;
   }
 
   async listTools(): Promise<McpToolDescriptor[]> {
@@ -2228,6 +2311,12 @@ class NodeMcpAdapter implements McpPort {
           authorization: createOAuthAuthorizationStatus(context),
           status: "connecting",
         });
+        // 链接已发布：等待方按 needs_auth 结束本次准入，不继续占用执行预算。
+        const waiters = this.authorizationWaiters.get(serverName);
+        if (waiters) {
+          this.authorizationWaiters.delete(serverName);
+          for (const notify of waiters) notify();
+        }
         await this.mcpOAuth?.onAuthorizationRequired?.(context);
       },
     };

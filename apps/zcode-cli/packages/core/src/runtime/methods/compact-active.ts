@@ -276,7 +276,8 @@ async function compactActiveConversationImpl(
     turnTraceContext,
     events,
   );
-  await this.initializeMcp(turnTraceContext);
+  // 自动/超窗压缩重发已有输入，不能消费后台已更新的能力快照。
+  if (trigger === CompactTrigger.Manual) await this.initializeMcp(turnTraceContext);
   throwIfTurnAborted(options.abortSignal);
   // 与主循环同一份工具目录（含本轮禁用规则），由同一个请求准备入口投影。
   // 修复原因：摘要请求另选工具（只带 ToolSearch 相关工具，或超过 100 个时发空列表）时，

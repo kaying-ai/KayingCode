@@ -211,6 +211,8 @@ export const KAYINGCODE_MCP_NODE_REPL_COMPUTER_USE_META_KEY = "kayingcode/nodeRe
 export const KAYINGCODE_MCP_SERVER_REQUEST_ID_META_KEY = "kayingcode/officialMcpServerRequestId";
 
 export interface McpToolDescriptor {
+  /** live discovery；展示缓存必须显式使用 catalogOnly:true 的投影。 */
+  catalogOnly?: false;
   alwaysLoad?: boolean;
   searchHint?: string;
   serverName: string;
