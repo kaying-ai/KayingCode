@@ -2205,6 +2205,12 @@ const enUS: Record<string, string> = {
     "Show full reasoning inside the message stream. When off, the first reasoning item in each turn remains visible.",
   "settings.messageStreamShowTodos": "Show todos",
   "settings.messageStreamShowTodosDescription": "Show Todo tool cards inside the message stream. ",
+  "settings.totalTokensReminder": "Token budget reminder",
+  "settings.totalTokensReminderDescription":
+    "Give the model a fixed token budget and the amount left each turn, in new sessions and sessions restored after an app restart. It is only a reminder and does not limit usage. Active sessions keep their current setting.",
+  "settings.agentAlwaysBackground": "Always run subagents in the background",
+  "settings.agentAlwaysBackgroundDescription":
+    "Subagents always start in the background and their results arrive in a later turn, so you can keep working while they run. Turn this off to let the model choose: subagents then run in the foreground unless it asks for the background. Applies to new sessions and sessions restored after an app restart; active sessions keep their current setting.",
   "settings.toolGroupingExplore": "Group exploration tools",
   "settings.toolGroupingExploreDescription":
     "Group consecutive reads and searches into an Explore section.",

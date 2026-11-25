@@ -2260,6 +2260,9 @@ export const kayingcodeSessionRuntimePreferencesResultSchema = z
     toolSearchMode: appToolSearchModeSchema.default("off"),
     subagentRuntimeConfigEnabled: z.boolean().optional(),
     memoryEnabled: z.boolean().default(false),
+    // 兼容旧 Host：缺失时按产品默认关闭，避免旧版本把未声明能力当作已开启。
+    totalTokensReminderEnabled: z.boolean().default(false),
+    agentAlwaysBackgroundEnabled: z.boolean().default(false),
     askUserQuestionAutoResolutionEnabled: z.boolean().default(true),
     integratedTerminalShell: integratedTerminalShellSelectionSchema.optional(),
     // 兼容旧 Host：缺少字段时在协议解析边界使用当前默认策略。

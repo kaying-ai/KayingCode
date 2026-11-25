@@ -2092,6 +2092,12 @@ const zhCN: Record<string, string> = {
     "在消息流中展示完整的模型思考内容；关闭时每轮仍展示第一次思考。",
   "settings.messageStreamShowTodos": "显示待办",
   "settings.messageStreamShowTodosDescription": "在消息流中展示 Todo 工具卡片。",
+  "settings.totalTokensReminder": "Token 预算提醒",
+  "settings.totalTokensReminderDescription":
+    "在新建会话或应用重启后恢复的会话中，向模型提供固定的 token 预算，并在每轮附带剩余量。只是提醒，不限制实际用量。当前会话保持现有设置。",
+  "settings.agentAlwaysBackground": "子智能体总在后台运行",
+  "settings.agentAlwaysBackgroundDescription":
+    "子智能体总在后台启动，结果在之后的回合送回，运行期间可以继续交代其他工作。关闭后由模型选择：默认在前台运行，模型要求时才在后台运行。在新建会话或应用重启后恢复的会话中生效；当前会话保持现有设置。",
   "settings.toolGroupingExplore": "分组探索工具",
   "settings.toolGroupingExploreDescription": "将连续的读取和搜索工具聚合为 Explore 分组。",
   "settings.toolGroupingTerminal": "分组终端命令",

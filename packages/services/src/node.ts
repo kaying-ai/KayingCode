@@ -1225,6 +1225,9 @@ export function createLocalServices(options: {
               nativeSearchEnhancementsEnabled: settings.nativeSearchEnhancementsEnabled !== false,
               toolSearchMode: settings.toolSearchMode ?? "auto",
               memoryEnabled: settings.memoryEnabled === true,
+              // 两个开关都按产品默认关闭：缺失/旧设置不下发开启，保持现有前台与不提醒行为。
+              totalTokensReminderEnabled: settings.totalTokensReminderEnabled === true,
+              agentAlwaysBackgroundEnabled: settings.agentAlwaysBackgroundEnabled === true,
               modelContextBudgetStrategy,
               // user-execution 只消费 Shell；共享默认策略是统一 result schema 的兼容占位，
               // 不会覆盖 runtime-materialization 阶段已经固定的 strategy。

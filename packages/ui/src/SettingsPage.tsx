@@ -409,6 +409,9 @@ export function SettingsPage({
   const askUserQuestionAutoResolutionEnabled =
     sharedSettings?.askUserQuestionAutoResolutionEnabled !== false;
   const modelIoFullRetentionEnabled = sharedSettings?.modelIoFullRetentionEnabled === true;
+  // 两个会话运行期开关都按产品默认关闭：缺失字段不显示为已开启。
+  const totalTokensReminderEnabled = sharedSettings?.totalTokensReminderEnabled === true;
+  const agentAlwaysBackgroundEnabled = sharedSettings?.agentAlwaysBackgroundEnabled === true;
   const [dataBaseDir, setDataBaseDir] = useState("");
   const [terminalInheritSystemProfile, setTerminalInheritSystemProfile] = useState(true);
   const [terminalFontFamily, setTerminalFontFamily] = useState("");
@@ -619,6 +622,36 @@ export function SettingsPage({
         action: "toggle_model_io_retention",
         trigger: "switch",
         operation: () => updateSharedSettings({ modelIoFullRetentionEnabled: enabled }),
+        completed: {
+          resultSource: "shared_settings",
+          stateAfter: enabled ? "enabled" : "disabled",
+        },
+      });
+    },
+    [updateSharedSettings],
+  );
+  const handleTotalTokensReminderEnabledChange = useCallback(
+    async (enabled: boolean) => {
+      await runSettingsActionAsync({
+        featureId: "settings.conversation",
+        action: "toggle_total_tokens_reminder",
+        trigger: "switch",
+        operation: () => updateSharedSettings({ totalTokensReminderEnabled: enabled }),
+        completed: {
+          resultSource: "shared_settings",
+          stateAfter: enabled ? "enabled" : "disabled",
+        },
+      });
+    },
+    [updateSharedSettings],
+  );
+  const handleAgentAlwaysBackgroundEnabledChange = useCallback(
+    async (enabled: boolean) => {
+      await runSettingsActionAsync({
+        featureId: "settings.conversation",
+        action: "toggle_agent_always_background",
+        trigger: "switch",
+        operation: () => updateSharedSettings({ agentAlwaysBackgroundEnabled: enabled }),
         completed: {
           resultSource: "shared_settings",
           stateAfter: enabled ? "enabled" : "disabled",
@@ -1492,6 +1525,8 @@ export function SettingsPage({
                             taskAutoArchiveOlderThanDays={taskAutoArchiveOlderThanDays}
                             messageStreamShowReasoning={messageStreamShowReasoning}
                             messageStreamShowTodos={messageStreamShowTodos}
+                            totalTokensReminderEnabled={totalTokensReminderEnabled}
+                            agentAlwaysBackgroundEnabled={agentAlwaysBackgroundEnabled}
                             toolGroupingExploreEnabled={toolGroupingExploreEnabled}
                             toolGroupingTerminalEnabled={toolGroupingTerminalEnabled}
                             toolGroupingChangesEnabled={toolGroupingChangesEnabled}
@@ -1534,6 +1569,12 @@ export function SettingsPage({
                               handleMessageStreamShowReasoningChange
                             }
                             onMessageStreamShowTodosChange={handleMessageStreamShowTodosChange}
+                            onTotalTokensReminderEnabledChange={
+                              handleTotalTokensReminderEnabledChange
+                            }
+                            onAgentAlwaysBackgroundEnabledChange={
+                              handleAgentAlwaysBackgroundEnabledChange
+                            }
                             onToolGroupingExploreEnabledChange={
                               handleToolGroupingExploreEnabledChange
                             }

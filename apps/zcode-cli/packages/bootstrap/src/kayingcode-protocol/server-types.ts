@@ -93,6 +93,9 @@ export interface KayingCodeProtocolSessionRecord {
   memoryEnabled: boolean;
   nativeSearchEnhancementsEnabled: boolean;
   toolSearchMode: AppToolSearchMode;
+  /** 子会话 inherit 时复用父会话的总额度提醒与子代理后台策略。 */
+  totalTokensReminderEnabled: boolean;
+  agentAlwaysBackgroundEnabled: boolean;
   modelContextBudgetStrategy: KayingCodeModelContextBudgetStrategy;
   createdAt: number;
   deliveryKind?: KayingCodeDeliveryKind;

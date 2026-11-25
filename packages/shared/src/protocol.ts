@@ -380,6 +380,13 @@ export interface AppSettings {
   toolSearchMode?: AppToolSearchMode;
   /** 新建或冷恢复 Session 是否启用 Memory；默认关闭。 */
   memoryEnabled?: boolean;
+  /** 新建或冷恢复 Session 是否向模型提供总额度提醒；默认关闭。 */
+  totalTokensReminderEnabled?: boolean;
+  /**
+   * 新建或冷恢复 Session 的子代理是否总在后台运行；默认关闭。
+   * 关闭时保持模型自行选择（默认前台）的产品行为，不采用上游常开默认。
+   */
+  agentAlwaysBackgroundEnabled?: boolean;
   onboardingOccupation?:
     | "office"
     | "developer"

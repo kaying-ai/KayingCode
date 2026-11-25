@@ -80,6 +80,8 @@ export function GeneralSectionContent({
   taskAutoArchiveOlderThanDays,
   messageStreamShowReasoning,
   messageStreamShowTodos,
+  totalTokensReminderEnabled = false,
+  agentAlwaysBackgroundEnabled = false,
   toolGroupingExploreEnabled,
   toolGroupingTerminalEnabled,
   toolGroupingChangesEnabled,
@@ -105,6 +107,8 @@ export function GeneralSectionContent({
   onAutoDownloadAndInstallUpdatesChange,
   onMessageStreamShowReasoningChange,
   onMessageStreamShowTodosChange,
+  onTotalTokensReminderEnabledChange = async () => {},
+  onAgentAlwaysBackgroundEnabledChange = async () => {},
   onToolGroupingExploreEnabledChange,
   onToolGroupingTerminalEnabledChange,
   onToolGroupingChangesEnabledChange,
@@ -147,6 +151,8 @@ export function GeneralSectionContent({
   taskAutoArchiveOlderThanDays: number;
   messageStreamShowReasoning: boolean;
   messageStreamShowTodos: boolean;
+  totalTokensReminderEnabled?: boolean;
+  agentAlwaysBackgroundEnabled?: boolean;
   toolGroupingExploreEnabled: boolean;
   toolGroupingTerminalEnabled: boolean;
   toolGroupingChangesEnabled: boolean;
@@ -172,6 +178,8 @@ export function GeneralSectionContent({
   onAutoDownloadAndInstallUpdatesChange: (enabled: boolean) => Promise<void>;
   onMessageStreamShowReasoningChange: (enabled: boolean) => Promise<void>;
   onMessageStreamShowTodosChange: (enabled: boolean) => Promise<void>;
+  onTotalTokensReminderEnabledChange?: (enabled: boolean) => Promise<void>;
+  onAgentAlwaysBackgroundEnabledChange?: (enabled: boolean) => Promise<void>;
   onToolGroupingExploreEnabledChange: (enabled: boolean) => Promise<void>;
   onToolGroupingTerminalEnabledChange: (enabled: boolean) => Promise<void>;
   onToolGroupingChangesEnabledChange: (enabled: boolean) => Promise<void>;
@@ -826,6 +834,36 @@ export function GeneralSectionContent({
               checked={messageStreamShowTodos}
               onCheckedChange={(checked) => {
                 void onMessageStreamShowTodosChange(checked);
+              }}
+            />
+          }
+        />
+        <SettingsRow
+          label={intl.formatMessage({ id: "settings.totalTokensReminder" })}
+          description={intl.formatMessage({
+            id: "settings.totalTokensReminderDescription",
+          })}
+          control={
+            <Switch
+              aria-label={intl.formatMessage({ id: "settings.totalTokensReminder" })}
+              checked={totalTokensReminderEnabled}
+              onCheckedChange={(checked) => {
+                void onTotalTokensReminderEnabledChange(checked);
+              }}
+            />
+          }
+        />
+        <SettingsRow
+          label={intl.formatMessage({ id: "settings.agentAlwaysBackground" })}
+          description={intl.formatMessage({
+            id: "settings.agentAlwaysBackgroundDescription",
+          })}
+          control={
+            <Switch
+              aria-label={intl.formatMessage({ id: "settings.agentAlwaysBackground" })}
+              checked={agentAlwaysBackgroundEnabled}
+              onCheckedChange={(checked) => {
+                void onAgentAlwaysBackgroundEnabledChange(checked);
               }}
             />
           }

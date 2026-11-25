@@ -179,6 +179,10 @@ interface SessionStartupPreferences {
   modelContextBudgetStrategy: KayingCodeModelContextBudgetStrategy;
   nativeSearchEnhancementsEnabled: boolean;
   toolSearchMode: AppToolSearchMode;
+  /** 总额度提醒；产品默认关闭，旧 Host 缺字段时由协议 schema 的 false 默认兜底。 */
+  totalTokensReminderEnabled: boolean;
+  /** 子代理总在后台；产品默认关闭，保持模型自行选择的前台默认。 */
+  agentAlwaysBackgroundEnabled: boolean;
   resolveInitialBashShellSelection: () => Promise<ExecutionShellSelection | undefined>;
 }
 
@@ -3529,6 +3533,10 @@ async function requestSessionRuntimePreferences(
         modelContextBudgetStrategy: DEFAULT_KAYINGCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
         nativeSearchEnhancementsEnabled: true,
         toolSearchMode: "auto",
+        // 旧 Host 不认识这两个字段：总额度提醒保持关闭，子代理后台策略不采用上游常开默认，
+        // 继续沿用产品“模型自行选择、默认前台”的行为。
+        totalTokensReminderEnabled: false,
+        agentAlwaysBackgroundEnabled: false,
       };
     }
     throw error;
@@ -3551,6 +3559,8 @@ async function resolveSessionStartupPreferences(
       modelContextBudgetStrategy: DEFAULT_KAYINGCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
       nativeSearchEnhancementsEnabled: source.parent.nativeSearchEnhancementsEnabled,
       toolSearchMode: source.parent.toolSearchMode,
+      totalTokensReminderEnabled: source.parent.totalTokensReminderEnabled,
+      agentAlwaysBackgroundEnabled: source.parent.agentAlwaysBackgroundEnabled,
       resolveInitialBashShellSelection: async () => inheritedShellSelection,
     };
   }
@@ -3574,6 +3584,8 @@ async function resolveSessionStartupPreferences(
     modelContextBudgetStrategy: DEFAULT_KAYINGCODE_MODEL_CONTEXT_BUDGET_STRATEGY,
     nativeSearchEnhancementsEnabled: runtimePreferences.nativeSearchEnhancementsEnabled,
     toolSearchMode: runtimePreferences.toolSearchMode,
+    totalTokensReminderEnabled: runtimePreferences.totalTokensReminderEnabled,
+    agentAlwaysBackgroundEnabled: runtimePreferences.agentAlwaysBackgroundEnabled,
     resolveInitialBashShellSelection: async () => {
       const executionPreferences = await requestSessionRuntimePreferences(
         context,
@@ -3689,6 +3701,10 @@ async function createRecord(
       toolDisallowlist: resolveSessionToolDenylist(params, workspace),
       nativeSearchEnhancementsEnabled: startupPreferences.nativeSearchEnhancementsEnabled,
       toolSearch: { mode: startupPreferences.toolSearchMode },
+      // 总额度提醒与子代理后台策略都属于建会话期配置：显式写入布尔值，
+      // 避免上游 4.0 的常开默认（agentAlwaysBackground）进入产品默认关闭行为。
+      totalTokensReminder: { enabled: startupPreferences.totalTokensReminderEnabled },
+      subagents: { alwaysBackground: startupPreferences.agentAlwaysBackgroundEnabled },
       modelContextBudgetStrategy: startupPreferences.modelContextBudgetStrategy,
       // Memory Settings 是现有 CLI features.memory/use 之外的总开关。只在关闭时
       // 写入 override，避免开启值反向覆盖用户已有的 CLI 禁用配置。
@@ -3787,6 +3803,8 @@ async function createRecord(
     modelContextBudgetStrategy: startupPreferences.modelContextBudgetStrategy,
     nativeSearchEnhancementsEnabled: startupPreferences.nativeSearchEnhancementsEnabled,
     toolSearchMode: startupPreferences.toolSearchMode,
+    totalTokensReminderEnabled: startupPreferences.totalTokensReminderEnabled,
+    agentAlwaysBackgroundEnabled: startupPreferences.agentAlwaysBackgroundEnabled,
     ...(parentSessionId ? { parentSessionId } : {}),
     persistence: "persistence" in params ? (params.persistence ?? "immediate") : "immediate",
     protocolEventSequences: new Map(),
