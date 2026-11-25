@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入）；阶段 4 主链完成（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption、-32033、额度提醒开关、回复语言、runtime prefs、live MCP 工具晚绑定）；剩余为未注册工具晚到解析、MCP background 启动策略、lifecycle hooks/pluginDiscoveryUi/活动摘要等增强项；阶段 5 已开始游戏插件兼容验收，非游戏上游能力待补齐。
+状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`：阶段 0 已完成；阶段 1 账号/OAuth/凭据机制与 CLI 入口完成，桌面登录 UI、真实端点联调与 staging 部署待后续；阶段 2 本轮完成（异步发现、workspace trust、Skill 实时目录、MCP 配置源）；阶段 3 本轮完成（工具快照、实时 reconcile、工具目录、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入）；阶段 4 主链完成（存储 0025/0026、ReadTopicResource、browser-state、InputPreemption、-32033、额度提醒开关、回复语言、runtime prefs、live MCP 工具晚绑定）；阶段 5 游戏插件兼容验收与 CUA 对齐评估已完成，剩余非游戏上游能力待排期。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -142,7 +142,7 @@
 - **适配后采纳**：配置源/热加载、McpSession 状态机、工具目录缓存、`WaitForMcpServers`、连接池等待、needs-auth 分类、重试/恢复、node fallback、MCP UI 重连。
 - **产品补丁**：`workspaceRoot`/`workspaceIdentity` 注入、错误展示 meta、`KAYINGCODE_*` 别名；localrun 鉴权改为上游机制 + mock；CUA MCP 由对齐评估决定是否启用。
 - **保留上游机制 + 端点/mock 适配**：官方鉴权、OAuth、账号/套餐、官方 MCP 鉴权、远端市场与遥测。localrun 默认走 mock，不再删除上游分支。
-- **单独评估**：上游 CUA broker 凭据与 `zcode-cua` 启动链（不属于游戏场景增量，但需决定是否恢复上游机制）。
+- **单独评估**：上游 CUA broker 凭据与 `zcode-cua` 启动链；已评估为保留产品 native 插件、不恢复 broker（见阶段 5 第二批）。
 - **验收**：配置优先级与信任、热加载、异步启动等待、重试/恢复、资源订阅、MCP UI 重连、localrun 与 Host/Relay 双栈、三平台 node fallback。
 
 ## CLI 运行时（4.0.0）
@@ -173,7 +173,7 @@
 | 高 | 存储 API/迁移 | 上游 0025 永久删除 + 0026 dwf 索引；产品刻意移除 0025 与 purge 实现（迁移止于 0023），只能采 0026 与 `messages(index)` |
 | 中 | 配置/信任 | 项目 `plugins.dirs` 只作候选、项目 options 剥离；`createConfigWithPluginMigrations` 变 async 并读 hook 脚本摘要；新增 `workspace_hook_script_unavailable` |
 | 中 | Windows shell 语义 | `WINDOWS_CMD_SHELL_DISPLAY_NAME` 从 "CMD" 改为 "cmd.exe"，`exec/bash-shell-provider.ts` 变 async 并改用 `@zcode/shared/node` 的 git-bash 发现；环境公告字节变化影响 prompt 前缀 |
-| 低 | CLI 登录相关 | 上游保留 `login/logout`；产品已删除 `login-command.ts`、`tui-auth.ts`。按新目标恢复上游登录链路；CUA 铸造随 CUA 对齐评估决定 |
+| 低 | CLI 登录相关 | 上游保留 `login/logout`；产品已删除 `login-command.ts`、`tui-auth.ts`。按新目标恢复上游登录链路；CUA 铸造已评估为不移植（保留产品插件） |
 
 ### 产品冲突
 
@@ -741,21 +741,66 @@ createConfig
 - tests：`adapters/test` 从失败恢复到全绿或只剩已记录的源码缺陷；不放宽断言。
 
 待完成（阶段 4 未完成，更新）：
-- turn/loop 剩余：未注册 MCP 工具晚到解析（`resolveUnregisteredTool`/`describeUnavailableTool`）、ToolSearch 实时 MCP 目录、`mcpStartupPolicy/background`、`mcpServerStatusFacts/deniedTools` 消费方；子代理冷恢复/compact 策略。
+- turn/loop 剩余：`mcpStartupPolicy/background`、`mcpServerStatusFacts.deniedTools` 消费方、ToolSearch 关闭时的连接中公告与 `runModelTextRequest` 集成、ToolSearch 增量交付 schema；子代理冷恢复/compact 策略。
 - lifecycle hooks 上下文、`createConfigWithPluginMigrations`、`pluginDiscoveryUi` 增量公告、批量删除预检、活动摘要。
 - plugin host 进程名；回复语言设置仅 Desktop 本机 Host 生效，远端/Web Host 仍回答 null。
-- marketplace `regions`/商店 UI；官方插件清单重生成。
+
+### 阶段 4 第五批补充：插件商店 regions（2026-11-25）
+
+- 数据流：目录条目 `regions: ["cn"|"global"]` → adapters `parseEntryStoreListing` 只保留已知值并去重（缺省/空表示全区域）→ contracts `PluginStoreListing.regions` → 协议 listing schema（strict，可选）→ UI `PluginStorePage` 浏览列表过滤（已安装/运行时 info 始终显示，个人 marketplace 不参与）。
+- 地区来源：产品暂无登录区域事实源，暂按 locale 推导（`zh*` → cn，其余 → global），与登录入口按 locale 预选 BigModel/Z.ai 的既有约定一致；后续接入真实登录区域只替换 `resolvePluginStoreRegion` 输入。
+- 内置官方插件不声明 regions，视为全区域可见；官方清单重生成无 diff。
+- 新增 spec：`packages/shared/spec/plugin-store-regions.md`；测试：shared 4 例、adapters 3 例、UI 4 例。
+- 验证：shared/services/ui `tsc -b`、contracts/adapters/bootstrap/cli 编译、`source:check`/`source:plugins:check`/`source:map:check` 通过。
+
+### 阶段 4 第六批：MCP 晚到解析与实时 ToolSearch（2026-11-25）
+
+- 未注册工具晚到解析：`ToolExecutorDeps.resolveUnregisteredTool`/`describeUnavailableTool` 可选端口；core 内部仅在存在 `mcpPort` 时装配。`lookupToolEntry` 先查 registry，miss 后调用 `resolveUnregisteredMcpTool`，只从当前 `McpSessionView` + 临时 registry 解析，不新建连接；首次连接按 `waitForServer` 有限等待，同一 assistant 回复共用 10s 预算，用满记录 `mcpPendingToolWaitExhausted`；解析异常回落未注册工具生命周期，取消返回 `ToolCancelled`。
+- 不可用诊断：`describeUnavailableMcpTool` 对 pending + WaitForMcpServers 可提供时提示先等待，否则按 `classifyServer` + `mcpUnavailableReason` 固定文案；registry-miss 的 `tool_use_error` 追加该后缀。
+- ToolSearch 实时目录：contracts 新增 `ToolSearchLiveView`/`readLatest`/`waitForPending` 与 pending/failed server 输出；`createLiveToolSearchContext` 按当前视图、会话 disallowlist、官方 CUA 重新 `selectMcpTools`，resident catalog 去掉 managed MCP 名称；`WaitForMcpServers` 在主会话实际发送后锁存，ToolSearch 开启时不提供。
+- 状态事实：`initializeMcp` 每次视图刷新重算 `McpServerStatusFacts`，维护 `offeredMcpTools`；`McpServerStatus.errorCode` 契约字段已就绪，adapters 暂未填充。
+- 测试：新增 `mcp-late-tool-resolution.test.ts` 17 例、`tool-search-live-mcp.test.ts` 6 例；core 全量 474/480（6 例为既有 Windows 路径/临时目录）。
+- 未完成：`mcpStartupPolicy/background`、`deniedTools` 消费方、ToolSearch 关闭时的连接中公告与 `runModelTextRequest` 集成、ToolSearch 增量交付 schema。
+
+### 阶段 4 第六批补充：测试 helper 与存量测试债（2026-11-25）
+
+- 恢复上游 helper 并适配产品：`bootstrap/tests/helpers/registry-backed-test-app.ts`、`adapters/tests/test-provider-config.ts`、`adapters/tests/test-adapter-model.ts`（品牌、ProviderConfig/ModelConfig schema、provider registry 回收）。
+- 修复：`draft-permission-full-access` 4/4、`session-features-workflow-command` 2/2、`model-session-features-wire` 12/12、`runner-stream-timing-wire` 13/13、`workspace-mcp-trust` 30/30、`subagent-workspace` 3/3；`provider-builtin-tool-rounds` 的 SSE CRLF 切帧导致 3 个用例转绿。
+- 测试断言按产品边界修正：CLI/headless 的 workspace MCP 开箱即用、不进入待信任集合，`source` 元数据只属于 protocol 信任模型；产品行为未回退。
+- Windows 夹具：`subagent-workspace` 改到 `tmpdir()` 父目录，避免 Git Bash `/tmp` 映射导致 cwd 捕获失败并保留断言。
+- 仍失败（源码缺口，未放宽断言）：`provider-builtin-tool-rounds` 5 例（live/cold `blockIndex` 与 text 块合并形态不一致，需同步 core message-history/hydrator/compact 投影）；`browser-control-scope-owner` 9 例（`BrowserGuestManager.getBackendIdentity` 产品未实现，窗口级稳定 identity 尚未落地）。
+- 最终：bootstrap 137/146（仅 browser-control 9 例失败），adapters 242/257（5 例投影缺口 + 1 例 Windows 并发 flake），shared 136/136，UI 184/184（另 1 个 node:test 文件未被 vitest 收集）。
 
 待完成（阶段 3 未完成）：
 - `WaitForMcpServers` 之外的 `ToolSearch` 关闭时连接中公告与 `runModelTextRequest` 集成。
 - HTTP transport 重试/401 step-up：会话过期与连接关闭已接入 `isRetryableCallError`，401 step-up 仍沿用既有授权恢复路径。
 - pool 租约化与 transport 错误收敛的上游完整形态；adapter 按需重连尚未包含 `retainTools` 与内建 server 重启上限。
 
+### 阶段 5 第二批：CUA 对齐评估（2026-11-25，结论：保留产品插件）
+
+对比上游 4.0.0 与产品现状：
+
+| 维度 | 上游 4.0.0 | 产品现状 | 结论 |
+| --- | --- | --- | --- |
+| 运行形态 | `node_repl` 进程内 `@zcode/zcode-cua` broker（自签凭据组，`in-process` socket） | 独立 native stdio MCP 插件 `kaying-computer-use-plugin`，macOS Swift/Windows/Linux native runtime | 保留产品插件；不恢复 broker |
+| 工具面 | `mcp__node_repl__js` + `agent.computerUse` | `mcp__plugin_kayingcode-cua_computer-use__*`（list_apps/get_app_state/click/...） | 保留插件 MCP 工具面 |
+| 平台 | macOS/Windows（Linux 不可用） | macOS/Windows/Linux（Linux AT-SPI2） | 产品覆盖更广 |
+| 权限边界 | 独立 CLI 用终端 App 的 TCC；进程内 socket 无对端鉴权 | 原生 App 自身权限/onboarding；Windows 前台输入策略 | 产品安全边界更清晰 |
+| 视觉反馈 | 第一阶段关闭 PiP/虚拟光标 | 插件内原生软件指针/窗口描边（macOS/Windows） | 保留产品实现 |
+| 共享策略 | `computer-use-policy.ts`、官方 CUA authority、subagent 禁用 | 与上游逐字一致 | 已对齐 |
+| 协议投影 | `cua-app-snapshot`、`cua-permission-observation`、`official-cua-media` | app snapshot 已移植；permission observation / media helper 缺失 | 仅当产品 CUA 产出 `display.kind="cua"`/`request_access` 时再补；当前无消费方，不引入死代码 |
+
+决策与理由：
+- 产品已退役 `@kayingcode/cua`、Helper/Broker、权限面板和 PiP，CUA 统一由内置插件承载；恢复上游 in-process broker 会重新引入终端 TCC 借用风险与第二套 native 运行时，且失去 Linux 支持。
+- 上游 4.0 新增的 SEA in-process broker 解决的是“独立 CLI 无宿主凭据”，产品的插件路径已能覆盖同类场景，不需要平行实现。
+- 保留适配点：官方 CUA server 名称/authority、subagent 禁用、app snapshot、tool display 已对齐；`cua-permission-observation` 与 `official-cua-media` 记录为“跟随上游架构、当前不适用”，待产品 CUA 增加对应展示契约时再评估。
+- 验收边界：CUA 不进入上游源码合并清单；后续升级只同步 `computer-use-policy`、官方鉴权与通用工具展示，不同步 broker/PiP/SEA CUA 资产。
+
 ### 阶段 5 第一批：游戏插件兼容验收（2026-11-24）
 
 - 新增 `adapters/tests/game-plugins-upstream-loader.test.ts`：用上游 loader 发现 blender、kaying-for-taptap、kaying-game-playtest、computer-use 四个内置游戏插件，验证 `source=official`、启用、skill 根与 MCP servers 均正常。
 - 游戏插件仍使用 `.zcode-plugin` manifest；新 loader 的 `.zcode-plugin` 优先/`.kayingcode-plugin` 回退、workspace trust、plugin-secrets 与 MCP 解析均已覆盖。
-- 未执行：游戏插件全链路 E2E（真实 Blender/TapTap/Playtest 运行时）、CUA 对齐评估、非游戏上游能力（preinstalled-tools/managed-worktree/voice-input/selection-comment/composer-edit-mode/settings-search/remote context-composition）。
+- 未执行：游戏插件全链路 E2E（真实 Blender/TapTap/Playtest 运行时）、非游戏上游能力（preinstalled-tools/managed-worktree/voice-input/selection-comment/composer-edit-mode/settings-search/remote context-composition）。
 - 旧 loader 兼容分支仍保留在游戏插件/产品装配中；确认新路径稳定后再删除。
 
 ## 验证记录
