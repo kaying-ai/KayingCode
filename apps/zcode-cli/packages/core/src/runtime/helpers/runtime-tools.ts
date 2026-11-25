@@ -7,11 +7,15 @@ import {
   registerBuiltInTools,
   traceContextToLogContext,
 } from "../deps.js";
-import type { HookRunner, SessionId, ToolExecutor, TraceContext } from "../deps.js";
+import type { HookRunner, Model, SessionId, ToolExecutor, TraceContext } from "../deps.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import type { AgentRuntimeDeps } from "../types.js";
 import { resolveRuntimeEmbeddedSearchEnabled } from "../methods/embedded-search-branch.js";
-import { createMcpServerWaitPort } from "../methods/mcp.js";
+import {
+  createMcpServerWaitPort,
+  describeUnavailableMcpTool,
+  resolveUnregisteredMcpTool,
+} from "../methods/mcp.js";
 import { getSessionShellSelectionFromConfig } from "../methods/session-shell-environment.js";
 import { createRuntimeSessionModePort } from "../session-mode-port.js";
 import { sessionControlForRuntime } from "../../tool/session-control/contract.js";
@@ -213,7 +217,17 @@ function createRuntimeToolExecutor(
     dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort,
     dynamicWorkflowSnippetPort: deps.dynamicWorkflowSnippetPort,
     modelCatalogPort: deps.modelCatalogPort,
-    ...(deps.mcpPort === undefined ? {} : { mcpServerWaitPort: createMcpServerWaitPort(runtime) }),
+    ...(deps.mcpPort === undefined
+      ? {}
+      : {
+          mcpServerWaitPort: createMcpServerWaitPort(runtime),
+          // 未注册工具报错只解释本会话 MCP 工具所属 server 的当前状态。
+          describeUnavailableTool: (toolName: string, model?: Model) =>
+            describeUnavailableMcpTool(runtime, toolName, model),
+          // 晚到解析只从当前 McpSessionView 解析本会话提供过的 MCP 工具，不发起新连接。
+          resolveUnregisteredTool: (toolName, options) =>
+            resolveUnregisteredMcpTool(runtime, toolName, options),
+        }),
     runtimeTaskRegistry: runtime.runtimeTaskRegistry,
     registerResidencyBlockingWork: (work) => {
       void runtime.trackResidencyBlockingWork(work).catch(() => undefined);

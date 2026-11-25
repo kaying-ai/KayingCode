@@ -48,6 +48,7 @@ import type {
   McpServerWaitPort,
   ReadFileStateMap,
   ToolBatchEvent,
+  ToolEntry,
   ToolExecutionResult,
   ToolRuntimeScope,
 } from "../types.js";
@@ -123,7 +124,12 @@ export interface ToolExecutorOptions {
   dynamicWorkflowSnippetPort?: DynamicWorkflowSnippetPort;
   /** 模型目录端口；缺席则 ListModels 报能力缺席，CreateWorkflow 的 subagent_model 被拒。 */
   modelCatalogPort?: ModelCatalogPort;
+  /** WaitForMcpServers 的端口；runtime 只在持有 MCP 会话时提供。 */
   mcpServerWaitPort?: McpServerWaitPort;
+  /** 未注册工具报错的原因后缀（以 ". " 开头）；runtime 只对 MCP 工具给出说明。 */
+  describeUnavailableTool?: (toolName: string, model?: Model) => string;
+  /** 本 step registry 没有的 MCP 工具：按最新会话视图构造 entry，必要时等首次连接。 */
+  resolveUnregisteredTool?: ResolveUnregisteredTool;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   readFileState?: ReadFileStateMap;
   /** 技能门的探针（ToolInputResolutionContext.hasLoadedSkill）；runtime 按 provider 可见历史回答。 */
@@ -193,6 +199,8 @@ export interface ToolExecutor {
 
 export interface ToolExecuteOptions {
   toolSearch?: ToolSearchExecutionContext;
+  /** 产生这批调用的 assistant 回复；未注册 MCP 工具的等待预算按它共享。 */
+  responseId?: string;
   automationTurn?: boolean;
   automationId?: string;
   offPeakTurn?: boolean;
@@ -205,6 +213,15 @@ export interface ToolExecuteOptions {
 export interface ToolBatchExecuteOptions extends ToolExecuteOptions {
   maxConcurrency?: number;
 }
+
+/**
+ * 未注册工具的晚到解析。responseId 标识同一条 assistant 回复：回复内的调用共用等待预算。
+ * 等待被取消时以 signal.reason 拒绝。
+ */
+export type ResolveUnregisteredTool = (
+  toolName: string,
+  options: { signal?: AbortSignal; responseId?: string },
+) => Promise<ToolEntry | undefined>;
 
 export interface ToolExecutorDeps {
   agentTelemetry?: AgentExecutionTelemetryPort;
@@ -253,7 +270,12 @@ export interface ToolExecutorDeps {
   dynamicWorkflowSnippetPort?: DynamicWorkflowSnippetPort;
   /** 模型目录端口；缺席则 ListModels 报能力缺席，CreateWorkflow 的 subagent_model 被拒。 */
   modelCatalogPort?: ModelCatalogPort;
+  /** WaitForMcpServers 的端口；runtime 只在持有 MCP 会话时提供。 */
   mcpServerWaitPort?: McpServerWaitPort;
+  /** 未注册工具报错的原因后缀（以 ". " 开头）；runtime 只对 MCP 工具给出说明。 */
+  describeUnavailableTool?: (toolName: string, model?: Model) => string;
+  /** 本 step registry 没有的 MCP 工具：按最新会话视图构造 entry，必要时等首次连接。 */
+  resolveUnregisteredTool?: ResolveUnregisteredTool;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   readFileState: ReadFileStateMap;
   /** 文件读取快照的下一个序号；执行器持有计数器，只增不减。 */

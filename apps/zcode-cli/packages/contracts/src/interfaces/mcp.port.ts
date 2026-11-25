@@ -137,6 +137,8 @@ export interface McpServerStatus {
   toolCount: number;
   updatedAt: string;
   error?: string;
+  /** 连接失败的稳定错误码（适配器能给出时）；诊断文案按它区分失败类型。 */
+  errorCode?: string;
   failureKind?: McpServerFailureKind;
   serverRequestId?: string;
   protocolEra?: "legacy" | "modern";

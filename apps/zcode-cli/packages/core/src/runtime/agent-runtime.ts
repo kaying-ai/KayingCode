@@ -134,7 +134,7 @@ import type {
   WorkspaceFileRewindPreview,
   WorkspaceForkResult,
 } from "./types.js";
-import type { AgentRuntimeInternal } from "./internal.js";
+import type { AgentRuntimeInternal, McpServerStatusFacts } from "./internal.js";
 import { InMemoryRuntimeTaskRegistry, type RuntimeTaskRegistry } from "../runtime-task/registry.js";
 import type { WorkflowBlockedReminderClock } from "../runtime-task/workflow-blocked-reminder.js";
 import type { BackgroundSubagentStallClock } from "../subagent/background-stall.js";
@@ -233,7 +233,12 @@ export class AgentRuntime {
   private mcpTrustAdmissionRead = false;
   private mcpToolsRegistered = false;
   private registeredMcpToolNames?: string[];
+  private readonly offeredMcpTools = new Map<string, string>();
+  private mcpServerWaitDeclared = false;
+  private readonly mcpPendingToolWaitByResponse = new Map<string, number>();
+  private readonly mcpPendingToolWaitExhausted = new Map<string, string>();
   private mcpToolsSignature?: string;
+  private mcpServerStatusFacts?: McpServerStatusFacts;
   private subagentPort?: SubagentPort;
   private readonly getAgentDefinitions: GetAgentDefinitions;
   private readonly prepareAgentDefinitions: ReturnType<

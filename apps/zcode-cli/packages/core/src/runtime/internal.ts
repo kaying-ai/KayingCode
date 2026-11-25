@@ -1,5 +1,5 @@
 import { PermissionService, ToolScheduler } from "./deps.js";
-import type { ModelRequestSessionFeature } from "@zcode/contracts";
+import type { ModelRequestSessionFeature, ToolSearchMcpState } from "@zcode/contracts";
 import type { PromptSnapshot } from "./helpers/prompt-snapshot.js";
 import type { TotalTokensBudgetState } from "./helpers/total-tokens-budget.js";
 import type { InstructionRefreshReason } from "../context/types.js";
@@ -67,7 +67,14 @@ import type { ProjectMemoryExtractionScheduler } from "./helpers/project-memory-
 import type { ProjectMemoryUpdate } from "./helpers/project-memory-dream.js";
 import type { RuntimeTelemetryFacade } from "../telemetry/runtime-telemetry.js";
 import type { WorkspaceHookRuntimeAdmissionPort } from "../hooks/workspace-hook-runtime-admission.js";
-import type { McpSession } from "../mcp/runtime/session.js";
+import type { McpSession, McpServerClass } from "../mcp/runtime/session.js";
+
+/** 最近一次应用 MCP 快照时的 server 状态分类；WaitForMcpServers 与 ToolSearch 诊断读它。 */
+export type McpServerStatusFacts = ToolSearchMcpState & {
+  needsAuth: string[];
+  sources: Record<string, McpServerClass>;
+  deniedTools?: string[];
+};
 
 export interface AgentRuntimeInternal
   extends AgentRuntimeCoreMethods, AgentRuntimeTurnMethods, AgentRuntimeHookMethods {
@@ -146,7 +153,17 @@ export interface AgentRuntimeInternal
   mcpToolsRegistered: boolean;
   /** 初始化 / 上次刷新时注册的 MCP 工具名与集合签名。 */
   registeredMcpToolNames?: string[];
+  /** 本会话曾向模型提供过的 MCP 工具名 → server 名；工具离开目录后用于说明原因。 */
+  offeredMcpTools: Map<string, string>;
+  /** 主 agent 请求已发送过 WaitForMcpServers：之后一直提供（锁存，只在内存）。 */
+  mcpServerWaitDeclared: boolean;
+  /** assistant 回复 id → 未注册工具已用的等待毫秒数；同一回复内的调用共用预算。 */
+  mcpPendingToolWaitByResponse: Map<string, number>;
+  /** server 名 → 已等满预算的那次连接（连接状态的 updatedAt）；同一次连接不再等待。 */
+  mcpPendingToolWaitExhausted: Map<string, string>;
   mcpToolsSignature?: string;
+  /** 最近一次应用快照时的 server 状态分类；ToolSearch 诊断与 WaitForMcpServers 曝光读它。 */
+  mcpServerStatusFacts?: McpServerStatusFacts;
   subagentPort?: SubagentPort;
   getAgentDefinitions: NonNullable<AgentRuntimeDeps["getAgentDefinitions"]>;
   prepareAgentDefinitions: (input: {

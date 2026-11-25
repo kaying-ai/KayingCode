@@ -1,4 +1,6 @@
 import { resolveToolSearchMode } from "../../tool/search/exposure.js";
+import { WAIT_FOR_MCP_SERVERS_TOOL_NAME } from "@zcode/contracts";
+import { isMcpServerWaitOffered } from "./mcp.js";
 import type {
   CollaborationMode,
   ExecutionShellSelection,
@@ -146,6 +148,10 @@ export function getTools(this: AgentRuntimeInternal, model?: Model): ModelToolCo
         (tool.name !== "ToolSearch" && tool.name !== "DeferredToolCall") ||
         !model ||
         resolveToolSearchMode(model, this.config.toolSearch?.mode) !== "off",
+    )
+    // 与 MCP 会话同门（agent-runtime 在有 mcpPort 时创建会话）；本轮是否可见由这里统一决定。
+    .filter(
+      (tool) => tool.name !== WAIT_FOR_MCP_SERVERS_TOOL_NAME || isMcpServerWaitOffered(this, model),
     )
     .filter((tool) => tool.name !== "WebSearch" || shouldExposeWebSearch.call(this, model))
     .map((tool) =>

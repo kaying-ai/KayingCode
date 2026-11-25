@@ -76,7 +76,8 @@ const CUA_USER_TITLE_SCHEMA = {
   description:
     "Required short user-facing title in the user's language that describes why the app interface is being read without implementation terms such as CUA, MCP, or get_app_state",
 } satisfies JsonSchema;
-const KAYINGCODE_CUA_CANONICAL_MODEL_PREFIX = "mcp__computer-use__";
+/** 官方 CUA 的规范模型名前缀；诊断按它把工具名映射回连接记录名。 */
+export const KAYINGCODE_CUA_CANONICAL_MODEL_PREFIX = "mcp__computer-use__";
 const KAYINGCODE_CUA_PROVIDER_SPELLING_ALIAS_PREFIX = "mcp__computer_use__";
 
 export interface RegisterMcpToolsOptions {
@@ -106,19 +107,11 @@ export function registerMcpTools(
   descriptors: readonly McpToolDefinition[],
   options: RegisterMcpToolsOptions = {},
 ): string[] {
-  const allowed = options.allowedTools ? new Set(options.allowedTools) : undefined;
-  const disallowed = createToolRuleNameSet(options.disallowedTools);
   const registered: string[] = [];
-
-  for (const descriptor of descriptors) {
-    const officialCuaAuthorityVerified =
-      options.officialCuaServerNames?.has(descriptor.serverName) === true;
-    const descriptorName = toMcpToolName(descriptor);
-    const name = toRegisteredMcpToolName(descriptor, officialCuaAuthorityVerified);
-    // 官方 CUA 投影模型主名后，如果只按新名检查规则，升级前保存的 namespaced
-    // denylist 会静默失效并放行。新旧名称任一命中 deny 即拒绝，任一命中 allow 即接受。
-    if (allowed && !allowed.has(name) && !allowed.has(descriptorName)) continue;
-    if (disallowed?.has(name) || disallowed?.has(descriptorName)) continue;
+  for (const { name, descriptor, officialCuaAuthorityVerified } of selectMcpTools(
+    descriptors,
+    options,
+  )) {
     registry.register(
       createMcpToolEntry(
         name,
@@ -135,6 +128,32 @@ export function registerMcpTools(
   }
 
   return registered;
+}
+
+/** 执行注册和实时搜索共用名称、别名及权限准入；搜索不创建执行 handler。 */
+export function* selectMcpTools(
+  descriptors: readonly McpToolDefinition[],
+  options: RegisterMcpToolsOptions = {},
+) {
+  const allowed = options.allowedTools ? new Set(options.allowedTools) : undefined;
+  const disallowed = createToolRuleNameSet(options.disallowedTools);
+  for (const descriptor of descriptors) {
+    const officialCuaAuthorityVerified =
+      options.officialCuaServerNames?.has(descriptor.serverName) === true;
+    const descriptorName = toMcpToolName(descriptor);
+    const name = toRegisteredMcpToolName(descriptor, officialCuaAuthorityVerified);
+    // 官方 CUA 投影模型主名后，如果只按新名检查规则，升级前保存的 namespaced
+    // denylist 会静默失效并放行。新旧名称任一命中 deny 即拒绝，任一命中 allow 即接受。
+    // 搜索时同样不能放宽。
+    if (allowed && !allowed.has(name) && !allowed.has(descriptorName)) continue;
+    if (disallowed?.has(name) || disallowed?.has(descriptorName)) continue;
+    yield {
+      name,
+      descriptor,
+      officialCuaAuthorityVerified,
+      aliases: officialCuaProviderSpellingAliases(name, descriptor, officialCuaAuthorityVerified),
+    };
+  }
 }
 
 function toRegisteredMcpToolName(

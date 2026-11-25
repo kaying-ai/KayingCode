@@ -72,6 +72,8 @@ export class ToolExecutorImpl implements ToolExecutor {
       dynamicWorkflowSnippetPort: options.dynamicWorkflowSnippetPort,
       modelCatalogPort: options.modelCatalogPort,
       mcpServerWaitPort: options.mcpServerWaitPort,
+      describeUnavailableTool: options.describeUnavailableTool,
+      resolveUnregisteredTool: options.resolveUnregisteredTool,
       runtimeTaskRegistry: options.runtimeTaskRegistry,
       readFileState: options.readFileState ?? new Map(),
       nextReadFileStateSnapshotIndex: () => this.readFileStateSnapshotCount++,

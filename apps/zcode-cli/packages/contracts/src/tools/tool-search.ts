@@ -14,6 +14,19 @@ export function isToolSearchName(name: string | undefined): boolean {
 }
 export const TOOL_SEARCH_DEFAULT_RESULTS = 5;
 export const TOOL_SEARCH_BETA = "advanced-tool-use-2025-11-20";
+// 连接中/失败的 MCP server 诊断：ToolSearch 未命中时随结果返回给模型。
+export const ToolSearchMcpFailureSchema = z.object({
+  name: z.string(),
+  errorCode: z.string().optional(),
+  error: z.string().optional(),
+});
+export const ToolSearchMcpStateSchema = z.object({
+  pending: z.array(z.string()),
+  /** 需要用户授权后才能使用的 server；缺席等同空列表。 */
+  needsAuth: z.array(z.string()).optional(),
+  failed: z.array(ToolSearchMcpFailureSchema),
+});
+export type ToolSearchMcpState = z.infer<typeof ToolSearchMcpStateSchema>;
 export const ToolSearchAnnouncementSchema = z
   .object({
     addedNames: z.array(z.string().min(1)),
@@ -55,6 +68,8 @@ export const ToolSearchOutputSchema = z.object({
   matches: z.array(z.string()),
   query: z.string(),
   total_deferred_tools: z.number(),
+  pending_mcp_servers: z.array(z.string()).optional(),
+  failed_mcp_servers: z.array(ToolSearchMcpFailureSchema).optional(),
 });
 export const ToolSearchInputJsonSchema = toToolJsonSchema(ToolSearchInputSchema);
 export const ToolSearchOutputJsonSchema = toToolJsonSchema(ToolSearchOutputSchema);
@@ -70,9 +85,25 @@ export interface ToolSearchCandidate {
   readonly searchHint?: string;
   readonly deferred: boolean;
 }
+export interface ToolSearchLiveView {
+  readonly catalog: readonly ToolSearchCandidate[];
+  readonly pending: readonly string[];
+  readonly failed: ToolSearchMcpState["failed"];
+}
 export interface ToolSearchExecutionContext {
   readonly mode: ResolvedToolSearchMode;
   readonly enabled: boolean;
   readonly catalog: readonly ToolSearchCandidate[];
   readonly discovered: ReadonlySet<string>;
+  /**
+   * 当前会话的实时目录投影：MCP server 在 step 之后连接/断线时以它为准，避免用过期启动快照。
+   * 缺席时按构建请求时的 catalog 处理（compact 等不经过 turn loop 的请求）。
+   */
+  readonly readLatest?: () => ToolSearchLiveView;
+  /** 搜索未命中且目标 server 仍在连接时等待其首次连接；缺席表示不等待。 */
+  readonly waitForPending?: (
+    servers: readonly string[],
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ) => Promise<void>;
 }

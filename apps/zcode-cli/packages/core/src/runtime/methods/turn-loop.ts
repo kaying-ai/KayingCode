@@ -5,6 +5,7 @@ import {
   persistAnnouncements,
 } from "./context-refresh.js";
 import { getTurnTools } from "./turn-tool-visibility.js";
+import { createLiveToolSearchContext, latchMcpServerWait } from "./mcp.js";
 import { refreshOffPeakTurnAfterTakeover } from "../off-peak/turn.js";
 import { appendRuntimeAgentListing } from "../helpers/agent-listing.js";
 import { beginLocalTurnPreparation } from "@zcode/contracts";
@@ -216,6 +217,13 @@ export async function runRegularTurnLoop(
       entries: requestEntries,
       traceContext: state.turnTraceContext,
     });
+    // 实时 MCP 目录：ToolSearch 读取当前会话视图，不使用启动时的快照。
+    Object.assign(
+      prepared.toolSearch,
+      createLiveToolSearchContext(this, state, prepared.toolSearch),
+    );
+    // 请求真正发送了 WaitForMcpServers 才锁存；重试、续写看到同一份工具列表。
+    latchMcpServerWait(this, prepared.request.tools);
     this.logger?.debug("ToolSearch request exposure", {
       event: "tool.search.exposure",
       enabled: prepared.toolSearch.enabled,
