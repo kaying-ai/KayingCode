@@ -35,8 +35,10 @@ import {
   buildStoreItems,
   canUpdatePluginItem,
   isPluginUpdatePending,
+  isPluginVisibleForStoreRegion,
   resolveItemDisplayName,
   resolvePluginDisplayName,
+  resolvePluginStoreRegion,
   type StorePluginItem,
 } from "@/settings/pluginStoreListing.js";
 import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID } from "@zcode/shared";
@@ -145,6 +147,10 @@ export function PluginStorePage({
     void KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID;
   }, [marketplaces, pluginManagementService, updateMarketplace]);
 
+  // 商店浏览（分段、Featured、分类、游戏专区、搜索、详情定位）只看当前地区可见的条目；
+  // 已安装条目在 isPluginVisibleForStoreRegion 里保留，管理已安装视图用自己的全集不受影响。
+  // 地区暂由 locale 推导，见 packages/shared/spec/plugin-store-regions.md。
+  const storeRegion = resolvePluginStoreRegion(locale);
   const items = useMemo(
     () =>
       buildStoreItems({
@@ -154,7 +160,7 @@ export function PluginStorePage({
         installedPlugins,
         plugins,
         restorableBuiltins,
-      }),
+      }).filter((item) => isPluginVisibleForStoreRegion(item, storeRegion)),
     [
       availablePlugins,
       installedPlugins,
@@ -162,6 +168,7 @@ export function PluginStorePage({
       marketplaces,
       plugins,
       restorableBuiltins,
+      storeRegion,
     ],
   );
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);

@@ -5,6 +5,7 @@ import type {
   KayingCodePluginInfo,
   KayingCodePluginMarketplaceSummary,
   KayingCodePluginStoreListing,
+  KayingCodePluginStoreRegion,
 } from "@zcode/shared";
 import {
   sortPluginStoreEntries,
@@ -426,4 +427,30 @@ export type PluginStoreSegment = "public" | "community" | "personal";
 export function resolvePluginStoreSegment(item: StorePluginItem): PluginStoreSegment {
   if (!isPublicStoreMarketplaceId(item.marketplace)) return "personal";
   return item.listing?.publisherType === "community" ? "community" : "public";
+}
+
+/**
+ * 商店浏览列表的地区（packages/shared/spec/plugin-store-regions.md）。
+ *
+ * 产品暂时没有「登录区域」事实源：按 locale 推导，`zh*` 国内、其余海外。这与
+ * `LoginApiKeyForm` 按 locale 预选 BigModel / Z.ai 登录入口的既有约定一致，也不新增设置项。
+ * 将来接入真实登录区域时只替换本函数的输入，过滤规则与数据层不变。
+ */
+export function resolvePluginStoreRegion(locale: string): KayingCodePluginStoreRegion {
+  return locale.toLowerCase().startsWith("zh") ? "cn" : "global";
+}
+
+/**
+ * 商店浏览列表是否显示该条目：已安装（或有运行时 info）始终显示，避免已装插件从商店消失；
+ * 个人 marketplace 不参与官方区域定向；条目没声明 regions 时所有区域可见。
+ */
+export function isPluginVisibleForStoreRegion(
+  item: Pick<StorePluginItem, "installed" | "info" | "marketplace" | "listing">,
+  region: KayingCodePluginStoreRegion,
+): boolean {
+  if (item.installed || item.info) return true;
+  if (!isPublicStoreMarketplaceId(item.marketplace)) return true;
+  const regions = item.listing?.regions;
+  if (!regions || regions.length === 0) return true;
+  return regions.includes(region);
 }

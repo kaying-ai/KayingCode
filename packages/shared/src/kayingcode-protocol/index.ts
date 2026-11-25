@@ -3878,6 +3878,10 @@ export type KayingCodePluginsSetEnabledResult = z.infer<
   typeof kayingcodePluginsSetEnabledResultSchema
 >;
 
+/** 插件商店定向展示的区域：`cn` 国内、`global` 海外（packages/shared/spec/plugin-store-regions.md）。 */
+export const kayingcodePluginStoreRegionSchema = z.enum(["cn", "global"]);
+export type KayingCodePluginStoreRegion = z.infer<typeof kayingcodePluginStoreRegionSchema>;
+
 // 商店信息（Store Listing）：目录条目携带的展示性元数据（显示名/icon/分类/作者/链接/hero/
 // 示例提示词），全部可选，UI 缺失时按降级矩阵处理（字母头像/隐藏区块/省略信息行）。
 // i18n 采用 `<字段>I18n` map，locale 解析复用 shared 的 plugin-display-name helper。
@@ -3905,6 +3909,12 @@ export const kayingcodePluginStoreListingSchema = z
      * 不参与安装门禁与计费，命名也不绑定具体套餐商品名。
      */
     requiresPaidPlan: z.boolean().optional(),
+    /**
+     * 目录条目声明的可见区域：`cn` 国内、`global` 海外；缺省表示所有区域可见。
+     * CLI 读目录时只透传这两个值（未知值丢弃，strict 协议才不会整页解析失败），
+     * UI 按当前地区过滤商店浏览列表；只影响展示，不限制安装与运行。
+     */
+    regions: z.array(kayingcodePluginStoreRegionSchema).optional(),
   })
   .strict();
 export type KayingCodePluginStoreListing = z.infer<typeof kayingcodePluginStoreListingSchema>;

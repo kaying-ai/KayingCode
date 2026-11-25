@@ -154,7 +154,16 @@ export interface PluginStoreListing {
    * 因此不参与安装门禁与计费；命名不绑定具体套餐商品名，套餐改名不会让字段过期。
    */
   requiresPaidPlan?: boolean;
+  /**
+   * 目录条目声明的可见区域：`cn` 国内、`global` 海外。商店按当前地区只显示对应插件；
+   * 缺省表示所有区域可见。CLI 只保留这两个值并去重，过滤后为空时不写。
+   * 只影响商店展示，不限制安装与运行（packages/shared/spec/plugin-store-regions.md）。
+   */
+  regions?: PluginStoreRegion[];
 }
+
+/** 商店定向展示的区域：`cn` 国内、`global` 海外。 */
+export type PluginStoreRegion = "cn" | "global";
 
 export const pluginBrowserCompareProfileSchema = z.enum(["standard-web", "taptap-preview"]);
 export type PluginBrowserCompareProfile = z.infer<typeof pluginBrowserCompareProfileSchema>;

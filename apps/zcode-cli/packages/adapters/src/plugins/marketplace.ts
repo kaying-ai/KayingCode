@@ -9,7 +9,12 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import type { PluginDiagnostic, PluginManifest, PluginStoreListing } from "@zcode/contracts";
+import type {
+  PluginDiagnostic,
+  PluginManifest,
+  PluginStoreListing,
+  PluginStoreRegion,
+} from "@zcode/contracts";
 import {
   isOfficialMarketplaceId,
   KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE,
@@ -1648,6 +1653,7 @@ function createManifestFromMarketplaceEntry(
   delete raw.examplePrompts;
   delete raw.examplePrompts_i18n;
   delete raw.requiresPaidPlan;
+  delete raw.regions;
   return {
     ...raw,
     name: entry.name,
@@ -2176,7 +2182,22 @@ export function parseEntryStoreListing(
   // 付费套餐提示只认显式布尔 true；字符串 "true"、1 等歧义写法一律按无需套餐处理，
   // 避免目录写错就给免费插件挂上付费提示。
   if (entry.requiresPaidPlan === true) listing.requiresPaidPlan = true;
+  const regions = readStoreRegions(entry.regions);
+  if (regions) listing.regions = regions;
   return Object.keys(listing).length > 0 ? listing : undefined;
+}
+
+const STORE_REGIONS: readonly PluginStoreRegion[] = ["cn", "global"];
+
+/**
+ * 读目录条目的可见区域：只保留认识的 `cn` / `global` 并去重。
+ * 未知值直接忽略、不报错：协议 schema 是 strict 的，将来目录加新区域值时，
+ * 透传未知值会让 App 整页解析失败。缺省、非数组或过滤后为空都返回 undefined，表示全部区域可见。
+ */
+function readStoreRegions(value: unknown): PluginStoreRegion[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const regions = STORE_REGIONS.filter((region) => value.includes(region));
+  return regions.length > 0 ? regions : undefined;
 }
 
 /** author 字段兼容 string 与 {name,url}（plugin.json 与目录条目共用此规则）。 */
