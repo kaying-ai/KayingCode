@@ -153,6 +153,8 @@ export function createTuiSubmitPrompt(
       createdApp = await createAppFactory({
         modelSelectionMode: "cli-default",
         standaloneSessionControl: true,
+        // TUI 交互入口：首个请求不等全部 MCP server；prompt 命令等其他入口保持默认 blocking。
+        mcpStartupPolicy: "background",
         browserControlPort: browserRuntime?.browserControlPort,
         env: appEnv,
         projectConfigPath: deps.projectConfigPath,

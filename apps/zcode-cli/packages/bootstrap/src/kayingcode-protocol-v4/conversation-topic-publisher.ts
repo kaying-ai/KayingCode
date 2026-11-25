@@ -42,6 +42,11 @@ import {
   workflowRunDeltaGrowthUpperBound,
 } from "./conversation-workflow-run-deltas.js";
 import {
+  hasPluginInstallInteraction,
+  pluginInstallDeltasForConnection,
+  pluginInstallSnapshotForConnection,
+} from "./plugin-discovery-subscription.js";
+import {
   ProductProjection,
   type ConversationRowTargetAction,
   type ConversationRowTargetResolution,
@@ -99,6 +104,11 @@ interface Subscription {
    * false = 旧消费者：增量折成整键 patch、快照裁到旧界（conversation-workflow-run-deltas.ts）。
    */
   workflowRunDeltas: boolean;
+  /**
+   * 这条订阅认不认得插件发现 UI 的增量（`pluginInstall` 卡片）。
+   * false = 旧消费者：快照与增量都裁掉该卡片（plugin-discovery-subscription.ts）。
+   */
+  pluginDiscoveryUi: boolean;
   /** flush buffer：push 时已过 profile 过滤与该订阅的编码，flush 时 coalesce 打帧。 */
   buffer: ConversationDelta[];
   bufferBytes: number;
@@ -121,6 +131,11 @@ export interface ConversationSubscribeParams {
    * 注入，面向 UI 的 subscribe 选不了。缺省 false——能力位缺席一律按旧消费者办。
    */
   workflowRunDeltas?: boolean;
+  /**
+   * 该连接的 clientHello 声明过认得插件发现 UI 的增量（`pluginInstall` 卡片）。
+   * 与 workflowRunDeltas 同族：可信 host 注入，缺省 false——能力位缺席按旧消费者裁剪。
+   */
+  pluginDiscoveryUi?: boolean;
 }
 
 export interface ConversationSubscribeResult {
@@ -370,20 +385,25 @@ export class ConversationTopicPublisher {
   }
 
   /**
-   * 一个订阅者的快照帧：profile 决定行可见性，能力位决定 `workflowRuns` 发全量还是旧界。
+   * 一个订阅者的快照帧：profile 决定行可见性，能力位决定插件安装卡片与 `workflowRuns`
+   * 发全量还是旧界。
    *
    * 快照与增量必须同一档：一个收着旧界整键 patch 的客户端，如果快照里突然来了 512 个节点，
    * 它的 `.max(256)` 会让**整帧**解析失败（已知键上的解析错误不会只剥掉一个键）。
    */
   private getWireSnapshotForSubscription(subscription: Subscription): ConversationSnapshot {
-    const snapshot = this.getWireSnapshotForProfile(subscription.profile);
+    // 旧连接先裁插件安装卡片，再做 workflowRuns 旧界裁剪；两步都保持同一引用语义。
+    const snapshot = pluginInstallSnapshotForConnection(
+      this.getWireSnapshotForProfile(subscription.profile),
+      subscription.pluginDiscoveryUi,
+    );
     if (subscription.workflowRunDeltas || snapshot.workflowRuns === undefined) return snapshot;
     const workflowRuns = clampWorkflowRunsForLegacy(snapshot.workflowRuns);
     return workflowRuns === snapshot.workflowRuns ? snapshot : { ...snapshot, workflowRuns };
   }
 
   /**
-   * 一批 delta 的**每订阅者**编码：profile 过滤 + 旧消费者的整键折叠。
+   * 一批 delta 的**每订阅者**编码：profile 过滤 + 插件安装卡片裁剪 + 旧消费者的整键折叠。
    *
    * 折叠取的是**当前**投影状态，所以恢复回放上历史增量会折成终态——中间态被跳过，终态一致，
    * 与 coalesce 的既有行为同规（conversation-workflow-run-deltas.ts 的文件头）。
@@ -392,7 +412,10 @@ export class ConversationTopicPublisher {
     deltas: readonly ConversationDelta[],
     subscription: Subscription,
   ): readonly ConversationDelta[] {
-    const filtered = filterConversationDeltasForProfile(deltas, subscription.profile);
+    const filtered = pluginInstallDeltasForConnection(
+      filterConversationDeltasForProfile(deltas, subscription.profile),
+      subscription.pluginDiscoveryUi,
+    );
     if (subscription.workflowRunDeltas) return filtered;
     return encodeConversationDeltasForLegacy(filtered, this.projection.getSnapshot().workflowRuns);
   }
@@ -853,6 +876,7 @@ export class ConversationTopicPublisher {
       connectionId: params.connectionId,
       profile,
       workflowRunDeltas: params.workflowRunDeltas === true,
+      pluginDiscoveryUi: params.pluginDiscoveryUi === true,
       buffer: [],
       bufferBytes: 0,
       resyncRequired: false,
@@ -881,7 +905,11 @@ export class ConversationTopicPublisher {
       return true;
     };
 
-    const base = params.base;
+    // 同一 seq 可能对应不同卡片投影。能力变化或挂起卡片的 base 来源未知时，用快照校正。
+    const sameProjection = previousSubscription
+      ? previousSubscription.pluginDiscoveryUi === subscription.pluginDiscoveryUi
+      : !hasPluginInstallInteraction(this.getSnapshot().pendingInteractions);
+    const base = sameProjection ? params.base : undefined;
     const resumable =
       base !== undefined &&
       base.logEpoch === this.logEpoch &&

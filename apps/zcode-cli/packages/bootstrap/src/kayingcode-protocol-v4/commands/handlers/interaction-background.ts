@@ -51,7 +51,12 @@ async function resolveInteraction(
     payload.answer.optionId === PERMISSION_FULL_ACCESS_OPTION_ID
       ? ((await host.interactions?.resolveFullAccess(payload.interactionId, envelope.sessionId!)) ??
         false)
-      : (host.interactions?.resolve(payload.interactionId, payload.answer) ?? false);
+      : (host.interactions?.resolve(
+          payload.interactionId,
+          payload.answer,
+          envelope.sessionId,
+          envelope.pluginDiscoveryUi === true,
+        ) ?? false);
   if (!delivered) {
     host.logger?.info?.("v4 resolveInteraction no pending interaction (idempotent)", {
       event: "kayingcode_protocol.v4.interaction_already_resolved",

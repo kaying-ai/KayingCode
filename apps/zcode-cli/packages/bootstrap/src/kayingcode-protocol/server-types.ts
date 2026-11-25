@@ -172,6 +172,8 @@ export interface KayingCodeProtocolAgentServerContext {
   // 协议请求则持有 operation lease，禁止异步 handler 与容量回收交错。
   sessionResidentPool?: SessionResidentPool;
   sessionLifecycle?: import("../session-lifecycle/index.js").SessionLifecycleController;
+  /** 每个会话当前在途的协议请求数；彻底删除据此阻止确认期间仍在恢复/读取的会话。 */
+  sessionRequestCounts?: Map<string, number>;
   /** context 组成修订号的唯一 owner（context-composition/tracker.ts），首次使用时创建。 */
   contextCompositionTracker?: import("./context-composition/tracker.js").ContextCompositionRevisionTracker;
   sessions: Map<string, KayingCodeProtocolSessionRecord>;

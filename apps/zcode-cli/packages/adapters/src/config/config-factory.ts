@@ -1,5 +1,7 @@
 // Config Factory - Load and merge all config sources
 
+import { readFile, realpath, stat } from "node:fs/promises";
+import { homedir } from "node:os";
 import { resolve } from "node:path";
 import type {
   ConfigPort,
@@ -15,11 +17,18 @@ import {
   DefaultRuntimeConfig,
   createWorkspaceHookBundleSnapshot,
 } from "@zcode/contracts";
+import { remoteWorkspaceTrustIdentity } from "@zcode/shared";
 import {
   buildWorkspaceHookBundleSnapshot,
+  readWorkspaceHookScriptStates,
   resolveWorkspaceHookRuntimeRoot,
+  type WorkspaceHookScriptState,
   type WorkspaceHookRuntimeRoot,
 } from "@zcode/shared/workspace-hook-discovery";
+import {
+  resolveWorkspaceHookTrustIdentity,
+  type WorkspaceHookTrustIdentityFs,
+} from "@zcode/shared/managed-worktree";
 import { createConfigPort } from "./index.js";
 import { loadFileConfig, getDefaultConfigPath, type LoadedConfig } from "./file-config.adapter.js";
 import { parseEnvConfig } from "./env-config.adapter.js";
@@ -42,6 +51,12 @@ export interface ConfigFactoryOptions {
   workingDirectory?: string;
   /** Opaque workspace identity supplied by the existing Host resolver; local callers fall back to workspacePath. */
   workspaceIdentity?: string;
+  /**
+   * Hook Trust identity（D23），由调用方经 resolveWorkspaceHookTrustIdentityForWorkspace 预先算好。
+   * createConfig 是同步函数，而 resolver 需要异步读取 .git 链接，所以不在这里解析。
+   * 缺省时沿用旧规则（远程 identity 优先，否则工作目录）。
+   */
+  workspaceHookTrustIdentity?: string;
   /** Environment variables (default: process.env) */
   env?: Record<string, string | undefined>;
   /** CLI overrides (highest priority) */
@@ -125,6 +140,48 @@ export interface PluginOptionLayer {
   options: Record<string, Record<string, string | number | boolean>>;
 }
 
+interface LoadedConfigSources {
+  userConfigResult: LoadedConfig;
+  discoveredProjectConfigs: ProjectConfigDiscovery;
+}
+
+function loadConfigSources(options: ConfigFactoryOptions): LoadedConfigSources {
+  const userConfigResult: LoadedConfig = options.skipUserConfig
+    ? { config: {}, diagnostics: [], path: getDefaultConfigPath(), loaded: false }
+    : loadFileConfig(options.userConfigPath);
+  const discoveredProjectConfigs: ProjectConfigDiscovery = options.workingDirectory
+    ? loadProjectConfigs(options.workingDirectory, options.projectConfigPath)
+    : options.projectConfigPath
+      ? summarizeProjectConfigs([
+          loadProjectConfigFile(options.projectConfigPath, {
+            discoveryOrder: 0,
+            explicitProjectConfig: true,
+          }),
+        ])
+      : summarizeProjectConfigs([]);
+  return { userConfigResult, discoveredProjectConfigs };
+}
+
+/**
+ * 会话/查询装配的异步入口。
+ *
+ * 名称沿用上游，但本产品当前没有需要异步写回的插件配置迁移：visualize 官方插件在
+ * config/official-plugins.json 中 defaultEnabled=false，从未默认开启，也就不存在
+ * “升级后把旧默认值改回关闭”的迁移语义；直接照搬会让用户明确开启的插件被意外关闭。
+ * 保留这个入口是因为 Hook Trust 绑定入口脚本内容（D24）必须读文件：这里在异步 IO 中
+ * 读取 scriptStates 后交给同步装配，保证 Runtime、Settings 与 CLI trust 得到同一 digest。
+ */
+export async function createConfigWithPluginMigrations(
+  options: ConfigFactoryOptions = {},
+): Promise<ConfigResult> {
+  const sources = loadConfigSources(options);
+  const workspaceHookScriptStates = await readWorkspaceHookScriptStates({
+    workspacePath: resolve(options.workingDirectory ?? process.cwd()),
+    sources: sources.discoveredProjectConfigs.hookCandidates,
+  });
+  return assembleConfig(options, sources, workspaceHookScriptStates);
+}
+
 /**
  * Create ConfigPort with all sources merged
  *
@@ -136,16 +193,21 @@ export interface PluginOptionLayer {
  * 5. CLI overrides
  */
 export function createConfig(options: ConfigFactoryOptions = {}): ConfigResult {
+  return assembleConfig(options, loadConfigSources(options));
+}
+
+function assembleConfig(
+  options: ConfigFactoryOptions,
+  sources: LoadedConfigSources,
+  workspaceHookScriptStates?: ReadonlyMap<string, WorkspaceHookScriptState>,
+): ConfigResult {
+  const { userConfigResult, discoveredProjectConfigs } = sources;
   // 1. System defaults
   const configs: ReturnType<typeof createPrioritizedConfig>[] = [
     createPrioritizedConfig(DefaultRuntimeConfig, ConfigScope.System),
   ];
 
   // 2. User config file
-  const userConfigResult: LoadedConfig = options.skipUserConfig
-    ? { config: {}, diagnostics: [], path: getDefaultConfigPath(), loaded: false }
-    : loadFileConfig(options.userConfigPath);
-
   if (userConfigResult.loaded) {
     configs.push(
       createPrioritizedConfig(
@@ -159,16 +221,6 @@ export function createConfig(options: ConfigFactoryOptions = {}): ConfigResult {
   }
 
   // 3. Project config files
-  const discoveredProjectConfigs: ProjectConfigDiscovery = options.workingDirectory
-    ? loadProjectConfigs(options.workingDirectory, options.projectConfigPath)
-    : options.projectConfigPath
-      ? summarizeProjectConfigs([
-          loadProjectConfigFile(options.projectConfigPath, {
-            discoveryOrder: 0,
-            explicitProjectConfig: true,
-          }),
-        ])
-      : summarizeProjectConfigs([]);
   // explicit 配置曾在 auto-discovery 之后手工追加并自行编号，绕过 shared
   // canonical-path dedup；同一文件会进入 snapshot 两次并使既有 Trust 全部 stale。
   // 修法：有 workspace 时由 loadProjectConfigs 统一走 discoverWorkspaceHookConfigPaths，
@@ -226,11 +278,18 @@ export function createConfig(options: ConfigFactoryOptions = {}): ConfigResult {
     options.cliOverrides?.hooks,
   ]);
   const workspacePath = resolve(options.workingDirectory ?? process.cwd());
+  const fallbackIdentity = options.workspaceIdentity?.trim();
   const workspaceHookSnapshotData = buildWorkspaceHookBundleSnapshot({
-    workspaceIdentity: options.workspaceIdentity?.trim() || workspacePath,
+    // 未经解析的 identity 与共享 resolver 同一规则：远程保留 host 命名空间、路径取执行目录，
+    // 其他自报 identity 忽略。
+    workspaceIdentity:
+      options.workspaceHookTrustIdentity?.trim() ||
+      (fallbackIdentity && remoteWorkspaceTrustIdentity(fallbackIdentity, workspacePath)) ||
+      workspacePath,
     workspacePath,
     sources: projectSummary.hookCandidates,
     runtimeRoot: workspaceHookRuntimeRoot,
+    ...(workspaceHookScriptStates ? { scriptStates: workspaceHookScriptStates } : {}),
   });
   const workspaceHookSnapshot = workspaceHookSnapshotData
     ? createWorkspaceHookBundleSnapshot(workspaceHookSnapshotData)
@@ -335,9 +394,7 @@ function resolvePluginConfigSources(input: {
     dirs: {
       user: input.userConfig.plugins?.dirs ?? [],
       // 项目目录只是待信任候选；config.plugins.dirs 不含它们，发现时按信任记录准入。
-      workspace: [
-        ...new Set(input.projectFiles.flatMap((file) => file.pluginDirCandidates ?? [])),
-      ],
+      workspace: [...new Set(input.projectFiles.flatMap((file) => file.pluginDirCandidates ?? []))],
     },
     enabled,
     marketplaces,
@@ -498,15 +555,49 @@ function summarizeOptionalProjectConfig(files: ProjectConfigFile[]): OptionalPat
   };
 }
 
+// ── Hook Trust identity（docs/specs/workspace-hook-trust.md D23）──
+// 唯一 resolver 在 @zcode/shared/managed-worktree；这里只提供 Node 只读文件端口与数据根目录。
+
+const KAYINGCODE_DATA_BASE_DIR_ENV_KEY = "KAYINGCODE_DATA_BASE_DIR";
+
+/** 与 Host getDataBaseDir 同规则：KAYINGCODE_DATA_BASE_DIR 优先，空值回落 homedir。 */
+export function resolveKayingCodeDataBaseDir(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  return env[KAYINGCODE_DATA_BASE_DIR_ENV_KEY]?.trim() || homedir();
+}
+
+const nodeTrustIdentityFs: WorkspaceHookTrustIdentityFs = {
+  readFile: (path) => readFile(path, "utf8"),
+  realpath: (path) => realpath(path),
+  stat: async (path) => {
+    try {
+      const info = await stat(path);
+      return { isFile: info.isFile(), isDirectory: info.isDirectory() };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw error;
+    }
+  },
+};
+
 /**
- * workspace 的 Hook/插件信任 identity。
- * 产品当前没有受管 worktree 归一层，沿用 workspaceIdentity 优先、workspacePath 兜底。
+ * 计算 workspace 的 Hook Trust identity。远程 identity 保留 host 命名空间、路径取执行目录；
+ * 本地受管 worktree 严格校验通过后归一为源仓库对应路径；其余情况返回 workspacePath
+ * （调用方负责传入已规范化的路径）。CLI snapshot、CLI trust 与 Host Settings 必须调用同一实现，
+ * 保证两侧 digest / record 键一致（D23）。
  */
 export async function resolveWorkspaceHookTrustIdentityForWorkspace(input: {
   workspacePath: string;
   workspaceIdentity?: string;
   env?: Record<string, string | undefined>;
 }): Promise<string> {
-  void input.env;
-  return input.workspaceIdentity?.trim() || input.workspacePath;
+  return resolveWorkspaceHookTrustIdentity(
+    {
+      workspacePath: input.workspacePath,
+      ...(input.workspaceIdentity ? { workspaceIdentity: input.workspaceIdentity } : {}),
+      dataBaseDir: resolveKayingCodeDataBaseDir(input.env),
+    },
+    nodeTrustIdentityFs,
+  );
 }

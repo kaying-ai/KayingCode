@@ -675,6 +675,19 @@ const enUS: Record<string, string> = {
   "settings.plugins.installLocal.failed": "Failed to install local plugin from {path}",
   "pluginCreator.unavailable":
     "Plugin Creator is unavailable. Check the connection, then enable or restore Plugin Creator in the marketplace and retry.",
+  "plugin.discovery.confirmTitle": "Official plugin recommendation",
+  "plugin.discovery.official": "KayingCode official marketplace",
+  "plugin.discovery.installAndEnable": "Install and enable in this workspace",
+  "plugin.discovery.enableInWorkspace": "Enable in this workspace",
+  "plugin.discovery.workspaceInstall":
+    "Install the plugin and enable it in this workspace. Other workspace settings stay unchanged; configuration or authorization may still be required.",
+  "plugin.discovery.workspaceEnable": "Enable this plugin in the current workspace.",
+  "plugin.discovery.userInstall":
+    "Installed plugins are saved for this user. Configuration or authorization may still be required.",
+  "plugin.discovery.responseFailed": "Could not submit your choice. Please try again.",
+  "plugin.discovery.skip": "Skip",
+  "plugin.discovery.install": "Install",
+  "plugin.discovery.enable": "Enable",
   "settings.create.action": "New",
   "settings.resourceActions.import": "Import",
   "settings.resourceActions.export": "Export",
@@ -775,6 +788,37 @@ const enUS: Record<string, string> = {
   "taskList.deleteAllArchivedResult": "Deleted {deleted}, skipped {skipped}, failed {failed}.",
   "taskList.deleteAllArchivedError":
     "The operation or list refresh failed. Refresh to check the remaining tasks.",
+  "taskList.permanentDelete": "Delete permanently",
+  "taskList.permanentDeleteMenu": "Permanently delete archived tasks…",
+  "taskList.permanentDeleteTitle": "Permanently delete {count} archived tasks?",
+  "taskList.permanentDeleteSingleTitle": "Permanently delete this archived task?",
+  "taskList.permanentDeleteDescription":
+    "Session history, checkpoints and task data will be removed from disk. Shared attachments referenced by other tasks are kept. This cannot be undone.",
+  "taskList.permanentDeleteBusy": "Deleting permanently…",
+  "taskList.permanentDeletePreviewCollecting": "Checking what will be deleted…",
+  "taskList.permanentDeletePreviewSummary":
+    "Tasks to delete: {count}. Kept forks: {forks}. Files to remove: {files}. Shared attachments kept: {artifacts}.",
+  "taskList.permanentDeleteBlockedCount": "Blocked: {count}",
+  "taskList.permanentDeleteResult":
+    "Permanently deleted {deleted}, blocked {blocked}, incomplete {incomplete}, failed {failed}.",
+  "taskList.permanentDeleteError": "Permanent deletion failed: {reason}",
+  "taskList.permanentDeleteItem": "{task} ({workspace}): {reason}",
+  "taskList.permanentDeleteIncompleteHint":
+    "Some files were already removed. Run permanent deletion again to finish.",
+  "taskList.permanentDeletePreviewFailed": "Preview failed: {reason}",
+  "taskList.permanentDeleteBlocked": "Cannot delete: {reason}",
+  "taskList.permanentDeleteBlocked.running": "The task is still running. Stop it first.",
+  "taskList.permanentDeleteBlocked.in-use": "The task is open in another window or process.",
+  "taskList.permanentDeleteBlocked.not-found": "Session data for this task was not found.",
+  "taskList.permanentDeleteBlocked.not-archived": "The task is no longer archived.",
+  "taskList.permanentDeleteBlocked.unavailable": "Session data is currently unavailable.",
+  "taskList.permanentDeleteBlocked.changed":
+    "Session data changed after preview. Preview again before deleting.",
+  "taskList.permanentDeleteBlocked.deleting":
+    "Deletion is already in progress. Retry after it finishes.",
+  "taskList.permanentDeleteBlocked.unsupported":
+    "The connected agent does not support permanent deletion. Update it first.",
+  "taskList.permanentDeleteBlocked.unknown": "The deletion was rejected ({reason}).",
   "confirmDialog.taskArchiveTitle": "Archive this task?",
   "confirmDialog.taskArchiveDescription":
     "Task “{taskTitle}” will move to the archive list and can still be restored later.",
@@ -2228,6 +2272,10 @@ const enUS: Record<string, string> = {
   "settings.askUserQuestionAutoResolution": "Automatically continue questions",
   "settings.askUserQuestionAutoResolutionDescription":
     "When enabled, Agent questions automatically continue after 5 minutes without an answer. When disabled, current and future questions wait for your response.",
+  "settings.pluginAutoRecommendation": "Automatic plugin recommendations",
+  "settings.pluginAutoRecommendationDescription":
+    "Let the agent find and recommend plugins in conversations. When off, you can still install plugins in Settings. Applies from your next message. Installation requires confirmation.",
+  "settings.pluginAutoRecommendationSaveError": "Could not save. Try again.",
   "settings.modelIoFullRetention": "Keep complete model I/O",
   "settings.modelIoFullRetentionDescription":
     "Keep complete model requests and responses without compression, size limits, or automatic deletion.",
@@ -3354,6 +3402,11 @@ const enUS: Record<string, string> = {
   "settings.plugin.tab.mcps": "MCP",
   "settings.plugin.tab.skills": "Skills",
   "settings.plugin.tab.commands": "Commands",
+  "settings.search.title": "Search settings",
+  "settings.search.description": "Find a setting and jump to it",
+  "settings.search.results": "Search results",
+  "settings.search.empty": "No matching settings",
+  "settings.search.section": "Settings section",
   "settings.search.clear": "Clear search",
   "settings.plugin.plugins.installed": "Installed",
   "settings.plugin.plugins.builtIn": "Built-in",
@@ -4081,6 +4134,39 @@ const enUS: Record<string, string> = {
   "chat.queue.editDraftConflict":
     "Send or clear the current draft before editing a queued message.",
   "chat.queue.editRestoreFailed": "Couldn't return the queued message to the composer. Try again.",
+  "chat.queue.editLockedByOther": "Being edited in another window or device",
+  "chat.queue.releaseEdit": "Release",
+  "chat.composerEdit.editingUserQuery": "Editing your last message",
+  "chat.composerEdit.editingQueueItem": "Editing queued message",
+  "chat.composerEdit.inComposerHint": "Editing below",
+  "chat.composerEdit.cancel": "Cancel editing",
+  "chat.composerEdit.busy": "Wait for the current send or upload to finish before editing.",
+  "chat.composerEdit.switchTitle": "Discard current edits?",
+  "chat.composerEdit.switchDescription":
+    "Switching to another message discards your current edits.",
+  "chat.composerEdit.switchConfirm": "Discard and switch",
+  "chat.composerEdit.lockFailed.reserved": "This message is being sent and can't be edited",
+  "chat.composerEdit.lockFailed.locked": "This message is being edited in another window or device",
+  "chat.composerEdit.lockFailed.generic": "Couldn't edit this message. Try again.",
+  "chat.composerEdit.saveFailed": "Couldn't save the edit. Try again.",
+  "chat.composerEdit.invalid.notLatest":
+    "This is no longer the last message; sending will create a new message",
+  "chat.composerEdit.invalid.queueItemRemoved":
+    "The queued message is no longer in the queue; sending will create a new message",
+  "chat.composerEdit.invalid.editLockLost":
+    "Editing was released by another device; sending will create a new message",
+  "chat.composerEdit.applyQueue.title": "Apply to queued messages?",
+  "chat.composerEdit.applyQueue.modelAndMode":
+    "You changed the permission to {mode} and the model to {model}. Apply this to all queued messages too?",
+  "chat.composerEdit.applyQueue.model":
+    "You changed the model to {model}. Apply this to all queued messages too?",
+  "chat.composerEdit.applyQueue.mode":
+    "You changed the permission to {mode}. Apply this to all queued messages too?",
+  "chat.composerEdit.applyQueue.confirm": "Apply to queue",
+  "chat.composerEdit.applyQueue.cancel": "Only this message",
+  "chat.composerEdit.applyQueue.failed": "Could not apply to queued messages",
+  "chat.composerEdit.kindMismatch.goal": "A goal message must keep the /goal prefix.",
+  "chat.composerEdit.kindMismatch.text": "A regular message can't be changed into a /goal command.",
   "chat.queue.remove": "Remove queued message",
   "chat.queue.turnSteer.steering": "Steering conversation",
   "chat.queue.paused.stopped": "The queue was paused because you stopped the current response",
@@ -6824,9 +6910,12 @@ const enUS: Record<string, string> = {
   "extensions.activation.failedToast": "Could not update the extension",
   "extensions.activation.needsConfirmation": "Needs confirmation",
   "extensions.activation.review": "Review",
-  "extensions.grants.dialog.body":  "Extension code runs in the same process as other extensions, with no isolation between them. Any enabled extension can technically use the permissions granted here. Only enable plugins you trust.\n\nRead: the titles, status and full conversations of all sessions, including tool output. Write: create, fork, send messages to, interrupt, rename, open, archive and pin any session on this computer. If the target session runs in full access mode, a message from the plugin makes the Agent run tools directly.\n\nSessions in the plugin's project: the plugin can also approve or deny tool calls for you, answer the Agent's questions and switch the permission mode.\n\nActions started by a plugin show their source and are written to the audit log.",
-  "extensions.grants.dialog.fullAccessBody":  "Full access: the plugin can switch sessions in its project to full access, so the Agent reads and writes files, runs commands and uses the network without asking. Only grant this to plugins you trust.",
-  "extensions.grants.dialog.notificationsBody":  "System notifications: the plugin can show system notifications while the window is in the background, with the plugin name before the title. At most 1 per minute and 20 per day. You can turn them off on the plugin details page; nothing is shown while system notifications are off in Settings.",
+  "extensions.grants.dialog.body":
+    "Extension code runs in the same process as other extensions, with no isolation between them. Any enabled extension can technically use the permissions granted here. Only enable plugins you trust.\n\nRead: the titles, status and full conversations of all sessions, including tool output. Write: create, fork, send messages to, interrupt, rename, open, archive and pin any session on this computer. If the target session runs in full access mode, a message from the plugin makes the Agent run tools directly.\n\nSessions in the plugin's project: the plugin can also approve or deny tool calls for you, answer the Agent's questions and switch the permission mode.\n\nActions started by a plugin show their source and are written to the audit log.",
+  "extensions.grants.dialog.fullAccessBody":
+    "Full access: the plugin can switch sessions in its project to full access, so the Agent reads and writes files, runs commands and uses the network without asking. Only grant this to plugins you trust.",
+  "extensions.grants.dialog.notificationsBody":
+    "System notifications: the plugin can show system notifications while the window is in the background, with the plugin name before the title. At most 1 per minute and 20 per day. You can turn them off on the plugin details page; nothing is shown while system notifications are off in Settings.",
   "extensions.grants.enable.confirm": "Enable",
   "extensions.grants.enable.title": "Enable “{plugin}”?",
   "extensions.grants.failedToast": "Couldn't update the extension permission",
@@ -6863,14 +6952,16 @@ const enUS: Record<string, string> = {
   "extensions.permissions.action.failed": "{action} (failed)",
   "extensions.permissions.note": "Any enabled extension can technically use these permissions.",
   "extensions.permissions.notifications": "System notifications",
-  "extensions.permissions.notificationsNote":  "When system notifications are off in Settings, nothing is shown even if this is on.",
+  "extensions.permissions.notificationsNote":
+    "When system notifications are off in Settings, nothing is shown even if this is on.",
   "extensions.permissions.recent": "Recent actions",
   "extensions.permissions.revoke": "Revoke",
   "extensions.permissions.title": "Permissions",
   "extensions.state.invalid": "Invalid manifest",
   "extensions.state.reasonWithPath": "{path}: {reason}",
   "extensions.view.failed": "The extension view failed to load: {reason}",
-  "extensions.view.hostNotRunning":  "Extensions are not running. The view reopens when they recover.",
+  "extensions.view.hostNotRunning":
+    "Extensions are not running. The view reopens when they recover.",
   "extensions.view.loading": "Loading the extension view…",
   "extensions.view.unavailable": "This extension view is not available right now.",
   "extensions.view.unsupported": "Extension views are not supported here.",
@@ -6889,9 +6980,11 @@ const enUS: Record<string, string> = {
   "pluginUi.retry": "Reload",
   "pluginUi.unpin": "Stop keeping expanded",
   "settings.plugins.store.segment.community": "Community",
-  "settings.plugins.store.ui.needsSession":  "Open this plugin in an available session of the current project.",
+  "settings.plugins.store.ui.needsSession":
+    "Open this plugin in an available session of the current project.",
   "settings.plugins.store.ui.open": "Open",
-  "settings.plugins.store.ui.unavailable":  "No plugin UI is available in this project. Check whether the plugin is enabled.",
+  "settings.plugins.store.ui.unavailable":
+    "No plugin UI is available in this project. Check whether the plugin is enabled.",
   "settings.plugins.store.ui.unsupported": "Plugin UI is available in local desktop projects only.",
   "sidePane.launcher.empty": "No recommended app plugins yet",
 };

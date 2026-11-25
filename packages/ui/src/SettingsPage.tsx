@@ -104,6 +104,14 @@ import {
   type UserActionTrigger,
 } from "@/lib/userActionTelemetry.js";
 import type { SettingsUserActionFeatureId } from "@/lib/userActionTraceCatalog.js";
+import {
+  resolveSettingsSearchNavigation,
+  SettingsSearch,
+  SettingsSearchSectionTarget,
+  SettingsSearchTargetContext,
+  type SettingsSearchAvailability,
+  type SettingsSearchResult,
+} from "@/settings-search/index.js";
 
 function runSettingsActionAsync<T>(options: {
   featureId: SettingsUserActionFeatureId;
@@ -245,6 +253,9 @@ export function SettingsPage({
     writeLastSettingsSectionPreference(visibleInitialSection);
     return visibleInitialSection;
   });
+  // 搜索定位目标由 SettingsPage 独占持有：进入分区后保留给目标分区消费，
+  // 任何普通侧栏导航都会清空它，避免下次进入同分区仍然高亮。
+  const [searchTarget, setSearchTarget] = useState<SettingsSearchResult | null>(null);
   const [pluginTab, setPluginTab] = useState(() => consumePendingSettingsPluginTab());
   const [pluginNavigationOrigin, setPluginNavigationOrigin] = useState(() =>
     consumePendingSettingsPluginOrigin(),
@@ -304,6 +315,7 @@ export function SettingsPage({
   const setActiveSettingsSection = useCallback(
     (section: SettingsSectionId, fallbackSection: SettingsSectionId = activeSection) => {
       const resolvedSection = resolveSettingsSection(section, fallbackSection);
+      setSearchTarget(null);
       setActiveSection(resolvedSection);
       writeLastSettingsSectionPreference(resolvedSection);
     },
@@ -317,6 +329,21 @@ export function SettingsPage({
     // 但头像菜单的“使用统计”应该停留在设置页并切到 Usage，不能跟着返回工作区。
     setActiveSettingsSection("usage");
   }, [setActiveSettingsSection]);
+  const handleSettingsSearchSelect = useCallback(
+    (result: SettingsSearchResult) => {
+      // 搜索结果沿用侧栏导航，但先按当前可见分区与索引收敛；
+      // 旧分区或已移除的设置行只降级到分区，不带着过期目标滚动。
+      const resolved = resolveSettingsSearchNavigation({
+        result,
+        visibleSections: settingsSections,
+      });
+      setPluginNavigationOrigin(undefined);
+      setSettingsSectionNavigationVersion((version) => version + 1);
+      setActiveSettingsSection(resolved.section);
+      setSearchTarget(resolved);
+    },
+    [setActiveSettingsSection, settingsSections],
+  );
   // 远程设备依赖 Desktop Host；Web 端即使带着持久化分区或旧意图也不能停留在这里。
   useEffect(() => {
     if (!isDesktop && activeSection === "remoteDevices") {
@@ -720,10 +747,16 @@ export function SettingsPage({
           }),
         completed: { resultSource: "setting_service", configured: normalized.length > 0 },
       });
+      // 本机 Desktop Host 只在内存里保存回复语言，启动时从 Main 取一次；不推送的话
+      // 要重建 Host 才生效。空串在 Main 侧是「清除」，显式 undefined 让内存值回到 null，
+      // 避免 CLI 把 "" 当成未变化而保留旧语言公告。
+      platform.syncAppSettings?.({
+        replyLanguage: normalized.length > 0 ? normalized : undefined,
+      });
       setReplyLanguage(normalized);
       toast(intl.formatMessage({ id: "settings.replyLanguageSavedHint" }));
     },
-    [services.settingService, intl],
+    [services.settingService, intl, platform],
   );
   const handleHttpProxyNoProxyChange = useCallback(
     async (noProxy: string) => {
@@ -1089,6 +1122,22 @@ export function SettingsPage({
     },
     [setCodePreviewSettings],
   );
+  const settingsSearchAvailability = useMemo<SettingsSearchAvailability>(
+    () => ({
+      desktop: Boolean(isDesktop),
+      macDesktop: Boolean(isMacDesktop),
+      windowsDesktop: Boolean(isWindowsDesktop),
+      windowsHost: hostPlatform === "win32",
+      notWindows: !isWindowsDesktop,
+    }),
+    [isDesktop, isMacDesktop, isWindowsDesktop, hostPlatform],
+  );
+  // Provider 值按目标对象稳定：行级 hook 用对象身份区分高亮轮次，
+  // 每帧新建对象会让高亮计时反复重排、永不消失。
+  const searchTargetContextValue = useMemo(
+    () => (searchTarget?.setting ? { id: searchTarget.setting } : null),
+    [searchTarget],
+  );
   const activeSectionMeta = settingsSections.find((section) => section.id === activeSection);
   // 灰度裁决异步到达：sections 列表可能在挂载后变化（如 computerUse 区被灰度移除）。
   // 若用户正停留在被移除的 section，回落到第一个可见区，避免整页 return null。
@@ -1116,7 +1165,7 @@ export function SettingsPage({
     (activeSection === "plugin" && pluginNavigationOrigin === "plugin-store");
 
   return (
-    <>
+    <SettingsSearchTargetContext.Provider value={searchTargetContextValue}>
       <DesktopWindowFrame
         title={intl.formatMessage({ id: "settings.title" })}
         isDesktop={isDesktop}
@@ -1230,6 +1279,15 @@ export function SettingsPage({
                   </select>
                 </div>
               ) : null}
+
+              <div className="px-2 pb-2">
+                {/* 搜索入口沿侧栏导航：窄屏收成图标按钮，宽屏与返回按钮同高。 */}
+                <SettingsSearch
+                  sections={settingsSections}
+                  availability={settingsSearchAvailability}
+                  onSelect={handleSettingsSearchSelect}
+                />
+              </div>
 
               <nav
                 aria-label={intl.formatMessage({ id: "settings.navLabel" })}
@@ -1417,7 +1475,7 @@ export function SettingsPage({
                         // isWindowsDesktop && "pt-12",
                       )}
                     >
-                      <div>
+                      <SettingsSearchSectionTarget section={activeSection} target={searchTarget}>
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex min-w-0 flex-wrap items-center gap-3">
                             {showActiveSectionTitle ? (
@@ -1443,7 +1501,7 @@ export function SettingsPage({
                         {activeSection === "general" ? (
                           <GeneralSectionHeader localePreference={localePreference} />
                         ) : null}
-                      </div>
+                      </SettingsSearchSectionTarget>
                       <div className="space-y-8">
                         {activeSection === "general" ? (
                           <GeneralSectionContent
@@ -1827,6 +1885,6 @@ export function SettingsPage({
           </section>
         </div>
       </DesktopWindowFrame>
-    </>
+    </SettingsSearchTargetContext.Provider>
   );
 }

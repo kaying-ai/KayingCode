@@ -1,5 +1,5 @@
 import { buildToolExposure } from "../../tool/search/exposure.js";
-import type { ModelToolContract } from "@zcode/contracts";
+import type { ModelToolContract, ToolSearchMcpState } from "@zcode/contracts";
 import type { RuntimeMessageEntry } from "../../agent/message-history.js";
 import type { ToolRegistry } from "../../tool/registry.js";
 import type { Model } from "../deps.js";
@@ -26,6 +26,8 @@ export function shouldFoldRemindersIntoToolResults(
 }
 
 type RequestRuntime = {
+  /** ToolSearch 诊断与撤销原因的唯一来源：最近一次应用视图时的 server 状态事实。 */
+  readonly mcpServerStatusFacts?: ToolSearchMcpState;
   readonly config: Pick<AgentRuntimeConfig, "midConversationSystem" | "toolSearch">;
 };
 
@@ -53,6 +55,7 @@ export function prepareRuntimeProviderRequest(
     tools: input.tools,
     registry: input.registry,
     entries: input.entries,
+    mcp: runtime.mcpServerStatusFacts,
   });
   const projection = buildRuntimeProviderRequestMessages(runtime, {
     entries:
@@ -71,6 +74,8 @@ export function prepareRuntimeProviderRequest(
       toolSearchEnabled: exposure.context.mode === "native",
     },
     projection,
+    // 本次请求候选的交付增量；只有随成功 assistant 提交后才进入历史。
+    delivery: exposure.delivery,
     entries: exposure.entries,
     // 记录过滤 Continue 后会重新渲染，需复用本次有效引用，避免遗漏成功提示或重复扫描历史。
     loadedToolCallIds: exposure.loadedToolCallIds,

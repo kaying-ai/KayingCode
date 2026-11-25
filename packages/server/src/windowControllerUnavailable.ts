@@ -24,6 +24,9 @@ export function createUnavailableWindowControllerService(): IWindowControllerSer
   return {
     deleteArchivedTask: async () => unavailable("deleteArchivedTask"),
     deleteArchivedTasks: async () => unavailable("deleteArchivedTasks"),
+    previewArchivedTaskDeletion: async () => unavailable("previewArchivedTaskDeletion"),
+    previewArchivedTaskDeletions: async () => unavailable("previewArchivedTaskDeletions"),
+    permanentlyDeleteArchivedTask: async () => unavailable("permanentlyDeleteArchivedTask"),
     listTaskList: async () => unavailable("listTaskList"),
     getTaskMeta: async () => unavailable("getTaskMeta"),
     mutateTask: async () => unavailable("mutateTask"),

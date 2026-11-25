@@ -4,7 +4,10 @@ import {
   MessageHistoryImpl,
   countContextPrefixMessages,
   createRuntimeAssistantEntry,
+  type RuntimeMessageEntry,
 } from "../src/agent/message-history.js";
+import { commitAssistantToTurnRequest } from "../src/runtime/methods/turn-output-token-continuation.js";
+import type { RuntimeModelTextResult } from "../src/runtime/types.js";
 import { buildProviderRequestMessages } from "../src/runtime/helpers/provider-request-messages.js";
 import type { ContextBuildResult, ContextSection } from "../src/context/types.js";
 import { estimateTokens } from "../src/context/utils.js";
@@ -258,5 +261,90 @@ describe("legacy assistant entries", () => {
       { type: "text", text: "answer" },
     ]);
     expect(reasoning[0]).toHaveProperty("blockIndex", 0);
+  });
+});
+
+describe("live assistant ordered projection", () => {
+  it("commits ordered stream blocks through buildAssistantEntries and marks repaired steps", () => {
+    // live 与冷恢复共用 buildAssistantEntries：相邻文字块不合并、保留 blockIndex；
+    // 签名修复后成功的请求在第一条 assistant 上记标记，冷恢复按消息 metadata 还原同一标记。
+    const committed: RuntimeMessageEntry[] = [];
+    const state = {
+      model: createTestModelSelection("provider-a/model-a"),
+      modelResponse: "firstsecond",
+      turnRequestState: { entries: [] as RuntimeMessageEntry[], outputTokenContinuationCount: 0 },
+    };
+    const result: RuntimeModelTextResult = {
+      finishReason: "stop",
+      text: "firstsecond",
+      textBlocks: [
+        { type: "text", text: "first", blockIndex: 0 },
+        { type: "text", text: "second", blockIndex: 1 },
+      ],
+      usage: {},
+      signedReasoningReset: true,
+    };
+    const runtime = {
+      messageHistory: {
+        addEntries(entries: readonly RuntimeMessageEntry[]) {
+          committed.push(...entries);
+        },
+      },
+    };
+
+    const handled = commitAssistantToTurnRequest(
+      runtime as never,
+      state as never,
+      result,
+      undefined,
+    );
+
+    expect(handled).toBe(true);
+    expect(committed).toHaveLength(1);
+    expect(committed[0]?.message).toMatchObject({
+      role: "assistant",
+      content: [
+        { type: "text", text: "first", blockIndex: 0 },
+        { type: "text", text: "second", blockIndex: 1 },
+      ],
+      providerId: "provider-a",
+      modelId: "model-a",
+      signedReasoningReset: true,
+    });
+    // 本轮请求条目与历史条目是同一对象，交付定义/标记不会在两条路径间分叉。
+    expect(state.turnRequestState.entries).toEqual(committed);
+  });
+});
+
+describe("tool search message fields", () => {
+  it("clones delivery and mcp delta without sharing mutable state", () => {
+    const history = new MessageHistoryImpl();
+    const delivery = {
+      definitions: [{ tool: { name: "analyze_image", inputSchema: { type: "object" } } }],
+      strippedReferences: [{ toolCallId: "call-1", toolName: "analyze_image" }],
+    };
+    history.addAssistant("answer", undefined, undefined, undefined, undefined, delivery);
+    delivery.strippedReferences.push({ toolCallId: "mutated", toolName: "mutated" });
+    const entry = history.toRuntimeEntries()[0];
+    expect(entry?.toolSearchDelivery).toMatchObject({
+      strippedReferences: [{ toolCallId: "call-1", toolName: "analyze_image" }],
+    });
+
+    const delta = {
+      mcp: { pending: ["server"], failed: [] },
+      retractedTools: [{ name: "old_tool", cause: "switched_off" }],
+    };
+    history.addEntries([
+      {
+        message: { role: "user", content: "tool availability" },
+        metadata: { source: "tool_search_announcement", toolSearchMcpDelta: delta },
+      },
+    ]);
+    delta.retractedTools.push({ name: "mutated", cause: "mutated" });
+    const metadata = history.toRuntimeEntries()[1]?.metadata;
+    expect(metadata?.toolSearchMcpDelta).toEqual({
+      mcp: { pending: ["server"], failed: [] },
+      retractedTools: [{ name: "old_tool", cause: "switched_off" }],
+    });
   });
 });

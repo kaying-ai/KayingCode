@@ -13,7 +13,11 @@ import {
   createNodeToolArtifactStore,
 } from "@zcode/adapters/storage";
 import { createNodeLoggerFactory } from "@zcode/adapters/logging";
-import { createConfig, resolvePath } from "@zcode/adapters/config";
+import {
+  createConfigWithPluginMigrations,
+  resolvePath,
+  resolveWorkspaceHookTrustIdentityForWorkspace,
+} from "@zcode/adapters/config";
 import {
   createNodeExecutionAdapter,
   resolveEffectiveBashShellSelection,
@@ -178,6 +182,48 @@ function decodePromptAttachmentDataUrl(
   return { bytes, mediaType };
 }
 
+type SessionStoreLike = NonNullable<KayingCodeAppOptions["sessionStore"]>;
+
+/**
+ * 跨进程 in-use 的 runtime 归属登记。同一进程内可能有多个 app 共用同一个 sessionId
+ * （重启交界），按 store 计数，只有最后一个实例关闭后才注销 presence，避免旧实例提前放行删除。
+ * 用 WeakMap 以 store 为键：测试或多库场景下不同 store 的同名 session 不能互相吞掉登记。
+ */
+const sessionRuntimeRegistrationCounts = new WeakMap<object, Map<string, number>>();
+
+function runtimeRegistrationCountsOf(sessionStore: SessionStoreLike): Map<string, number> {
+  let counts = sessionRuntimeRegistrationCounts.get(sessionStore);
+  if (!counts) {
+    counts = new Map();
+    sessionRuntimeRegistrationCounts.set(sessionStore, counts);
+  }
+  return counts;
+}
+
+async function registerSessionRuntimePresence(
+  sessionStore: SessionStoreLike,
+  sessionId: SessionId,
+): Promise<void> {
+  const counts = runtimeRegistrationCountsOf(sessionStore);
+  const count = counts.get(sessionId) ?? 0;
+  if (count === 0) await sessionStore.registerSessionRuntime?.(sessionId);
+  counts.set(sessionId, count + 1);
+}
+
+async function unregisterSessionRuntimePresence(
+  sessionStore: SessionStoreLike,
+  sessionId: SessionId,
+): Promise<void> {
+  const counts = runtimeRegistrationCountsOf(sessionStore);
+  const count = counts.get(sessionId) ?? 0;
+  if (count > 1) {
+    counts.set(sessionId, count - 1);
+    return;
+  }
+  counts.delete(sessionId);
+  if (count === 1) await sessionStore.unregisterSessionRuntime?.(sessionId);
+}
+
 export async function createKayingCodeApp(options: KayingCodeAppOptions): Promise<KayingCodeApp> {
   if (!options?.providerRegistry) {
     throw new Error("createKayingCodeApp requires a Provider Registry");
@@ -187,12 +233,22 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
   const sessionId = options.sessionId ?? createSessionId();
   const traceContext = options.traceContext ?? createRootTraceContext({ sessionId });
   const workingDirectory = resolve(options.runtimeConfig?.workingDirectory ?? process.cwd());
+  // Hook Trust identity（D23）：受管 worktree 归一为源仓库路径，snapshot 与 Trust record 共用该键。
+  // createConfig 是同步函数，resolver 要异步读取 .git 链接，所以在这里先算好再传入。
+  const workspaceHookTrustIdentity = await resolveWorkspaceHookTrustIdentityForWorkspace({
+    workspacePath: workingDirectory,
+    ...(options.runtimeConfig?.memory?.workspaceIdentity?.trim()
+      ? { workspaceIdentity: options.runtimeConfig.memory.workspaceIdentity.trim() }
+      : {}),
+    ...(options.env ? { env: options.env } : {}),
+  });
   const configResult = resolveEffectiveConfigResult(
-    createConfig({
+    await createConfigWithPluginMigrations({
       env: options.env,
       projectConfigPath: options.projectConfigPath,
       workingDirectory,
       workspaceIdentity: options.runtimeConfig?.memory?.workspaceIdentity,
+      workspaceHookTrustIdentity,
       skipUserConfig: options.skipUserConfig,
       userConfigPath: options.userConfigPath,
       cliOverrides: createConfigCliOverrides(options),
@@ -461,6 +517,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       policy: options.workspaceHookPolicy,
       policyProvider: options.workspaceHookPolicyProvider,
       reviewHost: options.workspaceHookReviewHost,
+      ...(options.env ? { env: options.env } : {}),
       workspaceHookTrustEnabled: options.workspaceHookTrustEnabled,
       runtimeRoot: configResult.sources.project.workspaceHookRuntimeRoot ?? {
         // Fallback 只在 config-factory 未导出时生效（理论上不会发生）。
@@ -987,7 +1044,9 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
         )
       : undefined;
     const catalogSkillPortEnabled =
-      configResult.config.features.skill && configResult.config.skills.enabled && !options.skillPort;
+      configResult.config.features.skill &&
+      configResult.config.skills.enabled &&
+      !options.skillPort;
     // 注入 skillPort（测试）时不建实时目录；否则读取配置、启用插件与 skill 文件的实时快照。
     if (catalogSkillPortEnabled) {
       catalogSkillPort = await createAppSkillPort({
@@ -1080,6 +1139,8 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       mcpPort,
       mcpConfigurationSource: mcpConfigSource,
       mcpToolCatalogPort,
+      // MCP 启动策略由入口显式传入；交互入口传 background，缺省 blocking 保持既有行为。
+      mcpStartupPolicy: options.mcpStartupPolicy,
       eventSink: options.eventSink,
       onOffPeakLifecycleEvent: options.onOffPeakLifecycleEvent
         ? (event) => options.onOffPeakLifecycleEvent!({ ...event, sessionId })
@@ -1503,6 +1564,15 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
                   event: "session.telemetry_shutdown.failed",
                   error: error instanceof Error ? error.message : String(error),
                 });
+              } finally {
+                // runtime 已释放后才能注销 presence，否则其它进程可能在 close 仍进行时删除会话。
+                await unregisterSessionRuntimePresence(sessionStore, sessionId).catch((error) => {
+                  logger.warn("Session runtime presence unregister failed", {
+                    event: "session.runtime_presence.unregister_failed",
+                    sessionId,
+                    error: error instanceof Error ? error.message : String(error),
+                  });
+                });
               }
             }
           }
@@ -1675,6 +1745,14 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       ...inputFacade,
     };
     standaloneSessionControl?.attachRoot(app, standaloneRootProvenance);
+    try {
+      // 删除凭据存在时 registerSessionRuntime 由存储层触发器拒绝：此时会话已进入写屏障，
+      // 不能再物化 runtime；关闭刚构造的 app，避免留下半个实例。
+      await registerSessionRuntimePresence(sessionStore, sessionId);
+    } catch (error) {
+      await app.close?.();
+      throw error;
+    }
     return app;
   } catch (error) {
     mcpConfigSource?.close();

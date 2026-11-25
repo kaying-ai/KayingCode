@@ -13,7 +13,7 @@ import type {
   TurnId,
 } from "../deps.js";
 import type { ActiveTurnSteeringState } from "../types.js";
-import type { ModelToolContract, SubagentRunOptions } from "@zcode/contracts";
+import type { ModelToolContract, SubagentRunOptions, ToolSearchDelivery } from "@zcode/contracts";
 import type { DrainedPendingInputDiagnostics, ModelExecutionContext } from "../types.js";
 import type { TurnMachineImpl } from "../deps.js";
 import type { RuntimeMessageEntry } from "../../agent/message-history.js";
@@ -79,6 +79,8 @@ export interface ReactiveCompactLoopContext {
 export interface TurnRequestState {
   entries: readonly RuntimeMessageEntry[];
   outputTokenContinuationCount: number;
+  /** 本次请求候选的已交付定义；只有随成功 assistant 提交后才固化进历史。 */
+  toolSearchDelivery?: ToolSearchDelivery;
 }
 
 export interface RegularTurnLoopState {

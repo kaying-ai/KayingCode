@@ -1,4 +1,8 @@
-import { beginLocalTurnPreparation, type LocalTtftDetail } from "@zcode/contracts";
+import {
+  PLUGIN_DISCOVERY_INPUT,
+  beginLocalTurnPreparation,
+  type LocalTtftDetail,
+} from "@zcode/contracts";
 import { runtimeInputMetadata } from "../../agent/runtime-input-presentation.js";
 import { refreshWorkspaceTrustAdmission } from "./mcp.js";
 import { withConversationQuotes } from "../helpers/conversation-quotes.js";
@@ -873,6 +877,8 @@ export async function executeTurnCommand(
             entries: [...this.messageHistory.borrowReadOnlyRuntimeEntries()],
             outputTokenContinuationCount: 0,
           },
+          // Host 仅在具备 pluginDiscoveryUi 能力时注入该意图；冷恢复不继承。
+          pluginDiscoveryUi: options?.intent?.[PLUGIN_DISCOVERY_INPUT] === true,
           toolDisallowlist: options?.toolDisallowlist,
           traceId,
           turnAbortSignal,

@@ -9,6 +9,7 @@ import type {
   ModelToolCall,
   ModelToolContract,
   MessageId,
+  PendingInputEditLock,
   ProjectId,
   SessionEvent,
   SessionEventSink,
@@ -60,6 +61,9 @@ import type {
   ContextUsageToolDetail,
   ContinueActiveTargetLoopOptions,
   DrainedPendingInputDiagnostics,
+  EditPendingInputOptions,
+  EditPendingInputResult,
+  LockPendingInputEditResult,
   ForegroundPromotionLeaseMode,
   EnqueueSubagentMessageInput,
   ResumeSessionOptions,
@@ -215,11 +219,19 @@ export interface AgentRuntimeCoreMethods {
     reservationId: string;
     traceContext: TraceContext;
   }): Promise<boolean>;
-  editPendingInputById(options: {
+  editPendingInputById(
+    options: EditPendingInputOptions & { traceContext: TraceContext },
+  ): Promise<EditPendingInputResult>;
+  lockPendingInputEdit(options: {
     pendingInputId: string;
-    newText: string;
+    editLock: PendingInputEditLock;
+    traceContext: TraceContext;
+  }): Promise<LockPendingInputEditResult>;
+  releasePendingInputEdit(options: {
+    pendingInputId: string;
     traceContext: TraceContext;
   }): Promise<boolean>;
+  getPendingInputEditLock(pendingInputId: string): PendingInputEditLock | undefined;
   reorderPendingInput(options: {
     pendingInputId: string;
     beforePendingInputId: string | null;

@@ -1,5 +1,6 @@
 import type { GitRepositorySummary } from "@zcode/shared";
 import type {
+  ActivitySummaryDismissed,
   BackgroundWorkSummary,
   GoalState,
   PlanState,
@@ -106,6 +107,35 @@ export function workflowRunOpenTarget(
   };
 }
 
+/**
+ * 上一批活动结果是否已收起（docs/ui/chat-summary-panel.md §8）。
+ *
+ * 判定与 CLI 投影写入的 activitySummaryDismissed 同源：身份在名单内且结束时间不晚于收起水位
+ * 才算旧结果；`endedAt > at` 表示收起之后又有新一轮结束，必须继续展示。这三条谓词是面板
+ * 唯一实现，运行行不经过它们——运行中的同一身份永远优先展示，恢复时由投影移除收起标记。
+ */
+export function isDismissedSubagentResult(
+  dismissed: ActivitySummaryDismissed | undefined,
+  item: Pick<RunningSubagentSummary, "childSessionId"> & { endedAt?: number },
+): boolean {
+  if (!dismissed?.subagentIds.includes(item.childSessionId)) return false;
+  return (item.endedAt ?? 0) <= dismissed.at;
+}
+
+export function isDismissedWorkflowRunResult(
+  dismissed: ActivitySummaryDismissed | undefined,
+  runId: string,
+): boolean {
+  return dismissed?.workflowRunIds.includes(runId) ?? false;
+}
+
+export function isDismissedBackgroundWorkResult(
+  dismissed: ActivitySummaryDismissed | undefined,
+  workId: string,
+): boolean {
+  return dismissed?.workIds.includes(workId) ?? false;
+}
+
 export interface ConversationStatusPanelModel {
   hasContent: boolean;
   git: ConversationStatusPanelGitModel | null;
@@ -129,6 +159,8 @@ interface BuildConversationStatusPanelModelInput {
   backgroundWorks?: readonly BackgroundWorkSummary[];
   runningSubagents?: readonly RunningSubagentSummary[];
   workflowRuns?: readonly WorkflowRunState[];
+  /** 上一批活动结果的收起水位；缺席 = 旧 CLI/旧快照，全部结果继续可见。 */
+  activitySummaryDismissed?: ActivitySummaryDismissed;
 }
 
 function buildGitModel({
@@ -303,7 +335,19 @@ export function buildConversationStatusPanelModel(
   const runningBashWorks: BackgroundWorkSummary[] = [];
   const workflowWorkByWorkId = new Map<string, BackgroundWorkSummary>();
   const subagentControlByChildSessionId = new Map<string, BackgroundWorkSummary | null>();
-  for (const work of input.backgroundWorks ?? []) {
+  // 收起水位只作用于**已结束**的活动：运行中的同一 work/run 永远优先展示（恢复时 CLI 会移除
+  // 收起标记）。这里先过滤终态输入，避免旧 Host 的迟到快照把已收起结果重新接回活动区。
+  const dismissed = input.activitySummaryDismissed;
+  const backgroundWorks = (input.backgroundWorks ?? []).filter(
+    (work) => work.status === "running" || !isDismissedBackgroundWorkResult(dismissed, work.workId),
+  );
+  const workflowRuns = (input.workflowRuns ?? []).filter(
+    (run) =>
+      run.status === "pending" ||
+      run.status === "running" ||
+      !isDismissedWorkflowRunResult(dismissed, run.runId),
+  );
+  for (const work of backgroundWorks) {
     if (work.kind === "workflow") {
       // "workflow"（workflow run）曾与 bash 同列在 Terminals 下，那是保住停止入口的已记录错标；
       // 现在它有自己的 Workflows 分区，于是**只**按 workId ≡ runId 进 workflow 联接表。
@@ -331,15 +375,25 @@ export function buildConversationStatusPanelModel(
   }
   const runningSubagentWorks: ConversationStatusPanelRunningSubagent[] = (
     input.runningSubagents ?? []
-  ).map((subagent) => {
-    const controlWork = subagentControlByChildSessionId.get(subagent.childSessionId);
-    if (!controlWork) return subagent;
-    return {
-      ...subagent,
-      controlWorkId: controlWork.workId,
-      cancellable: controlWork.cancellable !== false,
-    };
-  });
+  )
+    // 运行/等待/阻塞都是活状态，收起水位不能隐藏它们；只拦截终态项（旧 Host 可能仍带在
+    // 运行列表里）。身份恢复后由 CLI 投影移除收起标记，这里不另存第二份状态。
+    .filter(
+      (subagent) =>
+        subagent.status === "running" ||
+        subagent.status === "waiting" ||
+        subagent.status === "blocked" ||
+        !isDismissedSubagentResult(dismissed, subagent),
+    )
+    .map((subagent) => {
+      const controlWork = subagentControlByChildSessionId.get(subagent.childSessionId);
+      if (!controlWork) return subagent;
+      return {
+        ...subagent,
+        controlWorkId: controlWork.workId,
+        cancellable: controlWork.cancellable !== false,
+      };
+    });
   const projectedChildSessionIds = new Set(
     runningSubagentWorks.map((subagent) => subagent.childSessionId),
   );
@@ -360,7 +414,7 @@ export function buildConversationStatusPanelModel(
     });
   }
 
-  const runningWorkflowRuns = buildRunningWorkflowRuns(input.workflowRuns, workflowWorkByWorkId);
+  const runningWorkflowRuns = buildRunningWorkflowRuns(workflowRuns, workflowWorkByWorkId);
 
   return {
     git,

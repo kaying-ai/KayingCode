@@ -17,6 +17,7 @@ import type {
   ModelRequestAuth,
   ModelRequestDependencies,
   ModelSelection,
+  PendingTurnAttachment,
   PluginReferenceCatalog,
   ResolvedUserInstructions,
   StableForkGoalBoundaryMetadata,
@@ -345,6 +346,9 @@ export interface MemoryRuntimeConfig {
   workspaceIdentity?: string;
 }
 
+/** blocking：首个请求等全部 server 启动结束；background：先交付已就绪与缓存工具，后来者在下一个正常请求生效。 */
+export type McpStartupPolicy = "blocking" | "background";
+
 export interface AgentRuntimeDeps {
   /** 只读目录入口；必须同步读取内存，不在请求收集阶段进行 I/O。 */
   getAgentDefinitions?: GetAgentDefinitions;
@@ -392,6 +396,11 @@ export interface AgentRuntimeDeps {
   mcpToolCatalogPort?: McpToolCatalogPort;
   /** 宿主注入的实时 MCP 配置源；变化时 runtime 重连并重注册工具。 */
   mcpConfigurationSource?: McpConfigurationSource;
+  /**
+   * MCP 启动策略，由入口显式传入，默认 blocking：首个请求等全部 server 启动结束。
+   * background 只用缓存命中与已就绪 server 的工具，其余 server 就绪后在下一次正常请求生效。
+   */
+  mcpStartupPolicy?: McpStartupPolicy;
   subagentPort?: SubagentPort;
   coordinatorResponsePort?: CoordinatorResponsePort;
   /** 工作流 actor 提交终态结果的端口；存在即作为 submit_result 工具的注册门。 */
@@ -581,6 +590,31 @@ export type PromptAdmissionOptions = ExecuteTurnOptions & {
   /** queue promotion 等内部调用要求 admission 必须 idle，否则直接拒绝。 */
   requireIdle?: boolean;
 };
+
+/** composer 编辑态写回排队项（docs/ui/composer-edit-mode.md）；可选字段缺省 = 保留原值。 */
+export interface EditPendingInputOptions {
+  pendingInputId: string;
+  /**
+   * 缺省 = 保留原输入，只改配置（applyQueueItemsConfig）。不能由调用方用投影 text 回填：
+   * 投影 text 经过 genUi 归一化，写回会丢掉输入里的上下文。
+   */
+  newText?: string;
+  /** 携带时必须持有该编辑器的锁；成功后同一调用释放锁。 */
+  editorId?: string;
+  attachmentRefs?: NonNullable<TurnInputIntentMetadata["attachmentRefs"]>;
+  attachments?: PendingTurnAttachment[];
+  conversationQuotes?: TurnInputIntentMetadata["conversationQuotes"];
+  modelSelection?: ModelSelection;
+  mode?: TurnInputIntentMetadata["mode"];
+  planEnabled?: boolean;
+  /** 用户改了模型：入队时冻结的 Highspeed 卡不能再覆盖用户的新选择。 */
+  dropHighspeed?: boolean;
+}
+
+/** editLocked = 该项被他人锁定且调用方未持锁；lockLost = 调用方声明的锁已不在。 */
+export type EditPendingInputResult = "edited" | "missing" | "editLocked" | "lockLost";
+
+export type LockPendingInputEditResult = "locked" | "missing" | "reserved" | "lockedByOther";
 
 export type PromptAdmissionReceipt =
   | {
@@ -885,6 +919,7 @@ export interface ActiveTurnStartReservation {
 }
 
 export interface DrainedPendingInputDiagnostics {
+  pluginDiscoveryUi?: boolean;
   injectedMessageIds: MessageId[];
   /** 行内 Guide 本身携带的原子 Submission 配置；由下一次 model-step 边界消费。 */
   intent?: TurnInputIntentMetadata;

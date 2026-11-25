@@ -10,6 +10,7 @@ import type {
   MessageId,
   TurnId,
   ModelToolContract,
+  PendingInputEditLock,
   PermissionBrokerPort,
   SessionEventSink,
   SessionEventStorePort,
@@ -48,6 +49,7 @@ import type {
   AgentRuntimeConfig,
   AgentRuntimeDeps,
   BackgroundTaskNotificationSealReason,
+  McpStartupPolicy,
   PendingModelChangeTimeline,
   ProviderRuntimeHeadersPort,
   MainTurnCacheHitAggregate,
@@ -144,6 +146,8 @@ export interface AgentRuntimeInternal
   /** 配置订阅、连接收敛与视图投影的唯一所有者。 */
   mcpSession?: McpSession;
   mcpConfigurationSource?: McpConfigurationSource;
+  /** 入口显式传入；turn loop 据此决定首个正常请求是否等全部 server 启动结束。 */
+  mcpStartupPolicy: McpStartupPolicy;
   mcpStartupPromise?: Promise<McpConnectionSnapshot>;
   residencyBlockingWorkCount: number;
   residencyBlockingWork: Set<Promise<unknown>>;
@@ -209,6 +213,7 @@ export interface AgentRuntimeInternal
   activeTurnStartReservation?: ActiveTurnStartReservation;
   pendingInputSequence: number;
   pendingInputReservations: Map<string, string>;
+  pendingInputEditLocks: Map<string, PendingInputEditLock>;
   permissionFullAccessPending?: boolean;
   pendingInputDrains?: number;
   lastPermissionGrantId?: string;

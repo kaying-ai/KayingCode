@@ -15,6 +15,8 @@ import type {
   IWindowControllerService,
   IKayingCodeAgentService,
   IKayingCodeTaskService,
+  KayingCodeArchivedTaskDeletionResult,
+  KayingCodeArchivedTaskPermanentDeletionResult,
   WindowHostControllerFrame,
   WindowHostControllerTaskListItem,
   WindowHostControllerTaskListResult,
@@ -47,6 +49,18 @@ function sourceKey(scope: WindowHostControllerSourceScope): string {
 
 function taskKey(task: Pick<KayingCodeTaskMeta, "taskId" | "workspacePath" | "workspaceIdentity">) {
   return `${task.workspaceIdentity?.trim() || task.workspacePath}\0${task.taskId}`;
+}
+
+function isArchivedTaskDeletionResult(
+  result: WindowHostControllerMutationResult,
+): result is KayingCodeArchivedTaskDeletionResult {
+  return Boolean(result && typeof result === "object" && "deletedTaskIds" in result);
+}
+
+function isPermanentDeletionResult(
+  result: WindowHostControllerMutationResult,
+): result is KayingCodeArchivedTaskPermanentDeletionResult {
+  return Boolean(result && typeof result === "object" && "status" in result);
 }
 
 function normalizeTaskMeta(
@@ -279,6 +293,15 @@ export function createWindowHostControllerRuntime(options: {
           workspacePath: base.workspacePath,
           workspaceIdentity: base.workspaceIdentity,
           taskIds: mutation.taskIds,
+        });
+      case "permanently-delete-archived":
+        if (sourceKey(current.scope) !== sourceKey(scope)) {
+          throw new Error("永久删除的 source 已替换");
+        }
+        return service.permanentlyDeleteArchivedTask({
+          ...base,
+          revision: mutation.revision,
+          ...(mutation.operationId ? { operationId: mutation.operationId } : {}),
         });
       case "mark-read":
         await service.setTaskUnread({
@@ -708,6 +731,36 @@ export function createWindowHostControllerRuntime(options: {
       : undefined;
     const subscriptions = new Map<string, { dispose(): void }>();
     let attachmentDisposed = false;
+    /** 归档永久删除的读面同样要绑定当前 attachment 的唯一 source，不能借用同名 workspace 的其它连接。 */
+    const resolveExpectedSource = (
+      address: WindowHostTaskAddress,
+      action: string,
+    ): ResolvedWindowHostControllerSource => {
+      const resolved = options.resolveSource({
+        workspacePath: address.workspacePath,
+        ...(address.workspaceIdentity ? { workspaceIdentity: address.workspaceIdentity } : {}),
+      });
+      if (
+        attachmentDisposed ||
+        !resolved?.taskService ||
+        resolved.sourceAvailability !== "online"
+      ) {
+        throw new Error(
+          resolved?.sourceAvailability === "offline"
+            ? "远程 source 当前离线，禁止归档删除操作"
+            : "本地 source 当前不可用",
+        );
+      }
+      if (resolved.scope.kind === "remote") {
+        const mismatched = address.sourceServerId
+          ? address.sourceServerId !== resolved.scope.sourceServerId
+          : address.remoteSessionId !== resolved.scope.remoteSessionId;
+        if (mismatched) throw new Error(`任务地址与 source 不匹配（${action}）`);
+      } else if (address.remoteSessionId != null || address.sourceServerId != null) {
+        throw new Error(`任务地址与 source 不匹配（${action}）`);
+      }
+      return resolved;
+    };
     return {
       listTaskList,
       async getTaskMeta(params) {
@@ -755,7 +808,7 @@ export function createWindowHostControllerRuntime(options: {
           return { deletedTaskIds: [], skippedTaskIds: [], failedTaskIds: [] };
         }
         const result = await projection.mutate(address, { kind: "delete-archived-batch", taskIds });
-        if (!result || typeof result === "boolean") {
+        if (!isArchivedTaskDeletionResult(result)) {
           throw new Error("归档删除批次未返回逐项目标结果");
         }
         const resolved = options.resolveSource({
@@ -784,6 +837,45 @@ export function createWindowHostControllerRuntime(options: {
         }
         return deleted === true;
       },
+      async previewArchivedTaskDeletion({ address }) {
+        const resolved = resolveExpectedSource(address, "永久删除预检");
+        return resolved.taskService!.previewArchivedTaskDeletion({
+          taskId: address.taskId,
+          workspacePath: address.workspacePath,
+          ...(address.workspaceIdentity ? { workspaceIdentity: address.workspaceIdentity } : {}),
+        });
+      },
+      async previewArchivedTaskDeletions({ address, taskIds }) {
+        if (taskIds.length === 0) return { items: [] };
+        const resolved = resolveExpectedSource(address, "永久删除批量预检");
+        return resolved.taskService!.previewArchivedTaskDeletions({
+          workspacePath: address.workspacePath,
+          ...(address.workspaceIdentity ? { workspaceIdentity: address.workspaceIdentity } : {}),
+          taskIds,
+        });
+      },
+      async permanentlyDeleteArchivedTask({ address, revision, operationId }) {
+        const result = await projection.mutate(address, {
+          kind: "permanently-delete-archived",
+          revision,
+          ...(operationId ? { operationId } : {}),
+        });
+        if (!isPermanentDeletionResult(result)) {
+          throw new Error("永久删除未返回逐项结果");
+        }
+        const resolved = options.resolveSource({
+          workspacePath: address.workspacePath,
+          workspaceIdentity: address.workspaceIdentity,
+        });
+        // blocked 没有改变任何事实，无需重拉；deleted/incomplete 都可能有会话行已被移除。
+        if (resolved && result.status !== "blocked") {
+          await refreshSource(resolved, true).catch((error) =>
+            options.onSourceError?.(resolved.scope, "refresh", error),
+          );
+        }
+        return result;
+      },
+
       async mutateTask({ address, mutation }) {
         await projection.mutate(address, mutation as WindowHostControllerMutation);
         const resolved = options.resolveSource({

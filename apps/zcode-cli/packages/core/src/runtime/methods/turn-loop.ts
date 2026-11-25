@@ -50,6 +50,8 @@ import { formatTotalTokensReminder } from "../../context/total-tokens.js";
 import { inputRoleOf } from "../helpers/provider-entry-origins.js";
 import {
   evaluateRapidRefill,
+  isAutomationMutationRestrictedTurn,
+  isOffPeakCreateRestrictedTurn,
   MAX_CONSECUTIVE_RAPID_REFILLS,
   RAPID_REFILL_TOOL_TURN_THRESHOLD,
   recordCompactHistoryRound,
@@ -101,8 +103,16 @@ export async function runRegularTurnLoop(
 
     const finishMcp = beginLocalTurnPreparation(state.turnTraceContext, "mcp");
     // 只有正常新请求才应用最新 MCP 列表；断流重试、准入重试、续写等恢复请求沿用原请求的工具列表。
-    if (state.inputAttachmentCollectionPending) {
-      const mcpView = await this.initializeMcp(state.turnTraceContext);
+    const mcpToolListRefreshed = Boolean(state.inputAttachmentCollectionPending);
+    // 自动任务（automation / 闲时）无人交互，即使会话策略是 background 也等启动结束。
+    const mcpBackground =
+      this.mcpStartupPolicy === "background" &&
+      !isAutomationMutationRestrictedTurn(state) &&
+      !isOffPeakCreateRestrictedTurn(state);
+    if (mcpToolListRefreshed) {
+      const mcpView = await this.initializeMcp(state.turnTraceContext, {
+        background: mcpBackground,
+      });
       if (state.pluginReferenceInput !== undefined) {
         const pluginReferenceInput = state.pluginReferenceInput;
         state.pluginReferenceInput = undefined;
@@ -271,6 +281,8 @@ export async function runRegularTurnLoop(
       iteration: state.toolCallCount === 0 ? 0 : Math.ceil(state.toolCallCount / 10),
     });
 
+    // 本次请求候选的交付增量：只有随成功 assistant 提交时才固化进历史，投影/估算不写入。
+    state.turnRequestState.toolSearchDelivery = prepared.delivery;
     const result = await runModelBackedTurnStep.call(this, state, {
       drainedSteerForNextRequest,
       latestRealUserMessageIndex: providerProjection.diagnostics.latestRealUserMessageIndex,
@@ -464,6 +476,7 @@ async function appendToolSearchAnnouncement(
     tools,
     registry: runtime.getToolRegistry(),
     entries: state.turnRequestState.entries,
+    mcp: runtime.mcpServerStatusFacts,
   });
   // 公告正文和增量事实必须先一起落盘；否则 fork/resume 会把已公告工具重新当成首次出现。
   await persistAnnouncements(

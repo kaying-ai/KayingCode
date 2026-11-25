@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { LoaderIcon, MoreHorizontal, Trash2 } from "lucide-react";
+import { Eraser, LoaderIcon, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import {
   DropdownMenu,
@@ -15,10 +15,13 @@ import { useConfirmDialog } from "@/hooks/useConfirmDialog.js";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 import {
   collectArchivedTaskDeletion,
+  collectArchivedTaskPermanentDeletion,
+  deleteArchivedTaskPermanentSelection,
   deleteArchivedTaskSelection,
   type ArchivedTaskDeletionWorkspace,
   type ArchivedTaskDeletionTarget,
 } from "@/lib/archivedTaskDeletion.js";
+import { describeArchivedTaskDeletionBlockedReason } from "@/lib/permanentDeletionPresentation.js";
 import { logger } from "@/logger.js";
 
 export function DeleteAllArchivedTasksButton({
@@ -102,6 +105,151 @@ export function DeleteAllArchivedTasksButton({
     }
   }
 
+  async function handlePermanentDeleteAll() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    setResultMessage(null);
+    try {
+      const selection = await collectArchivedTaskPermanentDeletion(workspaces);
+      const unavailable =
+        selection.unavailableWorkspaces.length > 0
+          ? intl.formatMessage(
+              { id: "taskList.deleteAllArchivedUnavailable" },
+              { projects: selection.unavailableWorkspaces.join("、") },
+            )
+          : "";
+      if (selection.entries.length === 0) {
+        setResultMessage(unavailable || intl.formatMessage({ id: "taskList.noArchivedTasks" }));
+        return;
+      }
+      let forkCount = 0;
+      let fileCount = 0;
+      let artifactCount = 0;
+      const blockedLines: string[] = [];
+      for (const entry of selection.entries) {
+        if (!entry.preview) {
+          blockedLines.push(
+            intl.formatMessage(
+              { id: "taskList.permanentDeleteItem" },
+              {
+                task: entry.target.title || entry.target.taskId,
+                workspace: entry.target.workspaceLabel,
+                reason: intl.formatMessage(
+                  { id: "taskList.permanentDeletePreviewFailed" },
+                  {
+                    reason: describeArchivedTaskDeletionBlockedReason(intl, entry.errorCode),
+                  },
+                ),
+              },
+            ),
+          );
+          continue;
+        }
+        forkCount += entry.preview.forks.length;
+        fileCount += entry.preview.deletedFiles;
+        artifactCount += entry.preview.retainedArtifacts.length;
+        if (entry.preview.blockedReason) {
+          blockedLines.push(
+            intl.formatMessage(
+              { id: "taskList.permanentDeleteItem" },
+              {
+                task: entry.target.title || entry.target.taskId,
+                workspace: entry.target.workspaceLabel,
+                reason: describeArchivedTaskDeletionBlockedReason(
+                  intl,
+                  entry.preview.blockedReason,
+                ),
+              },
+            ),
+          );
+        }
+      }
+      const confirmed = await confirmDialog({
+        title: intl.formatMessage(
+          { id: "taskList.permanentDeleteTitle" },
+          { count: selection.entries.length },
+        ),
+        description: [
+          intl.formatMessage({ id: "taskList.permanentDeleteDescription" }),
+          intl.formatMessage(
+            { id: "taskList.permanentDeletePreviewSummary" },
+            {
+              count: selection.entries.length,
+              forks: forkCount,
+              files: fileCount,
+              artifacts: artifactCount,
+            },
+          ),
+          ...blockedLines,
+          unavailable,
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+        confirmLabel: intl.formatMessage({ id: "taskList.permanentDelete" }),
+        confirmVariant: "destructive",
+        scrollableDescription: blockedLines.length > 4,
+      });
+      if (!confirmed) return;
+      const result = await deleteArchivedTaskPermanentSelection(selection, workspaces, onDeleted);
+      const problemLines = result.items
+        .filter((item) => item.status !== "deleted")
+        .map((item) =>
+          intl.formatMessage(
+            { id: "taskList.permanentDeleteItem" },
+            {
+              task: item.target.title || item.target.taskId,
+              workspace: item.target.workspaceLabel,
+              reason:
+                item.status === "failed"
+                  ? intl.formatMessage(
+                      { id: "taskList.permanentDeleteError" },
+                      { reason: describeArchivedTaskDeletionBlockedReason(intl, item.reason) },
+                    )
+                  : describeArchivedTaskDeletionBlockedReason(intl, item.reason),
+            },
+          ),
+        );
+      setResultMessage(
+        [
+          intl.formatMessage(
+            { id: "taskList.permanentDeleteResult" },
+            {
+              deleted: result.deleted,
+              blocked: result.blocked,
+              incomplete: result.incomplete,
+              failed: result.failed,
+            },
+          ),
+          result.incomplete > 0
+            ? intl.formatMessage({ id: "taskList.permanentDeleteIncompleteHint" })
+            : "",
+          ...problemLines,
+          unavailable,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+      await onRefresh?.();
+    } catch (error) {
+      logger.error("[ArchivedTaskDeletion] 永久删除或刷新失败", error);
+      setResultMessage((current) =>
+        [
+          current,
+          intl.formatMessage(
+            { id: "taskList.permanentDeleteError" },
+            { reason: error instanceof Error ? error.message : String(error) },
+          ),
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  }
+
   const actionLabel = intl.formatMessage({
     id: busy ? "taskList.deleteAllArchivedBusy" : "taskList.archivedActions",
   });
@@ -144,6 +292,20 @@ export function DeleteAllArchivedTasksButton({
         >
           <Trash2 className="size-3.5" />
           {intl.formatMessage({ id: "taskList.deleteAllArchivedMenu" })}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          variant="destructive"
+          disabled={disabled || busy}
+          data-testid="permanently-delete-all-archived-tasks"
+          className="max-md:min-h-9"
+          onSelect={() => {
+            setMenuOpen(false);
+            void handlePermanentDeleteAll();
+          }}
+        >
+          <Eraser className="size-3.5" />
+          {intl.formatMessage({ id: "taskList.permanentDeleteMenu" })}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

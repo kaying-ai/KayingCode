@@ -3611,6 +3611,9 @@ async function materializeSessionRecord(
   source: SessionStartupPreferencesSource,
   trace?: KayingCodeProtocolTrace,
 ): Promise<KayingCodeProtocolSessionRecord> {
+  // 请求边界已做一次检查；这里覆盖进程内直接物化（fork/导入/生命周期激活）路径。
+  // 删除写屏障已提交时禁止再创建 runtime，避免半物化实例在删除完成后复活会话。
+  await context.deps.sessionStore?.assertSessionNotDeleting?.(sessionId);
   let directorySessionId: string | undefined;
   if (source.kind === "host" && context.sessionDirectorySourceEnabled) {
     directorySessionId = sessionId;

@@ -235,3 +235,18 @@ export function buildRemoteHostWorkspaceIdentity(hostId: string, workspacePath: 
     throw new Error("Invalid remote host identity");
   return identity;
 }
+
+/**
+ * 远程 identity 的 Hook Trust identity：保留 host 命名空间，路径取本次实际执行目录。
+ * 修复原因：Trust 键若原样使用调用方传入的 identity，协议调用可用 workspacePath=B、
+ * workspaceIdentity=A 借 A 的授权执行 B 的 Hook；这里统一把路径段换成 workspacePath。
+ * 非远程 identity 返回 null，由调用方走本地路径解析。
+ */
+export function remoteWorkspaceTrustIdentity(
+  identity: string,
+  workspacePath: string,
+): string | null {
+  if (!identity.startsWith(REMOTE_IDENTITY_PREFIX)) return null;
+  const hostId = remoteHostIdFromWorkspaceIdentity(identity);
+  return hostId === null ? identity : buildRemoteHostWorkspaceIdentity(hostId, workspacePath);
+}

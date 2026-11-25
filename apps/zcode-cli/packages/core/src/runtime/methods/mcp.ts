@@ -562,6 +562,21 @@ export async function initializeMcp(
       view.configuration.servers ?? {},
       new Set(view.configuration.trustedOfficialCuaServerNames ?? []),
     );
+    // 撤销原因的唯一来源：同一批描述符先按 allow/deny 求准入集合，再与全量集合求差。
+    // ToolSearch 公告据此把被权限规则撤销的工具与断线/下线区分开，避免模型继续调用已撤销定义。
+    const admitted = new Set(
+      [
+        ...selectMcpTools(descriptors, {
+          allowedTools: this.config.toolAllowlist,
+          disallowedTools: this.config.toolDisallowlist,
+          officialCuaServerNames,
+        }),
+      ].map((tool) => tool.name),
+    );
+    const deniedTools = [...selectMcpTools(descriptors, { officialCuaServerNames })]
+      .map((tool) => tool.name)
+      .filter((name) => !admitted.has(name));
+    if (deniedTools.length) this.mcpServerStatusFacts.deniedTools = deniedTools;
     // 官方 CUA 授权集合变化会改变模型可见名称与权限能力组，必须进入注册签名。
     const signature = mcpToolsSignature(descriptors, officialCuaServerNames);
     this.mcpToolsRegistered = true;

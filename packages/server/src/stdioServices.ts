@@ -1,7 +1,10 @@
 import {
   createLocalServices,
+  createSettingServiceWithMigrations,
+  createSettingServiceReplyLanguageResolver,
   getAppConfigDir,
   type KayingCodeAgentCommandResolver,
+  type ReplyLanguageResolver,
 } from "@zcode/services/node";
 import { createServerCredentialCipher } from "@zcode/shared/credential-security";
 import { join } from "node:path";
@@ -16,6 +19,8 @@ interface CreateStdioServicesOptions {
   env?: Record<string, string | undefined>;
   kayingcodeBuiltinProviderConfigFilePath: string;
   kayingcodeAgentCommandResolver?: KayingCodeAgentCommandResolver;
+  /** 远端 stdio Host 的回复语言来源；缺省读取本 Host Setting（未设置回答 null）。 */
+  resolveReplyLanguage?: ReplyLanguageResolver;
 }
 
 interface RemoteAgentNetworkOptions {
@@ -44,6 +49,10 @@ export async function createStdioServices(options: CreateStdioServicesOptions) {
     filePath: join(getAppConfigDir(), "credentials.json"),
     env,
   });
+  // 回复语言的设置页写入经既有 ISettingService 到达本 Host；复用同一实例保证
+  // 读到已提交的更新，未设置时由 resolver 回答 null，不伪造默认语言。
+  const { service: settingService, prepareLegacyAccountConnections } =
+    createSettingServiceWithMigrations();
   // 远程 Desktop 的呈现能力必须从 stdio 入口收到的 authority mode 进入 Services 推导链。
   // 测试注入 resolver 只用于在 spawn 前观察最终命令，不改变生产默认 resolver。
   const services = createLocalServices({
@@ -52,6 +61,10 @@ export async function createStdioServices(options: CreateStdioServicesOptions) {
     serviceAuthorityMode: authorityModeParseResult.mode,
     kayingcodeAgentCommandResolver: options.kayingcodeAgentCommandResolver,
     remoteAgentNetwork,
+    settingService,
+    prepareLegacyAccountConnections,
+    resolveReplyLanguage:
+      options.resolveReplyLanguage ?? createSettingServiceReplyLanguageResolver(settingService),
   });
 
   return {

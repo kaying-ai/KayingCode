@@ -52,6 +52,7 @@ import type {
   PluginReferenceCatalog,
   ProviderEndpointRoutingPort,
   QueryId,
+  PendingInputEditLock,
   SessionEvent,
   SessionEventSink,
   SessionEventStorePort,
@@ -81,10 +82,14 @@ import type {
   AgentRuntimeDeps,
   AmendWorkflowRunSettingsInput,
   AmendWorkflowRunSettingsResult,
+  EditPendingInputOptions,
+  EditPendingInputResult,
   ExecuteTurnOptions,
   ExpertWorkflowCommandResult,
+  LockPendingInputEditResult,
   McpAppProvidedToolDefinition,
   McpAppProvidedToolExecutor,
+  McpStartupPolicy,
   ModelExecutionContext,
   PresentationSurface,
   ProviderRuntimeHeadersPort,
@@ -226,6 +231,8 @@ export interface KayingCodeAppOptions {
   mcpPort?: McpPort;
   /** 由宿主提供 per-app lease；产出的端口归 app 所有。 */
   mcpPortFactory?: (input: { workingDirectory?: string }) => McpPort;
+  /** MCP 启动策略，入口显式传入；缺省 blocking。交互入口传 background。 */
+  mcpStartupPolicy?: McpStartupPolicy;
   permissionBroker?: PermissionBrokerPort;
   eventSink?: SessionEventSink;
   onOffPeakLifecycleEvent?: (event: import("@zcode/shared").OffPeakLifecycleNotification) => void;
@@ -822,10 +829,27 @@ export interface KayingCodeApp {
     reservationId: string,
     options?: { traceContext?: TraceContext },
   ): Promise<boolean>;
-  /** v4 queue 单项编辑：按 pendingInputId 替换排队输入文本（保位）。返回是否命中。 */
+  /**
+   * v4 queue 单项编辑：按 pendingInputId 原地替换排队输入（保位）。携带 editorId 时必须持有
+   * composer 编辑锁，成功后同一调用释放锁（docs/ui/composer-edit-mode.md）。
+   */
   editQueueItem(
     pendingInputId: string,
-    newText: string,
+    /** undefined = 保留原输入，只改配置。 */
+    newText: string | undefined,
+    options?: Omit<EditPendingInputOptions, "pendingInputId" | "newText"> & {
+      traceContext?: TraceContext;
+    },
+  ): Promise<EditPendingInputResult>;
+  /** composer 编辑态冻结排队项；锁与 sendQueuedNow reservation 互斥。 */
+  lockQueueItemEdit(
+    pendingInputId: string,
+    editLock: PendingInputEditLock,
+    options?: { traceContext?: TraceContext },
+  ): Promise<LockPendingInputEditResult>;
+  /** 释放编辑锁；无锁返回 false。 */
+  releaseQueueItemEdit(
+    pendingInputId: string,
     options?: { traceContext?: TraceContext },
   ): Promise<boolean>;
   /** v4 queue 重排：移动 pendingInputId 到 beforePendingInputId 之前（null=队尾）。 */

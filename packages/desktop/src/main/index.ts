@@ -572,6 +572,7 @@ async function runBrowserCommandOnView(params: {
     const result = await browserGuestManager.execute(
       {
         requestId: params.requestId,
+        controlScopeId: params.controlScopeId,
         browserId: params.browserId ?? "legacy-iab",
         browserGeneration: params.browserGeneration ?? 0,
         windowId: params.win.id,
@@ -2033,6 +2034,8 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
       const host = windowHostProcessMap.get(windowKey);
       if (host) extensionHostSupervisor?.trackWindowHost(host);
     },
+    // browser 资源身份与作用域属于 Main owner；窗口销毁后必须同步释放，不能让新窗口沿用。
+    onWindowClosed: (windowId) => browserGuestManager.closeWindow(windowId),
     awaitFirstHostSpawnDecision,
     spawnHostProcess: (win, label, initMessage) =>
       spawnHostProcess(
@@ -2040,6 +2043,7 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
         label,
         {
           ...initMessage,
+          browserBackendIdentity: browserGuestManager.getBackendIdentity(win.id),
           kayingcodeBuiltinProviderConfigFilePath: resolveKayingCodeBuiltinProviderConfigFilePath(),
         },
         {

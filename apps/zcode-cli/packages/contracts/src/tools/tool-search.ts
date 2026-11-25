@@ -14,6 +14,15 @@ export function isToolSearchName(name: string | undefined): boolean {
 }
 export const TOOL_SEARCH_DEFAULT_RESULTS = 5;
 export const TOOL_SEARCH_BETA = "advanced-tool-use-2025-11-20";
+/** 写入方使用的撤销原因。读取历史时接受任意字符串：未知原因按“已撤销”处理，compact 不携带。 */
+export type ToolSearchRetractionCause =
+  | "policy_blocked"
+  | "org_blocked"
+  | "denied"
+  | "disabled"
+  | "switched_off"
+  | "not_configured";
+// MCP 状态扩展读取时丢弃未知字段：开发期写入过的字段（willRetry、blocked、revoked、sources 等）不能让整条公告失效。
 // 连接中/失败的 MCP server 诊断：ToolSearch 未命中时随结果返回给模型。
 export const ToolSearchMcpFailureSchema = z.object({
   name: z.string(),
@@ -37,6 +46,32 @@ export const ToolSearchAnnouncementSchema = z
   .refine((delta) => delta.readdedNames.every((name) => delta.addedNames.includes(name)), {
     message: "Readded tool names must be included in addedNames",
   });
+export type ToolSearchAnnouncement = z.infer<typeof ToolSearchAnnouncementSchema>;
+// 新状态放在独立 metadata 扩展键，旧读取器仍能校验三数组公告。
+// 原因不用封闭枚举：新版本增加的原因不能让降级读取丢掉整条撤销事实。
+export const ToolSearchMcpDeltaSchema = z.object({
+  mcp: ToolSearchMcpStateSchema.optional(),
+  retractedTools: z.array(z.object({ name: z.string(), cause: z.string() })).optional(),
+  restoredNames: z.array(z.string()).optional(),
+});
+export type ToolSearchMcpDelta = z.infer<typeof ToolSearchMcpDeltaSchema>;
+// 只保存模型定义，不能持久化 execute、权限或连接等执行能力（由写入方只写这些字段保证）。
+// 读取时丢弃未知字段而不是拒绝：修复前 strict 让新版本写入的记录在降级读取时整条被丢弃。
+export const ToolSearchDeliverySchema = z.object({
+  definitions: z.array(
+    z.object({
+      tool: z.object({
+        name: z.string().min(1),
+        description: z.string().optional(),
+        inputSchema: z.record(z.string(), z.unknown()),
+        strict: z.boolean().optional(),
+      }),
+      mcp: z.object({ serverName: z.string(), toolName: z.string() }).optional(),
+    }),
+  ),
+  strippedReferences: z.array(z.object({ toolCallId: z.string(), toolName: z.string() })),
+});
+export type ToolSearchDelivery = z.infer<typeof ToolSearchDeliverySchema>;
 export const ToolReferenceContentSchema = z
   .object({
     type: z.literal("tool_reference"),

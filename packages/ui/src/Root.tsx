@@ -322,6 +322,8 @@ function RootInner({
       .syncAppRuntimePreferences({
         askUserQuestionAutoResolutionEnabled:
           appSettings.askUserQuestionAutoResolutionEnabled !== false,
+        // 默认关闭：旧设置缺该字段时不得启用插件发现工具面。
+        pluginAutoRecommendationEnabled: appSettings.pluginAutoRecommendationEnabled === true,
         modelIoFullRetentionEnabled: appSettings.modelIoFullRetentionEnabled === true,
       })
       .catch((error) => {
@@ -329,6 +331,7 @@ function RootInner({
       });
   }, [
     appSettings?.askUserQuestionAutoResolutionEnabled,
+    appSettings?.pluginAutoRecommendationEnabled,
     appSettings?.modelIoFullRetentionEnabled,
     services.kayingcodeAgentService,
   ]);

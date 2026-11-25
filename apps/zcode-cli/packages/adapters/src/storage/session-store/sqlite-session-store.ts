@@ -1,4 +1,5 @@
 import type { MigrationResult } from "@zcode/shared/sqlite-migrations";
+import { randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import * as permissionFullAccessRepository from "./repositories/permission-full-access.js";
@@ -41,6 +42,7 @@ import type {
   ScriptWorkflowRunRecord,
   ScriptWorkflowRunStatus,
   ScriptWorkflowStorePort,
+  SessionDeletionInspectOptions,
   SessionGoal,
   SessionId,
   SessionInfo,
@@ -299,11 +301,68 @@ export class SqliteSessionStore
     return SqliteSessionStore.open(options, migrationOptions);
   }
 
+  private readonly runtimeOwnerId = `${process.pid}:${randomUUID()}`;
+
+  async assertSessionNotDeleting(id: SessionId): Promise<void> {
+    if (this.db.prepare("select 1 from session_purge where session_id=?").get(id))
+      throw new Error("session-data.deleting");
+  }
+  async registerSessionRuntime(id: SessionId): Promise<void> {
+    this.db
+      .prepare(
+        "insert or ignore into session_runtime_presence(session_id,owner_id,process_id) values(?,?,?)",
+      )
+      .run(id, this.runtimeOwnerId, process.pid);
+  }
+  async unregisterSessionRuntime(id: SessionId): Promise<void> {
+    this.db
+      .prepare("delete from session_runtime_presence where session_id=? and owner_id=?")
+      .run(id, this.runtimeOwnerId);
+  }
+  async inspectSessionDeletion(id: SessionId, options?: SessionDeletionInspectOptions) {
+    return sessionRepository.inspectSessionDeletion(this.db, id, this.runtimeOwnerId, options);
+  }
+  async inspectSessionDeletions(
+    targets: ReadonlyArray<{ sessionId: SessionId } & SessionDeletionInspectOptions>,
+  ) {
+    return sessionRepository.inspectSessionDeletions(
+      this.db,
+      targets.map(({ sessionId, scanArtifactReferences }) => ({
+        root: sessionId,
+        scanArtifactReferences,
+      })),
+      this.runtimeOwnerId,
+    );
+  }
+  async beginSessionDeletion(
+    id: SessionId,
+    revision: string,
+    operationId: string,
+    retained: Array<{ sessionId: SessionId; artifactId: string }>,
+    options?: SessionDeletionInspectOptions,
+  ): Promise<void> {
+    sessionRepository.beginSessionDeletion(
+      this.db,
+      id,
+      this.runtimeOwnerId,
+      revision,
+      operationId,
+      retained,
+      options,
+    );
+  }
+  async completeSessionDeletion(id: SessionId): Promise<void> {
+    sessionRepository.completeSessionDeletion(this.db, id);
+  }
+
   getDatabasePath(): string {
     return this.dbPath;
   }
 
   close(): void {
+    this.db
+      .prepare("delete from session_runtime_presence where owner_id=?")
+      .run(this.runtimeOwnerId);
     this.db.close();
   }
 
@@ -642,6 +701,8 @@ export class SqliteSessionStore
   }
 
   async getSession(sessionID: SessionId): Promise<SessionInfo | null> {
+    if (this.db.prepare("select 1 from session_purge where session_id=?").get(sessionID))
+      return null;
     return sessionRepository.getSession(this.db, sessionID);
   }
 

@@ -13,6 +13,7 @@ import {
   type PluginUserOptionsReader,
 } from "#src/kayingcode-agent/pluginHostQueriesClient.js";
 import { createContextCompositionClient } from "#src/kayingcode-agent/contextCompositionClient.js";
+import type { ReplyLanguageResolver } from "#src/kayingcode-agent/replyLanguage.js";
 import { tapMakerProjectsRequestSchema, tapMakerProjectsResultSchema } from "@zcode/shared";
 import {
   localTtftFactsSchema,
@@ -25,6 +26,7 @@ import {
   ensureGenUiContextSupport,
   ensureIndependentPlanSupport,
   supportsHistoryFirst,
+  supportsPluginDiscoveryUi,
 } from "./independentPlanSupport.js";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -304,6 +306,9 @@ import {
   v4ConversationResyncResultSchema,
   v4ConversationSubscribeResultSchema,
   v4ConversationUsageResultSchema,
+  v4SessionDeletionPreviewBatchResultSchema,
+  v4SessionDeletionPreviewSchema,
+  v4SessionDeletionResultSchema,
   v4SessionsIndexSubscribeResultSchema,
   v4UsageStatsResultSchema,
   v4WorkspaceConfigSubscribeResultSchema,
@@ -903,8 +908,11 @@ interface CreateKayingCodeAgentServiceOptions extends Omit<
   authorizeLocalMediaPreviewPath?: (path: string) => Promise<string>;
   modelSelectionReadinessSource?: ModelSelectionReadinessSource;
   sessionRuntimePreferencesAuthority?: "local" | "external";
-  /** Agent 回复语言（同步、只读内存，null 为未设置），应答 CLI 的 session/readReplyLanguage。 */
-  resolveReplyLanguage?: () => string | null;
+  /**
+   * Agent 回复语言（Host 级只读来源，null 为未设置），应答 CLI 的 session/readReplyLanguage。
+   * 本机 Host 同步读内存；Web/远端 Host 可按需异步读取本 Host 的 Setting。
+   */
+  resolveReplyLanguage?: ReplyLanguageResolver;
   /**
    * 新会话创建前的 Host 归属预留；返回本次创建固化的执行目录。
    * 缺省表示该装配不提供项目服务：调用方携带 projectId 时必须显式失败
@@ -2208,9 +2216,32 @@ export function createKayingCodeAgentService(
             return;
           }
           // 注入的值已在 Host 收消息时按 replyLanguageSchema 校验，这里不再重复。
-          void client
-            .respond(request.id, { language: options?.resolveReplyLanguage?.() ?? null })
-            .catch(() => {});
+          // 远端/Web Host 的 resolver 需要读 Setting（异步）；读取失败返回 RPC error，
+          // 由 CLI 按读取失败跳过本轮，不能回答 null（null 会清除已有语言公告）。
+          const resolveReplyLanguage = options?.resolveReplyLanguage;
+          if (!resolveReplyLanguage) {
+            void client.respond(request.id, { language: null }).catch(() => {});
+            return;
+          }
+          void (async () => {
+            let language: string | null;
+            try {
+              language = await resolveReplyLanguage();
+            } catch (error) {
+              logger.warn(undefined, "回复语言读取失败", {
+                error: error instanceof Error ? error.message : String(error),
+                workspaceKey: resolveWorkspaceKey(workspace),
+              });
+              await client
+                .respondError(request.id, {
+                  code: -32603,
+                  message: "Reply language unavailable",
+                })
+                .catch(() => {});
+              return;
+            }
+            await client.respond(request.id, { language }).catch(() => {});
+          })();
           return;
         }
         if (appControl?.handle(request)) return;
@@ -3626,6 +3657,7 @@ export function createKayingCodeAgentService(
       const normalizedPreferences: KayingCodeAgentAppRuntimePreferences = {
         ...preferences,
         modelIoFullRetentionEnabled: preferences.modelIoFullRetentionEnabled === true,
+        pluginAutoRecommendationEnabled: preferences.pluginAutoRecommendationEnabled === true,
       };
       latestAppRuntimePreferences = normalizedPreferences;
       const activeClients = [...activeClientsByWorkspaceKey.values()];
@@ -3917,6 +3949,48 @@ export function createKayingCodeAgentService(
         V4_METHODS.conversationUsage,
         { sessionId: params.sessionId },
         v4ConversationUsageResultSchema,
+      );
+    },
+
+    async previewSessionDeletion(params: KayingCodeAgentSessionTarget) {
+      const client = await getReadOnlyClient(params);
+      return client.request(
+        V4_METHODS.sessionDeletionPreview,
+        { sessionId: params.sessionId, workspace: buildWorkspaceRef(params) },
+        v4SessionDeletionPreviewSchema,
+      );
+    },
+
+    async previewSessionDeletions(
+      params: KayingCodeAgentWorkspaceTarget & { sessionIds: string[] },
+    ) {
+      const client = await getReadOnlyClient(params);
+      return client.request(
+        V4_METHODS.sessionDeletionPreviewBatch,
+        {
+          items: params.sessionIds.map((sessionId) => ({
+            sessionId,
+            workspace: buildWorkspaceRef(params),
+          })),
+        },
+        v4SessionDeletionPreviewBatchResultSchema,
+      );
+    },
+
+    async executeSessionDeletion(
+      params: KayingCodeAgentSessionTarget & { revision: string; operationId: string },
+    ) {
+      // 删除必须走可写 client：只读 runtime 不持有 sessionDataFiles 的执行面。
+      const client = await getClient(params);
+      return client.request(
+        V4_METHODS.sessionDeletionExecute,
+        {
+          sessionId: params.sessionId,
+          workspace: buildWorkspaceRef(params),
+          revision: params.revision,
+          operationId: params.operationId,
+        },
+        v4SessionDeletionResultSchema,
       );
     },
 
@@ -5318,6 +5392,9 @@ export function createKayingCodeAgentService(
           compression: "none" as const,
           workspaceHookReview: true,
           independentPlanState: true,
+          // 与 connection scope 的 hello 同一份能力集：直连 base service 的宿主消费者
+          // 也能据此声明插件发现 UI；真正注入仍要 CLI runtimeCapabilities 探测通过。
+          pluginDiscovery: true,
         },
         auth: {},
       };
@@ -5399,6 +5476,9 @@ export function createKayingCodeAgentService(
           clientMode: connection.clientMode,
           // 与 clientMode 同族的可信位：只由连接 clientHello 注入，调用方不能伪造。
           ...(connection.workflowRunDeltas === true ? { workflowRunDeltas: true } : {}),
+          ...(connection.pluginDiscoveryUi === true && (await supportsPluginDiscoveryUi(client))
+            ? { pluginDiscoveryUi: true }
+            : {}),
           ...(historyFirst
             ? {
                 historyFirst: true,
@@ -5522,6 +5602,32 @@ export function createKayingCodeAgentService(
             ...envelope,
             payload: { ...payload, browserAmbientContext },
           };
+        }
+      }
+      const trustedConnection = readTrustedKayingCodeAgentV4Connection(params);
+      // 来自 UI 的同名字段永远不是授权；relay 透传的是下游握手。旧 CLI 严格校验，缺席比发送 false 安全。
+      delete envelope.pluginDiscoveryUi;
+      if (
+        envelope.type === "createSession" &&
+        envelope.payload &&
+        typeof envelope.payload === "object"
+      ) {
+        const { pluginDiscoveryToolEnabled: _untrusted, ...payload } = envelope.payload as Record<
+          string,
+          unknown
+        >;
+        envelope.payload = payload;
+      }
+      if (
+        trustedConnection?.pluginDiscoveryUi === true &&
+        (await supportsPluginDiscoveryUi(client))
+      ) {
+        // 偏好控制下一次输入的工具面；已展示的确认卡片仍可完成或跳过，避免关开关后卡住旧轮。
+        if (
+          latestAppRuntimePreferences?.pluginAutoRecommendationEnabled === true ||
+          envelope.type === "resolveInteraction"
+        ) {
+          envelope.pluginDiscoveryUi = true;
         }
       }
       const ack: CommandAck = await client.request(V4_METHODS.command, envelope, commandAckSchema);

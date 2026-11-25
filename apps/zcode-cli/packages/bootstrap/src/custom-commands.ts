@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { createConfig } from "@zcode/adapters/config";
+import { createConfigWithPluginMigrations } from "@zcode/adapters/config";
 import { createNodeCustomCommandAdapter } from "@zcode/adapters/commands";
 import type {
   CustomCommandContent,
@@ -72,7 +72,7 @@ export async function loadKayingCodeCustomCommand(
 
 async function createCustomCommandDiscovery(options: ListKayingCodeCustomCommandsOptions) {
   const workingDirectory = resolve(options.workingDirectory ?? process.cwd());
-  const configResult = createConfig({
+  const configResult = await createConfigWithPluginMigrations({
     env: options.env,
     projectConfigPath: options.projectConfigPath,
     workingDirectory,

@@ -31,6 +31,7 @@ import { DataBaseDirControl } from "@/settings/DataBaseDirControl.js";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 import { useOptionalServices } from "@/hooks/useServices.js";
 import { ProactiveSuggestionsSetting } from "@/settings/ProactiveSuggestionsSetting.js";
+import { PluginAutoRecommendationSetting } from "@/settings/PluginAutoRecommendationSetting.js";
 import { normalizeInterfaceMode, type InterfaceMode } from "@/lib/interfaceMode.js";
 import {
   createSettingsPageConfig,
@@ -793,6 +794,8 @@ export function GeneralSectionContent({
             />
           }
         />
+        {/* 无 services 的精简 SSR 渲染不引入设置读写依赖。 */}
+        {hasServices ? <PluginAutoRecommendationSetting /> : null}
         <SettingsRow
           label={intl.formatMessage({ id: "settings.modelIoFullRetention" })}
           description={intl.formatMessage({

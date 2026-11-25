@@ -1,6 +1,7 @@
-import {
-  createDefaultFileWorkspaceHookTrustStore,
-} from "@zcode/adapters/storage";
+import { createDefaultFileWorkspaceHookTrustStore } from "@zcode/adapters/storage";
+import { resolveWorkspaceHookTrustIdentityForWorkspace } from "@zcode/adapters/config";
+import { isRemoteWorkspaceIdentity } from "@zcode/shared";
+import { readWorkspaceHookScriptState } from "@zcode/shared/workspace-hook-discovery";
 import {
   InMemoryWorkspaceHookPolicyProvider,
   WorkspaceHookTrustCoordinator,
@@ -78,6 +79,8 @@ export function createWorkspaceHookRuntimeSecurity(input: {
     payload: WorkspaceHookAdmissionUpdatedPayload;
   }) => Promise<void>;
   emitReviewEvent?: (event: WorkspaceHookReviewLifecycleEvent) => Promise<void>;
+  /** 解析受管 worktree 数据根目录用（KAYINGCODE_DATA_BASE_DIR）；缺省 process.env。 */
+  env?: Record<string, string | undefined>;
   logger: Logger;
   projectConfigPath?: string;
   policy?: WorkspaceHookPolicy;
@@ -118,34 +121,32 @@ export function createWorkspaceHookRuntimeSecurity(input: {
   let controller: WorkspaceHookReviewController | undefined;
   // 软门禁:onAdmissionStateChanged → 发射 WorkspaceHookAdmissionUpdated 会话事件。
   // activate() 完成 evaluate 后、replaceSnapshot 后均会触发,供投影层写入 snapshot 字段。
-  const onAdmissionStateChanged:
-    | ((state: WorkspaceHookAdmissionState) => void)
-    | undefined = input.emitAdmissionEvent
-    ? (state) => {
-        void input.emitAdmissionEvent!({
-          type: SessionEventType.WorkspaceHookAdmissionUpdated,
-          payload: {
-            pendingCount: state.pendingCount,
-            bundleDigest: state.bundleDigest,
-            ...(state.workspaceIdentity
-              ? { workspaceIdentity: state.workspaceIdentity }
-              : {}),
-          },
-        }).catch((error: unknown) => {
-          input.logger.warn("Failed to emit WorkspaceHookAdmissionUpdated", {
-            errorType: error instanceof Error ? error.name : typeof error,
-            event: "workspace_hook.admission_event_emit_failed",
-            module: "bootstrap.workspace_hook_trust",
+  const onAdmissionStateChanged: ((state: WorkspaceHookAdmissionState) => void) | undefined =
+    input.emitAdmissionEvent
+      ? (state) => {
+          void input.emitAdmissionEvent!({
+            type: SessionEventType.WorkspaceHookAdmissionUpdated,
+            payload: {
+              pendingCount: state.pendingCount,
+              bundleDigest: state.bundleDigest,
+              ...(state.workspaceIdentity ? { workspaceIdentity: state.workspaceIdentity } : {}),
+            },
+          }).catch((error: unknown) => {
+            input.logger.warn("Failed to emit WorkspaceHookAdmissionUpdated", {
+              errorType: error instanceof Error ? error.name : typeof error,
+              event: "workspace_hook.admission_event_emit_failed",
+              module: "bootstrap.workspace_hook_trust",
+            });
           });
-        });
-      }
-    : undefined;
+        }
+      : undefined;
   const admission = createWorkspaceHookRuntimeAdmission({
     coordinator,
     enabled: trustEnabled,
     logger: input.logger,
     ready,
     ...(onAdmissionStateChanged ? { onAdmissionStateChanged } : {}),
+    readScriptState: readWorkspaceHookScriptState,
     snapshot: input.snapshot,
   });
 
@@ -168,6 +169,20 @@ export function createWorkspaceHookRuntimeSecurity(input: {
       }),
       sessionId: input.sessionId,
       store: store as NonNullable<typeof store>,
+      // target 的 workspaceIdentity 是 workspaceKey：本地按路径解析 Trust identity。
+      // 修复原因（第三轮 CR-02）：远程 Trust identity 由 host 与执行目录构造，曾把整个 workspaceKey
+      // 当作路径传入，得到 host:/remote:… 而与 snapshot 永远不等，远程会话的审核与撤销全部失败。
+      // 远程 key 必须是本会话的 workspaceKey，再按本会话的执行目录解析；其他 key 原样返回，随后被判 mismatch。
+      resolveTargetTrustIdentity: (workspaceKey) =>
+        isRemoteWorkspaceIdentity(workspaceKey) &&
+        workspaceKey !== input.snapshot!.workspaceIdentity
+          ? Promise.resolve(workspaceKey)
+          : resolveWorkspaceHookTrustIdentityForWorkspace({
+              ...(isRemoteWorkspaceIdentity(workspaceKey)
+                ? { workspacePath: input.workingDirectory, workspaceIdentity: workspaceKey }
+                : { workspacePath: workspaceKey }),
+              ...(input.env ? { env: input.env } : {}),
+            }),
     });
   }
 
@@ -189,9 +204,7 @@ export function createWorkspaceHookRuntimeSecurity(input: {
       await admission.activate("resume");
     },
     requestReview: (target) =>
-      controller
-        ? controller.requestReview(target)
-        : Promise.resolve(unavailable()),
+      controller ? controller.requestReview(target) : Promise.resolve(unavailable()),
     respond: (target, decision) =>
       controller ? controller.respond(target, decision) : Promise.resolve(unavailable()),
     toggle: (target, reviewItemId, enabled) =>

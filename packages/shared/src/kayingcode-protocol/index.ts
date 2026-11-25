@@ -156,6 +156,7 @@ export const KAYINGCODE_PROTOCOL_VERSION = 1 as const;
 export const KAYINGCODE_PROTOCOL_V4_WIRE_VERSION = 3 as const;
 export const kayingcodeRuntimeCapabilitiesSchema = z.object({
   sessionLifecycleWorkspace: z.boolean().optional(),
+  pluginDiscoveryUi: z.boolean().optional(),
   sessionDirectorySource: z.boolean().optional(),
   sessionWorkspaceRouting: z.boolean().optional(),
   genUiContext: z.boolean().optional(),
@@ -3160,9 +3161,7 @@ export const kayingcodePluginWorkspaceTrustSchema = z
     declarationDigest: z.string().regex(/^[a-f0-9]{64}$/u),
   })
   .strict();
-export type KayingCodePluginWorkspaceTrust = z.infer<
-  typeof kayingcodePluginWorkspaceTrustSchema
->;
+export type KayingCodePluginWorkspaceTrust = z.infer<typeof kayingcodePluginWorkspaceTrustSchema>;
 
 // 组件类型与详情弹窗/市场详情共用的分组顺序保持一致：agent / command / skill / hook / mcp。
 // 注意：这三个 schema 必须定义在 kayingcodePluginInfoSchema 之前，因为后者（.strict()）的 components 字段引用了它们。

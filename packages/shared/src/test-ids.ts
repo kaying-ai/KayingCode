@@ -612,6 +612,14 @@ export const TID_V4_COMPOSER_BACKGROUND_WORK_TRIGGER = "v4-composer-background-w
 export const TID_V4_COMPOSER_CUA_ENTRY = "v4-composer-cua-entry";
 /** v4 composer 发送按钮 */
 export const TID_V4_COMPOSER_SEND = "v4-composer-send";
+/** v4 composer 编辑态状态条（编辑最后一条消息或排队消息） */
+export const TID_V4_COMPOSER_EDIT_BAR = "v4-composer-edit-bar";
+/** v4 composer 编辑态取消按钮（排队消息同时 releaseQueueItemEdit） */
+export const TID_V4_COMPOSER_EDIT_CANCEL = "v4-composer-edit-cancel";
+/** v4 composer 编辑态切换到另一条消息的「放弃当前编辑」确认框 */
+export const TID_V4_COMPOSER_EDIT_SWITCH_DIALOG = "v4-composer-edit-switch-dialog";
+/** v4 composer 编辑提交后「应用到排队消息」确认框 */
+export const TID_V4_COMPOSER_EDIT_APPLY_QUEUE_DIALOG = "v4-composer-edit-apply-queue-dialog";
 /** v4 暂停队列发送确认：清空队列并发送 */
 export const TID_V4_COMPOSER_CLEAR_QUEUE_SEND = "v4-composer-clear-queue-send";
 /** v4 暂停队列发送确认：保留队列并发送 */
@@ -640,6 +648,8 @@ export const TID_V4_HOOK_DETAILS_TRIGGER = "v4-hook-details-trigger";
 export const TID_V4_HOOK_DETAILS_CONTENT = "v4-hook-details-content";
 /** v4 user 行 edit 按钮（动态后缀为 rowId） */
 export const TID_V4_EDIT = "v4-edit";
+/** v4 user 行「正在下方编辑」占位（动态后缀为 rowId） */
+export const TID_V4_EDIT_IN_COMPOSER_HINT = "v4-edit-in-composer-hint";
 /** v4 user query 编辑输入框（动态后缀为 rowId） */
 export const TID_V4_EDIT_INPUT = "v4-edit-input";
 /** v4 user query 编辑提交按钮（动态后缀为 rowId） */
@@ -667,6 +677,10 @@ export const TID_V4_QUEUE_ITEM = "v4-queue-item";
 export const TID_V4_QUEUE_ITEM_DELETE = "v4-queue-item-delete";
 /** v4 queue 项编辑按钮（动态后缀为 queueItemId） */
 export const TID_V4_QUEUE_ITEM_EDIT = "v4-queue-item-edit";
+/** v4 queue 项冻结编辑锁归属提示（动态后缀为 queueItemId；data-edit-lock-owner=self|other） */
+export const TID_V4_QUEUE_ITEM_EDIT_LOCK = "v4-queue-item-edit-lock";
+/** v4 queue 项解除他人编辑锁按钮（动态后缀为 queueItemId） */
+export const TID_V4_QUEUE_ITEM_RELEASE_EDIT = "v4-queue-item-release-edit";
 /** v4 queue 项立即发送按钮（动态后缀为 queueItemId） */
 export const TID_V4_QUEUE_ITEM_SEND_NOW = "v4-queue-item-send-now";
 /** v4 queue 项上移按钮（动态后缀为 queueItemId） */

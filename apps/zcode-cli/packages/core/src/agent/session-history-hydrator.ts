@@ -1,12 +1,16 @@
 import { genUiModelContextSchema, type GenUiModelContext } from "@zcode/shared/gen-ui";
 import { attachGenUiContext, normalizeGenUiInput } from "./message-history.js";
-import { ModelCallWrapperSchema } from "@zcode/contracts";
+import { ModelCallWrapperSchema, ToolSearchDeliverySchema } from "@zcode/contracts";
 import {
   hydrateToolSearchContent,
   hydrateCompactDiscovery,
   hydrateToolSearchAnnouncement,
+  hydrateToolSearchMcpDelta,
 } from "./tool-search-hydration.js";
-import { parseToolSearchHiddenNames } from "../tool/search/history.js";
+import {
+  isToolSearchAnnouncementMetadata,
+  parseToolSearchHiddenNames,
+} from "../tool/search/history.js";
 import { parseAgentListingDelta } from "./agent-listing-metadata.js";
 import { parseEnvironmentAnnouncement } from "../context/sections/env-info.js";
 import { parseInstructionAnnouncement } from "../context/sections/instruction-files.js";
@@ -31,6 +35,7 @@ import type {
   MessageId,
   ToolArtifactStorePort,
   ToolPart,
+  ToolSearchDelivery,
 } from "@zcode/contracts";
 import {
   getSystemReminderDescriptor,
@@ -48,6 +53,7 @@ import {
   createRuntimeToolResultEntry,
   INTERRUPT_MARKER_SOURCE,
   isKnownSystemReminderSource,
+  isRuntimeAttachmentEntry,
   legacySyntheticRuntimeMetadata,
   realUserRuntimeMetadata,
   buildUserMessageEntries,
@@ -172,6 +178,13 @@ export async function hydrateMessageHistoryFromSession(input: {
           },
         };
       }
+      // compact 摘要消息上也可能带已交付定义：与 live 一样只在有 compaction 边界时恢复，
+      // 不能把交付事实挂到普通用户输入上。
+      const boundaryDelivery = boundaryPart
+        ? parseToolSearchDelivery(message.info.metadata)
+        : undefined;
+      if (boundaryDelivery && entries[0] && entries[0].kind !== "attachment")
+        entries[0] = { ...entries[0], toolSearchDelivery: boundaryDelivery };
       input.history.addEntries(
         presentation
           ? entries.map((entry) =>
@@ -252,7 +265,13 @@ export async function hydrateMessageHistoryFromSession(input: {
         keepEmptyFinal: persistedTokenUsageBaseline(message.info.tokens) !== undefined,
       });
       if (entries.length === 0) continue;
-      input.history.addEntries(markRepaired(entries));
+      // 有序条目与 live 共用 buildAssistantEntries；已交付定义按 live 的提交点挂在第一条
+      // 非空 assistant 上，空 usage 锚点不固化交付事实。
+      const withDelivery = attachToolSearchDelivery(
+        entries,
+        parseToolSearchDelivery(message.info.metadata),
+      );
+      input.history.addEntries(markRepaired(withDelivery.entries));
       appliedMessageCount++;
       interruptedToolCount += await addToolResultsFromParts(input, toolParts);
       continue;
@@ -262,30 +281,33 @@ export async function hydrateMessageHistoryFromSession(input: {
     const { rounds: providerRounds, remainingParts } = splitProviderToolRoundParts(assistantParts);
     // 这条消息拆出的所有 assistant entry 共用分组键：compact 按数据库消息定持久化边界，两边组数才一致。
     const compactGroupKey = providerRounds.length > 0 ? message.info.id : undefined;
-    input.history.addEntries(
-      markRepaired(
-        withCompactGroupKey(
-          providerRounds.flatMap((round) => {
-            const toolPart = round.toolPart;
-            return [
-              createRuntimeAssistantEntry(
-                assistantTextFromParts(round.parts),
-                [{ id: toolPart.callID, input: toolPart.state.input, name: toolPart.tool }],
-                assistantReasoningFromParts(round.parts),
-                assistantModel,
-              ),
-              createRuntimeToolResultEntry(
-                toolPart.callID,
-                toolPart.tool,
-                providerToolResultFromPart(toolPart).output,
-                providerToolResultFromPart(toolPart).isError,
-              ),
-            ];
-          }),
-          compactGroupKey,
-        ),
+    // 已交付定义随第一条非空 assistant 恢复，与 live commitTurnRequestEntries 的提交点一致；
+    // 服务端工具轮次在前时先挂在轮次条目上。
+    const delivery = parseToolSearchDelivery(message.info.metadata);
+    const providerEntries = attachToolSearchDelivery(
+      withCompactGroupKey(
+        providerRounds.flatMap((round) => {
+          const toolPart = round.toolPart;
+          return [
+            createRuntimeAssistantEntry(
+              assistantTextFromParts(round.parts),
+              [{ id: toolPart.callID, input: toolPart.state.input, name: toolPart.tool }],
+              assistantReasoningFromParts(round.parts),
+              assistantModel,
+            ),
+            createRuntimeToolResultEntry(
+              toolPart.callID,
+              toolPart.tool,
+              providerToolResultFromPart(toolPart).output,
+              providerToolResultFromPart(toolPart).isError,
+            ),
+          ];
+        }),
+        compactGroupKey,
       ),
+      delivery,
     );
+    input.history.addEntries(markRepaired(providerEntries.entries));
 
     const text = assistantTextFromParts(remainingParts);
     const reasoning = assistantReasoningFromParts(remainingParts);
@@ -310,7 +332,14 @@ export async function hydrateMessageHistoryFromSession(input: {
       [createRuntimeAssistantEntry(text, finalToolCalls, reasoning, assistantModel, contextUsage)],
       compactGroupKey,
     );
-    input.history.addEntries(providerRounds.length > 0 ? finalEntries : markRepaired(finalEntries));
+    // 轮次条目已经挂过交付定义时不再重复写到最后一条。
+    const restoredFinal = attachToolSearchDelivery(
+      finalEntries,
+      providerEntries.attached ? undefined : delivery,
+    );
+    input.history.addEntries(
+      providerRounds.length > 0 ? restoredFinal.entries : markRepaired(restoredFinal.entries),
+    );
     appliedMessageCount++;
 
     interruptedToolCount += await addToolResultsFromParts(input, toolParts);
@@ -611,10 +640,11 @@ function syntheticSystemReminderAttachmentFromTextPart(
   part: Extract<MessagePart, { type: "text" }>,
 ): SyntheticSystemReminderAttachment | undefined {
   if (!part.synthetic) return undefined;
-  if (part.text.trim().length === 0) return undefined;
   const metadata = metadataFromSyntheticTextPart(part);
+  // 无正文的目录状态结算仍需恢复，否则冷恢复会重复公告已经结算的 pending。
+  const announcement = isToolSearchAnnouncementMetadata(metadata);
+  if (part.text.trim().length === 0 && !announcement) return undefined;
   // 只凭已校验的公告身份适配旧包装，不从普通用户正文推断提醒来源。
-  const announcement = metadata.toolSearchAnnouncement;
   const wrapped = isProviderWrappedSystemReminderText(part.text);
   if (wrapped && !announcement) return undefined;
   if (!isRestorableSystemReminderAttachmentSource(metadata.source)) return undefined;
@@ -729,14 +759,15 @@ function runtimeMessageMetadataFromPartMetadata(
   if (source === INTERRUPT_MARKER_SOURCE) return { source };
   if (source === "legacy_synthetic" || source === "tool_search_announcement") {
     const announcement = hydrateToolSearchAnnouncement(runtimeMessage.toolSearchAnnouncement);
+    const mcpDelta = hydrateToolSearchMcpDelta(runtimeMessage.toolSearchMcpDelta);
     const hiddenNames =
       announcement &&
       parseToolSearchHiddenNames(runtimeMessage.toolSearchHiddenNames, announcement);
     return {
       ...legacySyntheticRuntimeMetadata(),
-      ...(announcement
-        ? { source: "tool_search_announcement" as const, toolSearchAnnouncement: announcement }
-        : {}),
+      ...(mcpDelta ? { toolSearchMcpDelta: mcpDelta } : {}),
+      ...(announcement || mcpDelta ? { source: "tool_search_announcement" as const } : {}),
+      ...(announcement ? { toolSearchAnnouncement: announcement } : {}),
       ...(hiddenNames ? { toolSearchHiddenNames: hiddenNames } : {}),
     };
   }
@@ -752,6 +783,39 @@ function runtimeMessageMetadataFromPartMetadata(
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseToolSearchDelivery(
+  metadata: Record<string, unknown> | undefined,
+): ToolSearchDelivery | undefined {
+  return ToolSearchDeliverySchema.safeParse(metadata?.toolSearchDelivery).data;
+}
+
+/**
+ * 恢复已交付的工具定义。live 在 `commitTurnRequestEntries` 把它挂在第一条非空 assistant 条目上，
+ * 空 usage 锚点不固化交付事实；冷恢复按同一位置重建，请求准备才不会重复交付或把 tool_reference
+ * 当成失效引用改写。
+ */
+function attachToolSearchDelivery(
+  entries: readonly RuntimeMessageEntry[],
+  delivery: ToolSearchDelivery | undefined,
+): { entries: RuntimeMessageEntry[]; attached: boolean } {
+  if (!delivery) return { entries: [...entries], attached: false };
+  const index = entries.findIndex(
+    (entry) =>
+      !isRuntimeAttachmentEntry(entry) &&
+      entry.message.role === "assistant" &&
+      (entry.message.content.length > 0 || (entry.message.toolCalls?.length ?? 0) > 0),
+  );
+  const target = entries[index];
+  if (!target || isRuntimeAttachmentEntry(target))
+    return { entries: [...entries], attached: false };
+  return {
+    entries: entries.map((entry, entryIndex) =>
+      entryIndex === index ? { ...target, toolSearchDelivery: delivery } : entry,
+    ),
+    attached: true,
+  };
 }
 
 function assistantTextFromParts(parts: MessagePart[]): string {

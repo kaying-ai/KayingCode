@@ -157,7 +157,7 @@ export function getModeOptionDisplayLabel(
   return intl.formatMessage({ id: labelMessageId });
 }
 
-function getModeOptionLabelMessageId(
+export function getModeOptionLabelMessageId(
   provider: KayingCodeProvider | undefined,
   entry: Pick<KayingCodeConfigSelectValue, "value">,
 ): string | null {

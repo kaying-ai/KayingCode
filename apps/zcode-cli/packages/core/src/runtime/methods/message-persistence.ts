@@ -1,4 +1,4 @@
-import type { RuntimeInputPresentation } from "@zcode/contracts";
+import type { RuntimeInputPresentation, ToolSearchDelivery } from "@zcode/contracts";
 import { createModelId, createModelProviderId } from "@zcode/contracts";
 import { SessionEventType, createPartId, traceContextToLogContext } from "../deps.js";
 import { withConversationQuotes } from "../helpers/conversation-quotes.js";
@@ -292,6 +292,7 @@ export async function persistAssistantMessage(
   created: number,
   update:
     | {
+        toolSearchDelivery?: ToolSearchDelivery;
         completed?: number;
         error?: { name: string; data?: Record<string, unknown> };
         finish?: string;
@@ -349,7 +350,17 @@ export async function persistAssistantMessage(
       },
       anchor: buildProjectionAnchor(traceContext),
       // 同一条消息每次保存都是整行覆盖；完成时必须带上标记，不能只在某次中间保存里写。
-      ...(update?.signedReasoningReset ? { metadata: { signedReasoningReset: true } } : {}),
+      // 已交付定义与签名修复标记共用同一 metadata：分开 spread 时后写者会覆盖前者，丢掉交付事实。
+      ...(update?.signedReasoningReset || update?.toolSearchDelivery
+        ? {
+            metadata: {
+              ...(update?.signedReasoningReset ? { signedReasoningReset: true } : {}),
+              ...(update?.toolSearchDelivery
+                ? { toolSearchDelivery: update.toolSearchDelivery }
+                : {}),
+            },
+          }
+        : {}),
     },
     traceContext,
   );

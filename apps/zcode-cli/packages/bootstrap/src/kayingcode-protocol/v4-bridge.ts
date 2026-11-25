@@ -708,6 +708,8 @@ export function createConversationV4Gateway(
       record.app.completeExternalQueueDrain();
       return;
     }
+    // 队首冻结（composer 编辑态）：停住且不重试；解锁或编辑提交会再次触发本函数。
+    if (head.editLocked) return;
     const coreForegroundBusy = record.app.runtime.getActiveForegroundExecutionId() !== undefined;
     if (
       head.autoDrain &&
@@ -738,6 +740,7 @@ export function createConversationV4Gateway(
       !shouldAutoDrainV4QueueHead({
         autoDrain: head.autoDrain,
         dispatchState: head.dispatchState,
+        editLocked: head.editLocked,
         sessionBusy: Boolean(record.activeAbortController) || coreForegroundBusy,
         targetStatus,
       })
@@ -806,6 +809,8 @@ export function createConversationV4Gateway(
     // 返回值回填），这里惰性取用避免构造期自引用。
     getQueueItem: (sessionId, queueItemId) =>
       context.v4Gateway?.getQueueItem(sessionId, queueItemId) ?? null,
+    isQueueHeadEditLocked: (sessionId) =>
+      context.v4Gateway?.getQueueHead(sessionId)?.editLocked === true,
     hasQueueItemKind: (sessionId, kind) =>
       context.v4Gateway?.hasQueueItemKind(sessionId, kind) ?? false,
     hasQueuedDelivery: (sessionId, delivery) =>

@@ -1,7 +1,10 @@
 /* eslint-disable max-lines -- 投影状态、V4 帧与离线替换属于同一个一致性边界。 */
 import { isDeepStrictEqual } from "node:util";
 import type { KayingCodeTaskMeta } from "@zcode/shared";
-import type { KayingCodeArchivedTaskDeletionResult } from "@zcode/services";
+import type {
+  KayingCodeArchivedTaskDeletionResult,
+  KayingCodeArchivedTaskPermanentDeletionResult,
+} from "@zcode/services";
 import {
   CONTROLLER_TASKS_INDEX_TOPIC,
   CONTROLLER_WORKSPACES_TOPIC,
@@ -59,6 +62,7 @@ export type WindowHostControllerMutation =
   | { kind: "delete" }
   | { kind: "delete-archived" }
   | { kind: "delete-archived-batch"; taskIds: string[] }
+  | { kind: "permanently-delete-archived"; revision: string; operationId?: string }
   | { kind: "mark-read"; expectedUnreadAt?: number }
   | { kind: "mark-unread" }
   | { kind: "open" }
@@ -67,7 +71,8 @@ export type WindowHostControllerMutation =
 export type WindowHostControllerMutationResult =
   | void
   | boolean
-  | KayingCodeArchivedTaskDeletionResult;
+  | KayingCodeArchivedTaskDeletionResult
+  | KayingCodeArchivedTaskPermanentDeletionResult;
 
 interface ControllerSource {
   scope: WindowHostControllerSourceScope;
@@ -530,6 +535,7 @@ export function createWindowHostControllerProjection(options: { createId: () => 
         !source ||
         (mutation.kind !== "delete-archived" &&
           mutation.kind !== "delete-archived-batch" &&
+          mutation.kind !== "permanently-delete-archived" &&
           !source.rows.has(taskKey(address)))
       ) {
         throw new Error("没有与任务地址匹配的 source");

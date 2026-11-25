@@ -31,6 +31,7 @@
     "./workspace-hook-mutation": "./src/workspace-hook-mutation.ts",
     "./workspace-hook-review-monotonicity": "./src/workspace-hook-review-monotonicity.ts",
     "./workspace-hook-trust-store-file": "./src/workspace-hook-trust-store-file.ts",
+    "./managed-worktree": "./src/managed-worktree/index.ts",
     "./channel-mention": "./src/channel-mention.ts",
     "./usage-quota": "./src/usage-quota.ts",
     "./gen-ui": "./src/gen-ui/index.ts",

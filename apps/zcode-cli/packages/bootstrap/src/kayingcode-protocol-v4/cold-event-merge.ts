@@ -337,6 +337,8 @@ function resumedSubagentLifecycleEventIndexes(events: readonly SessionEvent[]): 
 function queueStateEventIndexes(events: readonly SessionEvent[]): Set<number> {
   const queuedLifecycleById = new Map<string, number[]>();
   const latestDispatchById = new Map<string, number>();
+  // 编辑锁与 dispatch 同为进程内状态：仍在队列中的项只需最近一次锁变化。
+  const latestEditLockById = new Map<string, number>();
   const latestDeliveryChangeById = new Map<string, number>();
   const pendingIds = new Set<string>();
   let latestReorder: number | null = null;
@@ -359,6 +361,11 @@ function queueStateEventIndexes(events: readonly SessionEvent[]): Set<number> {
       if (id) latestDispatchById.set(id, index);
       return;
     }
+    if (event.type === SessionEventType.TurnSteerEditLockChanged) {
+      const id = stringField(event.payload, "pendingInputId");
+      if (id) latestEditLockById.set(id, index);
+      return;
+    }
     if (event.type === SessionEventType.TurnSteerDeliveryChanged) {
       const id = stringField(event.payload, "pendingInputId");
       if (id) latestDeliveryChangeById.set(id, index);
@@ -369,6 +376,7 @@ function queueStateEventIndexes(events: readonly SessionEvent[]): Set<number> {
         pendingIds.delete(id);
         queuedLifecycleById.delete(id);
         latestDispatchById.delete(id);
+        latestEditLockById.delete(id);
         latestDeliveryChangeById.delete(id);
       }
       return;
@@ -378,6 +386,7 @@ function queueStateEventIndexes(events: readonly SessionEvent[]): Set<number> {
         pendingIds.delete(id);
         queuedLifecycleById.delete(id);
         latestDispatchById.delete(id);
+        latestEditLockById.delete(id);
         latestDeliveryChangeById.delete(id);
       }
       return;
@@ -388,6 +397,7 @@ function queueStateEventIndexes(events: readonly SessionEvent[]): Set<number> {
         pendingIds.delete(id);
         queuedLifecycleById.delete(id);
         latestDispatchById.delete(id);
+        latestEditLockById.delete(id);
         latestDeliveryChangeById.delete(id);
       }
       return;
@@ -401,6 +411,7 @@ function queueStateEventIndexes(events: readonly SessionEvent[]): Set<number> {
   for (const id of pendingIds) {
     const queuedLifecycle = queuedLifecycleById.get(id) ?? [];
     const dispatch = latestDispatchById.get(id);
+    const editLock = latestEditLockById.get(id);
     const deliveryChange = latestDeliveryChangeById.get(id);
     // editQueueItem 在旧事件里可能只重发新 text，完整 intent/附件/来源
     // 仍只在首次 queued 事件。从空投影 cold replay 时必须保留该 id
@@ -408,6 +419,7 @@ function queueStateEventIndexes(events: readonly SessionEvent[]): Set<number> {
     for (const queued of queuedLifecycle) keep.add(queued);
     const latestQueued = queuedLifecycle.at(-1) ?? -1;
     if (dispatch !== undefined && dispatch > latestQueued) keep.add(dispatch);
+    if (editLock !== undefined && editLock > latestQueued) keep.add(editLock);
     if (deliveryChange !== undefined && deliveryChange > latestQueued) keep.add(deliveryChange);
   }
   if (latestReorder !== null && pendingIds.size > 0) keep.add(latestReorder);

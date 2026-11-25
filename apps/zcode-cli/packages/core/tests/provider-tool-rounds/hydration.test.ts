@@ -180,6 +180,37 @@ describe("provider tool round hydration", () => {
     expect(entries.some((entry) => "tokens" in entry && entry.tokens)).toBe(false);
   });
 
+  it("replays ordered provider rounds through the shared ordered projection", async () => {
+    // 有序消息与 live 共用 buildAssistantEntries：保留 blockIndex，相邻文字块不合并，
+    // 重启前后的请求字节因此一致。
+    const entries = await hydrate(
+      assistant([
+        { ...text("先看图"), blockIndex: 0 },
+        { ...providerTool("completed"), blockIndex: 1 },
+        { ...text("补充"), blockIndex: 2 },
+        { ...text("回答"), blockIndex: 3 },
+      ]),
+    );
+    expect(entries[0]).toMatchObject({
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "先看图", blockIndex: 0 }],
+        toolCalls: [
+          expect.objectContaining({ id: "call_image", name: "analyze_image", blockIndex: 1 }),
+        ],
+      },
+    });
+    expect(entries[2]).toMatchObject({
+      message: {
+        role: "assistant",
+        content: [
+          { type: "text", text: "补充", blockIndex: 2 },
+          { type: "text", text: "回答", blockIndex: 3 },
+        ],
+      },
+    });
+  });
+
   it("drops rounds and text of a discarded attempt but keeps its settled local tool", async () => {
     const entries = await hydrate(
       assistant([text("先看图"), providerTool("completed"), text("再读文件"), localRead()], {

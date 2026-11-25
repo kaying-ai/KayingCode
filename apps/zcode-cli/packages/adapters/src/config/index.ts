@@ -486,6 +486,8 @@ export { KayingCodeConfigFileSchema, type KayingCodeConfigFile } from "./schema.
 export { mergeConfigs, createPrioritizedConfig, getScopePriority } from "./config-merger.js";
 export {
   createConfig,
+  createConfigWithPluginMigrations,
+  resolveKayingCodeDataBaseDir,
   resolveWorkspaceHookTrustIdentityForWorkspace,
   resolveWorkspaceStorageDir,
   type ConfigFactoryOptions,

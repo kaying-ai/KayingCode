@@ -357,6 +357,11 @@ export interface AppSettings {
   kayingcodeInteractionBehavior?: KayingCodeInteractionBehavior;
   /** Agent 提问五分钟无人回答时是否允许自动继续；缺失按开启兼容旧配置。 */
   askUserQuestionAutoResolutionEnabled?: boolean;
+  /**
+   * 是否允许 Agent 在对话中搜索并推荐官方插件。默认关闭；开启后 Host 才为可信连接
+   * 注入插件发现工具面，安装仍由确认卡片决定。
+   */
+  pluginAutoRecommendationEnabled?: boolean;
   /** 是否完整保留 Model I/O；开启后不轮转、不限额重置、不压缩或裁剪，鉴权信息仍会脱敏。 */
   modelIoFullRetentionEnabled?: boolean;
   /**

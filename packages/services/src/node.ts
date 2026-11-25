@@ -136,6 +136,10 @@ export {
 export { createCredentialService } from "./credential/credentialService.js";
 export { createBroadcastService } from "./broadcast/broadcastService.js";
 export { createKayingCodeAgentService } from "./kayingcode-agent/kayingcodeAgentService.js";
+export {
+  createSettingServiceReplyLanguageResolver,
+  type ReplyLanguageResolver,
+} from "./kayingcode-agent/replyLanguage.js";
 export { createKayingCodeTaskServiceAdapter } from "./kayingcode-agent/kayingcodeTaskServiceAdapter.js";
 export { createBotsService } from "./bots/botsService.js";
 export { createKayingCodeSessionService } from "./kayingcode-session/kayingcodeSessionService.js";
@@ -377,10 +381,7 @@ import { GitCommitMessageGenerator } from "./git/gitCommitMessageGenerator.js";
 import { createGitCheckpointService } from "./git/gitCheckpointService.js";
 import { createSystemService } from "./system/systemService.js";
 import { createTerminalService } from "./terminal/terminalService.js";
-import {
-  createSettingService,
-  createSettingServiceWithMigrations,
-} from "./setting/settingService.js";
+import { createSettingServiceWithMigrations } from "./setting/settingService.js";
 import { createOnboardingRecordService } from "./onboarding/onboardingRecordService.js";
 import { createLegacyTeamOrganizationResolver } from "./model-provider/legacyTeamOrganizationResolver.js";
 import { createObservableSettingService } from "./setting/observableSettingService.js";
@@ -392,6 +393,10 @@ import { IBotsService } from "./bots/bots.js";
 import { createBotProjectRuntime } from "./bot-project-runtime/index.js";
 import type { BotProjectConnection } from "./bot-project-runtime/contract.js";
 import { createKayingCodeAgentService } from "./kayingcode-agent/kayingcodeAgentService.js";
+import {
+  createSettingServiceReplyLanguageResolver,
+  type ReplyLanguageResolver,
+} from "./kayingcode-agent/replyLanguage.js";
 import type { KayingCodeAgentCommandResolver } from "./kayingcode-agent/kayingcodeAgentProcessManager.js";
 import { buildAgentTelemetrySpawnEnv } from "./kayingcode-agent/agentTelemetryEnv.js";
 import { resolveKayingCodeAgentPresentationSurface } from "./kayingcode-agent/kayingcodeAgentPresentationSurface.js";
@@ -631,8 +636,11 @@ export function createLocalServices(options: {
   hostApiNetworkTransport?: HostApiNetworkTransport;
   /** Desktop Host 请求 Main 登记 Agent 已授权的精确本地视频路径。 */
   authorizeLocalMediaPreviewPath?: (path: string) => Promise<string>;
-  /** Agent 回复语言（Host 级内存值）；缺省回答 null，CLI 不产生语言公告。 */
-  resolveReplyLanguage?: () => string | null;
+  /**
+   * Agent 回复语言（Host 级来源）；缺省回答 null，CLI 不产生语言公告。
+   * 本机 Host 同步读 Main 推送的内存值；Web/远端 Host 传 Setting 读取器。
+   */
+  resolveReplyLanguage?: ReplyLanguageResolver;
   feedback?: Partial<
     Omit<CreateFeedbackServiceOptions, "apiClient" | "credentialService" | "oauthService">
   >;
@@ -1326,6 +1334,7 @@ export function createLocalServices(options: {
           return {
             askUserQuestionAutoResolutionEnabled:
               settings.askUserQuestionAutoResolutionEnabled !== false,
+            pluginAutoRecommendationEnabled: settings.pluginAutoRecommendationEnabled === true,
             modelIoFullRetentionEnabled: settings.modelIoFullRetentionEnabled === true,
           };
         },
@@ -1805,11 +1814,17 @@ export async function createServerHostServices(options: {
   providerProvisioningTargetEnabled?: boolean;
   /** 旧 Supervisor 托管的候选 Core 注入 v1-only cipher；正常 Server 缺省使用系统/文件密钥。 */
   credentialCipherProvider?: CredentialCipher;
+  /** Web/Server Host 的回复语言来源；缺省读取本 Host Setting（未设置回答 null）。 */
+  resolveReplyLanguage?: ReplyLanguageResolver;
 }) {
   const projectStorageHostId = remoteHostIdFromWorkspaceIdentity(
     buildServerRemoteWorkspaceIdentity({ serverId: options.sourceServerId, workspacePath: "/" }),
   );
   if (!projectStorageHostId) throw new Error("Invalid Source Server storage identity");
+  // Web/Server Host 同时也是其 Setting 权威：复用同一个实例做启动迁移与 Agent
+  // 回复语言读取，避免另建读实例与写队列分叉。
+  const { service: settingService, prepareLegacyAccountConnections } =
+    createSettingServiceWithMigrations();
   // Bug 原因：billing/balance 把 X-Device-Mid 当必填，而独立 Server 主机没有 Desktop main 写设备身份，
   // buildKayingCodeSourceHeaders() 又只读不生成。原修复只放在旧 stdio entry，SSH/WSL/Docker 的 Core 与
   // Lite HTTP 入口共用本装配却没有确保，首次 Start Plan 权益查询返回 400，Start 模型被判为不可用。
@@ -1821,7 +1836,7 @@ export async function createServerHostServices(options: {
       error instanceof Error ? error.message : String(error),
     );
   });
-  await migrateApplicationStorage(await createSettingService().get(), projectStorageHostId);
+  await migrateApplicationStorage(await settingService.get(), projectStorageHostId);
   const workspaceAliasRepo = new SourceServerWorkspaceAliasRepo();
   const workspaceIdentityMapper = new SourceServerWorkspaceIdentityMapper();
   const sourceServerWorkspaceService = createSourceServerWorkspaceService(workspaceAliasRepo, {
@@ -1851,6 +1866,10 @@ export async function createServerHostServices(options: {
     topicResourceRelayChannel: options.topicResourceRelayChannel,
     projectStorageHostId,
     sourceServerWorkspaceService,
+    settingService,
+    prepareLegacyAccountConnections,
+    resolveReplyLanguage:
+      options.resolveReplyLanguage ?? createSettingServiceReplyLanguageResolver(settingService),
   });
   return { services, workspaceIdentityMapper, migrationFailedPathCount };
 }

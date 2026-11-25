@@ -57,6 +57,7 @@ import type {
   McpPort,
   DynamicWorkflowRunPort,
   ModelCatalogPort,
+  PendingInputEditLock,
   SubagentPort,
   ToolArtifactStorePort,
   ToolCallId,
@@ -111,6 +112,9 @@ import type {
   ContinueActiveTargetLoopOptions,
   ConversationBeforeInputForkOptions,
   ConversationRewindResult,
+  EditPendingInputOptions,
+  EditPendingInputResult,
+  LockPendingInputEditResult,
   ExecuteToolsOptions,
   ExecuteToolsResult,
   ExecuteTurnOptions,
@@ -121,6 +125,7 @@ import type {
   PendingModelChangeTimeline,
   PermissionDecisionResult,
   MainTurnCacheHitAggregate,
+  McpStartupPolicy,
   RuntimeTurnFileChangeMap,
   ResumeSessionOptions,
   ResumeSessionResult,
@@ -221,6 +226,7 @@ export class AgentRuntime {
   private mcpSession?: McpSession;
   private mcpConfigurationSource?: McpConfigurationSource;
   private mcpConfigUnsubscribe?: () => void;
+  private mcpStartupPolicy: McpStartupPolicy;
   private mcpStartupPromise?: Promise<McpConnectionSnapshot>;
   private residencyBlockingWorkCount = 0;
   private readonly residencyBlockingWork = new Set<Promise<unknown>>();
@@ -285,6 +291,8 @@ export class AgentRuntime {
   private pendingInputSequence = 0;
   /** sendQueuedNow reservation；只活在当前 CLI 进程，防 drain/多端重复提升。 */
   private pendingInputReservations = new Map<string, string>();
+  /** composer 编辑态冻结锁；只活在当前 CLI 进程，锁归属在投影中只读（docs/ui/composer-edit-mode.md）。 */
+  private pendingInputEditLocks = new Map<string, PendingInputEditLock>();
   // v4 setAutoDrain：false 时排队输入不自动消费
   // （turn-stop 不续跑、roundtrip 间不 drain），保留成 held 供显式消费。
   private queueAutoDrain = true;
@@ -373,6 +381,7 @@ export class AgentRuntime {
     this.contextSourcePort = deps.contextSourcePort;
     this.skillPort = deps.skillPort;
     this.mcpPort = deps.mcpPort;
+    this.mcpStartupPolicy = deps.mcpStartupPolicy ?? "blocking";
     this.runtimeTaskRegistry = deps.runtimeTaskRegistry ?? new InMemoryRuntimeTaskRegistry();
     this.runtimeTaskRegistry.setActiveBranchGeneration?.(this.branchGeneration);
     this.workflowBlockedReminder = createWorkflowBlockedReminder(runtime);
@@ -659,12 +668,22 @@ export interface AgentRuntime {
     reservationId: string;
     traceContext?: TraceContext;
   }): Promise<boolean>;
-  /** v4 queue 单项编辑：按 pendingInputId 替换排队输入文本（保位）。 */
-  editPendingInputById(options: {
+  /** v4 queue 单项编辑：按 pendingInputId 原地替换排队输入（保位），并释放编辑锁。 */
+  editPendingInputById(
+    options: EditPendingInputOptions & { traceContext?: TraceContext },
+  ): Promise<EditPendingInputResult>;
+  /** composer 编辑态冻结：只对未 reserve 且无他人锁的排队项生效。 */
+  lockPendingInputEdit(options: {
     pendingInputId: string;
-    newText: string;
+    editLock: PendingInputEditLock;
+    traceContext?: TraceContext;
+  }): Promise<LockPendingInputEditResult>;
+  /** 释放编辑锁（发起端取消、刷新自愈或任意端手动解除）；无锁返回 false。 */
+  releasePendingInputEdit(options: {
+    pendingInputId: string;
     traceContext?: TraceContext;
   }): Promise<boolean>;
+  getPendingInputEditLock(pendingInputId: string): PendingInputEditLock | undefined;
   /** v4 queue 重排：移动 pendingInputId 到 beforePendingInputId 之前（null=队尾）。 */
   reorderPendingInput(options: {
     pendingInputId: string;

@@ -587,7 +587,10 @@ function shareCredentialKeyWithDataRoot(targetBaseDir: string): Promise<void> {
   });
 }
 
+// 资源身份由 Main 的窗口级 owner 持有；Host 只保存 InitLocal 下发的事实并原样转发。
+let browserBackendIdentity: { id: string; generation: number } | undefined;
 const browserControlMainBridge = createBrowserControlMainBridge({
+  getBackendIdentity: () => browserBackendIdentity,
   postToMain: (message) => {
     if (!parentPort) {
       throw new Error("parentPort unavailable");
@@ -2708,6 +2711,47 @@ function createControllerRoutedTaskService(
             }),
           });
       }
+      if (property === "previewArchivedTaskDeletion") {
+        return async (
+          params: Parameters<IKayingCodeTaskService["previewArchivedTaskDeletion"]>[0],
+        ) =>
+          windowHostControllerRuntime.service.previewArchivedTaskDeletion({
+            address: await windowHostControllerRuntime.resolveTaskAddress({
+              ...params,
+              attachmentScope,
+              allowMissingTask: true,
+            }),
+          });
+      }
+      if (property === "previewArchivedTaskDeletions") {
+        return async (
+          params: Parameters<IKayingCodeTaskService["previewArchivedTaskDeletions"]>[0],
+        ) =>
+          windowHostControllerRuntime.service.previewArchivedTaskDeletions({
+            address: await windowHostControllerRuntime.resolveTaskAddress({
+              workspacePath: params.workspacePath,
+              workspaceIdentity: params.workspaceIdentity,
+              taskId: params.taskIds[0]!,
+              attachmentScope,
+              allowMissingTask: true,
+            }),
+            taskIds: params.taskIds,
+          });
+      }
+      if (property === "permanentlyDeleteArchivedTask") {
+        return async (
+          params: Parameters<IKayingCodeTaskService["permanentlyDeleteArchivedTask"]>[0],
+        ) =>
+          windowHostControllerRuntime.service.permanentlyDeleteArchivedTask({
+            address: await windowHostControllerRuntime.resolveTaskAddress({
+              ...params,
+              attachmentScope,
+              allowMissingTask: true,
+            }),
+            revision: params.revision,
+            ...(params.operationId ? { operationId: params.operationId } : {}),
+          });
+      }
       if (property === "setTaskUnread") {
         return async (params: Parameters<IKayingCodeTaskService["setTaskUnread"]>[0]) => {
           const meta = await route(
@@ -3873,6 +3917,7 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
   }
 
   if (msg.type === HostMessageTypes.InitLocal) {
+    browserBackendIdentity = msg.browserBackendIdentity;
     if (!port) {
       logger.error("init-local message missing MessagePort");
       return;

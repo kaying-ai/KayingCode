@@ -4,6 +4,7 @@ import type { IKayingCodeAgentService } from "../src/kayingcode-agent/kayingcode
 import {
   createKayingCodeAgentConnectionScope,
   readTrustedKayingCodeAgentV4Connection,
+  withTrustedConnection,
 } from "../src/kayingcode-agent/kayingcodeAgentConnectionScope.js";
 
 function createBase(capture: (params: unknown) => void) {
@@ -17,7 +18,11 @@ function createBase(capture: (params: unknown) => void) {
   } as unknown as IKayingCodeAgentService;
 }
 
-function clientHello(capabilities?: { workflowRunDeltas?: boolean; historyFirst?: boolean }) {
+function clientHello(capabilities?: {
+  workflowRunDeltas?: boolean;
+  pluginDiscoveryUi?: boolean;
+  historyFirst?: boolean;
+}) {
   return {
     kind: "clientHello" as const,
     protocolVersion: V4_WIRE_PROTOCOL_VERSION,
@@ -94,7 +99,75 @@ describe("agent connection hello capabilities", () => {
 
     const trusted = readTrustedKayingCodeAgentV4Connection(captured);
     expect(trusted?.workflowRunDeltas).toBeUndefined();
+    expect(trusted?.pluginDiscoveryUi).toBeUndefined();
     expect(trusted?.historyFirst).toBeUndefined();
+    await scope.dispose();
+  });
+
+  it("forwards plugin discovery UI only when the terminal client declares it", async () => {
+    let captured: unknown;
+    const scope = createKayingCodeAgentConnectionScope(
+      createBase((params) => (captured = params)),
+      {
+        connectionId: "conn-4",
+        clientMode: "desktop-continuous",
+      },
+    );
+    await scope.service.helloConversationV4();
+    await scope.service.initializeConversationV4(clientHello({ pluginDiscoveryUi: true }));
+    // UI 层同名字段不是授权，facade 必须先剥掉再写 clientHello 的真值。
+    await scope.service.sendConversationCommandV4({
+      envelope: envelope(),
+      pluginDiscoveryUi: false,
+    } as never);
+
+    const trusted = readTrustedKayingCodeAgentV4Connection(captured);
+    expect(trusted).toMatchObject({
+      connectionId: "conn-4",
+      pluginDiscoveryUi: true,
+    });
+    await scope.dispose();
+  });
+
+  it("does not forward plugin discovery UI for a trusted relay without a downstream declaration", async () => {
+    let captured: unknown;
+    const scope = createKayingCodeAgentConnectionScope(
+      createBase((params) => (captured = params)),
+      {
+        connectionId: "relay-1",
+        clientMode: "web-remote-replayable",
+        role: "trusted-host-relay",
+      },
+    );
+    await scope.service.sendConversationCommandV4({ envelope: envelope() } as never);
+
+    expect(readTrustedKayingCodeAgentV4Connection(captured)?.pluginDiscoveryUi).toBeUndefined();
+    await scope.dispose();
+  });
+
+  it("relays the downstream clientHello plugin discovery declaration", async () => {
+    let captured: unknown;
+    const scope = createKayingCodeAgentConnectionScope(
+      createBase((params) => (captured = params)),
+      {
+        connectionId: "relay-2",
+        clientMode: "web-remote-replayable",
+        role: "trusted-host-relay",
+      },
+    );
+    const downstream = withTrustedConnection(
+      { envelope: envelope() },
+      {
+        connectionId: "downstream-1",
+        clientMode: "web-remote-replayable",
+        pluginDiscoveryUi: true,
+      },
+    );
+    await scope.service.sendConversationCommandV4(downstream as never);
+
+    const trusted = readTrustedKayingCodeAgentV4Connection(captured);
+    expect(trusted?.pluginDiscoveryUi).toBe(true);
+    expect(trusted?.connectionId).toContain("downstream-1");
     await scope.dispose();
   });
 });

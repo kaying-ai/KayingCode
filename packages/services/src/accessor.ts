@@ -3,6 +3,7 @@ import type { IRemoteProjectService } from "#src/remote-projects/contract.js";
 import type { ITaskGroupService } from "#src/task-groups/contract.js";
 import type { WindowProjectDirectoryServices } from "#src/window-project-directory/contract.js";
 import type { IProjectService } from "#src/project/contract.js";
+import type { IManagedWorktreeService } from "#src/managed-worktree-tasks/contract.js";
 import type { IGenUiService } from "./gen-ui/contract.js";
 import type { ISourceServerManagementService } from "./source-server-management/sourceServerManagement.js";
 import type { IFileService } from "./file/file.js";
@@ -59,6 +60,8 @@ export interface IServiceAccessor {
   readonly windowProjectDirectory?: WindowProjectDirectoryServices;
   /** 当前 Host 的权威项目服务；旧 Host / 测试 double 可不提供。 */
   readonly projectService?: IProjectService;
+  /** 受管 worktree 管理；仅本地桌面 Host 提供，手机与旧 Host 缺省。 */
+  readonly managedWorktreeService?: IManagedWorktreeService;
   /** 本机持有的远端项目入口；旧 Host / 测试 double 可不提供。 */
   readonly remoteProjectService?: IRemoteProjectService;
   /** 任务分组服务；旧 Host / 测试 double 可不提供。 */

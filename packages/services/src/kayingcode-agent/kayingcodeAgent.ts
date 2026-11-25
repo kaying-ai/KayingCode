@@ -105,6 +105,9 @@ import type {
   V4ConversationRowsRangeResult,
   V4ConversationResyncResult,
   V4ConversationSubscribeResult,
+  V4SessionDeletionPreview,
+  V4SessionDeletionPreviewBatchResult,
+  V4SessionDeletionResult,
   V4SessionsIndexSubscribeResult,
   V4WorkspaceConfigSubscribeResult,
   WorkspaceConfigTopicWireCandidate,
@@ -573,6 +576,8 @@ export type KayingCodeAgentServiceEvent =
 export interface KayingCodeAgentAppRuntimePreferences {
   askUserQuestionAutoResolutionEnabled: boolean;
   modelIoFullRetentionEnabled?: boolean;
+  /** 插件自动推荐开关：决定下一次输入是否携带 plugin discovery 工具面。 */
+  pluginAutoRecommendationEnabled?: boolean;
 }
 
 export interface KayingCodeAgentLocalRuntimeChildProcesses {
@@ -627,6 +632,16 @@ export interface IKayingCodeAgentService {
   getTaskTokenUsage(
     params: KayingCodeAgentTaskTokenUsageParams,
   ): Promise<KayingCodeTaskTokenUsageResult>;
+  /** 归档永久删除的单根预检；旧 CLI 以 method-not-found 表示不支持。 */
+  previewSessionDeletion(params: KayingCodeAgentSessionTarget): Promise<V4SessionDeletionPreview>;
+  /** 归档永久删除的批量预检；整批共用一次 CLI 引用扫描。 */
+  previewSessionDeletions(
+    params: KayingCodeAgentWorkspaceTarget & { sessionIds: string[] },
+  ): Promise<V4SessionDeletionPreviewBatchResult>;
+  /** 永久删除单个根及其 owned tree；revision 来自同一目标的最近一次预检。 */
+  executeSessionDeletion(
+    params: KayingCodeAgentSessionTarget & { revision: string; operationId: string },
+  ): Promise<V4SessionDeletionResult>;
   readSession(params: KayingCodeAgentReadSessionParams): Promise<KayingCodeSessionStateSnapshot>;
   readSessionMessages(
     params: KayingCodeAgentReadSessionMessagesParams,

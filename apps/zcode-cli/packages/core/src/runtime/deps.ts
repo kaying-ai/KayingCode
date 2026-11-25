@@ -165,6 +165,7 @@ export type {
   ModelUsageSummary,
   PendingSteerInputInfo,
   PendingTurnInput,
+  PendingInputEditLock,
   TurnAttachmentMeta,
   PartId,
   PermissionBrokerPort,

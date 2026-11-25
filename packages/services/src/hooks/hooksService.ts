@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import type {
@@ -9,9 +9,14 @@ import type {
   SettingsDirectorySource,
 } from "@zcode/shared";
 import {
+  resolveWorkspaceHookTrustIdentity,
+  type WorkspaceHookTrustIdentityFs,
+} from "@zcode/shared/managed-worktree";
+import {
   buildWorkspaceHookBundleSnapshot,
   createWorkspaceHookSourceInput,
   readWorkspaceHookProjectSources,
+  readWorkspaceHookScriptStates,
   resolveWorkspaceHookRuntimeRoot,
   workspaceHooksConfigSchema,
   type WorkspaceHookBundleSnapshotData,
@@ -34,6 +39,16 @@ import {
 
 const SETTINGS_FILE = "settings.json";
 const KAYINGCODE_CONFIG_FILE = "config.json";
+
+/** Trust identity resolver 的只读文件端口（Host 侧 node:fs/promises 适配）。 */
+const trustIdentityFs: WorkspaceHookTrustIdentityFs = {
+  readFile: (path) => readFile(path, "utf8"),
+  realpath: (path) => realpath(path),
+  stat: async (path) => {
+    const info = await stat(path).catch(() => null);
+    return info ? { isFile: info.isFile(), isDirectory: info.isDirectory() } : null;
+  },
+};
 const HOOK_EVENTS: readonly HookEvent[] = [
   "SessionStart",
   "UserPromptSubmit",
@@ -244,7 +259,18 @@ async function loadHooksImpl(
     ];
     return { hooks, hooksEnabled: hooks.some((hook) => hook.enabled) };
   }
+  // 对外字段（snapshot、Settings 行）保持 workspaceKey：review binding 与路由按它匹配（D23）。
   const workspaceIdentity = params.workspaceIdentity?.trim() || workspacePath;
+  // Trust identity 只用于读取持久 Trust record，必须与 CLI 侧同一 resolver 计算：
+  // 受管 worktree 归一到源仓库，其余 workspace 等于 workspaceKey。
+  const trustIdentity = await resolveWorkspaceHookTrustIdentity(
+    {
+      workspacePath,
+      dataBaseDir: getDataBaseDir(),
+      ...(params.workspaceIdentity ? { workspaceIdentity: params.workspaceIdentity } : {}),
+    },
+    trustIdentityFs,
+  );
   const [{ sources: projectSources }, userSource] = await Promise.all([
     readWorkspaceHookProjectSources({ workingDirectory: workspacePath }),
     readUserKayingCodeSource(),
@@ -258,8 +284,10 @@ async function loadHooksImpl(
     workspacePath,
     sources: projectSources,
     runtimeRoot,
+    // 与 Runtime 同一入口脚本绑定（D24），Settings 展示的 digest 才能与 Agent 的 Trust 判定一致。
+    scriptStates: await readWorkspaceHookScriptStates({ workspacePath, sources: projectSources }),
   });
-  const persistentTrust = await readPersistentWorkspaceHookTrustDigests(workspaceIdentity, logger);
+  const persistentTrust = await readPersistentWorkspaceHookTrustDigests(trustIdentity, logger);
   const persistentTrustedDigests = persistentTrust.digests;
   const hooks = [
     ...fromProjectSnapshot({

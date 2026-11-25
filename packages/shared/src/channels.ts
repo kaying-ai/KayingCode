@@ -117,6 +117,8 @@ export const ServiceChannels = {
   ZCodeSession: "kayingcode-session",
   /** 会话分享服务描述符（localrun 仅保留 unsupported 门禁实现） */
   Project: "project",
+  /** 受管 worktree 任务管理（列表、删除、起点、fork 到新 worktree），仅本地桌面 Host。 */
+  ManagedWorktrees: "managed-worktrees",
   TaskGroups: "task-groups",
   RemoteProjects: "remote-projects",
   WindowProject: "window-project",

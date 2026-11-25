@@ -132,6 +132,7 @@ interface GuestDownloadItem {
 }
 
 export interface BrowserGuestExecutionContext {
+  controlScopeId?: string;
   requestId: string;
   browserId: string;
   browserGeneration: number;
@@ -267,6 +268,7 @@ interface BrowserRecordingEntry {
   artifact?: BrowserRecordingJob["artifact"];
   error?: string;
   cleanupTimer?: ReturnType<typeof setTimeout>;
+  completion?: Promise<void>;
 }
 
 interface DownloadRecord {
@@ -348,7 +350,7 @@ function buildViewportMetricsOverride(viewport: BrowserViewportSize): Record<str
   };
 }
 
-function scopeKey(context: InternalExecutionContext): string {
+function sessionScopeKey(context: InternalExecutionContext): string {
   if (context.legacy) return "legacy";
   return [
     context.browserId,
@@ -359,6 +361,13 @@ function scopeKey(context: InternalExecutionContext): string {
     context.sessionId,
     context.clientMode,
   ].join("\u0000");
+}
+
+// 会话只读视图与实例控制权是两个边界；不能放宽 sameScope 来让 Host 读取 ambient。
+function scopeKey(context: InternalExecutionContext): string {
+  return context.legacy
+    ? "legacy"
+    : `${sessionScopeKey(context)}\u0000${context.controlScopeId ?? ""}`;
 }
 
 /** tab 归属的 session 身份：不含 browserId / generation，释放回 user-tab 集合的 tab 仍然匹配。 */
@@ -477,6 +486,87 @@ function safeNumber(read: () => number | undefined): number | undefined {
 }
 
 export class BrowserGuestManager {
+  // 资源身份属于窗口内的 Main owner，不能随 Host 的转发桥重建。
+  private readonly backendIdentities = new Map<number, { id: string; generation: number }>();
+  private readonly controlScopes = new Map<
+    string,
+    {
+      context: InternalExecutionContext;
+      closed: boolean;
+      released: boolean;
+      pending: Set<Promise<void>>;
+      closing?: Promise<BrowserCommandResult>;
+    }
+  >();
+
+  getBackendIdentity(windowId: number): { id: string; generation: number } {
+    let identity = this.backendIdentities.get(windowId);
+    if (!identity) {
+      identity = { id: `iab:${randomUUID()}`, generation: 1 };
+      this.backendIdentities.set(windowId, identity);
+    }
+    return { ...identity };
+  }
+
+  private async releaseControlScope(
+    context: InternalExecutionContext,
+    closeTabs: boolean,
+  ): Promise<BrowserCommandResult> {
+    const id = context.controlScopeId!;
+    const scope = this.controlScopes.get(id);
+    const result = (state: "released" | "absent"): BrowserCommandResult => ({
+      ok: true,
+      elapsedMs: 0,
+      scope: { id, state },
+    });
+    if (!scope) {
+      // 即使 open 的请求还在路上，也先留下关闭屏障，禁止迟到 open 复活资源。
+      this.controlScopes.set(id, { context, closed: true, released: true, pending: new Set() });
+      return result("absent");
+    }
+    if (!sameScope(scope.context, context))
+      return {
+        ok: false,
+        elapsedMs: 0,
+        error: {
+          code: "execution_error",
+          message: "Browser scope identity mismatch",
+          sideEffect: "none",
+        },
+      };
+    if (scope.released) return result("released");
+    scope.closed = true;
+    const current = scope;
+    current.closing ??= (async () => {
+      this.abortRecordings((entry) => sameScope(entry.context, context), "scope released");
+      for (const request of this.runningRequests.values()) {
+        if (sameScope(request.context, context))
+          request.controller.abort(new DOMException("scope released", "AbortError"));
+      }
+      await Promise.all(current.pending);
+      // recordingStart 返回的是后台 job；命令完成不能代表录制 surface 已释放。
+      await Promise.all(
+        [...this.recordings.values()]
+          .filter((entry) => sameScope(entry.context, context))
+          .map((entry) => entry.completion),
+      );
+      // 等已准入命令真正落地后再释放 tab，避免它们在关闭后创建或重新绑定资源。
+      await Promise.all(
+        [...this.tabs.values()]
+          .filter((tab) => tab.owner.controlScopeId === id && ownedBySession(tab.owner, context))
+          .map((tab) => this.releaseGuestCdpAfterIdle(tab, "scope released", true)),
+      );
+      this.closeSession(context);
+      if (closeTabs) await this.closeSessionTabs(context);
+      current.released = true;
+      return result("released");
+    })().catch((error) => {
+      current.closing = undefined;
+      throw error;
+    });
+    return current.closing;
+  }
+
   private readonly tabs = new Map<string, ManagedTab>();
 
   /** 资源管理器：当前仍活着的浏览器 guest webContents id，用于把其 renderer 归到内置插件 browser-use */
@@ -1022,11 +1112,66 @@ export class BrowserGuestManager {
     command: BrowserCommand,
     signal?: AbortSignal,
   ): Promise<BrowserCommandResult> {
-    const context =
+    const context: InternalExecutionContext =
       typeof contextOrKey === "string" ? normalizeLegacyContext(contextOrKey) : contextOrKey;
     this.log?.(
       `[browser-use] execute requestId=${context.requestId} browserId=${context.browserId} generation=${context.browserGeneration} windowId=${context.windowId} sessionId=${context.sessionId} method=${command.method}`,
     );
+
+    if (
+      command.method === "openScope" ||
+      command.method === "releaseScope" ||
+      context.controlScopeId
+    ) {
+      const id = context.controlScopeId;
+      const reject = (message: string): BrowserCommandResult => ({
+        ok: false,
+        elapsedMs: 0,
+        ...(command.method === "openScope" && id
+          ? { scope: { id, state: "rejected" as const } }
+          : {}),
+        error: { code: "backend_unavailable", message, sideEffect: "none" },
+      });
+      if (!id) return reject("Browser control scope is required");
+      if (command.method === "releaseScope")
+        return this.releaseControlScope(context, command.closeTabs === true);
+      const scope = this.controlScopes.get(id);
+      if (scope && (!sameScope(scope.context, context) || scope.closed))
+        return reject("Browser control scope is closed or belongs to another owner");
+      if (command.method === "openScope") {
+        const owner = this.getBackendIdentity(context.windowId);
+        if (context.browserId !== owner.id || context.browserGeneration !== owner.generation)
+          return reject("Browser resource owner is no longer available");
+        this.controlScopes.set(
+          id,
+          scope ?? { context, closed: false, released: false, pending: new Set() },
+        );
+        return { ok: true, elapsedMs: 0, scope: { id, state: "open" } };
+      }
+      if (!scope) return reject("Browser control scope was not opened");
+    }
+
+    if (
+      !context.controlScopeId &&
+      !context.legacy &&
+      context.browserId !== "legacy-iab" &&
+      // 产品旧恢复记录/单测用 backend 类型名 "iab" 作为无实例代次的历史标识；
+      // 真实实例 id 始终是 `iab:<uuid>`，因此这两种哨兵值继续走兼容路径。
+      context.browserId !== "iab"
+    ) {
+      // 身份校验从 Host 移到资源 owner，兼容请求也不能因桥重连而绕过代次校验。
+      const owner = this.getBackendIdentity(context.windowId);
+      if (context.browserId !== owner.id || context.browserGeneration !== owner.generation)
+        return {
+          ok: false,
+          elapsedMs: 0,
+          error: {
+            code: "backend_unavailable",
+            message: "Browser resource owner is no longer available",
+            sideEffect: "none",
+          },
+        };
+    }
 
     if (this.runningRequests.has(context.requestId)) {
       // requestId 是取消与 lifecycle cleanup 的 correlation key。同 key 覆盖会让
@@ -1063,10 +1208,17 @@ export class BrowserGuestManager {
     const unlink = linkAbortSignal(signal, controller);
     const running: RunningRequest = { context, controller, dispatched: false };
     this.runningRequests.set(context.requestId, running);
+    const scope = context.controlScopeId
+      ? this.controlScopes.get(context.controlScopeId)
+      : undefined;
+    const settled = Promise.withResolvers<void>();
+    scope?.pending.add(settled.promise);
     try {
       return await this.executeInScope(context, command, running);
     } finally {
       unlink();
+      scope?.pending.delete(settled.promise);
+      settled.resolve();
       // 清理必须绑定 entry identity；即使未来其它入口误写同 key，旧请求也不能删除新状态。
       if (this.runningRequests.get(context.requestId) === running) {
         this.runningRequests.delete(context.requestId);
@@ -1086,7 +1238,10 @@ export class BrowserGuestManager {
     }
 
     if (command.method === "list") {
-      const tabs = await Promise.all(this.ownedTabs(context).map((tab) => this.summary(tab)));
+      // Host 的 ambient 查询没有实例 ID，只读汇总同一会话路由；业务操作仍使用严格实例匹配。
+      const tabs = await Promise.all(
+        this.ownedTabs(context, !context.controlScopeId).map((tab) => this.summary(tab)),
+      );
       return this.withMeta({ ok: true, tabs, elapsedMs: Date.now() - startedAt }, context);
     }
 
@@ -1366,7 +1521,7 @@ export class BrowserGuestManager {
       const entry = this.createRecordingEntry(context, tab);
       this.recordings.set(entry.id, entry);
       this.refreshRuntimeProtection(tab.tabId);
-      void this.runRecording(entry, tab, command.options).catch((error: unknown) => {
+      entry.completion = this.runRecording(entry, tab, command.options).catch((error: unknown) => {
         if (entry.status !== "running") return;
         if (
           entry.controller.signal.aborted &&
@@ -2942,9 +3097,13 @@ export class BrowserGuestManager {
     return null;
   }
 
-  private ownedTabs(context: InternalExecutionContext): ManagedTab[] {
+  private ownedTabs(context: InternalExecutionContext, sessionView = false): ManagedTab[] {
     return [...this.tabs.values()].filter(
-      (tab) => tab.lifecycle !== "closed" && sameScope(tab.owner, context),
+      (tab) =>
+        tab.lifecycle !== "closed" &&
+        (sessionView
+          ? sessionScopeKey(tab.owner) === sessionScopeKey(context)
+          : sameScope(tab.owner, context)),
     );
   }
 
@@ -3045,7 +3204,8 @@ export class BrowserGuestManager {
     if (this.defaultTabByScope.get(claimedScope) === tab.tabId) {
       this.defaultTabByScope.delete(claimedScope);
     }
-    tab.owner = { ...tab.userOwner };
+    // 同一用户 tab 可被后续 runtime 再认领；释放归属必须跟随当前使用者，不能回到首次 claim 的 scope。
+    tab.owner = { ...tab.userOwner, controlScopeId: tab.owner.controlScopeId };
     tab.origin = "user";
     tab.claimable = true;
     tab.lifecycle = "active";
@@ -3167,7 +3327,8 @@ export class BrowserGuestManager {
     tab?: ManagedTab,
     lifecycleOverride?: BrowserResponseMeta["lifecycle"],
   ): BrowserCommandResult {
-    const openTabs = this.ownedTabs(context);
+    // list 的只读视图可能跨实例，meta 必须描述实际返回列表，不能再次按控制作用域缩小。
+    const openTabs = result.tabs ?? this.ownedTabs(context);
     const currentUrl = tab
       ? sanitizeBrowserMetaUrl(
           tab.guest ? safeStr(() => tab.guest!.getURL(), tab.cachedUrl) : tab.cachedUrl,
@@ -3296,10 +3457,14 @@ export class BrowserGuestManager {
     }
   }
 
-  private releaseGuestCdpAfterIdle(tab: ManagedTab, reason: string): void {
+  private async releaseGuestCdpAfterIdle(
+    tab: ManagedTab,
+    reason: string,
+    requireReleased = false,
+  ): Promise<void> {
     const guest = tab.guest;
     if (!guest || tab.guestLifecycle !== "attached") return;
-    void (async () => {
+    await (async () => {
       // 在途 CDP 命令（playwright cdp.send / viewport override / dialog 处理）结束后再断开，
       // 避免中途拆掉正在使用的管线；超时兜底与 runGuestTeardown 共用同一预算。
       const settled = await this.waitForGuestCdpIdle(tab, DEFAULT_GUEST_CDP_TEARDOWN_TIMEOUT_MS);
@@ -3312,7 +3477,10 @@ export class BrowserGuestManager {
       // 等待期间 tab 可能已换代/关闭/再次进入命令期，此时放弃本轮释放。
       if (this.tabs.get(tab.tabId) !== tab || tab.guest !== guest) return;
       if (tab.guestLifecycle !== "attached") return;
-      if (tab.pendingCdpCommands > 0) return;
+      if (tab.pendingCdpCommands > 0) {
+        if (requireReleased) throw new Error("Browser CDP commands are still running");
+        return;
+      }
       if (safeBool(() => guest.isDestroyed(), true)) return;
       try {
         if (!guest.debugger.isAttached()) {
@@ -3321,11 +3489,14 @@ export class BrowserGuestManager {
           return;
         }
         guest.debugger.detach();
+        if (requireReleased && guest.debugger.isAttached())
+          throw new Error("Browser CDP is still attached");
         tab.cdpAttached = false;
         tab.oopifSessions.clear();
         this.log?.(`[browser-use] cdp released after ${reason} tabId=${tab.tabId}`);
       } catch (error) {
         this.warn(`browser guest cdp release failed tabId=${tab.tabId} reason=${reason}`, error);
+        if (requireReleased) throw error;
       }
     })();
   }
@@ -3381,12 +3552,22 @@ export class BrowserGuestManager {
    */
   private async closeSessionTabs(context: InternalExecutionContext): Promise<void> {
     const owned = [...this.tabs.values()].filter(
-      (tab) => tab.lifecycle !== "closed" && ownedBySession(tab.owner, context),
+      (tab) =>
+        tab.lifecycle !== "closed" &&
+        ownedBySession(tab.owner, context) &&
+        (!context.controlScopeId || tab.owner.controlScopeId === context.controlScopeId),
     );
     for (const tab of owned) await this.closeTabDurably(tab);
   }
 
   closeWindow(windowId: number): void {
+    this.backendIdentities.delete(windowId);
+    for (const [id, scope] of this.controlScopes) {
+      if (scope.context.windowId === windowId) {
+        scope.closed = true;
+        this.controlScopes.delete(id);
+      }
+    }
     this.abortRecordings((entry) => entry.context.windowId === windowId, "window closed");
     for (const request of this.runningRequests.values()) {
       if (request.context.windowId === windowId) {
@@ -4787,6 +4968,9 @@ export class BrowserGuestManager {
   }
 
   disposeAll(): void {
+    for (const scope of this.controlScopes.values()) scope.closed = true;
+    this.controlScopes.clear();
+    this.backendIdentities.clear();
     for (const request of this.runningRequests.values()) {
       request.controller.abort(new DOMException("browser manager disposed", "AbortError"));
     }

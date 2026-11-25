@@ -1170,7 +1170,53 @@ export interface LocalSettingStorePort {
   }): CollaborationMode | Promise<CollaborationMode>;
 }
 
+/** 永久删除只保留身份与附件引用元数据，不备份会话正文。 */
+export interface SessionDeletionReference {
+  sessionId: SessionId;
+  artifactId: string;
+  referrers: Array<{ sessionId: SessionId; title: string }>;
+}
+export interface SessionDeletionSnapshot {
+  workspacePath?: string;
+  workspaceIdentity?: string;
+  revision: string;
+  sessionIds: SessionId[];
+  forks: Array<{ sessionId: SessionId; title: string }>;
+  references: SessionDeletionReference[];
+  foreignRuntime: boolean;
+  localRuntimeIds: SessionId[];
+  pendingWork: boolean;
+  deleting: boolean;
+  completed: boolean;
+}
+/**
+ * scanArtifactReferences=false：调用方已确认 owned tree 没有 artifact 文件，跳过引用扫描
+ * （删除凭据仍有保留附件时照样扫描）。缺省为 true。预检、执行与写锁内复检必须传同一判定。
+ */
+export interface SessionDeletionInspectOptions {
+  scanArtifactReferences?: boolean;
+}
+
 export interface SessionStorePort {
+  inspectSessionDeletion?(
+    sessionID: SessionId,
+    options?: SessionDeletionInspectOptions,
+  ): Promise<SessionDeletionSnapshot>;
+  /** 一批根共用一次扫描；结果按入参顺序，与逐个 inspectSessionDeletion 一致。 */
+  inspectSessionDeletions?(
+    targets: ReadonlyArray<{ sessionId: SessionId } & SessionDeletionInspectOptions>,
+  ): Promise<SessionDeletionSnapshot[]>;
+  beginSessionDeletion?(
+    sessionID: SessionId,
+    revision: string,
+    operationId: string,
+    retained: Array<{ sessionId: SessionId; artifactId: string }>,
+    options?: SessionDeletionInspectOptions,
+  ): Promise<void>;
+  completeSessionDeletion?(sessionID: SessionId): Promise<void>;
+  registerSessionRuntime?(sessionID: SessionId): Promise<void>;
+  unregisterSessionRuntime?(sessionID: SessionId): Promise<void>;
+  assertSessionNotDeleting?(sessionID: SessionId): Promise<void>;
   createSession(input: CreateSessionInput): Promise<SessionInfo>;
   /** legacy 兼容原语；V4 stable/compact-edit fork 禁止调用，统一走 commitForkBundle。 */
   createForkedSessionWithMetadata?(

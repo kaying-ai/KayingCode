@@ -5,6 +5,7 @@ import { readPluginUiSurfaces } from "./plugin-ui-surface-metadata.js";
 import {
   addSuppressedBuiltinInFileConfig,
   createConfig,
+  createConfigWithPluginMigrations,
   resolvePath,
   enablePluginsByDefaultInFileConfig,
   removePluginEnabledFromFileConfig,
@@ -15,7 +16,11 @@ import {
   updatePluginOptionsInFileConfig,
   type ConfigResult,
 } from "@zcode/adapters/config";
-import { removeStoredPluginSecrets, savePluginOptions, withPluginSecrets } from "./plugin-secrets.js";
+import {
+  removeStoredPluginSecrets,
+  savePluginOptions,
+  withPluginSecrets,
+} from "./plugin-secrets.js";
 import {
   addMarketplace,
   comparePluginUpdate,
@@ -262,7 +267,7 @@ function countVisibleMarketplacePlugins(
 export async function resolveKayingCodePlugins(
   options: ResolveKayingCodePluginsOptions = {},
 ): Promise<PluginLoadOutcome> {
-  const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
+  const { configResult, pluginStorageRoot, workingDirectory } = await resolvePluginContext(options);
   // 敏感选项在私有文件里；按层叠加后再交给发现，运行时展开与协议投影读到的是同一份有效值。
   const secrets = await withPluginSecrets(
     configResult,
@@ -306,7 +311,7 @@ export async function resolveKayingCodePlugins(
 export async function getKayingCodePluginsOverview(
   options: ResolveKayingCodePluginsOptions = {},
 ): Promise<KayingCodePluginsOverviewData> {
-  const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
+  const { configResult, pluginStorageRoot, workingDirectory } = await resolvePluginContext(options);
   ensureDefaultPluginMarketplaces(pluginStorageRoot);
   const outcome = await resolveKayingCodePlugins({
     ...options,
@@ -441,7 +446,11 @@ export async function getKayingCodePluginsOverview(
 export function enrichCachedClaudeMarketplaceIconsForOverview(
   options: ResolveKayingCodePluginsOptions = {},
 ): void {
-  const { pluginStorageRoot } = resolvePluginContext(options);
+  // 同步展示增强不等待 Hook 脚本读取：有注入结果就复用，否则退回同步装配。
+  const configResult = options.configResult ?? createConfig(options);
+  const pluginStorageRoot =
+    options.pluginStorageRoot ??
+    getPluginStorageRoot(getCliStorageRoot(resolvePath(configResult.config.storage.dir)));
   // 图标是可选展示增强：overview 不等待网络；仅写回阶段进入 storage lock。
   void enrichCachedClaudeMarketplaceIcons(pluginStorageRoot, (write) =>
     withPluginStorageLock(pluginStorageRoot, write),
@@ -452,7 +461,7 @@ export async function listKayingCodePlugins(
   options: ListKayingCodePluginsOptions = {},
 ): Promise<PluginLoadOutcome> {
   const outcome = await resolveKayingCodePlugins(options);
-  const { pluginStorageRoot } = resolvePluginContext(options);
+  const { pluginStorageRoot } = await resolvePluginContext(options);
   return {
     ...outcome,
     // 用户可见名称必须从 marketplace listing 解析；这里按完整 id 传递给 CLI，
@@ -490,13 +499,13 @@ export async function setKayingCodePluginEnabled(
   const workingDirectory = resolve(options.workingDirectory ?? process.cwd());
   const configResult =
     options.configResult ??
-    createConfig({
+    (await createConfigWithPluginMigrations({
       env: options.env,
       projectConfigPath: options.projectConfigPath,
       workingDirectory,
       skipUserConfig: options.skipUserConfig,
       userConfigPath: options.userConfigPath,
-    });
+    }));
   const outcome = await resolveKayingCodePlugins({
     ...options,
     configResult,
@@ -522,7 +531,7 @@ export async function setKayingCodePluginEnabled(
 export async function addKayingCodePluginMarketplace(
   options: AddKayingCodeMarketplaceOptions,
 ): Promise<KayingCodeMarketplaceSummaryData> {
-  const { pluginStorageRoot } = resolvePluginContext(options);
+  const { pluginStorageRoot } = await resolvePluginContext(options);
   const source = applySparsePaths(
     await parseMarketplaceSourceInput(options.source),
     options.sparsePaths,
@@ -547,7 +556,7 @@ export async function addKayingCodePluginMarketplace(
 export async function removeKayingCodePluginMarketplace(
   options: RemoveKayingCodeMarketplaceOptions,
 ): Promise<void> {
-  const { pluginStorageRoot } = resolvePluginContext(options);
+  const { pluginStorageRoot } = await resolvePluginContext(options);
   await removeMarketplace({
     marketplace: options.marketplace,
     storageRoot: pluginStorageRoot,
@@ -557,7 +566,7 @@ export async function removeKayingCodePluginMarketplace(
 export async function updateKayingCodePluginMarketplace(
   options: UpdateKayingCodeMarketplaceOptions,
 ): Promise<KayingCodeMarketplaceUpdateData> {
-  const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
+  const { configResult, pluginStorageRoot, workingDirectory } = await resolvePluginContext(options);
   ensureDefaultPluginMarketplaces(pluginStorageRoot);
   const declared = resolveDeclaredMarketplaceSources({
     configResult,
@@ -638,7 +647,7 @@ export async function updateKayingCodePluginMarketplace(
 export async function installKayingCodeMarketplacePlugin(
   options: InstallKayingCodeMarketplacePluginOptions,
 ): Promise<KayingCodePluginInstallData> {
-  const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
+  const { configResult, pluginStorageRoot, workingDirectory } = await resolvePluginContext(options);
   ensureDefaultPluginMarketplaces(pluginStorageRoot);
   if (options.dryRun === true) {
     const declarationSource = resolveDeclaredMarketplaceSources({
@@ -700,7 +709,7 @@ export async function installKayingCodeMarketplacePlugin(
     // 当前调用由协议层的 storage lock 保护；这里必须调用不再加锁的核心，
     // 否则同一 storageRoot 的 promise-chain lock 会等待自身而永久阻塞。
     await restoreBuiltinPluginCore({ ...options, configResult, pluginId });
-    const fresh = resolvePluginContext({ ...options, configResult: undefined });
+    const fresh = await resolvePluginContext({ ...options, configResult: undefined });
     const outcome = await resolveKayingCodePlugins({
       ...options,
       configResult: fresh.configResult,
@@ -801,7 +810,7 @@ export async function installKayingCodeMarketplacePlugin(
 export async function uninstallKayingCodeMarketplacePlugin(
   options: UninstallKayingCodeMarketplacePluginOptions,
 ): Promise<KayingCodeInstalledPluginData | null> {
-  const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
+  const { configResult, pluginStorageRoot, workingDirectory } = await resolvePluginContext(options);
   return withPluginStorageLock(pluginStorageRoot, async () => {
     const pluginId = resolvePluginIdForMutation(options);
 
@@ -882,7 +891,7 @@ export async function uninstallKayingCodeMarketplacePlugin(
 export async function updateKayingCodeMarketplacePlugin(
   options: UpdateKayingCodeMarketplacePluginOptions,
 ): Promise<KayingCodePluginUpdateData> {
-  const { pluginStorageRoot } = resolvePluginContext(options);
+  const { pluginStorageRoot } = await resolvePluginContext(options);
   const record = listInstalledPluginRecords(pluginStorageRoot).find(
     (installed) => installed.id === options.pluginId,
   );
@@ -913,7 +922,7 @@ export async function updateKayingCodeMarketplacePlugin(
 export async function validateKayingCodePluginPath(
   options: ValidateKayingCodePluginPathOptions,
 ): Promise<PluginLoadOutcome["diagnostics"]> {
-  const { pluginStorageRoot } = resolvePluginContext(options);
+  const { pluginStorageRoot } = await resolvePluginContext(options);
   return (
     await validateLocalPluginPath({
       path: options.path,
@@ -938,7 +947,7 @@ export interface InstallKayingCodeLocalPluginOptions extends ResolveKayingCodePl
 export async function installKayingCodeLocalPlugin(
   options: InstallKayingCodeLocalPluginOptions,
 ): Promise<KayingCodePluginInstallData> {
-  const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
+  const { configResult, pluginStorageRoot, workingDirectory } = await resolvePluginContext(options);
   ensureDefaultPluginMarketplaces(pluginStorageRoot);
 
   const diagnostics = (
@@ -1083,11 +1092,11 @@ function applySparsePaths(
  * 因此核心不能再次获取 promise-chain lock；公开入口再负责提供锁保护。
  */
 async function restoreBuiltinPluginCore(options: RestoreBuiltinPluginOptions): Promise<void> {
-  const { configResult } = resolvePluginContext(options);
+  const { configResult } = await resolvePluginContext(options);
   await removeSuppressedBuiltinInFileConfig(configResult.sources.user.path, options.pluginId);
   // 重读磁盘上的最新 config（patch 后），确保抑制集合不再包含刚恢复的 id；
   // 不能复用 patch 前可能被传入的 configResult。
-  const fresh = resolvePluginContext({ ...options, configResult: undefined });
+  const fresh = await resolvePluginContext({ ...options, configResult: undefined });
   // 立即重新 seed，让插件即刻可用，无需等待下一次 resolve。
   await resolveOfficialPluginRoots({
     storageRoot: fresh.pluginStorageRoot,
@@ -1096,7 +1105,7 @@ async function restoreBuiltinPluginCore(options: RestoreBuiltinPluginOptions): P
 }
 
 export async function restoreBuiltinPlugin(options: RestoreBuiltinPluginOptions): Promise<void> {
-  const { pluginStorageRoot } = resolvePluginContext(options);
+  const { pluginStorageRoot } = await resolvePluginContext(options);
   await withPluginStorageLock(pluginStorageRoot, () => restoreBuiltinPluginCore(options));
 }
 
@@ -1105,7 +1114,7 @@ export async function configureKayingCodePlugin(
 ): Promise<void> {
   const normalizedOptions = normalizePluginOptions(options.options);
   const clearOptionKeys = normalizePluginOptionKeys(options.clearOptionKeys);
-  const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
+  const { configResult, pluginStorageRoot, workingDirectory } = await resolvePluginContext(options);
   const outcome = await resolveKayingCodePlugins({
     ...options,
     configResult,
@@ -1132,7 +1141,7 @@ export async function configureKayingCodePlugin(
 export async function resetKayingCodePluginConfig(
   options: ResetKayingCodePluginConfigOptions,
 ): Promise<{ path: string; pluginId: string }> {
-  const { configResult, pluginStorageRoot, workingDirectory } = resolvePluginContext(options);
+  const { configResult, pluginStorageRoot, workingDirectory } = await resolvePluginContext(options);
   const path = resolvePluginConfigPath(options, configResult, workingDirectory);
   if (options.scope === "workspace") {
     // “恢复继承”只删除 Workspace 的 enable override。options 是独立配置维度，
@@ -1140,11 +1149,9 @@ export async function resetKayingCodePluginConfig(
     await removePluginEnabledFromFileConfig(path, options.pluginId);
   } else {
     await removePluginFromFileConfig(path, options.pluginId);
-    await removeStoredPluginSecrets(
-      resolvePluginSecretsPath(pluginStorageRoot),
-      options.pluginId,
-      { kind: "user" },
-    );
+    await removeStoredPluginSecrets(resolvePluginSecretsPath(pluginStorageRoot), options.pluginId, {
+      kind: "user",
+    });
   }
   return { path, pluginId: options.pluginId };
 }
@@ -1152,7 +1159,7 @@ export async function resetKayingCodePluginConfig(
 export async function validateKayingCodePlugin(
   options: ValidateKayingCodePluginOptions,
 ): Promise<PluginLoadOutcome["diagnostics"]> {
-  const { pluginStorageRoot } = resolvePluginContext(options);
+  const { pluginStorageRoot } = await resolvePluginContext(options);
   ensureDefaultPluginMarketplaces(pluginStorageRoot);
   if (options.source) {
     try {
@@ -1203,7 +1210,7 @@ export async function validateKayingCodePlugin(
 export async function describeKayingCodePlugin(
   options: DescribeKayingCodePluginOptions,
 ): Promise<DescribeMarketplacePluginResult> {
-  const { pluginStorageRoot } = resolvePluginContext(options);
+  const { pluginStorageRoot } = await resolvePluginContext(options);
   // 默认市场登记由 ensureMarketplaceManifestAvailable 在写锁内完成；这里不再无锁写 known 列表。
   return describeMarketplacePlugin({
     marketplace: options.marketplace,
@@ -1215,21 +1222,21 @@ export async function describeKayingCodePlugin(
   });
 }
 
-function resolvePluginContext(options: ResolveKayingCodePluginsOptions): {
+async function resolvePluginContext(options: ResolveKayingCodePluginsOptions): Promise<{
   configResult: ConfigResult;
   pluginStorageRoot: string;
   workingDirectory: string;
-} {
+}> {
   const workingDirectory = resolve(options.workingDirectory ?? process.cwd());
   const configResult =
     options.configResult ??
-    createConfig({
+    (await createConfigWithPluginMigrations({
       env: options.env,
       projectConfigPath: options.projectConfigPath,
       workingDirectory,
       skipUserConfig: options.skipUserConfig,
       userConfigPath: options.userConfigPath,
-    });
+    }));
   const storageRoot = resolvePath(configResult.config.storage.dir);
   return {
     configResult,

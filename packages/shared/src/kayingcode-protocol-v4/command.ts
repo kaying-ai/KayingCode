@@ -214,7 +214,32 @@ export const commandPayloadSchemas = {
       highspeedMeta: highspeedMessageMetaSchema.optional(),
     })
     .superRefine(requireModelSelectionForExecution),
-  editQueueItem: z.object({ queueItemId: z.string(), newText: z.string() }),
+  // 冻结编辑（docs/ui/composer-edit-mode.md）：lock 只对 queued 且无锁的项成功；
+  // editQueueItem 携带 editorId 时必须持有锁，原地替换后同一命令释放锁。
+  // attachments/modelSelection/mode/planEnabled 缺省 = 保留原值；attachments=[] 表示清空。
+  lockQueueItemEdit: z.object({ queueItemId: z.string(), editorId: z.string().min(1) }),
+  releaseQueueItemEdit: z.object({ queueItemId: z.string() }),
+  editQueueItem: z.object({
+    queueItemId: z.string(),
+    newText: z.string(),
+    editorId: z.string().min(1).optional(),
+    attachments: z.array(attachmentRefSchema).optional(),
+    conversationQuotes: conversationQuotesSchema.optional(),
+    modelSelection: modelSelectionSchema.optional(),
+    mode: submissionModeSchema.optional(),
+    planEnabled: z.boolean().optional(),
+  }),
+  // 编辑提交后把新模型/mode 应用到其他排队项（docs/ui/composer-edit-mode.md）：正文与 Plan 不变；
+  // 不存在、非 queued、compact、有编辑锁的项跳过，全部跳过 = noop。不走 CAS，理由同 editQueueItem。
+  applyQueueItemsConfig: z
+    .object({
+      queueItemIds: z.array(z.string()).min(1),
+      modelSelection: modelSelectionSchema.optional(),
+      mode: submissionModeSchema.optional(),
+    })
+    .refine((value) => value.modelSelection !== undefined || value.mode !== undefined, {
+      message: "applyQueueItemsConfig requires modelSelection or mode",
+    }),
   // beforeQueueItemId = null → 移到队尾。
   reorderQueueItem: z.object({
     queueItemId: z.string(),
@@ -323,7 +348,8 @@ export const COMMANDS_REQUIRING_BASE_REVISION: ReadonlySet<CommandType> = new Se
   "retryTurn",
   "setAssistantFeedback",
   "sendQueuedNow",
-  "editQueueItem",
+  // editQueueItem 不走 CAS：运行中 revision 随 control/queue 投影频繁递增，用户编辑排队消息的提交
+  // 会被 proto.staleRevision 误拒。冻结编辑的并发保护是 CLI 编辑锁（editorId 必须仍持锁）。
   "reorderQueueItem",
   "deleteQueueItem",
   "setAutoDrain",
@@ -345,6 +371,8 @@ export const ROW_TARGETING_COMMANDS: ReadonlySet<CommandType> = new Set([
 
 // ── 信封 ──
 export const commandEnvelopeSchema = z.object({
+  /** 仅 Host 根据当前附件握手注入；未知 CLI 不发送。 */
+  pluginDiscoveryUi: z.literal(true).optional(),
   /** Host 可信 attachment 注入；CLI 保留到原 input intent。 */
   inputOrigin: z.enum(["desktop", "mobile"]).optional(),
   ttft: localTtftContextSchema.optional(),
@@ -470,6 +498,11 @@ export const commandAckSchema = z.object({
 export type CommandAck = z.infer<typeof commandAckSchema>;
 
 // ── commands/query ──
+/**
+ * commands/query 读取命令记录失败时的 reasonCode（status 为 failed）。它表示"无法确认命令是否执行"，
+ * 不表示命令执行失败；调用方不能据此做破坏性清理（受管 worktree 创建失败后的放弃流程会据此中止）。
+ */
+export const COMMAND_QUERY_UNAVAILABLE_REASON = "fault.command.queryUnavailable" as const;
 export const commandKeySchema = z
   .object({
     // null 只属于全局/createSession 幂等桶；session 命令必须携带 sessionId。

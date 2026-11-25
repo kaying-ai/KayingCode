@@ -103,6 +103,8 @@ export const SessionEventType = {
   SessionInputPromoted: "session_input_promoted",
   // v4 queue 重排：queue 项顺序变化（reducer 按 orderedPendingInputIds 重排 queue rows）。
   TurnSteerReordered: "turn_steer_reordered",
+  // composer 编辑态冻结：锁加/解都进入事件流，投影只读锁归属，不用超时猜测。
+  TurnSteerEditLockChanged: "turn_steer_edit_lock_changed",
   // v4 输入控制：queue autoDrain 开关（held 派生 heldQueueInputRequiresChoice 的授权位）。
   QueueAutoDrainChanged: "queue_auto_drain_changed",
   // v4 输入控制：followup 路由模式（running 时 enqueue vs guide）。
@@ -147,6 +149,10 @@ export const SessionEventType = {
   // workflow_completed，script-workflow-runtime.ts）是另一套日志，同名会真的混淆。
   DynamicWorkflowRunProgress: "dynamic_workflow_run_progress",
   PermissionRequested: "permission_requested",
+  // 插件发现确认卡片：Requested 携带官方插件安装/启用请求，Resolved 在用户选择后收口工具行。
+  // 只进 live v4 投影（与 permission 同族），由 Host 按连接 pluginDiscoveryUi 能力裁剪。
+  PluginInstallRequested: "plugin_install_requested",
+  PluginInstallResolved: "plugin_install_resolved",
   PermissionResolved: "permission_resolved",
   PermissionDenied: "permission_denied",
   // 插件 UI 订阅的 MCP 资源变化。只进 live 投影（v4Gateway.ingest，seq 0），不落盘、不进冷恢复。
@@ -590,6 +596,20 @@ export interface TurnSteerDispatchChangedPayload {
   reservationId?: string;
   state: "queued" | "reserved" | "promoting";
   targetTurnId: TurnId;
+}
+
+/** editorId = 单个窗口/标签页的编辑器实例；clientId 同设备多窗口共享，不能单独作为归属。 */
+export interface PendingInputEditLock {
+  editorId: string;
+  clientId: string;
+  inputOrigin?: "desktop" | "mobile";
+}
+
+export interface TurnSteerEditLockChangedPayload {
+  pendingInputId: string;
+  targetTurnId: TurnId;
+  /** 缺省 = 已释放。 */
+  editLock?: PendingInputEditLock;
 }
 
 export interface QueueAutoDrainChangedPayload {
@@ -1338,6 +1358,7 @@ export type SessionEventPayload =
   | TurnSteerDispatchChangedPayload
   | TurnSteerDrainedPayload
   | TurnSteerReorderedPayload
+  | TurnSteerEditLockChangedPayload
   | QueueAutoDrainChangedPayload
   | FollowupModeChangedPayload
   | TurnSteerRejectedPayload

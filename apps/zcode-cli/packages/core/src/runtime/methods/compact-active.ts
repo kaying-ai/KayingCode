@@ -5,7 +5,11 @@ import {
   shouldFoldRemindersIntoToolResults,
   shouldUseMidConversationSystem,
 } from "../helpers/runtime-provider-request-messages.js";
-import { collectDiscoveredTools, compactDiscoveryMetadata } from "../../tool/search/history.js";
+import {
+  collectDiscoveredTools,
+  compactDiscoveryMetadata,
+  compactToolSearchDelivery,
+} from "../../tool/search/history.js";
 import { collectRuntimeAgentListing } from "../helpers/agent-listing.js";
 import {
   CompactPhase,
@@ -552,13 +556,24 @@ async function compactActiveConversationImpl(
         preCompactDiscoveredTools: [...preCompactDiscoveredTools],
       });
       // 新检查点尚未提交；公告使用同一候选分类，避免把即将提升的工具重新公告为待加载。
+      // 已交付定义跨 compact 只携带仍被保留引用使用的部分；撤销事实与目录变化一起重算。
+      const toolSearchDelivery = compactToolSearchDelivery(
+        activeEntries,
+        preservedEntries,
+        (name) => registry.get(name) !== undefined,
+      );
+      const deliveryCarrier = {
+        message: { role: "user" as const, content: "" },
+        toolSearchDelivery,
+      };
       const toolAnnouncement = buildToolSearchAnnouncement(
         {
           model: compactModel,
           mode: this.config.toolSearch?.mode,
           tools: options.getContinuationTools?.() ?? this.getTools(compactModel),
           registry,
-          entries: preservedEntries,
+          entries: [...preservedEntries, deliveryCarrier],
+          mcp: this.mcpServerStatusFacts,
         },
         preCompactDiscoveredTools,
       );
@@ -646,6 +661,8 @@ async function compactActiveConversationImpl(
       const summaryEntry = {
         message: { role: "user" as const, content: summaryMessageContent },
         metadata: { ...legacySyntheticRuntimeMetadata(), compactBoundary: discovery },
+        // 保留引用的已交付定义跟随 summary 进入 live 历史，冷恢复后首个请求不需要重发。
+        ...(toolSearchDelivery ? { toolSearchDelivery } : {}),
       };
       const postCompactEntries = buildPostCompactRuntimeEntries(activeEntries, summaryEntry, {
         leadingReminderEntries,
@@ -694,6 +711,7 @@ async function compactActiveConversationImpl(
           operationId: compactTimeline.operationId,
           leadingReminderEntries,
           postCompactReminderEntries,
+          toolSearchDelivery,
         },
       );
 

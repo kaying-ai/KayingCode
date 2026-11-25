@@ -96,6 +96,7 @@ import {
   classifyOutputTokenContinuation,
   commitAssistantToTurnRequest,
   commitTurnRequestEntries,
+  committedToolSearchDelivery,
   completeOutputTokenRecovery,
   hasAssistantReasoningContent,
   OUTPUT_TOKEN_LIMIT_ERROR_MESSAGE,
@@ -354,6 +355,7 @@ async function runModelBackedTurnStepImpl(
         state.userMessageId,
         assistantCreatedAt,
         {
+          toolSearchDelivery: committedToolSearchDelivery(state.turnRequestState),
           completed: Date.now(),
           finish: "off_peak_request_replaced",
         },
@@ -406,6 +408,7 @@ async function runModelBackedTurnStepImpl(
         state.userMessageId,
         assistantCreatedAt,
         {
+          toolSearchDelivery: committedToolSearchDelivery(state.turnRequestState),
           completed: Date.now(),
           finish: "start_plan_admission_retry_discarded",
         },
@@ -527,6 +530,7 @@ async function runModelBackedTurnStepImpl(
       state.userMessageId,
       assistantCreatedAt,
       {
+        toolSearchDelivery: committedToolSearchDelivery(state.turnRequestState),
         completed: Date.now(),
         error: {
           name: finalError instanceof Error ? finalError.name : "UnknownError",
