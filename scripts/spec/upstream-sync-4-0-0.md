@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`，当前 HEAD `f8bbbdab`，已推送远端。阶段 0 完成；阶段 1 基本完成（Desktop 登录 UI/真实端点/staging 待做）；阶段 2 完成；阶段 3 主链完成（剩余 ToolSearch 关闭公告、可选 401 step-up、pool 完整租约）；阶段 4 主链完成（剩余 MCP background/deniedTools/ToolSearch 交付与少数增强）；阶段 5 游戏插件验收与 CUA 对齐评估完成，非游戏上游能力待排期。`UPSTREAM_BASE.json` 仍保持 3.18.2，待阶段 5 验收完整后再更新。
+状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`，P0/Wave2/3 改动在当前工作区（未提交），基线提交 `e67391de`。阶段 0 完成；阶段 1 基本完成（Desktop 登录 UI/真实端点/staging 待做）；阶段 2 完成；阶段 3/4 主链完成（MCP 后台启动、deniedTools、ToolSearch 交付链、core 投影、Browser 身份、lifecycle hooks、队列编辑锁、pluginDiscoveryUi 协议/Host 已落地；剩余 401 step-up/pool 租约、live 有序投影、完整 composer 编辑态与阶段 4 增强）；阶段 5 部分完成（managed-worktree 底座已移植，装配/UI 未完成）。`UPSTREAM_BASE.json` 仍保持 3.18.2，待阶段 5 验收完整后再更新。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -24,7 +24,7 @@
 
 ### 分支与提交
 
-- 分支：`feat/upstream-sync-4-0-0`，HEAD `f8bbbdab`，已推送 `origin`，工作区干净。
+- 分支：`feat/upstream-sync-4-0-0`，已推送 `origin`；2026-11-25 P0 收尾改动位于当前工作区（未提交），基线提交 `e67391de`。
 - 本轮关键提交（按时间）：
   - `01cb03b1` 4.0 协议基线/账号机制；`f36df010` 异步插件 + workspace trust + live catalog；`3a4c196e`/`ead9c72a`/`a165d052` MCP 工具快照/reconcile/WaitForMcpServers。
   - `123d1c65` 存储 0025/0026、ReadTopicResource、browser-state；`19afaa1e` InputPreemption + Agent 后台；`85a330c6` Windows cmd 只读；`2e7ae67c` agent-always-background CLI。
@@ -33,16 +33,45 @@
   - `bfe6f6f9` MCP 晚到解析/实时 ToolSearch；`b0936de5` 商店 regions；`7f26496f` 测试 helper；`f8bbbdab` 本文档记录。
 - `UPSTREAM_BASE.json` 仍为 3.18.2（`fec97590`）；阶段 5 完整验收前不更新。
 
+### P0 并行收尾（2026-11-25，未提交）
+
+本轮按四条互斥文件边界并行完成，全部改动未提交：
+
+- **MCP 收尾**：`mcpStartupPolicy`（blocking/background）贯通 core/bootstrap/协议入口/TUI；`startMcpStartup` 幂等后台启动；`initializeMcp` 计算 `deniedTools`；ToolSearch 4.0 交付链（delivery/retained/stripped/常驻冻结/公告）与 contracts 类型；`runtime-provider-request-messages`、compact、turn-loop 消费 MCP 状态。自动化/闲时轮强制 blocking。
+- **core 投影**：hydrator 冷恢复对齐 live 形状（无本地工具）并恢复 `toolSearchDelivery` / `toolSearchMcpDelta`；`provider-builtin-tool-rounds` 5 例转绿。
+- **Browser 身份**：`BrowserGuestManager.getBackendIdentity`（窗口级稳定 `iab:<uuid>` / generation）、control scope 释放屏障、Main→Host→bridge 身份透传与窗口关闭清理。
+- **测试入口**：`imageComposerTarget` 迁移 vitest 并改名；CLI `test` / `coverage` 改指向实际存在的 `scripts/upload-sea-license-policy.test.mjs`。
+- **登记偏差**：冷恢复目前是“对齐 live 旧形状”的临时兼容层，不是上游 `buildAssistantEntries` live 有序投影；live 有序迁移列入 P1，迁移时删除 `projectAssistantEntriesToLegacyShape` 分支及对应测试。
+
+### Wave 2/3 并行推进（2026-11-25，未提交）
+
+- **managed-worktree 底座**：新增 `packages/shared/src/managed-worktree`（layout/trust-identity/contract）与 services `git/managed-worktree`、`managed-worktree-tasks`；数据根 `.kayingcode/worktrees`，fork carry 前缀 `.kayingcode-carry-*`；shared 新增 `./managed-worktree` 子路径导出（Node-only，避免 renderer 拉入内置模块）。已接入 `hooksService` 的 trust identity；尚未装配 `services/node.ts`、project-storage worktree 列与 UI。
+- **pluginDiscoveryUi**：shared 信封/transport/runtimeCapabilities、bootstrap v4 input intent/interaction registry/conversation publisher/subscribe、core intent 消费、services Host 能力探测/连接转发/envelope 注入均已落地；UI hello 能力位、`pluginAutoRecommendationEnabled` 设置生产者和 pluginInstall 卡片链路仍缺（fail-closed，未启用）。
+- **lifecycle hooks**：core `verifyHookBeforeDispatch` + 重新 admission、shared script states/digest、services trust identity、adapters `createConfigWithPluginMigrations`、bootstrap review/grant/CLI 全链路；可视化插件迁移因产品无“曾默认开启”语义未移植。
+- **队列编辑锁**：core `pendingInputEditLocks` 为唯一所有者，shared `lockQueueItemEdit`/`releaseQueueItemEdit`/`queueItem.editLock`，bootstrap queue 拒绝冻结项删除/重排/立即发送，UI 接入最小闭环（编辑/取消/切任务释放/他人锁提示）；完整 composer edit-mode UI、编辑失效原因条、readiness 门禁与 desktop E2E 未完成。
+- 偏差：`editQueueItem` 从 `COMMANDS_REQUIRING_BASE_REVISION` 移除，并发保护改由编辑锁承担（与上游一致）。
+
+### Wave 4（2026-11-25）
+
+- **core 有序投影**：live `commitAssistantToTurnRequest` → `buildAssistantEntries`，删除 `projectAssistantEntriesToLegacyShape` 兼容层；core 528/528、adapters `provider-builtin-tool-rounds` 8/8。
+- **批量删除**：shared 协议 + adapters `inspectSessionDeletions` + bootstrap 路由 + services/desktop/UI 永久删除接线 + runtime presence 注册（跨进程 in-use）；shared 166、adapters 364、bootstrap 181、UI 227、services 136。
+- **活动摘要**：CLI 权威 `activitySummaryDismissed` 水位 + bootstrap/UI/手机 relay 复制；手机端 146/146。
+- **MCP 残余**：401 step-up 单次恢复、pool 完整租约、`retainTools`/内建 server 重启上限；adapters 376/376。
+- **composer 编辑态**：铅笔进入底部编辑、editorId Web Lock、草稿隔离、失效态、apply-to-queue；行内编辑器移除；UI 227/227。
+- **pluginDiscoveryUi（部分）**：shared hello/交互 kind、UI `PluginInstallCard`/`PluginAutoRecommendationSetting`、services 偏好由被中止的 J2 留下；UI typecheck 通过，mobile-taro 卡片提示由主代理补齐；设置生产者与端到端激活未完整验收，保持 fail-closed。
+- **测试/设置**：settings-search（UI 207/207）；回复语言远端/Web Host。
+- **未启动**：managed-worktree 装配/UI、preinstalled-tools、voice-input、selection-comment、settings 行级定位；旧 loader 清理与游戏 E2E 留待测试轮。
+
 ### 阶段完成度
 
-| 阶段 | 状态 | 已落地 | 主要缺口 |
-| --- | --- | --- | --- |
-| 0 规划/基线 | 完成 | 差异评估、目标修订、文件边界 | — |
-| 1 账号/OAuth/凭据 | 基本完成 | 上游协议基线、凭据 enc:v2、CLI 登录入口、localrun mock | Desktop 登录 UI、真实端点联调、staging |
-| 2 插件/技能 | 完成 | 异步 material loader、workspace trust、私密选项、Skill 实时目录、MCP 配置源 | marketplace 远端源按产品边界保持关闭 |
-| 3 MCP | 完成 | 工具快照/目录缓存、配置 reconcile、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入 | ToolSearch 关闭时连接公告、可选 401 step-up、pool 完整租约 |
-| 4 CLI 运行时/跨层 | 主链完成 | 存储迁移、ReadTopicResource、browser-state、InputPreemption、cmd 只读、`-32033`、额度提醒、回复语言、runtime prefs、live tool 晚绑定、商店 regions | MCP background/deniedTools、ToolSearch 增量交付、lifecycle hooks、pluginDiscoveryUi、活动摘要/批量删除预检、plugin host 进程名 |
-| 5 游戏/上游补齐 | 部分完成 | 游戏插件 loader 验收、CUA 对齐评估、旧测试 helper 恢复 | 非游戏上游能力、真实游戏 E2E、旧 loader 兼容层清理 |
+| 阶段              | 状态     | 已落地                                                                                                                                                                                                                                                   | 主要缺口                                                                                                                       |
+| ----------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 0 规划/基线       | 完成     | 差异评估、目标修订、文件边界                                                                                                                                                                                                                             | —                                                                                                                              |
+| 1 账号/OAuth/凭据 | 基本完成 | 上游协议基线、凭据 enc:v2、CLI 登录入口、localrun mock                                                                                                                                                                                                   | Desktop 登录 UI、真实端点联调、staging                                                                                         |
+| 2 插件/技能       | 完成     | 异步 material loader、workspace trust、私密选项、Skill 实时目录、MCP 配置源                                                                                                                                                                              | marketplace 远端源按产品边界保持关闭                                                                                           |
+| 3 MCP             | 完成     | 工具快照/目录缓存、配置 reconcile、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入、mcpStartupPolicy/startMcpStartup、deniedTools、ToolSearch delivery/公告                                                                                        | 可选 401 step-up、pool 完整租约、`retainTools`/内建 server 重启上限                                                            |
+| 4 CLI 运行时/跨层 | 主链完成 | 存储迁移、ReadTopicResource、browser-state、InputPreemption、cmd 只读、`-32033`、额度提醒、回复语言、runtime prefs、live tool 晚绑定、商店 regions、ToolSearch 交付链、core 投影、Browser 身份、lifecycle hooks、队列编辑锁、pluginDiscoveryUi 协议/Host | live 有序投影迁移、完整 composer edit-mode UI/E2E、批量删除预检、活动摘要、plugin host 进程名、回复语言远端/Web Host           |
+| 5 游戏/上游补齐   | 部分完成 | 游戏插件 loader 验收、CUA 对齐评估、旧测试 helper 恢复、managed-worktree shared/services 底座                                                                                                                                                            | preinstalled-tools/voice-input/selection-comment/settings-search、managed-worktree 装配/UI、真实游戏 E2E、旧 loader 兼容层清理 |
 
 ### 本轮已落地能力（4.0.0）
 
@@ -53,28 +82,47 @@
 - 商店/桌面：listing `regions` 与浏览过滤（locale 推导）；回复语言设置持久化与 Main→Host 推送。
 - 测试：恢复 3 个上游测试 helper；旧 `adapters/test` 迁移 vitest；新增 MCP 晚到解析、live ToolSearch、regions、runtime prefs、reply language、runtime headers 等用例。
 
-### 验证矩阵（2026-11-25 最终）
+### 验证矩阵（2026-11-25 P0 收尾）
 
-| 范围 | 命令 | 结果 | 说明 |
-| --- | --- | --- | --- |
-| 根类型 | `pnpm run typecheck` | 通过 | 含 shared/services/ui/desktop/web/mobile/server |
-| CLI 包 | contracts/core build；adapters/bootstrap/cli `typecheck` | 通过 | 顺序按依赖构建 |
-| core | `vitest run` | 474/480 | 6 例既有 Windows `/tmp` 路径/临时目录问题 |
-| adapters | `vitest run` | 242/257，9 skipped | 5 例 live/cold 投影缺口；1 例 Windows 并发 flake |
-| bootstrap | `vitest run` | 137/146 | 9 例 `BrowserGuestManager.getBackendIdentity` 源码缺口 |
-| shared | `test` | 136/136 | — |
-| UI | `test` | 184/184 | 另 1 个 `node:test` 文件未被 vitest 收集 |
-| services | `test`（上一轮） | 94/96 | 2 例 Windows sqlite WAL EBUSY |
-| 治理 | `lint` / `architecture:check --changed` / `source:check` | 0 errors / OK / OK | source 含 plugins/map 校验 |
+| 范围      | 命令                                                                                     | 结果                              | 说明                                            |
+| --------- | ---------------------------------------------------------------------------------------- | --------------------------------- | ----------------------------------------------- |
+| 根类型    | `pnpm run typecheck`                                                                     | 通过                              | 含 shared/services/ui/desktop/web/mobile/server |
+| CLI 包    | contracts/core/shared-types/adapters/bootstrap build；adapters/bootstrap/cli `typecheck` | 通过                              | 按依赖顺序构建后全部 0 errors                   |
+| core      | `vitest run`                                                                             | 504/504                           | macOS 全绿；原 12 例失败随 A/B 改动消失         |
+| adapters  | `vitest run`                                                                             | 260/260                           | 原 5 例投影缺口已清零                           |
+| bootstrap | `vitest run`                                                                             | 146/146                           | Browser 9 例已清零                              |
+| shared    | `test`                                                                                   | 136/136                           | —                                               |
+| UI        | `test`                                                                                   | 186/186                           | 原 `node:test` 文件已迁移 vitest                |
+| services  | `test`                                                                                   | 96/96                             | macOS 未复现 Windows sqlite WAL EBUSY           |
+| contracts | `vitest run`                                                                             | 3/3                               | 新增 ToolSearch schema 随类型导出               |
+| CLI       | `@zcode/cli test`                                                                        | 3/3                               | 仅现有 license-policy 测试；上游 CLI 套件未移植 |
+| desktop   | `typecheck` + 定向 browser 单测                                                          | 通过 / 17 passed                  | Browser 身份工作流记录                          |
+| 治理      | `lint` / `architecture:check --changed` / `source:check` / 改动文件 `oxfmt --check`      | 0 errors / 0 violations / OK / OK | 133 个既有 warning                              |
+
+### 验证矩阵（2026-11-25 Wave 3 最终）
+
+| 范围      | 命令                                                                                     | 结果                              | 说明                                                                     |
+| --------- | ---------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------------ |
+| 根类型    | `pnpm run typecheck`                                                                     | 通过                              | shared/services/ui/desktop/web/mobile/server                             |
+| CLI 包    | contracts/core/shared-types/adapters/bootstrap build；adapters/bootstrap/cli `typecheck` | 通过                              | 按依赖顺序构建后 0 errors                                                |
+| core      | `vitest run`                                                                             | 525/525                           | macOS 全绿，含新增 MCP/hook/queue 用例                                   |
+| adapters  | `vitest run`                                                                             | 359/359                           | 含 lifecycle hook 99 个移植用例                                          |
+| bootstrap | `vitest run`                                                                             | 163/163                           | 含 pluginDiscoveryUi/queue 编辑锁用例                                    |
+| shared    | `test`                                                                                   | 156/156                           | 含 managed-worktree/protocol 编辑锁用例                                  |
+| services  | `test`                                                                                   | 124/124                           | 含 managed-worktree/pluginDiscoveryUi 用例                               |
+| UI        | `test`                                                                                   | 192/192                           | 含队列编辑锁用例                                                         |
+| contracts | `vitest run`                                                                             | 3/3                               | —                                                                        |
+| CLI       | `@zcode/cli test`                                                                        | 3/3                               | 仅现有 license-policy 测试                                               |
+| desktop   | `typecheck` + 定向 browser 单测                                                          | 通过 / 17 passed                  | Browser 身份                                                             |
+| 治理      | `lint` / `architecture:check --changed` / `source:check` / `git diff --check`            | 0 errors / 0 violations / OK / OK | 133 个既有 warning                                                       |
+| 格式      | 改动文件 `oxfmt --check`                                                                 | 通过（3 个 UI 文件除外）          | `zh-CN.ts`/`en-US.ts`/`SessionPane.tsx` 在 HEAD 基线即不合规，未批量重排 |
 
 ### 已知失败判定
 
-- core 6 例：`post-compact-file-restore`、`subagent-explore-permission-mode`、`tool-executor-read-deny-probe`，均为 Windows 路径或临时目录名问题，改动前已复现。
-- adapters 5 例 `provider-builtin-tool-rounds`：live 与 cold-resume 的 `message.content`/`blockIndex`/text 块合并形态不一致，属 core message-history/hydrator/compact 投影未同步，不放宽断言。
-- adapters 1 例 `mcp-node-fallback`：Windows 并发临时目录 `EPERM/ECONNRESET` flake。
-- bootstrap 9 例 `browser-control-scope-owner`：产品 `BrowserGuestManager` 无窗口级稳定 `getBackendIdentity`，测试按上游契约保留失败证据。
-- UI 1 个文件无 suite：`imageComposerTarget.node.test.ts` 是 `node:test`，未被 vitest 收集。
-- services 2 例：Windows sqlite WAL `EBUSY` 清理竞态。
+- 2026-11-25 Wave 3 后，macOS 上 core 525/525、adapters 359/359、bootstrap 163/163、shared 156/156、services 124/124、UI 192/192 全部通过；此前 Windows 专属路径/临时目录失败未在本机复现。
+- Windows 三平台仍需回归；以下为历史/环境相关风险，不作为产品代码失败：core `/tmp` 路径、adapters `mcp-node-fallback` 并发临时目录、services sqlite WAL `EBUSY`。
+- 未执行：桌面/CLI 真实启动、三平台 E2E、staging/真实端点联调、desktop composer-edit-mode E2E。
+- 冷恢复临时兼容层、composer 完整编辑态、pluginDiscoveryUi UI 激活缺口见“剩余工作与优先级”。
 
 ### 产品决策登记
 
@@ -84,16 +132,20 @@
 - **workspace MCP**：产品边界为开箱即用，project 声明默认 trusted 并自动连接；protocol 逐项审核只在协议装配路径。
 - **商店地区**：暂无登录区域事实源，暂按 locale 推导；接入真实登录区域时只替换 `resolvePluginStoreRegion` 输入。
 - **旧 loader 兼容层**：保留到游戏插件全链路 E2E 通过后再删除。
+- **冷恢复临时兼容层**：当前把冷恢复对齐 live 旧形状，保证 live/cold 字节一致；live 有序投影迁移完成后删除，不视为长期产品分叉。
+- **mcpStartupPolicy 缺省**：runtime 缺省 `blocking`；协议入口/TUI 显式 `background`；自动化/闲时轮强制 `blocking`。
+- **队列编辑锁所有者**：CLI `AgentRuntime.pendingInputEditLocks` 是唯一事实源；投影只由 `TurnSteerEditLockChanged` 派生，bootstrap/UI 不保存锁状态。`editQueueItem` 不再依赖 base revision，并发保护由编辑锁承担。
+- **pluginDiscoveryUi fail-closed**：Host 先删除不可信字段，只有可信连接能力 + CLI 探测能力 + 偏好/resolveInteraction 同时满足才注入；UI hello 与设置生产者未完成前功能保持关闭。
+- **managed-worktree 数据根**：`<dataBaseDir>/.kayingcode/worktrees`，fork carry 前缀 `.kayingcode-carry-*`；shared 以 `./managed-worktree` 子路径导出，避免 renderer 引入 Node 内置模块。
+- **插件配置迁移范围**：`createConfigWithPluginMigrations` 当前只承载 hook script state 异步读取；visualize 插件迁移因产品不存在“曾默认开启”语义未移植。
 
 ### 剩余工作与优先级
 
-- **P0（MCP 收尾）**：`mcpStartupPolicy/background`、`mcpServerStatusFacts.deniedTools` 消费方、ToolSearch 关闭时连接中公告与 `runModelTextRequest`、ToolSearch 增量交付 schema。
-- **P0（测试/源码缺口）**：同步 core message-history/hydrator/compact 投影（解锁 5 例）；补 `BrowserGuestManager` 窗口身份与 `getBackendIdentity`；清理 `node:test` 文件收集方式。
-- **P1（阶段 4 增强）**：lifecycle hooks 上下文、`createConfigWithPluginMigrations`、`pluginDiscoveryUi` 增量公告、批量删除预检、活动摘要、plugin host 进程名、回复语言远端/Web Host 支持。
-- **P2（阶段 5）**：preinstalled-tools、managed-worktree、voice-input、selection-comment、composer-edit-mode、settings-search、remote context-composition；真实 Blender/TapTap/Playtest E2E；旧 loader 兼容层清理；更新 `UPSTREAM_BASE.json`。
-- **交付/运维**：PR 与远端 CI、桌面/CLI 真实启动、三平台 E2E、staging/真实端点联调、Desktop 登录 UI。
-
-
+- **P1（投影/运行时）**：live assistant 有序投影迁移（`commitAssistantToTurnRequest` → `buildAssistantEntries`），迁移后删除冷恢复临时兼容层；补齐 hydrator 未覆盖分支（compaction boundary delivery、provider rounds + delivery、空 usage 锚点）。
+- **P1（MCP 残余）**：可选 401 step-up、pool 完整租约、`retainTools`/内建 server 重启上限；Windows/真实链路复核 ToolSearch 关闭公告。
+- **P1（阶段 4 增强）**：pluginDiscoveryUi 的 UI hello 能力位与 `pluginAutoRecommendationEnabled` 设置生产者、pluginInstall 卡片链路；composer edit-mode 完整交互（上一条消息编辑/应用到其他排队项/失效原因条/readiness 门禁/desktop E2E）；批量删除预检、活动摘要、plugin host 进程名、回复语言远端/Web Host 支持。
+- **P2（阶段 5）**：managed-worktree 装配（`services/node.ts`、project-storage worktree 列/任务查询、UI）；preinstalled-tools、voice-input、selection-comment、settings-search；真实 Blender/TapTap/Playtest E2E；旧 loader 兼容层清理；更新 `UPSTREAM_BASE.json`。`remote context-composition` 主链已对齐，仅缺 shared 模块元数据，不再作为功能缺口。
+- **交付/运维**：PR 与远端 CI、桌面/CLI 真实启动、三平台 E2E、staging/真实端点联调、Desktop 登录 UI。P0 改动尚未提交，需先提交并推送后由 CI 验证。
 
 ## 结论（先行）
 
@@ -110,16 +162,16 @@
 
 ## 机制变更总览（新增受管模块）
 
-| 模块 | 位置 | 作用 |
-| --- | --- | --- |
-| `mcp-runtime` | `core/src/mcp/runtime`、`adapters/src/mcp/{config-loader,config-source,tool-catalog-cache,transport-errors,resource-subscriptions}.ts`、`bootstrap/src/app/dynamic-mcp-config.ts` | MCP 连接基础设施、配置桥接与会话消费 |
-| `live-config-watch` | `adapters/src/watch`、`adapters/src/plugins/live-inventory.ts` | 打开的会话重读配置/插件清单的进程级原语、锚点监听、去抖 |
-| `skill-live-catalog` | `core/src/skills`、`adapters/src/skills/catalog.ts`、`bootstrap/src/app/dynamic-skill-catalog.ts` | 进程级技能目录快照与增量公告 |
-| `plugin-discovery` | `adapters/src/plugins/discovery` | 启动发现与 MCP 共用的 manifest 解析与材料缓存 |
-| `workspace-plugin-declaration` | `adapters/src/plugins/workspace-plugin-declaration` | 项目 `plugins.dirs` 候选与声明摘要 |
-| `workspace-plugin-trust` | `bootstrap/src/workspace-plugin-trust` | 项目插件的用户信任记录与 pending 判定 |
-| `bash-cmd-readonly-policy` | `core/src/tool/cmd-readonly` | cmd/legacy-shell 的保守只读判定 |
-| `preinstalled-tools` 系 | `shared/src/preinstalled-tools`、`desktop/src/preinstalled-tools`、`ui/src/preinstalled-tools`、`shared/src/node/windowsGitBashDiscovery`、`ui/src/shortcuts` | LibreOffice/Python/Pandoc/Poppler/QPDF 预装工具链及 Windows 入口 shim |
+| 模块                           | 位置                                                                                                                                                                              | 作用                                                                  |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `mcp-runtime`                  | `core/src/mcp/runtime`、`adapters/src/mcp/{config-loader,config-source,tool-catalog-cache,transport-errors,resource-subscriptions}.ts`、`bootstrap/src/app/dynamic-mcp-config.ts` | MCP 连接基础设施、配置桥接与会话消费                                  |
+| `live-config-watch`            | `adapters/src/watch`、`adapters/src/plugins/live-inventory.ts`                                                                                                                    | 打开的会话重读配置/插件清单的进程级原语、锚点监听、去抖               |
+| `skill-live-catalog`           | `core/src/skills`、`adapters/src/skills/catalog.ts`、`bootstrap/src/app/dynamic-skill-catalog.ts`                                                                                 | 进程级技能目录快照与增量公告                                          |
+| `plugin-discovery`             | `adapters/src/plugins/discovery`                                                                                                                                                  | 启动发现与 MCP 共用的 manifest 解析与材料缓存                         |
+| `workspace-plugin-declaration` | `adapters/src/plugins/workspace-plugin-declaration`                                                                                                                               | 项目 `plugins.dirs` 候选与声明摘要                                    |
+| `workspace-plugin-trust`       | `bootstrap/src/workspace-plugin-trust`                                                                                                                                            | 项目插件的用户信任记录与 pending 判定                                 |
+| `bash-cmd-readonly-policy`     | `core/src/tool/cmd-readonly`                                                                                                                                                      | cmd/legacy-shell 的保守只读判定                                       |
+| `preinstalled-tools` 系        | `shared/src/preinstalled-tools`、`desktop/src/preinstalled-tools`、`ui/src/preinstalled-tools`、`shared/src/node/windowsGitBashDiscovery`、`ui/src/shortcuts`                     | LibreOffice/Python/Pandoc/Poppler/QPDF 预装工具链及 Windows 入口 shim |
 
 同时新增的设计文档：`docs/mcp-async-tool-catalog-cache.md`、`docs/skills-live-catalog.md`、`docs/plugins/workspace-plugin-dir-trust.md`、`docs/preinstalled-tools/*`、`apps/zcode-cli/docs/design/v2/tool/00-tool-change-chain.md`。
 
@@ -138,17 +190,17 @@
 
 ### 破坏性变更
 
-| 严重度 | 变更 | 影响 |
-| --- | --- | --- |
-| 严重 | 仓库 `plugins.options` 从“参与合并”变为“完全忽略” | 产品 `adapters/src/config/schema.ts:322` 仍允许项目选项并参与合并；升级后现有项目选项失效，需用户在设置页重新输入 |
-| 严重 | 新增插件私密选项存储与 workspace secrets 语义 | 产品当前无 `plugin-secrets`（adapters/config 与 bootstrap 均缺）；`configureKayingCodePlugin` 直接写 config 文件。升级后敏感 `userConfig` 的保存位置、优先级、clear/reset/uninstall 行为全部改变 |
-| 严重 | 项目目录插件从“直接丢弃”变为“候选 + 逐插件用户信任” | 产品 `normalizeProjectConfig` 直接剥离 `dirs`；需改成候选侧信道，并补齐信任协议/服务/UI |
-| 严重 | discovery API 改为异步 material cache | 产品 `discoverPlugins` 虽返回 Promise，但内部仍调用 `discoverPluginsSync`；`resolveKayingCodePlugins`、`loadPluginMcpServerDefinitions`、`loadBundledOfficialPluginRoots`、`installMarketplacePlugin` 等同步调用点均需改造 |
-| 高 | 单插件加载失败不再中断整次发现 | 新增诊断码 `plugin_load_failed`，产品 contracts 无此码，错误处理/遥测/UI 需同步 |
-| 高 | `.kayingcode-plugin` 回退会丢失 | 上游新模块硬编码只认 `.zcode-plugin/.claude-plugin/.codex-plugin`；产品 loader 仍以 `.kayingcode-plugin` 作第二顺位（`adapters/src/plugins/index.ts:107-110`）。必须在新模块中保留回退，否则只在旧目录下的工作区插件无法算摘要/热更 |
-| 高 | 市场安装/更新行为 | 新增“目标条目必须存在，否则补拉来源”；官方清单会按需拉 CDN，失败保留旧目录并传播来源错误。产品 `installMarketplacePlugin` 无 `pluginName` 校验 |
-| 中 | 目录条目新增 `regions` | 产品 contracts 无 `PluginStoreRegion`，strict 协议下透传未知值有整页解析风险 |
-| 中 | 内置插件版本/seed 路径三处一致约束 | manifest、package.json、`config/official-plugins.json` 及生成文件必须一起改；上游删除 `agents/visual-judge.md`，产品 catalog 仍将其列为 requiredSeedPaths |
+| 严重度 | 变更                                                | 影响                                                                                                                                                                                                                                |
+| ------ | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 严重   | 仓库 `plugins.options` 从“参与合并”变为“完全忽略”   | 产品 `adapters/src/config/schema.ts:322` 仍允许项目选项并参与合并；升级后现有项目选项失效，需用户在设置页重新输入                                                                                                                   |
+| 严重   | 新增插件私密选项存储与 workspace secrets 语义       | 产品当前无 `plugin-secrets`（adapters/config 与 bootstrap 均缺）；`configureKayingCodePlugin` 直接写 config 文件。升级后敏感 `userConfig` 的保存位置、优先级、clear/reset/uninstall 行为全部改变                                    |
+| 严重   | 项目目录插件从“直接丢弃”变为“候选 + 逐插件用户信任” | 产品 `normalizeProjectConfig` 直接剥离 `dirs`；需改成候选侧信道，并补齐信任协议/服务/UI                                                                                                                                             |
+| 严重   | discovery API 改为异步 material cache               | 产品 `discoverPlugins` 虽返回 Promise，但内部仍调用 `discoverPluginsSync`；`resolveKayingCodePlugins`、`loadPluginMcpServerDefinitions`、`loadBundledOfficialPluginRoots`、`installMarketplacePlugin` 等同步调用点均需改造          |
+| 高     | 单插件加载失败不再中断整次发现                      | 新增诊断码 `plugin_load_failed`，产品 contracts 无此码，错误处理/遥测/UI 需同步                                                                                                                                                     |
+| 高     | `.kayingcode-plugin` 回退会丢失                     | 上游新模块硬编码只认 `.zcode-plugin/.claude-plugin/.codex-plugin`；产品 loader 仍以 `.kayingcode-plugin` 作第二顺位（`adapters/src/plugins/index.ts:107-110`）。必须在新模块中保留回退，否则只在旧目录下的工作区插件无法算摘要/热更 |
+| 高     | 市场安装/更新行为                                   | 新增“目标条目必须存在，否则补拉来源”；官方清单会按需拉 CDN，失败保留旧目录并传播来源错误。产品 `installMarketplacePlugin` 无 `pluginName` 校验                                                                                      |
+| 中     | 目录条目新增 `regions`                              | 产品 contracts 无 `PluginStoreRegion`，strict 协议下透传未知值有整页解析风险                                                                                                                                                        |
+| 中     | 内置插件版本/seed 路径三处一致约束                  | manifest、package.json、`config/official-plugins.json` 及生成文件必须一起改；上游删除 `agents/visual-judge.md`，产品 catalog 仍将其列为 requiredSeedPaths                                                                           |
 
 ### 产品 P0–P5 适配冲突
 
@@ -187,16 +239,16 @@
 
 ### 破坏性变更
 
-| 严重度 | 变更 | 影响 |
-| --- | --- | --- |
-| 致命 | `McpPort` 与 `core/src/runtime/methods/mcp.ts` 重写 | 产品 `adapters/src/mcp/index.ts`、`core/src/mcp/index.ts`、`bootstrap/src/mcp-config.ts` 均有本地改写（localrun 鉴权、workspaceRoot/identity、CUA 清理），不能机械合并 |
-| 致命 | 配置改为配置源 + 热加载 | 产品 `bootstrap/src/mcp-config.ts` 仍是启动时构建；`create-app.ts` 需提供 `McpConfigurationSource`，localrun/Host 两种装配都要补齐 |
-| 高 | 项目级 `mcp.servers` + 信任 | 产品已有 `.agents/mcp.json` 与 `workspace-mcp-trust`，但上游扩展了信任来源与合并优先级；需确认现有 trust 记录可迁移，且未受信项目 server 不执行 |
-| 高 | 工具目录异步就绪 | 首轮请求可能没有 MCP 工具；`WaitForMcpServers`、ToolSearch、公告与 UI 状态都要适配；产品 `toolSearchDelivery` 本地实现需重接 |
-| 高 | 错误分类与 needs-auth | 新增/调整错误码与分类；按新目标恢复官方鉴权，localrun 由 `ApiMock` 返回，真实端点走远端，避免 UI 出现无效登录引导 |
-| 中 | 调用重试与远端恢复 | 重试次数/退避/超时预算变化，可能改变工具调用延迟与失败文案 |
-| 中 | node fallback 与 env 契约 | 上游环境键/路径与产品 `KAYINGCODE_NODE_FALLBACK_*` 可能分叉，需保留双兼容 |
-| 中 | `clientInfo.version` 来源 | 必须取产品根 `package.json` 版本（0.2.x），不能回退 workspace 子包版本 |
+| 严重度 | 变更                                                | 影响                                                                                                                                                                   |
+| ------ | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 致命   | `McpPort` 与 `core/src/runtime/methods/mcp.ts` 重写 | 产品 `adapters/src/mcp/index.ts`、`core/src/mcp/index.ts`、`bootstrap/src/mcp-config.ts` 均有本地改写（localrun 鉴权、workspaceRoot/identity、CUA 清理），不能机械合并 |
+| 致命   | 配置改为配置源 + 热加载                             | 产品 `bootstrap/src/mcp-config.ts` 仍是启动时构建；`create-app.ts` 需提供 `McpConfigurationSource`，localrun/Host 两种装配都要补齐                                     |
+| 高     | 项目级 `mcp.servers` + 信任                         | 产品已有 `.agents/mcp.json` 与 `workspace-mcp-trust`，但上游扩展了信任来源与合并优先级；需确认现有 trust 记录可迁移，且未受信项目 server 不执行                        |
+| 高     | 工具目录异步就绪                                    | 首轮请求可能没有 MCP 工具；`WaitForMcpServers`、ToolSearch、公告与 UI 状态都要适配；产品 `toolSearchDelivery` 本地实现需重接                                           |
+| 高     | 错误分类与 needs-auth                               | 新增/调整错误码与分类；按新目标恢复官方鉴权，localrun 由 `ApiMock` 返回，真实端点走远端，避免 UI 出现无效登录引导                                                      |
+| 中     | 调用重试与远端恢复                                  | 重试次数/退避/超时预算变化，可能改变工具调用延迟与失败文案                                                                                                             |
+| 中     | node fallback 与 env 契约                           | 上游环境键/路径与产品 `KAYINGCODE_NODE_FALLBACK_*` 可能分叉，需保留双兼容                                                                                              |
+| 中     | `clientInfo.version` 来源                           | 必须取产品根 `package.json` 版本（0.2.x），不能回退 workspace 子包版本                                                                                                 |
 
 ### 产品冲突
 
@@ -237,18 +289,18 @@
 
 ### 破坏性变更
 
-| 严重度 | 变更 | 影响 |
-| --- | --- | --- |
-| 致命 | contracts zod3 → zod4，JSON Schema 生成器重写 | 产品 `contracts` 仍为 zod `^3.24.0` + `zod-to-json-schema 3.25.2`（`src/tools/json-schema.ts`、`tool-search.ts`、`deferred-tool-call.ts` 直接使用）；`normalizeToolJsonSchema` 导出消失，defaulted 字段不再强制进 `required` |
-| 致命 | MCP 端口/运行时重写 | `contracts/src/interfaces/mcp.port.ts`（+148）、`core/src/runtime/methods/mcp.ts`、`adapters/src/mcp/index.ts` 大幅重写；产品这三个文件均有本地改写 |
-| 致命 | 协议目录改名 | 上游 `bootstrap/src/zcode-protocol*`；产品为 `kayingcode-protocol*`，20 个协议文件改动无法直接应用；产品 v4 冷恢复/回放/归属修复会丢 |
-| 高 | turn 循环状态与请求构建破坏 | `turn.ts`、`turn-loop.ts`、`turn-loop-state.ts` 字段改名，`buildRuntimeProviderRequestMessages` 移除，MCP 初始化返回 `McpSessionView`；产品同文件已删 lifecycle hook 上下文、`pluginDiscoveryUi`、`inputOrigin` |
-| 高 | executor 端口新增必填能力 | `describeUnavailableTool`、`resolveUnregisteredTool`、`mcpServerWaitPort`、`syncSubagent`、`inputPreemption`；`RuntimeInputValidationIssue` → `ToolInputValidationIssue` |
-| 高 | 工具契约变化 | Read 语义校验位置、ToolSearch 公告/交付 schema、BashOutput 后台 cwd/同步子代理、新 `WaitForMcpServers`、`unparsed-tool-input` |
-| 高 | 存储 API/迁移 | 上游 0025 永久删除 + 0026 dwf 索引；产品刻意移除 0025 与 purge 实现（迁移止于 0023），只能采 0026 与 `messages(index)` |
-| 中 | 配置/信任 | 项目 `plugins.dirs` 只作候选、项目 options 剥离；`createConfigWithPluginMigrations` 变 async 并读 hook 脚本摘要；新增 `workspace_hook_script_unavailable` |
-| 中 | Windows shell 语义 | `WINDOWS_CMD_SHELL_DISPLAY_NAME` 从 "CMD" 改为 "cmd.exe"，`exec/bash-shell-provider.ts` 变 async 并改用 `@zcode/shared/node` 的 git-bash 发现；环境公告字节变化影响 prompt 前缀 |
-| 低 | CLI 登录相关 | 上游保留 `login/logout`；产品已删除 `login-command.ts`、`tui-auth.ts`。按新目标恢复上游登录链路；CUA 铸造已评估为不移植（保留产品插件） |
+| 严重度 | 变更                                          | 影响                                                                                                                                                                                                                         |
+| ------ | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 致命   | contracts zod3 → zod4，JSON Schema 生成器重写 | 产品 `contracts` 仍为 zod `^3.24.0` + `zod-to-json-schema 3.25.2`（`src/tools/json-schema.ts`、`tool-search.ts`、`deferred-tool-call.ts` 直接使用）；`normalizeToolJsonSchema` 导出消失，defaulted 字段不再强制进 `required` |
+| 致命   | MCP 端口/运行时重写                           | `contracts/src/interfaces/mcp.port.ts`（+148）、`core/src/runtime/methods/mcp.ts`、`adapters/src/mcp/index.ts` 大幅重写；产品这三个文件均有本地改写                                                                          |
+| 致命   | 协议目录改名                                  | 上游 `bootstrap/src/zcode-protocol*`；产品为 `kayingcode-protocol*`，20 个协议文件改动无法直接应用；产品 v4 冷恢复/回放/归属修复会丢                                                                                         |
+| 高     | turn 循环状态与请求构建破坏                   | `turn.ts`、`turn-loop.ts`、`turn-loop-state.ts` 字段改名，`buildRuntimeProviderRequestMessages` 移除，MCP 初始化返回 `McpSessionView`；产品同文件已删 lifecycle hook 上下文、`pluginDiscoveryUi`、`inputOrigin`              |
+| 高     | executor 端口新增必填能力                     | `describeUnavailableTool`、`resolveUnregisteredTool`、`mcpServerWaitPort`、`syncSubagent`、`inputPreemption`；`RuntimeInputValidationIssue` → `ToolInputValidationIssue`                                                     |
+| 高     | 工具契约变化                                  | Read 语义校验位置、ToolSearch 公告/交付 schema、BashOutput 后台 cwd/同步子代理、新 `WaitForMcpServers`、`unparsed-tool-input`                                                                                                |
+| 高     | 存储 API/迁移                                 | 上游 0025 永久删除 + 0026 dwf 索引；产品刻意移除 0025 与 purge 实现（迁移止于 0023），只能采 0026 与 `messages(index)`                                                                                                       |
+| 中     | 配置/信任                                     | 项目 `plugins.dirs` 只作候选、项目 options 剥离；`createConfigWithPluginMigrations` 变 async 并读 hook 脚本摘要；新增 `workspace_hook_script_unavailable`                                                                    |
+| 中     | Windows shell 语义                            | `WINDOWS_CMD_SHELL_DISPLAY_NAME` 从 "CMD" 改为 "cmd.exe"，`exec/bash-shell-provider.ts` 变 async 并改用 `@zcode/shared/node` 的 git-bash 发现；环境公告字节变化影响 prompt 前缀                                              |
+| 低     | CLI 登录相关                                  | 上游保留 `login/logout`；产品已删除 `login-command.ts`、`tui-auth.ts`。按新目标恢复上游登录链路；CUA 铸造已评估为不移植（保留产品插件）                                                                                      |
 
 ### 产品冲突
 
@@ -290,7 +342,7 @@
 4. **Windows**：上游 `integratedTerminalShells.ts` 改 async 并依赖 shared `windowsGitBashDiscovery`；产品已删除 windows-runtime-host 且保留旧同步实现，直接引入会类型/行为冲突。
 5. **lint**：上游 lint 串联 document/libreoffice/python 检查；产品 lint 仅 oxlint，整包拷贝根 `package.json` 会失败。
 6. **品牌/通道**：4.0.0 新增 `zcode:*` 通道与 `ZCODE_*` 环境变量；产品已有 `kayingcode:*`/`KAYINGCODE_*`，需复制或改名，避免双前缀。
-7. **MCP Apps**：产品已扩展 `PluginSandboxRegisterRequestPayload`（extension 视图、kayingcode/* meta key）；上游该文件未变，保留产品版本，不要反向覆盖。
+7. **MCP Apps**：产品已扩展 `PluginSandboxRegisterRequestPayload`（extension 视图、kayingcode/\* meta key）；上游该文件未变，保留产品版本，不要反向覆盖。
 8. **已退役层**：产品删除 windows-runtime-host、managed-worktree、desktop app-control-navigation、CUA 桌面主进程集成、web web-remote-control；上游对应改进需按产品语义重做。
 9. **localrun/Host/Relay/移动端**：上游 `remoteWorkspaceTrustIdentity` 修复只覆盖 `remote:` identity；产品 remote-agent identity、relay-cloudflare 与手机链路需等价实现。
 10. **Hook 信任**：产品实现与上游 `resolveWorkspaceHookTrustIdentity` 不同；上游“入口脚本内容进 digest、不可读不可信”需在产品实现中重做，不能只挑 shared 文件。
@@ -302,7 +354,7 @@
 - **先做协议基线盘点**：逐文件 diff `kayingcode-protocol*` 与上游 3.18.2/4.0.0，形成“接受/拒绝”清单，并为 zcode shim 增加导出齐平测试；再移植 4.0.0 新方法/字段。
 - **按垂直切片推进跨层**：回复语言 → 插件 workspaceTrust + 商店区域 → 批量删除 → telemetry；每片都保留旧 Host fallback。
 - **凭据单独作为安全工单**：先 shared 代次/锁，再 services 写入，最后 Host 桥接；覆盖“旧 Host + 新 CLI”和“自动重置中途加密”。
-- **架构策略选择性登记**：只登记产品实际采纳的模块，新增模块用产品 kayingcode-* 实际路径，不合并上游 260+ 模块全量 policy。
+- **架构策略选择性登记**：只登记产品实际采纳的模块，新增模块用产品 kayingcode-\* 实际路径，不合并上游 260+ 模块全量 policy。
 - **预装工具最后做**：shared contract、desktop 模块、UI 对话框、scripts、lint、根依赖必须整组引入。
 
 ## 产品扩展边界（其余以上游为准）
@@ -330,13 +382,13 @@
 
 ### 里程碑
 
-| 里程碑 | 范围 | 退出标准 | 目标周 |
-| --- | --- | --- | --- |
-| M0 基线 | 阶段 0 | 协议/共享层生成管线可用，架构策略合并，contracts zod4 通过 | 第 2 周 |
-| M1 账号/API | 阶段 1 | localrun mock 全流程、staging 端点与 Relay mock 可用，真实端点联调通过 | 第 5–6 周 |
-| M2 机制对齐 | 阶段 2–3 | 插件与 MCP 只有一套上游实现，游戏插件冒烟通过 | 第 11–13 周 |
-| M3 CLI/跨层 | 阶段 4 | CLI 运行时/协议 v4/跨层切片完成，新旧 Host 兼容 | 第 16–17 周 |
-| M4 收尾 | 阶段 5 | 游戏插件迁移完成，兼容层移除，`UPSTREAM_BASE` 更新 | 第 18–20 周 |
+| 里程碑      | 范围     | 退出标准                                                               | 目标周      |
+| ----------- | -------- | ---------------------------------------------------------------------- | ----------- |
+| M0 基线     | 阶段 0   | 协议/共享层生成管线可用，架构策略合并，contracts zod4 通过             | 第 2 周     |
+| M1 账号/API | 阶段 1   | localrun mock 全流程、staging 端点与 Relay mock 可用，真实端点联调通过 | 第 5–6 周   |
+| M2 机制对齐 | 阶段 2–3 | 插件与 MCP 只有一套上游实现，游戏插件冒烟通过                          | 第 11–13 周 |
+| M3 CLI/跨层 | 阶段 4   | CLI 运行时/协议 v4/跨层切片完成，新旧 Host 兼容                        | 第 16–17 周 |
+| M4 收尾     | 阶段 5   | 游戏插件迁移完成，兼容层移除，`UPSTREAM_BASE` 更新                     | 第 18–20 周 |
 
 ### 阶段 0：上游对齐基线（1–2 周）
 
@@ -368,16 +420,16 @@
 - **Relay 边界**：不持久化 ZCode 账号密码/token/业务数据；`proxy` 只做精确 origin/path allowlist 转发，不缓存凭据；OAuth token/profile 默认直连官方，Relay 仅在 staging 提供模拟；模型推理与流式响应不经过 Relay。
 - **Staging**：当前无 staging 端点，`DEFAULT_KAYINGCODE_ENDPOINT_ORIGIN` 为空。建议增加 `local | staging | production` 端点预设与 Cloudflare `env.staging` 独立 DO/密钥；staging 默认 `mock`，可切 `proxy` 到官方测试 origin；客户端通过配置/环境选择，不硬编码。
 
-| 能力 | localrun 默认 | Relay staging | 生产 |
-| --- | --- | --- | --- |
-| 登录 / OAuth | 本地 mock | 模拟授权/过期/错误 | 直连官方 authorize/token/profile，不走 Relay |
-| 账号 / 套餐 / 配额 | 本地 mock | mock | 直连官方 |
-| 配置 / 帮助 / 强更 / 灰度 | 本地 mock | mock 或 proxy | Relay proxy 或直连 |
-| 官方 MCP 鉴权 / 用量 | 本地 mock | mock | 直连官方（Relay 可选 allowlist proxy） |
-| 市场清单 / 图标 / 下载 | 本地 mock | mock 或 proxy | 官方/CDN 直连，Relay 可做元数据缓存 |
-| 模型推理 / 流式 | scripted mock（仅测试） | mock | 直连 provider，不走 Relay |
-| 遥测 | no-op | mock sink | 直连或 Relay 接收 |
-| 远程设备身份 / 连接 | 不适用 | 真实 Relay | 真实 Relay |
+| 能力                      | localrun 默认           | Relay staging      | 生产                                         |
+| ------------------------- | ----------------------- | ------------------ | -------------------------------------------- |
+| 登录 / OAuth              | 本地 mock               | 模拟授权/过期/错误 | 直连官方 authorize/token/profile，不走 Relay |
+| 账号 / 套餐 / 配额        | 本地 mock               | mock               | 直连官方                                     |
+| 配置 / 帮助 / 强更 / 灰度 | 本地 mock               | mock 或 proxy      | Relay proxy 或直连                           |
+| 官方 MCP 鉴权 / 用量      | 本地 mock               | mock               | 直连官方（Relay 可选 allowlist proxy）       |
+| 市场清单 / 图标 / 下载    | 本地 mock               | mock 或 proxy      | 官方/CDN 直连，Relay 可做元数据缓存          |
+| 模型推理 / 流式           | scripted mock（仅测试） | mock               | 直连 provider，不走 Relay                    |
+| 遥测                      | no-op                   | mock sink          | 直连或 Relay 接收                            |
+| 远程设备身份 / 连接       | 不适用                  | 真实 Relay         | 真实 Relay                                   |
 
 待定：生产环境哪些非敏感端点允许走 Relay proxy（建议只限配置、市场元数据、MCP 用量；OAuth 与推理保持直连）。
 
@@ -430,46 +482,46 @@
 
 估算单位：人日（pd），不含三平台回归与发布。
 
-| ID | 阶段 | 任务 | 产出 | 依赖 | 估算 |
-| --- | --- | --- | --- | --- | --- |
-| P0-1 | 0 | 协议/共享层差异盘点与补丁清单 | accept/reject 清单、产品补丁列表 | 无 | 2 |
-| P0-2 | 0 | 上游源 + 品牌映射 + patch 生成管线 POC | 生成脚本、导出齐平检查 | P0-1 | 3 |
-| P0-3 | 0 | 架构策略合并与检查恢复 | 合并后的 policy、overlay 规则 | P0-1 | 2 |
-| P0-4 | 0 | contracts zod4 + JSON Schema 生成器 | 迁移后的 contracts、工具 schema | P0-2 | 3 |
-| P0-5 | 0 | CI 门禁：schema golden、协议 parity | CI job、失败样例 | P0-2/4 | 2 |
-| P1-1 | 1 | 端点模型与环境预设 `local/staging/production` | endpoint resolver、配置项 | P0 | 2 |
-| P1-2 | 1 | 共享 contracts/fixtures 目录 | mock/real 共用契约与 fixture | P0 | 2 |
-| P1-3 | 1 | 扩展本地 `ApiMock` 覆盖账号/配置/市场/MCP/遥测 | 本地 mock 实现 | P1-1/2 | 3 |
-| P1-4 | 1 | Relay `apiMock` 路由、模式门禁、场景控制 | `mock/proxy` 模块、场景 header | P1-2 | 4 |
-| P1-5 | 1 | 恢复上游登录/账号/OAuth/官方 MCP 鉴权/市场路径 | 恢复后的服务与 CLI/桌面接线 | P1-1 | 5 |
-| P1-6 | 1 | 凭据锁 + 代次 + 私有文件/自动重置 + keyring 适配 | 统一凭据写入与恢复 | P1-5 | 4 |
-| P1-7 | 1 | Cloudflare staging 环境（独立 DO/密钥/域名） | `env.staging`、部署脚本 | 外部权限 | 2 |
-| P1-8 | 1 | 离线/真实端点/旧 Host 兼容测试 | 测试套件、联调记录 | P1-3/4/5/6 | 3 |
-| P2-1 | 2 | discovery/material cache/加载隔离 | 上游 discovery 模块接入 | P0 | 4 |
-| P2-2 | 2 | plugin-secrets + 项目 options 收敛 + 迁移提示 | 私密选项存储、迁移逻辑 | P1-6 | 4 |
-| P2-3 | 2 | workspace declaration/trust + 协议/services/UI | 信任全链路 | P2-1/2 | 5 |
-| P2-4 | 2 | live inventory/watch/marketplace/regions | 热更新与市场来源 | P2-1/3 | 4 |
-| P2-5 | 2 | 产品扩展：`.kayingcode-plugin` 候选、官方清单适配、游戏插件转换 | 薄适配层、插件清单 | P2-1/3 | 4 |
-| P2-6 | 2 | 插件测试与桌面/手机 E2E | 上游测试 + 产品 E2E | P2-1–5 | 4 |
-| P3-1 | 3 | MCP port/adapter/pool/retry/recovery | 新 Port 与 Adapter 内核 | P0 | 5 |
-| P3-2 | 3 | config-loader/config-source/dynamic config/create-app | 配置源与热加载 | P2-4, P3-1 | 4 |
-| P3-3 | 3 | runtime session/tool catalog/WaitForMcpServers | 异步目录与会话状态机 | P3-2 | 4 |
-| P3-4 | 3 | 官方鉴权/workspaceKey 恢复 + mock 接线 | 鉴权路径、mock 适配 | P1-5, P3-2 | 3 |
-| P3-5 | 3 | MCP App 重连/设置页/协议投影 | UI 与协议适配 | P3-3 | 3 |
-| P3-6 | 3 | 游戏插件 MCP server 验证 | Blender/TapTap/Playtest 冒烟 | P3-1–5 | 3 |
-| P3-7 | 3 | MCP 上游测试 + 三平台联调 | 测试套件与记录 | P3-1–6 | 4 |
-| P4-1 | 4 | turn-loop/executor/抢占/子代理 | 上游运行时接入 | P3 | 5 |
-| P4-2 | 4 | compact/存储 0026/messages index | 迁移与查询 API | P0 | 3 |
-| P4-3 | 4 | 协议 v4 新 RPC/telemetry/批量删除预检 | 协议与服务接线 | P1, P4-1 | 4 |
-| P4-4 | 4 | 恢复 lifecycle hooks/pluginDiscoveryUi/inputOrigin/createConfigWithPluginMigrations | 上游语义恢复 | P2/P3 | 4 |
-| P4-5 | 4 | 跨层切片：回复语言/商店区域/活动摘要 | 桌面/UI/服务改动 | P4-3 | 3 |
-| P4-6 | 4 | Host/Relay/mobile 兼容与旧 Host 降级 | 兼容矩阵与测试 | P4-3/5 | 3 |
-| P4-7 | 4 | CLI/跨层测试与 prompt/schema golden | 测试套件 | P4-1–6 | 3 |
-| P5-1 | 5 | 游戏插件迁移到新插件 API/MCP runtime | 迁移后的游戏插件 | M2 | 4 |
-| P5-2 | 5 | 游戏插件 E2E/性能回归 | E2E 报告 | P5-1 | 3 |
-| P5-3 | 5 | 上游能力清单（preinstalled/managed-worktree/voice 等） | 逐项评估与排期 | M3 | 3 起 |
-| P5-4 | 5 | CUA 机制对齐评估 | 结论与安全边界 | M3 | 2 |
-| P5-5 | 5 | 兼容层清理、文档、`UPSTREAM_BASE` 更新 | 发布说明与基线 | P5-1–4 | 3 |
+| ID   | 阶段 | 任务                                                                                | 产出                             | 依赖       | 估算 |
+| ---- | ---- | ----------------------------------------------------------------------------------- | -------------------------------- | ---------- | ---- |
+| P0-1 | 0    | 协议/共享层差异盘点与补丁清单                                                       | accept/reject 清单、产品补丁列表 | 无         | 2    |
+| P0-2 | 0    | 上游源 + 品牌映射 + patch 生成管线 POC                                              | 生成脚本、导出齐平检查           | P0-1       | 3    |
+| P0-3 | 0    | 架构策略合并与检查恢复                                                              | 合并后的 policy、overlay 规则    | P0-1       | 2    |
+| P0-4 | 0    | contracts zod4 + JSON Schema 生成器                                                 | 迁移后的 contracts、工具 schema  | P0-2       | 3    |
+| P0-5 | 0    | CI 门禁：schema golden、协议 parity                                                 | CI job、失败样例                 | P0-2/4     | 2    |
+| P1-1 | 1    | 端点模型与环境预设 `local/staging/production`                                       | endpoint resolver、配置项        | P0         | 2    |
+| P1-2 | 1    | 共享 contracts/fixtures 目录                                                        | mock/real 共用契约与 fixture     | P0         | 2    |
+| P1-3 | 1    | 扩展本地 `ApiMock` 覆盖账号/配置/市场/MCP/遥测                                      | 本地 mock 实现                   | P1-1/2     | 3    |
+| P1-4 | 1    | Relay `apiMock` 路由、模式门禁、场景控制                                            | `mock/proxy` 模块、场景 header   | P1-2       | 4    |
+| P1-5 | 1    | 恢复上游登录/账号/OAuth/官方 MCP 鉴权/市场路径                                      | 恢复后的服务与 CLI/桌面接线      | P1-1       | 5    |
+| P1-6 | 1    | 凭据锁 + 代次 + 私有文件/自动重置 + keyring 适配                                    | 统一凭据写入与恢复               | P1-5       | 4    |
+| P1-7 | 1    | Cloudflare staging 环境（独立 DO/密钥/域名）                                        | `env.staging`、部署脚本          | 外部权限   | 2    |
+| P1-8 | 1    | 离线/真实端点/旧 Host 兼容测试                                                      | 测试套件、联调记录               | P1-3/4/5/6 | 3    |
+| P2-1 | 2    | discovery/material cache/加载隔离                                                   | 上游 discovery 模块接入          | P0         | 4    |
+| P2-2 | 2    | plugin-secrets + 项目 options 收敛 + 迁移提示                                       | 私密选项存储、迁移逻辑           | P1-6       | 4    |
+| P2-3 | 2    | workspace declaration/trust + 协议/services/UI                                      | 信任全链路                       | P2-1/2     | 5    |
+| P2-4 | 2    | live inventory/watch/marketplace/regions                                            | 热更新与市场来源                 | P2-1/3     | 4    |
+| P2-5 | 2    | 产品扩展：`.kayingcode-plugin` 候选、官方清单适配、游戏插件转换                     | 薄适配层、插件清单               | P2-1/3     | 4    |
+| P2-6 | 2    | 插件测试与桌面/手机 E2E                                                             | 上游测试 + 产品 E2E              | P2-1–5     | 4    |
+| P3-1 | 3    | MCP port/adapter/pool/retry/recovery                                                | 新 Port 与 Adapter 内核          | P0         | 5    |
+| P3-2 | 3    | config-loader/config-source/dynamic config/create-app                               | 配置源与热加载                   | P2-4, P3-1 | 4    |
+| P3-3 | 3    | runtime session/tool catalog/WaitForMcpServers                                      | 异步目录与会话状态机             | P3-2       | 4    |
+| P3-4 | 3    | 官方鉴权/workspaceKey 恢复 + mock 接线                                              | 鉴权路径、mock 适配              | P1-5, P3-2 | 3    |
+| P3-5 | 3    | MCP App 重连/设置页/协议投影                                                        | UI 与协议适配                    | P3-3       | 3    |
+| P3-6 | 3    | 游戏插件 MCP server 验证                                                            | Blender/TapTap/Playtest 冒烟     | P3-1–5     | 3    |
+| P3-7 | 3    | MCP 上游测试 + 三平台联调                                                           | 测试套件与记录                   | P3-1–6     | 4    |
+| P4-1 | 4    | turn-loop/executor/抢占/子代理                                                      | 上游运行时接入                   | P3         | 5    |
+| P4-2 | 4    | compact/存储 0026/messages index                                                    | 迁移与查询 API                   | P0         | 3    |
+| P4-3 | 4    | 协议 v4 新 RPC/telemetry/批量删除预检                                               | 协议与服务接线                   | P1, P4-1   | 4    |
+| P4-4 | 4    | 恢复 lifecycle hooks/pluginDiscoveryUi/inputOrigin/createConfigWithPluginMigrations | 上游语义恢复                     | P2/P3      | 4    |
+| P4-5 | 4    | 跨层切片：回复语言/商店区域/活动摘要                                                | 桌面/UI/服务改动                 | P4-3       | 3    |
+| P4-6 | 4    | Host/Relay/mobile 兼容与旧 Host 降级                                                | 兼容矩阵与测试                   | P4-3/5     | 3    |
+| P4-7 | 4    | CLI/跨层测试与 prompt/schema golden                                                 | 测试套件                         | P4-1–6     | 3    |
+| P5-1 | 5    | 游戏插件迁移到新插件 API/MCP runtime                                                | 迁移后的游戏插件                 | M2         | 4    |
+| P5-2 | 5    | 游戏插件 E2E/性能回归                                                               | E2E 报告                         | P5-1       | 3    |
+| P5-3 | 5    | 上游能力清单（preinstalled/managed-worktree/voice 等）                              | 逐项评估与排期                   | M3         | 3 起 |
+| P5-4 | 5    | CUA 机制对齐评估                                                                    | 结论与安全边界                   | M3         | 2    |
+| P5-5 | 5    | 兼容层清理、文档、`UPSTREAM_BASE` 更新                                              | 发布说明与基线                   | P5-1–4     | 3    |
 
 合计约 116 人日；按 3 名工程师并行约 16–20 周（含评审、联调与缓冲）。
 
@@ -525,16 +577,16 @@
 
 **硬断点：无。** 阶段 0、2、3 可以在外部依赖未确认时开工；以下依赖会影响阶段 1 的“真实端点”验收或后续范围。
 
-| 类型 | 事项 | 影响 | 未确认时的默认处理 |
-| --- | --- | --- | --- |
-| 外部 | ZCode 官方账号/API 的访问许可、客户端配置与测试端点（staging） | 阶段 1 真实登录/配置拉取验收 | 先完成 mock + 契约测试；真实联调标记为待验收，不阻塞阶段 2/3 |
-| 外部 | Cloudflare staging 账号、域名、DO 命名空间与部署权限 | Relay staging 环境 | 先用 `wrangler dev`/本地集成测试；staging 部署延后 |
-| 产品 | 生产环境 Relay proxy 范围（默认只代理配置、市场元数据、MCP 用量；OAuth 与模型推理直连） | 阶段 1 路由实现 | 按建议默认执行，后续可放宽 |
-| 产品 | 桌面/手机登录入口与账号 UI 的范围 | 阶段 1/4 前端工作量 | 先恢复上游 TUI/CLI 登录；桌面 UI 用最小入口，后续补齐 |
-| 产品 | 游戏插件迁移节奏（默认：阶段 2 兼容、阶段 5 迁移） | 阶段 2/5 排期 | 按默认执行，游戏功能不为升级让路 |
-| 产品 | Host/Relay/mobile 是否严格改为上游端口适配（默认：适配但保留现有行为） | 阶段 4 范围 | 先做兼容适配，不改用户可见行为 |
-| 技术 | P0-2 生成管线 POC 是否可控 | 阶段 0 方案 | 3 天 go/no-go；失败则退回“受控 vendoring + 手工 patch”，仍以 parity 检查兜底 |
-| 技术 | Relay mock 与本地 mock 的 fixture 是否完全同源 | 阶段 1 验收 | 共享 contracts/fixtures 目录 + 契约测试强制同源 |
+| 类型 | 事项                                                                                    | 影响                         | 未确认时的默认处理                                                           |
+| ---- | --------------------------------------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------- |
+| 外部 | ZCode 官方账号/API 的访问许可、客户端配置与测试端点（staging）                          | 阶段 1 真实登录/配置拉取验收 | 先完成 mock + 契约测试；真实联调标记为待验收，不阻塞阶段 2/3                 |
+| 外部 | Cloudflare staging 账号、域名、DO 命名空间与部署权限                                    | Relay staging 环境           | 先用 `wrangler dev`/本地集成测试；staging 部署延后                           |
+| 产品 | 生产环境 Relay proxy 范围（默认只代理配置、市场元数据、MCP 用量；OAuth 与模型推理直连） | 阶段 1 路由实现              | 按建议默认执行，后续可放宽                                                   |
+| 产品 | 桌面/手机登录入口与账号 UI 的范围                                                       | 阶段 1/4 前端工作量          | 先恢复上游 TUI/CLI 登录；桌面 UI 用最小入口，后续补齐                        |
+| 产品 | 游戏插件迁移节奏（默认：阶段 2 兼容、阶段 5 迁移）                                      | 阶段 2/5 排期                | 按默认执行，游戏功能不为升级让路                                             |
+| 产品 | Host/Relay/mobile 是否严格改为上游端口适配（默认：适配但保留现有行为）                  | 阶段 4 范围                  | 先做兼容适配，不改用户可见行为                                               |
+| 技术 | P0-2 生成管线 POC 是否可控                                                              | 阶段 0 方案                  | 3 天 go/no-go；失败则退回“受控 vendoring + 手工 patch”，仍以 parity 检查兜底 |
+| 技术 | Relay mock 与本地 mock 的 fixture 是否完全同源                                          | 阶段 1 验收                  | 共享 contracts/fixtures 目录 + 契约测试强制同源                              |
 
 ## 待确认项
 
@@ -549,13 +601,13 @@
 
 分支：`feat/upstream-sync-4-0-0`（从 `origin/main` `a4efa81d` 创建）。
 
-| 任务 | 状态 | 产出与结果 |
-| --- | --- | --- |
-| P0-1 协议/共享层盘点 | 完成 | `scripts/upstream-protocol-inventory.mjs` + [盘点报告](upstream-protocol-4-0-0-inventory.md)。242 个上游文件：132 parity、84 产品本地改动、26 缺失、3 产品独有；上游相对基线修改 30 个。 |
-| P0-2 三方合并 POC | 完成（仅 POC） | `scripts/upstream-protocol-merge.mjs` + [合并报告](upstream-protocol-4-0-0-merge-report.md)、[决策清单](upstream-protocol-4-0-0-decisions.md)。245 个结果：132 parity、26 上游有产品缺失（需确认，含 CUA/permanent-deletion/plugin-host-queries 等边界项）、2 直接采用上游、70 自动合并、12 冲突、3 产品独有、0 无共同基线。输出仅写临时目录，未改运行时文件。 |
-| P0-3 架构策略合并 | 完成（POC） | 上游策略盘点 + 合并脚本；候选 99 个模块（产品 32 + 新增 67），68 个上游模块 roots 缺失延后，14 个同 ID 产品优先；新增模块默认 `managed: false`，候选策略 `architecture-check` 0 violations；`--manage-added` 可生成启用版。 |
-| P0-4 contracts zod4 | 完成 | `@zcode/contracts` 升 zod `4.6.5`，删除 `zod-to-json-schema`；`toToolJsonSchema` 改用 `z.toJSONSchema`；修 10 处 `z.record` 双参签名与 `ZodEffects` → `ZodPreprocess`；`ToolSearch`/`DeferredToolCall` 统一走新生成器。 |
-| P0-5 CI parity 门禁 | 完成 | `scripts/check-upstream-parity.mjs` + expected 基线（242/132/84/26/3）；PR source checks 增加 contracts schema test；新增每周 `Upstream parity` workflow，fetch upstream main 与 3.18.2 base 后检查。 |
+| 任务                 | 状态           | 产出与结果                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-1 协议/共享层盘点 | 完成           | `scripts/upstream-protocol-inventory.mjs` + [盘点报告](upstream-protocol-4-0-0-inventory.md)。242 个上游文件：132 parity、84 产品本地改动、26 缺失、3 产品独有；上游相对基线修改 30 个。                                                                                                                                                                       |
+| P0-2 三方合并 POC    | 完成（仅 POC） | `scripts/upstream-protocol-merge.mjs` + [合并报告](upstream-protocol-4-0-0-merge-report.md)、[决策清单](upstream-protocol-4-0-0-decisions.md)。245 个结果：132 parity、26 上游有产品缺失（需确认，含 CUA/permanent-deletion/plugin-host-queries 等边界项）、2 直接采用上游、70 自动合并、12 冲突、3 产品独有、0 无共同基线。输出仅写临时目录，未改运行时文件。 |
+| P0-3 架构策略合并    | 完成（POC）    | 上游策略盘点 + 合并脚本；候选 99 个模块（产品 32 + 新增 67），68 个上游模块 roots 缺失延后，14 个同 ID 产品优先；新增模块默认 `managed: false`，候选策略 `architecture-check` 0 violations；`--manage-added` 可生成启用版。                                                                                                                                    |
+| P0-4 contracts zod4  | 完成           | `@zcode/contracts` 升 zod `4.6.5`，删除 `zod-to-json-schema`；`toToolJsonSchema` 改用 `z.toJSONSchema`；修 10 处 `z.record` 双参签名与 `ZodEffects` → `ZodPreprocess`；`ToolSearch`/`DeferredToolCall` 统一走新生成器。                                                                                                                                        |
+| P0-5 CI parity 门禁  | 完成           | `scripts/check-upstream-parity.mjs` + expected 基线（242/132/84/26/3）；PR source checks 增加 contracts schema test；新增每周 `Upstream parity` workflow，fetch upstream main 与 3.18.2 base 后检查。                                                                                                                                                          |
 
 12 个冲突文件（需人工决策，全部有共同基线；逐文件决策见[决策清单](upstream-protocol-4-0-0-decisions.md)）：
 
@@ -659,7 +711,7 @@ createConfig
 - **待信任停用**：pending 插件不产出 MCP/Hook/Skill/Command；信任或声明变化后由下一次发现重新投影。
 - **私密选项**：发现前叠加私有文件；项目 `plugins.options` 不参与合并；写入只走 `savePluginOptions`/`removeStoredPluginSecrets`。
 - **协议/UI**：新增 `plugins/workspaceTrust` 操作，插件列表投影 `workspaceTrust`；桌面/手机仅在 workspace scope 展示 pending 标记与“信任”按钮。
-- **产品边界保留**：localrun 仍只接受本地 marketplace 源；`.zcode-plugin` 优先、`.kayingcode-plugin` 回退；游戏插件 listing、UI contributions、`kayingcode-plugins-official` 磁盘 id 与 KAYINGCODE_* 运行时 env 不变。
+- **产品边界保留**：localrun 仍只接受本地 marketplace 源；`.zcode-plugin` 优先、`.kayingcode-plugin` 回退；游戏插件 listing、UI contributions、`kayingcode-plugins-official` 磁盘 id 与 KAYINGCODE\_\* 运行时 env 不变。
 
 验收：pending 目录插件启动时强制停用、信任后恢复组件；声明摘要变化重新 pending；私密选项参与发现且不落入项目配置；非本地 marketplace 源仍被拒绝；`pnpm run typecheck`、`lint`、定向测试与 `architecture:check --changed` 通过。规格见 [workspace-plugin-dir-trust.md](../../apps/zcode-cli/packages/adapters/docs/workspace-plugin-dir-trust.md)。
 
@@ -673,6 +725,7 @@ createConfig
 - 已知基线失败：`bootstrap/tests/workspace-mcp-trust.test.ts` 3 项与产品「workspace MCP 开箱即用」边界冲突，测试文件本轮未修改；剩余 28 项通过。未执行桌面/CLI 真实启动与远程 Host 联调。
 
 待完成（阶段 2 未完成）：
+
 - live inventory 尚未接入 MCP/Skill 配置加载；marketplace `regions` 与商店 UI 未迁移。
 - 内置插件清单/版本与 `config/official-plugins.json` 尚未按上游 definition 重新生成。
 
@@ -696,6 +749,7 @@ createConfig
 - 未执行：真实 CLI/TUI 文件监听冒烟与远程 Host 联调。
 
 待完成（阶段 2 未完成，更新）：
+
 - MCP 配置源已落地启动快照；打开会话的实时 reconcile 仍待阶段 3 接入 core `mcp/runtime`。
 - marketplace `regions` 与商店 UI 未迁移。
 - 内置插件清单/版本与 `config/official-plugins.json` 尚未按上游 definition 重新生成。
@@ -811,11 +865,13 @@ createConfig
 验收结果见各子项与“当前实施状态盘点”。
 
 验收标准：
+
 - MCP：未提供 live 解析的工具行为不变；MCP 工具在 server 断线/重连、配置变更后执行期能得到正确准入或可重试错误；turn-loop 新输入的 plugin reference 仍与工具视图一致；WaitForMcpServers 与 catalog-only 不回归。
 - prefs：旧 Host 缺字段时默认值保持产品行为（额度提醒关、子代理前台）；新设置保存后无需重启，下个新建会话生效；schema/服务/bootstrap/UI 类型一致。
 - tests：`adapters/test` 从失败恢复到全绿或只剩已记录的源码缺陷；不放宽断言。
 
 待完成（阶段 4 未完成，更新）：
+
 - turn/loop 剩余：`mcpStartupPolicy/background`、`mcpServerStatusFacts.deniedTools` 消费方、ToolSearch 关闭时的连接中公告与 `runModelTextRequest` 集成、ToolSearch 增量交付 schema；子代理冷恢复/compact 策略。
 - lifecycle hooks 上下文、`createConfigWithPluginMigrations`、`pluginDiscoveryUi` 增量公告、批量删除预检、活动摘要。
 - plugin host 进程名；回复语言设置仅 Desktop 本机 Host 生效，远端/Web Host 仍回答 null。
@@ -847,6 +903,7 @@ createConfig
 - 最终：bootstrap 137/146（仅 browser-control 9 例失败），adapters 242/257（5 例投影缺口 + 1 例 Windows 并发 flake），shared 136/136，UI 184/184（另 1 个 node:test 文件未被 vitest 收集）。
 
 待完成（阶段 3 未完成）：
+
 - `WaitForMcpServers` 之外的 `ToolSearch` 关闭时连接中公告与 `runModelTextRequest` 集成。
 - HTTP transport 重试/401 step-up：会话过期与连接关闭已接入 `isRetryableCallError`，401 step-up 仍沿用既有授权恢复路径。
 - pool 租约化与 transport 错误收敛的上游完整形态；adapter 按需重连尚未包含 `retainTools` 与内建 server 重启上限。
@@ -855,17 +912,18 @@ createConfig
 
 对比上游 4.0.0 与产品现状：
 
-| 维度 | 上游 4.0.0 | 产品现状 | 结论 |
-| --- | --- | --- | --- |
-| 运行形态 | `node_repl` 进程内 `@zcode/zcode-cua` broker（自签凭据组，`in-process` socket） | 独立 native stdio MCP 插件 `kaying-computer-use-plugin`，macOS Swift/Windows/Linux native runtime | 保留产品插件；不恢复 broker |
-| 工具面 | `mcp__node_repl__js` + `agent.computerUse` | `mcp__plugin_kayingcode-cua_computer-use__*`（list_apps/get_app_state/click/...） | 保留插件 MCP 工具面 |
-| 平台 | macOS/Windows（Linux 不可用） | macOS/Windows/Linux（Linux AT-SPI2） | 产品覆盖更广 |
-| 权限边界 | 独立 CLI 用终端 App 的 TCC；进程内 socket 无对端鉴权 | 原生 App 自身权限/onboarding；Windows 前台输入策略 | 产品安全边界更清晰 |
-| 视觉反馈 | 第一阶段关闭 PiP/虚拟光标 | 插件内原生软件指针/窗口描边（macOS/Windows） | 保留产品实现 |
-| 共享策略 | `computer-use-policy.ts`、官方 CUA authority、subagent 禁用 | 与上游逐字一致 | 已对齐 |
-| 协议投影 | `cua-app-snapshot`、`cua-permission-observation`、`official-cua-media` | app snapshot 已移植；permission observation / media helper 缺失 | 仅当产品 CUA 产出 `display.kind="cua"`/`request_access` 时再补；当前无消费方，不引入死代码 |
+| 维度     | 上游 4.0.0                                                                      | 产品现状                                                                                          | 结论                                                                                       |
+| -------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 运行形态 | `node_repl` 进程内 `@zcode/zcode-cua` broker（自签凭据组，`in-process` socket） | 独立 native stdio MCP 插件 `kaying-computer-use-plugin`，macOS Swift/Windows/Linux native runtime | 保留产品插件；不恢复 broker                                                                |
+| 工具面   | `mcp__node_repl__js` + `agent.computerUse`                                      | `mcp__plugin_kayingcode-cua_computer-use__*`（list_apps/get_app_state/click/...）                 | 保留插件 MCP 工具面                                                                        |
+| 平台     | macOS/Windows（Linux 不可用）                                                   | macOS/Windows/Linux（Linux AT-SPI2）                                                              | 产品覆盖更广                                                                               |
+| 权限边界 | 独立 CLI 用终端 App 的 TCC；进程内 socket 无对端鉴权                            | 原生 App 自身权限/onboarding；Windows 前台输入策略                                                | 产品安全边界更清晰                                                                         |
+| 视觉反馈 | 第一阶段关闭 PiP/虚拟光标                                                       | 插件内原生软件指针/窗口描边（macOS/Windows）                                                      | 保留产品实现                                                                               |
+| 共享策略 | `computer-use-policy.ts`、官方 CUA authority、subagent 禁用                     | 与上游逐字一致                                                                                    | 已对齐                                                                                     |
+| 协议投影 | `cua-app-snapshot`、`cua-permission-observation`、`official-cua-media`          | app snapshot 已移植；permission observation / media helper 缺失                                   | 仅当产品 CUA 产出 `display.kind="cua"`/`request_access` 时再补；当前无消费方，不引入死代码 |
 
 决策与理由：
+
 - 产品已退役 `@kayingcode/cua`、Helper/Broker、权限面板和 PiP，CUA 统一由内置插件承载；恢复上游 in-process broker 会重新引入终端 TCC 借用风险与第二套 native 运行时，且失去 Linux 支持。
 - 上游 4.0 新增的 SEA in-process broker 解决的是“独立 CLI 无宿主凭据”，产品的插件路径已能覆盖同类场景，不需要平行实现。
 - 保留适配点：官方 CUA server 名称/authority、subagent 禁用、app snapshot、tool display 已对齐；`cua-permission-observation` 与 `official-cua-media` 记录为“跟随上游架构、当前不适用”，待产品 CUA 增加对应展示契约时再评估。
@@ -889,3 +947,8 @@ createConfig
 - 2026-11-25：完成 CUA 对齐评估，决策保留产品 native 插件（不恢复 broker/PiP/SEA CUA 资产），原因与边界见“阶段 5 第二批”。
 - 2026-11-25：最终验证：根 `pnpm run typecheck`、contracts/core build、adapters/bootstrap/cli typecheck、`lint`（0 errors）、`architecture:check --changed`、`source:check` 通过；测试失败均为既有 Windows 环境/源码缺口，详见“当前实施状态盘点”。
 - 环境限制：未执行 PR/远端 CI、桌面/CLI 真实启动、三平台 E2E、真实端点/staging 联调；`fmt:check` 在 CRLF 检出下对未改动文件也报差异，未作为门禁。
+- 2026-11-25：P0 四路并行收尾（MCP 后台启动/deniedTools/ToolSearch 交付、core 投影与冷恢复、Browser 身份、UI/CLI 测试入口）。macOS 复验：root typecheck；contracts/core/shared-types/adapters/bootstrap build；adapters/bootstrap/cli typecheck；core 504/504、adapters 260/260、bootstrap 146/146、shared 136/136、services 96/96、UI 186/186、contracts 3/3、CLI 3/3；lint 0 errors、architecture 0 violations、source:check OK、改动文件 oxfmt OK。改动未提交。
+- 环境限制（2026-11-25 P0 收尾）：未跑 Windows/Linux 三平台、桌面/CLI 真实启动、staging/真实端点与 PR CI；live 有序投影与 hydrator 少数分支留待 P1。
+- 2026-11-25：Wave 2/3 并行推进（managed-worktree 底座、pluginDiscoveryUi 协议/CLI/core/Host、lifecycle hooks、队列编辑锁最小闭环）。最终验证：core 525/525、adapters 359/359、bootstrap 163/163、shared 156/156、services 124/124、UI 192/192、contracts 3/3、CLI 3/3；root/CLI 包 typecheck 通过；lint 0 errors、architecture 0 violations、source:check OK、git diff --check OK。改动未提交。
+- 环境限制（2026-11-25 Wave 3）：未跑 Windows/Linux、桌面/CLI 真实启动、desktop composer-edit-mode E2E、staging/真实端点与 PR CI；3 个 UI 文件（zh-CN/en-US/SessionPane）HEAD 基线即不符合 oxfmt，未批量重排。
+- 2026-11-25：Wave 4 提交（J1 有序投影、J3/J3b 批量删除、J4 活动摘要、J6 MCP 残余、J7 composer 编辑态、K1 settings-search、K2 回复语言远端、J2 留下的 pluginDiscoveryUi 部分改动 + mobile pluginInstall 卡片）。按用户指示跳过最终全量门禁；各工作流定向验证数字见上文，统一回归留给后续测试轮。
