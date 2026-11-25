@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import { kayingcodeProtocolMethods } from "@zcode/shared";
 import { parseWorktreeListPorcelain } from "../src/git/managed-worktree/worktreeList.js";
 import type { ManagedWorktreeServicePorts } from "../src/managed-worktree-tasks/ports.js";
 import {
@@ -7,6 +8,13 @@ import {
   createWorktreeRemovalGate,
 } from "../src/managed-worktree-tasks/removal-gate.js";
 import { createWorktreeRemoval } from "../src/managed-worktree-tasks/removal.js";
+import {
+  KAYINGCODE_WORKTREE_RELEASE_FAILED_CODE,
+  KayingCodeWorktreeReleaseFailedError,
+  isKayingCodeWorktreeReleaseFailedError,
+  requestSessionReleaseUnderDirectory,
+  supportsWorktreeCwd,
+} from "../src/kayingcode-agent/worktreeCwdSupport.js";
 
 const SOURCE = "/projects/repo";
 const WORKTREE = join("/data", ".kayingcode", "worktrees", "3f2a", "repo");
@@ -260,6 +268,15 @@ describe("removeWorktree", () => {
     expect(harness.afterChange).toHaveBeenCalledTimes(1);
     expect(harness.gate.isRemoving(WORKTREE)).toBe(false);
   });
+
+  it("deletes after the CLI releases every resident session without reporting busy", async () => {
+    const harness = createHarness({ cli: { released: ["s1", "s2"], busy: [] } });
+    await expect(
+      harness.removal.removeWorktree({ projectId: PROJECT_ID, path: WORKTREE }),
+    ).resolves.toEqual({ ok: true });
+    expect(harness.remove).toHaveBeenCalledWith({ path: WORKTREE });
+    expect(harness.afterChange).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("parseWorktreeListPorcelain", () => {
@@ -283,5 +300,100 @@ describe("parseWorktreeListPorcelain", () => {
       { path: "/repo-wt", head: "bbb", branchName: null, prunable: true, bare: false },
       { path: "/bare", head: null, branchName: null, prunable: false, bare: true },
     ]);
+  });
+});
+
+describe("worktreeCwd capability probe", () => {
+  function capabilityClient(result: () => Promise<unknown>) {
+    const request = vi.fn(result);
+    return { client: { request } as never, request };
+  }
+
+  it("reports true only when the CLI explicitly advertises worktreeCwd", async () => {
+    const { client, request } = capabilityClient(async () => ({ worktreeCwd: true }));
+
+    await expect(supportsWorktreeCwd(client)).resolves.toBe(true);
+    expect(request).toHaveBeenCalledWith(
+      kayingcodeProtocolMethods.runtimeCapabilities,
+      {},
+      expect.anything(),
+    );
+  });
+
+  it("reports false when worktreeCwd is absent, false or not a boolean", async () => {
+    await expect(supportsWorktreeCwd(capabilityClient(async () => ({})).client)).resolves.toBe(
+      false,
+    );
+    await expect(
+      supportsWorktreeCwd(capabilityClient(async () => ({ worktreeCwd: false })).client),
+    ).resolves.toBe(false);
+    // 旧 CLI 的宽 schema 可能把字段传成字符串；只有严格 true 才放行。
+    await expect(
+      supportsWorktreeCwd(capabilityClient(async () => ({ worktreeCwd: "true" })).client),
+    ).resolves.toBe(false);
+  });
+
+  it("probes once per physical CLI connection and reuses the result", async () => {
+    const { client, request } = capabilityClient(async () => ({ worktreeCwd: true }));
+
+    await expect(supportsWorktreeCwd(client)).resolves.toBe(true);
+    await expect(supportsWorktreeCwd(client)).resolves.toBe(true);
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("fails closed and retries after a probe error", async () => {
+    const request = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("proto.methodNotFound"))
+      .mockResolvedValueOnce({ worktreeCwd: true });
+    const client = { request } as never;
+
+    await expect(supportsWorktreeCwd(client)).resolves.toBe(false);
+    await expect(supportsWorktreeCwd(client)).resolves.toBe(true);
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("session release under directory", () => {
+  it("sends session/releaseUnderDirectory and returns released/busy as CLI facts", async () => {
+    const request = vi.fn(async () => ({ released: ["s1", "s2"], busy: [] }));
+    const client = { request } as never;
+
+    await expect(requestSessionReleaseUnderDirectory(client, WORKTREE)).resolves.toEqual({
+      released: ["s1", "s2"],
+      busy: [],
+    });
+    expect(request).toHaveBeenCalledWith(
+      kayingcodeProtocolMethods.sessionReleaseUnderDirectory,
+      { directory: WORKTREE },
+      expect.anything(),
+    );
+  });
+
+  it("preserves the CLI busy verdict without inventing released sessions", async () => {
+    const request = vi.fn(async () => ({ released: [], busy: ["s1"] }));
+    const client = { request } as never;
+
+    await expect(requestSessionReleaseUnderDirectory(client, WORKTREE)).resolves.toEqual({
+      released: [],
+      busy: ["s1"],
+    });
+  });
+
+  it("maps transport and protocol failures to a typed release failure", async () => {
+    const cause = Object.assign(new Error("method not found"), { code: -32601 });
+    const request = vi.fn().mockRejectedValue(cause);
+    const client = { request } as never;
+
+    const error = await requestSessionReleaseUnderDirectory(client, WORKTREE).catch(
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(KayingCodeWorktreeReleaseFailedError);
+    expect(isKayingCodeWorktreeReleaseFailedError(error)).toBe(true);
+    expect((error as KayingCodeWorktreeReleaseFailedError).code).toBe(
+      KAYINGCODE_WORKTREE_RELEASE_FAILED_CODE,
+    );
+    // 原始传输错误保留为 cause，删除流程可写日志而不解析文案。
+    expect((error as KayingCodeWorktreeReleaseFailedError).cause).toBe(cause);
   });
 });

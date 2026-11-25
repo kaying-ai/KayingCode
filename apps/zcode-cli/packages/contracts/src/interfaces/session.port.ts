@@ -359,6 +359,10 @@ export interface TurnInputIntentMetadata {
     senderId?: string;
     messageId?: string;
     sentAt?: string;
+    /** 用户对该选区的批注，随引用一起作为模型材料。 */
+    comment?: string;
+    /** 选区来自子 agent 输出时的 agent 类型。 */
+    agent?: string;
   }>;
   inputOrigin?: "desktop" | "mobile";
   botGroupSource?: {

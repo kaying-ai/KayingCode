@@ -608,6 +608,11 @@ export interface AgentRuntime {
     toModel: ModelSelection;
     toModelLabel: string;
   }): void;
+  /**
+   * 受管 worktree 新建会话：记录 "已创建 worktree"，首轮持久化会话后、TurnStarted 之前
+   * 写成 timeline part 并发出 WorktreeCreated（docs/git/worktree.md §6.6.4）。只记录一次。
+   */
+  recordPendingWorktreeCreation(fact: import("@zcode/contracts").WorktreeCreationFact): void;
   getActiveTurnInfo(): ActiveTurnInfo | undefined;
   admitPrompt(
     input: string,

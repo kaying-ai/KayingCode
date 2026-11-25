@@ -18,10 +18,13 @@ import type {
   ModelRequestDependencies,
   ModelSelection,
   PendingTurnAttachment,
+  PermissionRuleset,
   PluginReferenceCatalog,
+  ProjectId,
   ResolvedUserInstructions,
   StableForkGoalBoundaryMetadata,
   StableForkTargetMetadata,
+  WorktreeCreationFact,
   WorkspaceHookBundleSnapshot,
   WorkspaceId,
 } from "@zcode/contracts";
@@ -272,6 +275,17 @@ export interface AgentRuntimeConfig {
   workspacePath?: string;
   /** 仅用于持久化隔离；文件与命令执行仍使用 workingDirectory。 */
   workspaceIdentity?: WorkspaceId;
+  /**
+   * 会话所属 workspace 的 key：MCP 工具调用的 `workspace_key`、官方 MCP 授权头等发往 Host 的
+   * 请求都以它为身份。受管 worktree 会话 = 项目，不等于工作目录（docs/git/worktree.md §9.3）；
+   * 缺省按 workspaceIdentity || 工作目录。
+   */
+  workspaceKey?: string;
+  /**
+   * 派生项目身份（权限 project_id、项目记忆目录）使用的目录。受管 worktree 会话映射回
+   * 源仓库中对应路径，与 Hook Trust 继承同一规则（docs/git/worktree.md §6.6.3）；缺省 = 工作区根。
+   */
+  projectDirectory?: string;
   envInfo?: EnvInfo; // Optional, will be auto-detected if not provided
   /**
    * YYYY-MM-DD，缺省由 adapter 解析。只用于 ContextBuilder 日期段的用量统计；
@@ -764,8 +778,19 @@ export type StableConversationForkGoalBoundary = StableForkGoalBoundaryMetadata;
 
 export type StableConversationForkChildMetadata = ForkChildSessionMetadata;
 
+export interface StableConversationForkTargetCwd {
+  /** 子会话 cwd，同时写入 session.directory / path。workspaceID 沿用父会话（本地为空）。 */
+  directory: string;
+  /** 权限与记忆使用的项目 ID：由 cwd 映射回源仓库路径派生（§6.6.3），映射失败时按 cwd。 */
+  projectID: ProjectId;
+  /** 追加在复制历史之后的 "已创建 worktree" 时间线事实。 */
+  worktreeCreation: WorktreeCreationFact;
+}
+
 export interface StableConversationForkOptions {
   forkedSessionId?: SessionId;
+  /** 缺省 = 父会话 cwd（原行为）。 */
+  targetCwd?: StableConversationForkTargetCwd;
   modelSelection?: ModelSelection;
   goalBoundary: StableConversationForkGoalBoundary;
   sourceCommandId: string;

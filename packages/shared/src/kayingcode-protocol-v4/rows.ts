@@ -363,6 +363,14 @@ export const timelineMarkerPayloadSchema = z.union([
     childSessionId: z.string(),
     atRowId: z.number(),
   }),
+  // 受管 worktree 的创建结果，出现在 worktree 任务第一轮（docs/git/worktree.md §6.6.4）。
+  z.object({
+    type: z.literal("worktreeCreated"),
+    path: z.string(),
+    sha: z.string(),
+    ref: z.string().nullable(),
+    output: z.string(),
+  }),
   z.object({
     type: z.literal("modelChange"),
     fromProvider: z.string(),

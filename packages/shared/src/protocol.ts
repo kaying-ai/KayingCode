@@ -383,6 +383,13 @@ export interface AppSettings {
   nativeSearchEnhancementsEnabled?: boolean;
   /** 新建或冷恢复时读取；已有 Runtime 保持原策略。 */
   toolSearchMode?: AppToolSearchMode;
+  /**
+   * 本机预装文档工具：启动后是否自动准备缺失/过期的资源。缺省按开启处理。
+   * 只由 Desktop 预装进程写入；spec 见 packages/shared/spec/preinstalled-tools.md。
+   */
+  preinstalledToolsAutoInstall?: boolean;
+  /** 本机预装文档工具：用户关闭的工具 ID 列表。缺省空数组（全部启用）。 */
+  preinstalledToolsAgentDisabled?: string[];
   /** 新建或冷恢复 Session 是否启用 Memory；默认关闭。 */
   memoryEnabled?: boolean;
   /** 新建或冷恢复 Session 是否向模型提供总额度提醒；默认关闭。 */

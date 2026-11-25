@@ -45,6 +45,7 @@ import type {
 import {
   cancelBackgroundTask,
   closeSession,
+  releaseSessionsUnderDirectory,
   compactSession,
   createSession,
   forkSession,
@@ -822,6 +823,8 @@ export class KayingCodeProtocolAgentServer {
         return await setMode(this.context, request.params);
       case kayingcodeProtocolMethods.sessionClose:
         return await closeSession(this.context, request.params);
+      case kayingcodeProtocolMethods.sessionReleaseUnderDirectory:
+        return await releaseSessionsUnderDirectory(this.context, request.params);
       case kayingcodeProtocolMethods.workspaceReadPresentation:
         return await readWorkspacePresentation(this.context, request.params);
       case kayingcodeProtocolMethods.workspaceHookTrustGrant: {
@@ -957,6 +960,17 @@ export class KayingCodeProtocolAgentServer {
           sessionDirectorySource: true,
           residentRowsRange: true,
           genUiContext: true,
+          // 会话 cwd 可与 workspace 不同（受管 worktree）：createSession.cwd / worktreeCreation、
+          // forkAssistant.targetCwd、按 Host workspace key 冷恢复。旧 Host 的结果 schema 非 strict。
+          worktreeCwd: true,
+          // CLI 认识 {kind:"extension"} 输入来源：sendText.source 与 createSession.firstInput.source
+          // 都随 canonical intent 落库并投影到 userInput 行（packages/shared/spec/conversation-input-source.md §7）。
+          extensionInputSource: true,
+          // 对话引用的 comment / agent 字段会进入模型输入（选区批注）；旧 CLI 会静默剥掉。
+          conversationQuoteComment: true,
+          // plugins/overview 认识 includeExtensionSummary，并按它在商店信息里带扩展摘要
+          // （packages/shared/spec/plugin-extension-summary.md）。
+          pluginExtensionSummary: true,
         };
       }
       case kayingcodeProtocolMethods.pluginsLocalSourceAdd:

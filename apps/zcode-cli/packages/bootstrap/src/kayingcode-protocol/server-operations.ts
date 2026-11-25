@@ -1,4 +1,5 @@
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
+import { classifyLocalSessionDirectory } from "@zcode/adapters/config";
 import {
   isAuxiliarySessionKind,
   isReadonlyAgentSessionKind,
@@ -63,6 +64,7 @@ import {
   kayingcodeSessionListParamsSchema,
   kayingcodeSessionMessagesParamsSchema,
   kayingcodeSessionReadParamsSchema,
+  kayingcodeSessionReleaseUnderDirectoryParamsSchema,
   kayingcodeSessionRuntimePreferencesResultSchema,
   kayingcodeSessionResumeParamsSchema,
   kayingcodeSessionSendParamsSchema,
@@ -143,7 +145,10 @@ import {
   getSessionLifecycle,
   closeSessionRuntime,
   discardSessionRuntime,
+  deactivateSessionRecord,
+  readSessionBusyState,
 } from "./session-residency.js";
+import { resolveResumeWorkspaceRef } from "./workspace.js";
 
 const PLAN_MODE_GOAL_CONTINUATION_SKIPPED_MESSAGE = "Plan mode 下已记录 goal，但不会自动继续。";
 const SLOW_SNAPSHOT_LOG_THRESHOLD_MS = 1000;
@@ -1534,15 +1539,14 @@ export async function activateSessionRuntime(
     );
   }
   session = await repairLegacyRemoteSessionWorkspaceForResume(context, session);
-  const workspace =
-    params.workspace ??
-    buildWorkspaceRef({
-      // V4 历史会话冷订阅只传 sessionId；远端会话若在这里仅用目录
-      // 重建 workspace，identity 会退化成 path key，无法命中按 workspaceID 隔离的
-      // provider registry，最终把可用模型误判为不可用并永久触发 restoreWarning。
-      workspaceIdentity: session.workspaceID,
-      workspacePath: session.path ?? session.directory,
-    });
+  // V4 历史会话冷订阅只传 sessionId 时按存储重建：远端会话若仅用目录重建 workspace，
+  // identity 会退化成 path key，无法命中按 workspaceID 隔离的 provider registry。
+  // Host 携带本地 workspace 时只取它的身份，执行路径仍用存储的 cwd（受管 worktree 任务）。
+  const workspace = resolveResumeWorkspaceRef(params.workspace, {
+    ...(session.workspaceID ? { workspaceID: String(session.workspaceID) } : {}),
+    ...(session.path ? { path: session.path } : {}),
+    directory: session.directory,
+  });
   let persistedMessages =
     options.persistedMessages ?? (await readPersistedSessionMessages(context, params.sessionId));
   const mode = derivePersistedSessionMode(persistedMessages);
@@ -1719,6 +1723,68 @@ function resolveLegacyRemoteWorkspace(
   };
 }
 
+/**
+ * 本地会话目录是否属于 workspace（docs/git/worktree.md §9.3 归属判定）。冷恢复 / 激活校验与
+ * 本地冷列表、sessionsIndex/reconcile 共用这一函数，不能各写一份：
+ * - 与 workspace 是同一个真实目录（含大小写差异）；
+ * - cwd 是受管 worktree，严格 resolver 映射回该真实目录；
+ * - cwd 是已删除的受管 worktree（文件系统无法证明），才用创建时持久化的 projectID 兜底。
+ * 修复原因：冷恢复曾把 resolver 结果（realpath，磁盘真实大小写）和 workspace key（保留用户输入的
+ * 大小写）按字符串比较，key 大小写不同或 worktree 已删除时报 project.session-lineage-invalid。
+ * projectID 是有损 slug，不同项目可能相同（如 "my project" 与 "my-project"），不能作为一般的归属
+ * 证明，否则另一个项目的会话可以挂在当前 key 下执行。
+ */
+export async function isLocalSessionDirectoryInWorkspace(
+  context: Pick<KayingCodeProtocolAgentServerContext, "deps">,
+  session: { directory: string; projectID?: string },
+  workspacePath: string,
+): Promise<boolean> {
+  if (session.directory === workspacePath) return true;
+  const relation = await classifyLocalSessionDirectory({
+    directory: session.directory,
+    workspacePath,
+    ...(context.deps.env ? { env: context.deps.env } : {}),
+  });
+  if (relation === "same" || relation === "worktree") return true;
+  return (
+    relation === "removed-worktree" &&
+    session.projectID !== undefined &&
+    session.projectID === projectIdFromDirectory(workspacePath)
+  );
+}
+
+async function isSameSessionWorkspacePath(
+  context: KayingCodeProtocolAgentServerContext,
+  storedPath: string,
+  workspace: KayingCodeWorkspaceRef,
+  projectID?: string,
+): Promise<boolean> {
+  if (
+    storedPath === workspace.workspacePath ||
+    (isAbsolute(storedPath) &&
+      isAbsolute(workspace.workspacePath) &&
+      resolve(storedPath) === resolve(workspace.workspacePath))
+  )
+    return true;
+  if (workspace.workspaceIdentity?.trim() || workspace.workspaceKey.startsWith("remote:"))
+    return false;
+  // 受管 worktree 的 cwd 不等于项目 workspace；本地 workspace 的 key 就是项目目录。存储的 cwd 与
+  // 请求的执行路径都要按统一归属判定证明属于该项目，不能取消归属校验或把任意不同目录视为合法的
+  // 冷恢复/激活请求。
+  return (
+    (await isLocalSessionDirectoryInWorkspace(
+      context,
+      { directory: storedPath, ...(projectID ? { projectID } : {}) },
+      workspace.workspaceKey,
+    )) &&
+    (await isLocalSessionDirectoryInWorkspace(
+      context,
+      { directory: workspace.workspacePath },
+      workspace.workspaceKey,
+    ))
+  );
+}
+
 async function resolvePersistedDirectorySession(
   context: KayingCodeProtocolAgentServerContext,
   session: SessionInfo,
@@ -1737,11 +1803,9 @@ async function resolvePersistedDirectorySession(
     const key = identity || path;
     const auxiliary = isAuxiliarySessionKind(current.taskType);
     // 旧 root 曾保存规范化 cwd；只在目标 OS 的绝对路径词法等价时兼容，绝不重写身份 key。
-    const samePath =
-      path === workspace.workspacePath ||
-      (isAbsolute(path) &&
-        isAbsolute(workspace.workspacePath) &&
-        resolve(path) === resolve(workspace.workspacePath));
+    // 受管 worktree 的 cwd 不等于项目 workspace；存储的 cwd 与请求的执行路径都要按统一
+    // 归属判定证明属于该项目（docs/git/worktree.md §9.3）。
+    const samePath = await isSameSessionWorkspacePath(context, path, workspace, current.projectID);
     const sameIdentity =
       key === expectedKey || (!identity && !workspace.workspaceIdentity?.trim() && samePath);
     if (samePath && sameIdentity && (!resolveOwner || !auxiliary)) return current;
@@ -1764,7 +1828,7 @@ export async function validateSessionActivationWorkspace(
     // key 相同不保证显式 identity 相同；与在途操作一样逐字段校验，避免错误请求关闭原实例。
     if (
       active.workspace.workspaceKey !== workspace.workspaceKey ||
-      active.workspace.workspacePath !== workspace.workspacePath ||
+      !(await isSameSessionWorkspacePath(context, active.workspace.workspacePath, workspace)) ||
       active.workspace.workspaceIdentity !== workspace.workspaceIdentity ||
       active.workspace.remoteSessionId !== workspace.remoteSessionId
     )
@@ -2565,7 +2629,12 @@ async function registerForkedSessionRuntime(
       model: optionalModelSelectionFromString(parentModel),
       ...(fork.parentSessionId ? { parentSessionId: fork.parentSessionId } : {}),
       taskType: forkedSession.taskType,
-      workspace: record.workspace,
+      // 子会话属于父会话的 workspace；执行路径取子会话持久化的 cwd。fork 到受管 worktree
+      // 时两者不同（docs/git/worktree.md §8.2），普通 fork 下与父路径相同。
+      workspace: resolveResumeWorkspaceRef(record.workspace, {
+        ...(forkedSession.path ? { path: forkedSession.path } : {}),
+        directory: forkedSession.directory,
+      }),
     },
     fork.forkedSessionId as SessionId,
     true,
@@ -3018,6 +3087,33 @@ export async function closeSession(
   }
   await closeSessionRuntime(context, params.sessionId);
   return { closed: true };
+}
+
+/**
+ * 卸载 cwd 位于 directory 内的全部驻留会话（Host 删除受管 worktree 前使用，docs/git/worktree.md §8.3）。
+ * 会话选择与忙闲都以本进程驻留表为准（包括 Host 镜像尚未同步的同目录 fork 子会话）；
+ * 任一会话忙时全部不卸载。判断与开始卸载之间没有 await；之后的新命令由 Host 删除租约拦截。
+ * 只做驻留去激活，不删除持久会话，也不发 session.removed。
+ */
+export async function releaseSessionsUnderDirectory(
+  context: KayingCodeProtocolAgentServerContext,
+  rawParams: unknown,
+) {
+  const params = parseParams(kayingcodeSessionReleaseUnderDirectoryParamsSchema, rawParams);
+  const sessionIds = [...context.sessions]
+    .filter(([, record]) => isPathWithin(params.directory, record.workspace.workspacePath))
+    .map(([sessionId]) => sessionId);
+  const busy = sessionIds.filter(
+    (sessionId) => readSessionBusyState(context, sessionId) === "busy",
+  );
+  if (busy.length > 0) return { released: [], busy };
+  for (const sessionId of sessionIds) await deactivateSessionRecord(context, sessionId);
+  return { released: sessionIds, busy: [] };
+}
+
+function isPathWithin(parent: string, candidate: string): boolean {
+  const rel = relative(resolve(parent), resolve(candidate));
+  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
 export function shouldCloseSessionForExpectedPersistence(

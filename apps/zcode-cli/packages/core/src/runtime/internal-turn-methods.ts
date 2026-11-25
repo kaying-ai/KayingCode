@@ -397,6 +397,9 @@ export interface AgentRuntimeTurnMethods {
     toModelLabel: string;
   }): void;
   persistPendingModelChangeTimeline(traceContext: TraceContext): Promise<void>;
+  /** 受管 worktree 新建会话：只记录一次；首轮落盘并发出 WorktreeCreated。 */
+  recordPendingWorktreeCreation(fact: import("@zcode/contracts").WorktreeCreationFact): void;
+  persistPendingWorktreeCreationTimeline(traceContext: TraceContext): Promise<void>;
   persistSyntheticUserNotice(
     messageID: MessageId,
     text: string,

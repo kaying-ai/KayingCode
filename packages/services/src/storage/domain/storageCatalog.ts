@@ -33,6 +33,7 @@ const CLEANABILITY: Record<StorageCategoryId, StorageCleanability> = {
   backups: "confirm",
   exports: "safe",
   runtimes: "none",
+  preinstalledTools: "none",
   config: "none",
   other: "none",
 };
@@ -95,6 +96,8 @@ const PREFIX_RULES: Record<Exclude<StorageCategoryId, "other">, string[]> = {
   backups: ["backup", "v2/backup", "v2/migrations", "cli/db/backup", "cli/db/backups"],
   exports: ["export-log", "export-log-stage", "feedback"],
   runtimes: ["agents", "bundled-agents", "lite", "computer-use", "cli/plugins"],
+  // 预装工具由安装器独立管理，删除只走 Help → 预装工具；这里仅归类和展示。
+  preinstalledTools: ["preinstalled-tools"],
   // cli/plugins 整体（含 cache）不可清理，插件缓存归运行时。
   config: [
     "v2/agent-config",

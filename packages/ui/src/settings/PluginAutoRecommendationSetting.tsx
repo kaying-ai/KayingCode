@@ -28,6 +28,7 @@ export function PluginAutoRecommendationSetting() {
   };
   return (
     <SettingsRow
+      searchId="settings.pluginAutoRecommendation"
       controlLayout="wide"
       label={label}
       description={intl.formatMessage({ id: "settings.pluginAutoRecommendationDescription" })}

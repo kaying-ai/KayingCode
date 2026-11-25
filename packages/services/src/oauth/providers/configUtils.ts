@@ -32,7 +32,13 @@ export function buildKayingCodeApiUrlFromEnv(env: NodeJS.ProcessEnv, path: strin
 }
 
 export function buildDesktopOAuthRedirectUriFromEnv(env: NodeJS.ProcessEnv): string {
-  const url = new URL("/app/oauth/login", buildRuntimeKayingCodeEndpointUrls(env).origin);
+  const origin = buildRuntimeKayingCodeEndpointUrls(env).origin;
+  // Bug 原因：KayingCode.localrun 没有官方端点，origin 允许为空；空串进入 new URL 会抛
+  // ERR_INVALID_URL，并让 Desktop Host 在 starting_services 阶段整体启动失败。
+  // 无端点时 OAuth 登录不可用，回退到本地 deep link 作为占位，保证服务装配不因此中断。
+  if (!origin) return DESKTOP_OAUTH_CALLBACK_URI;
+
+  const url = new URL("/app/oauth/login", origin);
   url.searchParams.set("redirect", DESKTOP_OAUTH_CALLBACK_URI);
   // Website 需要按 App 版本决定是否关闭自动 deep link；缺少版本时必须兼容旧客户端行为。
   url.searchParams.set("app_version", KAYINGCODE_VERSION);

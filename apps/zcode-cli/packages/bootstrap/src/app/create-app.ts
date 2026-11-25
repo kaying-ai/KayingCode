@@ -428,7 +428,15 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       sessionControl = bindRoot(sessionId);
     }
     const localSettingStore = asLocalSettingStore(sessionStore);
-    const projectID = projectIdFromDirectory(workingDirectory);
+    // 受管 worktree 会话的项目身份（权限 project_id、项目记忆）映射回源仓库路径，与 Hook Trust
+    // 继承同一 resolver（docs/git/worktree.md §6.6.3）。远程 workspace 的 Trust identity 是
+    // 不透明身份而不是目录，保持按工作目录派生；映射失败时 resolver 已退回工作目录。
+    const projectDirectory =
+      !options.runtimeConfig?.memory?.workspaceIdentity?.trim() &&
+      workspaceHookTrustIdentity !== workingDirectory
+        ? workspaceHookTrustIdentity
+        : undefined;
+    const projectID = projectIdFromDirectory(projectDirectory ?? workingDirectory);
     const persistedMode = options.runtimeConfig?.mode
       ? undefined
       : readProjectPermissionMode(localSettingStore, projectID);
@@ -456,6 +464,10 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       configuredMcpServers = snapshot.servers;
       runtimeConfig.mcp = snapshot;
     }
+    if (projectDirectory) runtimeConfig.projectDirectory = projectDirectory;
+    // 协议入口给出会话所属 workspace 的 key（受管 worktree 会话 = 项目）；MCP 工具调用与官方 MCP
+    // 授权头以它为身份，不按工作目录重算（docs/git/worktree.md §9.3）。
+    if (options.workspaceKey) runtimeConfig.workspaceKey = options.workspaceKey;
     if (process.env.KAYINGCODE_REVIEW_WORKSPACE_ROOT) {
       // 根因：仅在工具调用处禁止写入仍会让 SessionStart hooks 和 MCP 启动进程
       // 在连接审核设备前执行。专用 Bot 必须在 runtime 装配时整体去除这些能力。
@@ -518,6 +530,11 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       policyProvider: options.workspaceHookPolicyProvider,
       reviewHost: options.workspaceHookReviewHost,
       ...(options.env ? { env: options.env } : {}),
+      // 对外 workspaceKey：协议入口传入会话所属 workspace 的 key（受管 worktree 会话 = 项目）；
+      // 独立 CLI 缺省同旧规则：远程 identity 优先，否则工作目录。
+      workspaceKey:
+        options.workspaceKey ??
+        (options.runtimeConfig?.memory?.workspaceIdentity?.trim() || workingDirectory),
       workspaceHookTrustEnabled: options.workspaceHookTrustEnabled,
       runtimeRoot: configResult.sources.project.workspaceHookRuntimeRoot ?? {
         // Fallback 只在 config-factory 未导出时生效（理论上不会发生）。

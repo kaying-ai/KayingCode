@@ -26,6 +26,8 @@ import {
   type WorkspaceHookRuntimeRoot,
 } from "@zcode/shared/workspace-hook-discovery";
 import {
+  parseManagedWorktreePath,
+  resolveManagedWorktreeRoot,
   resolveWorkspaceHookTrustIdentity,
   type WorkspaceHookTrustIdentityFs,
 } from "@zcode/shared/managed-worktree";
@@ -600,4 +602,57 @@ export async function resolveWorkspaceHookTrustIdentityForWorkspace(input: {
     },
     nodeTrustIdentityFs,
   );
+}
+
+/** 本地会话目录相对 workspace 目录的文件系统关系，见 classifyLocalSessionDirectory。 */
+export type LocalSessionDirectoryRelation = "same" | "worktree" | "removed-worktree" | "other";
+
+/**
+ * 本地会话目录与 workspace 目录的文件系统关系（docs/git/worktree.md §9.3 归属判定）：
+ * - same：同一个真实目录（realpath 比较，吸收 Host key 保留的输入大小写与磁盘真实大小写的差异）；
+ * - worktree：目录是受管 worktree，严格 resolver 映射回该真实目录；
+ * - removed-worktree：目录位于受管 worktree 布局内但已不存在，文件系统无法证明归属，调用方只能用
+ *   创建时持久化的身份兜底；
+ * - other：不属于。
+ * 只做文件系统判定，不使用 projectID：projectID 是有损 slug（转小写、替换字符、截断），
+ * 不同项目可能相同，不能作为会执行代码的冷恢复/激活路径的归属证明。
+ */
+export async function classifyLocalSessionDirectory(input: {
+  directory: string;
+  workspacePath: string;
+  env?: Record<string, string | undefined>;
+}): Promise<LocalSessionDirectoryRelation> {
+  const directory = resolve(input.directory);
+  const workspacePath = resolve(input.workspacePath);
+  if (directory === workspacePath) return "same";
+  const [realDirectory, realWorkspace] = await Promise.all([
+    realpathOrNull(directory),
+    realpathOrNull(workspacePath),
+  ]);
+  if (realDirectory !== null && realDirectory === realWorkspace) return "same";
+  const dataBaseDir = resolveKayingCodeDataBaseDir(input.env);
+  if (realDirectory === null) {
+    // 会话 cwd 落盘时就是 realpath；受管根目录本身可能经过软链，两种形态都认。
+    const managedRoot = resolveManagedWorktreeRoot(dataBaseDir);
+    const realManagedRoot = (await realpathOrNull(managedRoot)) ?? managedRoot;
+    return parseManagedWorktreePath(realManagedRoot, directory) ||
+      parseManagedWorktreePath(managedRoot, directory)
+      ? "removed-worktree"
+      : "other";
+  }
+  if (realWorkspace === null) return "other";
+  const mapped = await resolveWorkspaceHookTrustIdentity(
+    { workspacePath: directory, dataBaseDir },
+    nodeTrustIdentityFs,
+  );
+  if (mapped === directory) return "other";
+  return (await realpathOrNull(mapped)) === realWorkspace ? "worktree" : "other";
+}
+
+async function realpathOrNull(path: string): Promise<string | null> {
+  try {
+    return await realpath(path);
+  } catch {
+    return null;
+  }
 }

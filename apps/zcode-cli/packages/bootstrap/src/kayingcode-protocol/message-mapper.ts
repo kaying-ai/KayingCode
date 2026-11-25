@@ -206,6 +206,8 @@ function mapMessagePart(part: MessagePart): KayingCodeMessagePart {
         type: "timeline",
         verification: part.timelineType === "goal_verification" ? part.verification : undefined,
         verificationId: part.timelineType === "goal_verification" ? part.verificationId : undefined,
+        worktreeCreation:
+          part.timelineType === "worktree_creation" ? { ...part.worktreeCreation } : undefined,
       };
     case "subtask":
       return {

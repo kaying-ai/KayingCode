@@ -24,6 +24,8 @@ import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 import { PluginStoreAvatar } from "@/settings/PluginStoreAvatar.js";
 import {
   canUpdatePluginItem,
+  isPluginStoreUpdateBlocked,
+  isStoreItemInstallBlocked,
   resolveItemDescription,
   resolveItemDisplayName,
   type StorePluginItem,
@@ -327,6 +329,24 @@ export function PluginStoreInstallButton({
   size?: "sm" | "default" | "lg";
 }) {
   const { intl } = useKayingCodeIntl();
+  // 目录最新版要求更高的插件 API 版本（packages/ui/spec/plugin-store-extension-summary.md）：
+  // 同一位置换成不能点的提示按钮，理由由按钮文案直接表达。
+  if (isStoreItemInstallBlocked(item)) {
+    return (
+      <Button
+        type="button"
+        data-testid="plugin-store-install"
+        data-plugin-id={item.id}
+        data-install-blocked="requires-update"
+        variant="secondary"
+        size={size}
+        className="rounded-full"
+        disabled
+      >
+        {intl.formatMessage({ id: "settings.plugins.store.extension.requiresUpdate" })}
+      </Button>
+    );
+  }
   const installing =
     actions.operationId === `plugin:install:${item.name}@${item.marketplace}` ||
     actions.operationId === `plugin:restore:${item.id}`;
@@ -468,6 +488,18 @@ export function PluginStoreCard({
             <TriangleAlert className="size-3 shrink-0" aria-hidden="true" />
             <span className="truncate">
               {intl.formatMessage({ id: "settings.plugins.store.sourceMissing" })}
+            </span>
+          </div>
+        ) : isPluginStoreUpdateBlocked(item) ? (
+          // 最新版要求更高的插件 API 版本：更新入口按 canUpdatePluginItem 隐藏，这里说明原因。
+          <div
+            data-testid="plugin-store-extension-update-blocked"
+            data-plugin-id={item.id}
+            className="mt-0.5 flex items-center gap-1 truncate text-ui-sm text-warning"
+          >
+            <TriangleAlert className="size-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {intl.formatMessage({ id: "settings.plugins.store.extension.updateBlockedHint" })}
             </span>
           </div>
         ) : null}

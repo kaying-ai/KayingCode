@@ -19,8 +19,10 @@ import {
   type KayingCodeInstalledPluginSummary,
   type KayingCodePluginComponentGroup,
   type KayingCodePluginDiagnostic,
+  type KayingCodePluginExtensionSummary,
   type KayingCodePluginInfo,
   type KayingCodePluginMarketplaceSummary,
+  type KayingCodePluginStoreListing,
   type KayingCodePluginsConfigureResult,
   type KayingCodePluginsDescribeResult,
   type KayingCodePluginsInstallResult,
@@ -316,10 +318,17 @@ export async function getPluginsOverview(
     workingDirectory: params.workspace.workspacePath,
     workspaceIdentity: params.workspace.workspaceIdentity,
   });
+  // 扩展摘要只在被要求时放进 listing：listing 与结果都是 strict，比 CLI 旧的 services 解析到新键会让
+  // 整个商店打不开（packages/shared/spec/plugin-extension-summary.md）。能这样要的 services 已先读过能力位。
+  const withSummary = params.includeExtensionSummary === true;
   return {
     marketplaces: overview.marketplaces.map(toMarketplaceSummary),
-    availablePlugins: overview.availablePlugins.map(toAvailablePluginSummary),
-    installedPlugins: overview.installedPlugins.map(toInstalledPluginSummary),
+    availablePlugins: overview.availablePlugins.map((plugin) =>
+      toAvailablePluginSummary(withExtensionSummary(plugin, withSummary)),
+    ),
+    installedPlugins: overview.installedPlugins.map((plugin) =>
+      toInstalledPluginSummary(withExtensionSummary(plugin, withSummary)),
+    ),
     restorableBuiltins: overview.restorableBuiltins.map(toAvailablePluginSummary),
     diagnostics: overview.diagnostics.map(toPluginDiagnostic),
     capability: { supported: true },
@@ -614,6 +623,17 @@ function toMarketplaceSummary(input: {
     ...(input.featured ? { featured: input.featured } : {}),
     ...(input.refreshFailure ? { refreshFailure: input.refreshFailure } : {}),
   };
+}
+
+/** 按请求把 CLI 内部的扩展摘要并进 listing；不要求时原样返回（摘要不进线）。 */
+function withExtensionSummary<
+  T extends {
+    listing?: KayingCodePluginStoreListing;
+    extensionSummary?: KayingCodePluginExtensionSummary;
+  },
+>(plugin: T, include: boolean): T {
+  if (!include || !plugin.extensionSummary) return plugin;
+  return { ...plugin, listing: { ...plugin.listing, extensionSummary: plugin.extensionSummary } };
 }
 
 function toAvailablePluginSummary(input: {

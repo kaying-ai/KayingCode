@@ -4,6 +4,12 @@ import {
   databaseStartupStateSchema,
   databaseStartupPortPayloadSchema,
 } from "@zcode/shared";
+import {
+  preinstalledToolsStateSchema,
+  preinstalledToolsCommandSchema,
+  type PreinstalledToolsCommand,
+  type PreinstalledToolsState,
+} from "@zcode/shared/preinstalled-tools";
 /* eslint-disable max-lines -- preload bridge 集中暴露桌面平台 IPC，拆散会让 contextBridge 权限边界更难审计。 */
 import { contextBridge, ipcRenderer, webFrame, webUtils } from "electron";
 import {
@@ -78,6 +84,9 @@ import type {
   SaveFileRequest,
   SaveFileResult,
   PrintPageToPdfResult,
+  MicrophoneAccessResetResult,
+  MicrophoneAccessResult,
+  MicrophoneSettingsTarget,
   SSHConfigAliasOption,
   WebRemoteControlContext,
   WebRemoteControlReconnectWorkspaceRequest,
@@ -340,6 +349,15 @@ contextBridge.exposeInMainWorld("kayingcode", {
   /** 将当前页面的 print 媒体版面导出为 PDF（Chromium 打印引擎，矢量文本） */
   printPageToPdf: (): Promise<PrintPageToPdfResult> =>
     ipcRenderer.invoke(PlatformChannels.PrintToPdf),
+  /** 语音输入：检查并按需请求系统麦克风权限 */
+  ensureMicrophoneAccess: (): Promise<MicrophoneAccessResult> =>
+    ipcRenderer.invoke(PlatformChannels.MicrophoneAccess),
+  /** 语音输入：macOS 重置本 App 的麦克风授权记录并重新请求 */
+  resetMicrophoneAccess: (): Promise<MicrophoneAccessResetResult> =>
+    ipcRenderer.invoke(PlatformChannels.ResetMicrophoneAccess),
+  /** 语音输入：打开系统麦克风权限 / 声音输入设置页 */
+  openMicrophoneSettings: (target: MicrophoneSettingsTarget): Promise<boolean> =>
+    ipcRenderer.invoke(PlatformChannels.OpenMicrophoneSettings, target),
   /** 从系统拖拽/文件输入得到的 Web File 解析真实本地路径 */
   getPathForFile: (file: File): string | null => {
     // Electron 32 起移除了非标准 File.path，renderer 不能再直接从拖拽 File 上取路径。
@@ -353,6 +371,25 @@ contextBridge.exposeInMainWorld("kayingcode", {
   /** dwf 产物「作为文件打开」：把某一版的字节落成本机副本 */
   materializeWorkflowArtifactFile: (payload: MaterializeWorkflowArtifactFileRequest) =>
     ipcRenderer.invoke(PlatformChannels.MaterializeWorkflowArtifactFile, payload),
+  /** 预装文档工具：提交命令；回执不携带新状态。 */
+  executePreinstalledToolsCommand: async (command: PreinstalledToolsCommand): Promise<void> => {
+    await ipcRenderer.invoke(
+      PlatformChannels.ExecutePreinstalledToolsCommand,
+      preinstalledToolsCommandSchema.parse(command),
+    );
+  },
+  getPreinstalledToolsState: async (): Promise<PreinstalledToolsState> =>
+    preinstalledToolsStateSchema.parse(
+      await ipcRenderer.invoke(PlatformChannels.GetPreinstalledToolsState),
+    ),
+  onPreinstalledToolsState: (callback: (state: PreinstalledToolsState) => void): (() => void) => {
+    const handler = (_event: unknown, value: unknown) => {
+      const parsed = preinstalledToolsStateSchema.safeParse(value);
+      if (parsed.success) callback(parsed.data);
+    };
+    ipcRenderer.on(PlatformChannels.PreinstalledToolsState, handler);
+    return () => ipcRenderer.removeListener(PlatformChannels.PreinstalledToolsState, handler);
+  },
   /** 订阅当前窗口内远程连接过程日志，返回 disposer */
   onRemoteConnectionLog: (callback: (entry: RemoteConnectionRuntimeLog) => void) => {
     const handler = (_event: unknown, payload: unknown) =>

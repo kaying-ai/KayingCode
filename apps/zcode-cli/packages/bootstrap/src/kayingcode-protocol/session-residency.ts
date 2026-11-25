@@ -236,6 +236,21 @@ async function releaseSessionRecord(
     );
 }
 
+/**
+ * 会话是否忙：驻留阻塞工作、待处理交互或排队命令；未加载返回 null。
+ * 彻底删除会话数据与 `session/releaseUnderDirectory` 共用同一判定。
+ */
+export function readSessionBusyState(
+  context: KayingCodeProtocolAgentServerContext,
+  sessionId: string,
+): "busy" | "idle" | null {
+  const facts = createSessionResidentPoolHost(context).readResidencyFacts(sessionId);
+  if (!facts) return null;
+  return facts.hasResidencyBlockingWork || facts.hasPendingInteractions || facts.hasQueuedCommands
+    ? "busy"
+    : "idle";
+}
+
 export function createSessionResidentPoolHost(
   context: KayingCodeProtocolAgentServerContext,
 ): SessionResidentPoolHost {

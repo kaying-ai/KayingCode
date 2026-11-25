@@ -21,6 +21,8 @@ export interface ITerminalService {
   write(params: { id: string; data: string }): Promise<void>;
   resize(params: { id: string; cols: number; rows: number }): Promise<void>;
   dispose(params: { id: string }): Promise<void>;
+  /** 本 Host 中 cwd 位于 path 内的终端（删除受管 worktree 前的占用检查）。 */
+  listTerminalIdsUnderPath(params: { path: string }): Promise<string[]>;
   onDynamicData(id: string): Event<string>;
   onDynamicExit(id: string): Event<number>;
 }

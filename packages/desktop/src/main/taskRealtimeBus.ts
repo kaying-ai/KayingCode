@@ -19,6 +19,7 @@ import {
   HostResponseTypes,
   hostResponseMessageSchema,
 } from "@zcode/shared";
+import { isExtensionHostControlMessage } from "./extensionHostMessages.js";
 import { logger as defaultLogger } from "./logger.js";
 
 const STREAM_MIRROR_FLUSH_INTERVAL_MS = 1000;
@@ -28,6 +29,16 @@ const STREAM_MIRROR_MAX_BATCH_BYTES = 512 * 1024;
 const STREAM_MIRROR_TEXT_OP_MAX_CHARS = 128 * 1024;
 const OWNER_COMMAND_TIMEOUT_MS = 30_000;
 const SESSION_MESSAGE_DELIVERY_TIMEOUT_MS = 30_000;
+
+/** 只记录类型与顶层字段名，定位协议错配时不输出整条消息。 */
+function describeHostMessage(message: unknown) {
+  if (typeof message !== "object" || message === null) return { valueType: typeof message };
+  const type = (message as { type?: unknown }).type;
+  return {
+    type: typeof type === "string" ? type.slice(0, 64) : typeof type,
+    keys: Object.keys(message).slice(0, 8),
+  };
+}
 
 type HostMessageListener = (message: unknown) => void;
 type HostExitListener = () => void;
@@ -231,10 +242,12 @@ export class TaskRealtimeBus {
   }
 
   private handleHostMessage(hostId: string, message: unknown): void {
+    if (isExtensionHostControlMessage(message)) return;
     const parsed = hostResponseMessageSchema.safeParse(message);
     if (!parsed.success) {
       this.logger.warn(
         "[task-realtime] invalid host response message:",
+        describeHostMessage(message),
         formatZodError(parsed.error),
       );
       return;

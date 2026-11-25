@@ -60,6 +60,7 @@ type SessionFacade = Pick<
   | "getMcpAppConnectionSnapshot"
   | "waitForMcpAppConnection"
   | "onMcpAppConnectionInvalidated"
+  | "reconnectMcpAppConnection"
   | "replaceMcpAppProvidedTools"
   | "connectMcpServer"
   | "disconnectMcpServer"
@@ -100,6 +101,9 @@ type SessionFacade = Pick<
   | "setTarget"
   | "updateTargetStatus"
 >;
+
+/** 打开 MCP App 时重连断开连接的等待上限，与 MCP 默认请求超时一致。 */
+const MCP_APP_OPEN_RECONNECT_BUDGET_MS = 30_000;
 
 interface SessionResourceCloseInput {
   beginShutdown: () => void;
@@ -472,6 +476,12 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
       deps.mcpPort?.waitForAppConnection
         ? deps.mcpPort.waitForAppConnection(name)
         : (deps.mcpPort?.appConnectionSnapshot?.(name) ?? null),
+    reconnectMcpAppConnection: async (name) => {
+      await deps.mcpPort?.waitForServer?.(name, {
+        reconnect: true,
+        timeoutMs: MCP_APP_OPEN_RECONNECT_BUDGET_MS,
+      });
+    },
     callMcpToolForUi: async (serverName, toolName, args, options) => {
       if (!deps.mcpPort) {
         throw new Error("MCP is disabled");

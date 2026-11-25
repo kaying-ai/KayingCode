@@ -55,6 +55,7 @@ import type {
   WorkspaceHookReviewRequestedPayload,
   WorkspaceHookReviewSettledPayload,
   WorkspaceHookReviewSupersededPayload,
+  WorktreeCreatedPayload,
 } from "@zcode/contracts";
 import {
   DEFERRED_TOOL_CALL_NAME,
@@ -462,6 +463,10 @@ export class ProductProjection {
   // resume SessionStart 没有 turnId；先保留在 CLI projection，下一条真实 user-intent
   // TurnStarted 到达后再分配 rowId/turnId。不得构造 session-hooks:* synthetic turn。
   private pendingSessionHookInvocations = new Map<string, PendingSessionHookInvocation>();
+  // 新建 worktree 会话：WorktreeCreated 先于首轮到达，暂存到首个 TurnStarted 时在轮顶落行
+  // （docs/git/worktree.md §6.6.4）。
+  private pendingWorktreeCreated: { event: SessionEvent; payload: WorktreeCreatedPayload } | null =
+    null;
   // rewind 后 async Hook 的 terminal 仍可能迟到；保留 invocation 墓碑，避免被删旧分支
   // 因找不到原 row 而被 terminal-only 兼容路径重新 append。
   private rewoundHookInvocationIds = new Set<string>();
@@ -1196,6 +1201,7 @@ export class ProductProjection {
     );
     clone.subagentRowIdByAgentId = new Map(this.subagentRowIdByAgentId);
     clone.hookRowIdByInvocationId = new Map(this.hookRowIdByInvocationId);
+    clone.pendingWorktreeCreated = this.pendingWorktreeCreated;
     clone.pendingSessionHookInvocations = new Map(
       [...this.pendingSessionHookInvocations].map(([invocationId, pending]) => [
         invocationId,
@@ -1260,6 +1266,7 @@ export class ProductProjection {
     this.fileToolInputPreviewByCallId = candidate.fileToolInputPreviewByCallId;
     this.subagentRowIdByAgentId = candidate.subagentRowIdByAgentId;
     this.hookRowIdByInvocationId = candidate.hookRowIdByInvocationId;
+    this.pendingWorktreeCreated = candidate.pendingWorktreeCreated;
     this.pendingSessionHookInvocations = candidate.pendingSessionHookInvocations;
     this.rewoundHookInvocationIds = candidate.rewoundHookInvocationIds;
     this.invalidSubagentChildSessionIds = candidate.invalidSubagentChildSessionIds;
@@ -1627,6 +1634,8 @@ export class ProductProjection {
         return this.onTargetChanged(event);
       case SessionEventType.TargetCompletionVerification:
         return this.onTargetVerification(event);
+      case SessionEventType.WorktreeCreated:
+        return this.onWorktreeCreated(event);
       case SessionEventType.SessionForked:
         return this.onSessionForked(event);
       case SessionEventType.RewindTriggered:
@@ -2165,6 +2174,14 @@ export class ProductProjection {
     // 生成“正在使用”marker。思考深度变化只更新 config.thought，不是模型身份变化。
     // Bug 背景：旧实现在 onModelSelected（切换动作时）即落 marker，草稿态预热会话
     // 切一次模型就会在首条消息上方挂出 [modelChange]。
+    if (this.pendingWorktreeCreated) {
+      const pending = this.pendingWorktreeCreated;
+      this.pendingWorktreeCreated = null;
+      deltas.push({
+        op: "row.appended",
+        row: this.worktreeCreatedRow(pending.event, turnId, pending.payload, "lightBoundary"),
+      });
+    }
     const config = this.snapshot.config;
     const hasModel = config.provider !== "" && config.model !== "";
     if (hasModel && this.lastTurnModel.kind === "sourceLess") {
@@ -5667,6 +5684,42 @@ export class ProductProjection {
       },
     };
     return [{ op: "row.appended", row }];
+  }
+
+  // ── worktree marker（受管 worktree 创建结果，docs/git/worktree.md §6.6.4）──
+
+  private onWorktreeCreated(event: SessionEvent): ConversationDelta[] {
+    const payload = event.payload as WorktreeCreatedPayload;
+    if (this.turnHeaderRowIdByTurnId.size === 0) {
+      this.pendingWorktreeCreated = { event, payload };
+      return [];
+    }
+    return [
+      {
+        op: "row.appended",
+        row: this.worktreeCreatedRow(event, this.turnIdOf(event), payload, "turnTailBoundary"),
+      },
+    ];
+  }
+
+  private worktreeCreatedRow(
+    event: SessionEvent,
+    turnId: string,
+    payload: WorktreeCreatedPayload,
+    lane: "lightBoundary" | "turnTailBoundary",
+  ): TimelineMarkerRow {
+    return {
+      ...this.rowBase(event, turnId, `worktree-created:${payload.path}`),
+      kind: "timelineMarker",
+      lane,
+      marker: {
+        type: "worktreeCreated",
+        path: payload.path,
+        sha: payload.sha,
+        ref: payload.ref,
+        output: payload.output,
+      },
+    };
   }
 
   // ── 内部工具 ──

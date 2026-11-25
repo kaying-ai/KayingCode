@@ -49,6 +49,7 @@ export class WorkspaceHookReviewController {
   private readonly now: () => number;
   private readonly createId: () => string;
   private readonly resolveTargetTrustIdentity: (workspaceIdentity: string) => Promise<string>;
+  private readonly workspaceKey?: string;
   private readonly registry = new WorkspaceHookReviewFlowRegistry();
   /** flow → 监管 promise。WeakMap 使 flow 被回收后自动移除，不额外持有引用。 */
   private readonly supervisedFlows = new WeakMap<WorkspaceHookReviewFlow, Promise<void>>();
@@ -74,6 +75,12 @@ export class WorkspaceHookReviewController {
     this.resolveTargetTrustIdentity =
       options.resolveTargetTrustIdentity ??
       ((workspaceIdentity) => Promise.resolve(workspaceIdentity));
+    this.workspaceKey = options.workspaceKey;
+  }
+
+  /** 对外字段使用的 workspace 标识：会话 workspaceKey，不是 Trust identity（D23）。 */
+  private externalWorkspaceIdentity(snapshot: WorkspaceHookBundleSnapshot): string {
+    return this.workspaceKey ?? snapshot.workspaceIdentity;
   }
 
   /**
@@ -530,6 +537,7 @@ export class WorkspaceHookReviewController {
     return buildWorkspaceHookReviewRequest({
       snapshot,
       evaluation,
+      workspaceKey: this.externalWorkspaceIdentity(snapshot),
       ...flow,
       sessionId: this.sessionId,
       host: this.host,
@@ -584,7 +592,9 @@ export class WorkspaceHookReviewController {
       payload: {
         pendingCount,
         bundleDigest: snapshot.bundleDigest,
-        ...(snapshot.workspaceIdentity ? { workspaceIdentity: snapshot.workspaceIdentity } : {}),
+        ...((this.workspaceKey ?? snapshot.workspaceIdentity)
+          ? { workspaceIdentity: this.externalWorkspaceIdentity(snapshot) }
+          : {}),
       },
     });
   }

@@ -27,7 +27,11 @@ export function ensureIndependentPlanSupport(
 type CapabilityClient = Pick<KayingCodeProtocolClient, "request">;
 const discoveredCapabilities = new WeakMap<
   object,
-  Promise<{ historyFirst?: boolean; pluginDiscoveryUi?: boolean }>
+  Promise<{
+    historyFirst?: boolean;
+    pluginDiscoveryUi?: boolean;
+    pluginExtensionSummary?: boolean;
+  }>
 >();
 function discoverCapabilities(client: CapabilityClient) {
   let result = discoveredCapabilities.get(client);
@@ -53,6 +57,14 @@ export async function supportsHistoryFirst(client: CapabilityClient): Promise<bo
 /** plugin discovery 工具面同样先确认执行端能力；旧 CLI 的 strict 命令 schema 不认识新字段。 */
 export async function supportsPluginDiscoveryUi(client: CapabilityClient): Promise<boolean> {
   return (await discoverCapabilities(client)).pluginDiscoveryUi === true;
+}
+/**
+ * plugins/overview 的 includeExtensionSummary：旧 CLI 的参数 schema 是 strict，多一个键整条拒绝；
+ * 旧 services 的结果 schema 也拒绝新字段，所以未声明时连字段都不会出现。
+ * 规则见 packages/services/spec/plugin-extension-summary.md。
+ */
+export async function supportsPluginExtensionSummary(client: CapabilityClient): Promise<boolean> {
+  return (await discoverCapabilities(client)).pluginExtensionSummary === true;
 }
 
 /** 状态不能回退到拼接用户正文；不支持时保留草稿并拒绝发送。 */

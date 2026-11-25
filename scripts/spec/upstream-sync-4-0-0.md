@@ -1,6 +1,6 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0`，P0/Wave2/3 改动在当前工作区（未提交），基线提交 `e67391de`。阶段 0 完成；阶段 1 基本完成（Desktop 登录 UI/真实端点/staging 待做）；阶段 2 完成；阶段 3/4 主链完成（MCP 后台启动、deniedTools、ToolSearch 交付链、core 投影、Browser 身份、lifecycle hooks、队列编辑锁、pluginDiscoveryUi 协议/Host 已落地；剩余 401 step-up/pool 租约、live 有序投影、完整 composer 编辑态与阶段 4 增强）；阶段 5 部分完成（managed-worktree 底座已移植，装配/UI 未完成）。`UPSTREAM_BASE.json` 仍保持 3.18.2，待阶段 5 验收完整后再更新。
+状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0` 已推送到 `origin`（25 个提交，HEAD `ec1179ad`）；Wave 1–4 已提交，Wave 5 改动在当前工作区（未提交，220 个路径）。阶段 0 完成；阶段 1 基本完成（Desktop 登录 UI/真实端点/staging 待做）；阶段 2 完成；阶段 3 完成；阶段 4 主链完成（剩余 composer E2E、pluginDiscoveryUi UI 测试）；阶段 5 基本完成（managed-worktree 全链路、preinstalled-tools、voice-input、selection-comment、pluginExtensionSummary、settings 行级定位均已落地；剩余真实游戏 E2E、旧 loader 清理、打包与资源发布）。分支尚未创建 PR，远端 CI 未运行。`UPSTREAM_BASE.json` 仍保持 3.18.2，待阶段 5 收尾验收后再更新。
 来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
@@ -24,7 +24,7 @@
 
 ### 分支与提交
 
-- 分支：`feat/upstream-sync-4-0-0`，已推送 `origin`；2026-11-25 P0 收尾改动位于当前工作区（未提交），基线提交 `e67391de`。
+- 分支：`feat/upstream-sync-4-0-0`，已推送 `origin`；P0/Wave 2/3/4 改动均已提交（`f14e8636`、`ec1179ad`），工作区干净。
 - 本轮关键提交（按时间）：
   - `01cb03b1` 4.0 协议基线/账号机制；`f36df010` 异步插件 + workspace trust + live catalog；`3a4c196e`/`ead9c72a`/`a165d052` MCP 工具快照/reconcile/WaitForMcpServers。
   - `123d1c65` 存储 0025/0026、ReadTopicResource、browser-state；`19afaa1e` InputPreemption + Agent 后台；`85a330c6` Windows cmd 只读；`2e7ae67c` agent-always-background CLI。
@@ -33,17 +33,17 @@
   - `bfe6f6f9` MCP 晚到解析/实时 ToolSearch；`b0936de5` 商店 regions；`7f26496f` 测试 helper；`f8bbbdab` 本文档记录。
 - `UPSTREAM_BASE.json` 仍为 3.18.2（`fec97590`）；阶段 5 完整验收前不更新。
 
-### P0 并行收尾（2026-11-25，未提交）
+### P0 并行收尾（2026-11-25）
 
-本轮按四条互斥文件边界并行完成，全部改动未提交：
+本轮按四条互斥文件边界并行完成（已随 `f14e8636` 提交）：
 
 - **MCP 收尾**：`mcpStartupPolicy`（blocking/background）贯通 core/bootstrap/协议入口/TUI；`startMcpStartup` 幂等后台启动；`initializeMcp` 计算 `deniedTools`；ToolSearch 4.0 交付链（delivery/retained/stripped/常驻冻结/公告）与 contracts 类型；`runtime-provider-request-messages`、compact、turn-loop 消费 MCP 状态。自动化/闲时轮强制 blocking。
 - **core 投影**：hydrator 冷恢复对齐 live 形状（无本地工具）并恢复 `toolSearchDelivery` / `toolSearchMcpDelta`；`provider-builtin-tool-rounds` 5 例转绿。
 - **Browser 身份**：`BrowserGuestManager.getBackendIdentity`（窗口级稳定 `iab:<uuid>` / generation）、control scope 释放屏障、Main→Host→bridge 身份透传与窗口关闭清理。
 - **测试入口**：`imageComposerTarget` 迁移 vitest 并改名；CLI `test` / `coverage` 改指向实际存在的 `scripts/upload-sea-license-policy.test.mjs`。
-- **登记偏差**：冷恢复目前是“对齐 live 旧形状”的临时兼容层，不是上游 `buildAssistantEntries` live 有序投影；live 有序迁移列入 P1，迁移时删除 `projectAssistantEntriesToLegacyShape` 分支及对应测试。
+- **登记偏差**：冷恢复当时是“对齐 live 旧形状”的临时兼容层；该兼容层已在 Wave 4 随 `buildAssistantEntries` 有序投影迁移删除（见 Wave 4）。
 
-### Wave 2/3 并行推进（2026-11-25，未提交）
+### Wave 2/3 并行推进（2026-11-25）
 
 - **managed-worktree 底座**：新增 `packages/shared/src/managed-worktree`（layout/trust-identity/contract）与 services `git/managed-worktree`、`managed-worktree-tasks`；数据根 `.kayingcode/worktrees`，fork carry 前缀 `.kayingcode-carry-*`；shared 新增 `./managed-worktree` 子路径导出（Node-only，避免 renderer 拉入内置模块）。已接入 `hooksService` 的 trust identity；尚未装配 `services/node.ts`、project-storage worktree 列与 UI。
 - **pluginDiscoveryUi**：shared 信封/transport/runtimeCapabilities、bootstrap v4 input intent/interaction registry/conversation publisher/subscribe、core intent 消费、services Host 能力探测/连接转发/envelope 注入均已落地；UI hello 能力位、`pluginAutoRecommendationEnabled` 设置生产者和 pluginInstall 卡片链路仍缺（fail-closed，未启用）。
@@ -62,16 +62,33 @@
 - **测试/设置**：settings-search（UI 207/207）；回复语言远端/Web Host。
 - **未启动**：managed-worktree 装配/UI、preinstalled-tools、voice-input、selection-comment、settings 行级定位；旧 loader 清理与游戏 E2E 留待测试轮。
 
+### Wave 5（2026-11-25）上游能力补齐（未提交）
+
+按“验收后置、开发优先”并行完成全部剩余开发项；每项均先更新所属 spec，并补定向测试。
+
+- **MCP App open**：连接不可用时主动重连一次（30s 预算、adapter 单飞）；补回 3.18.2 基线即存在、产品遗漏的冷启动 `ensureReady` 前置。
+- **plugin host 进程名**：`kayingcode-mcp[-<plugin>]` 按角色命名，非法/缺失插件名 fail-closed；`KAYINGCODE_PLUGIN_ID` 优先、上游 `ZCODE_PLUGIN_ID` 回退。
+- **settings 行级定位**：48 个设置行接入稳定 `searchId`，索引成为唯一行注册表；行未挂载（平台隐藏/数据未就绪/旧 id）时一次宏任务后由分区兜底，无首帧闪跳。
+- **preinstalled-tools**：shared 契约/校验/字节重写；desktop 安装器（utilityProcess、串行队列、下载校验、解压、Windows shim、占用重试删除）；`kayingcode:preinstalled-tools:*` 通道与可选平台方法；设置字段双写；Agent PATH 注入（仅 bin 目录存在且有条目时前置，进程管理器 spawn 边界显式覆盖）；存储分类 `preinstalledTools`（不可清理，删除只走对话框）；帮助菜单 UI（先订阅后查询、回执不改状态）。
+- **managed-worktree 全链路**：project-storage `worktree_root` 列 + 迁移 `0010` + placement 继承；终端创建同段 cwd 阻断与按路径列终端；services 装配与 removal gate；协议 `worktreeCwd`、`createSession.cwd/worktreeCreation`、`forkAssistant.targetCwd`、`session/releaseUnderDirectory`、`plans.workspace`、`worktreeSessionIds`；CLI/core `worktree_creation` 时间线与 fork 权限迁移；services 能力探测（缓存、fail-closed）与 busy ⇒ 不卸载/不删；UI 列表/创建态/删除/创建与分叉接线；草稿不继承上一次 worktree 选择。
+- **voice-input**：shared 可选 `microphone` 平台方法；desktop 受管 `microphone-access`（权限查询/请求、macOS 重置、设置跳转）；UI `voice-input` 模块与 Composer 接线（提交结算、输入即结算）；services ticket/WebSocket 服务（复用代理/CA、空 origin 直接 unavailable）；样式 token 与 macOS 麦克风权限；修复插件沙箱来源校验写死上游 scheme 导致 camera/麦克风请求全拒。
+- **selection-comment**：完整模块（编辑器、正文标记、文字锚点、能力判定）、composer 编号 chip、编辑/删除/6 秒撤销、IME 与 `onSave` 语义；补 `useTextSelection` 滚动重定位与 rewind 剪枝。
+- **pluginExtensionSummary**：能力位、目录条目解析与 manifest 剥除、概览按需注入（install/legacy 永不携带）、services 门禁、商店兼容提示与安装/更新阻断。
+- **extensionInputSource**：`{kind:"extension"}` 输入来源能力位与严格 schema；`createSession.firstInput.source` / `sendText.source` 落库到队列项与 `userInput` 行、冷恢复保留、非法来源整条拒绝；services 仅在客户端声明能力时发送；UI 用户输入行显示"来自插件/交互视图"来源标记（来源取自 CLI 持久化事实，不由 renderer 推断）。
+- **其它修复**：Desktop Host 终端 RPC scope 补 `listTerminalIdsUnderPath`（按 attachment 过滤，避免跨窗口误判 in-use）；conversation share 公共投影过滤 `worktreeCreated`（本地路径/git 输出不外泄）。
+
+验证（2026-11-25，Windows）：根 typecheck 通过；CLI 链 contracts→shared-types→core→adapters→bootstrap 重建通过；core 539/545、adapters 368–369/378（9 skipped，1 例为既有的 `mcp-node-fallback` 并发临时目录 flake，重跑 2/3 通过）、bootstrap 261/261、shared 187/188、services 205/207、UI 330/330、contracts 3/3、CLI 11/11、desktop 新增 25/25；lint 0 errors/133 warnings；architecture 0 violations；source:check 通过（已重新生成 `SOURCE_PACKAGES.md`）。剩余 9 例失败均为既有 Windows 夹具（`/tmp` 3、session id 引号 3、POSIX 分隔符 1、sqlite `EBUSY` 2）。
+
 ### 阶段完成度
 
-| 阶段              | 状态     | 已落地                                                                                                                                                                                                                                                   | 主要缺口                                                                                                                       |
-| ----------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| 0 规划/基线       | 完成     | 差异评估、目标修订、文件边界                                                                                                                                                                                                                             | —                                                                                                                              |
-| 1 账号/OAuth/凭据 | 基本完成 | 上游协议基线、凭据 enc:v2、CLI 登录入口、localrun mock                                                                                                                                                                                                   | Desktop 登录 UI、真实端点联调、staging                                                                                         |
-| 2 插件/技能       | 完成     | 异步 material loader、workspace trust、私密选项、Skill 实时目录、MCP 配置源                                                                                                                                                                              | marketplace 远端源按产品边界保持关闭                                                                                           |
-| 3 MCP             | 完成     | 工具快照/目录缓存、配置 reconcile、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入、mcpStartupPolicy/startMcpStartup、deniedTools、ToolSearch delivery/公告                                                                                        | 可选 401 step-up、pool 完整租约、`retainTools`/内建 server 重启上限                                                            |
-| 4 CLI 运行时/跨层 | 主链完成 | 存储迁移、ReadTopicResource、browser-state、InputPreemption、cmd 只读、`-32033`、额度提醒、回复语言、runtime prefs、live tool 晚绑定、商店 regions、ToolSearch 交付链、core 投影、Browser 身份、lifecycle hooks、队列编辑锁、pluginDiscoveryUi 协议/Host | live 有序投影迁移、完整 composer edit-mode UI/E2E、批量删除预检、活动摘要、plugin host 进程名、回复语言远端/Web Host           |
-| 5 游戏/上游补齐   | 部分完成 | 游戏插件 loader 验收、CUA 对齐评估、旧测试 helper 恢复、managed-worktree shared/services 底座                                                                                                                                                            | preinstalled-tools/voice-input/selection-comment/settings-search、managed-worktree 装配/UI、真实游戏 E2E、旧 loader 兼容层清理 |
+| 阶段              | 状态     | 已落地                                                                                                                                                                                                                                                   | 主要缺口                                                                                                                                    |
+| ----------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0 规划/基线       | 完成     | 差异评估、目标修订、文件边界                                                                                                                                                                                                                             | —                                                                                                                                           |
+| 1 账号/OAuth/凭据 | 基本完成 | 上游协议基线、凭据 enc:v2、CLI 登录入口、localrun mock                                                                                                                                                                                                   | Desktop 登录 UI、真实端点联调、staging                                                                                                      |
+| 2 插件/技能       | 完成     | 异步 material loader、workspace trust、私密选项、Skill 实时目录、MCP 配置源                                                                                                                                                                              | marketplace 远端源按产品边界保持关闭                                                                                                        |
+| 3 MCP             | 完成     | 工具快照/目录缓存、配置 reconcile、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入、mcpStartupPolicy/startMcpStartup、deniedTools、ToolSearch delivery/公告                                                                                        | —（Wave 4 已补齐 401 step-up、pool 租约、`retainTools`/重启上限）                                                                           |
+| 4 CLI 运行时/跨层 | 主链完成 | 存储迁移、ReadTopicResource、browser-state、InputPreemption、cmd 只读、`-32033`、额度提醒、回复语言、runtime prefs、live tool 晚绑定、商店 regions、ToolSearch 交付链、core 投影、Browser 身份、lifecycle hooks、队列编辑锁、pluginDiscoveryUi 协议/Host | composer edit-mode E2E、pluginDiscoveryUi UI 测试与端到端冒烟                                                                               |
+| 5 游戏/上游补齐   | 基本完成 | 游戏插件 loader 验收、CUA 对齐评估、旧测试 helper 恢复、settings-search 行级定位、managed-worktree 全链路、preinstalled-tools、voice-input、selection-comment、pluginExtensionSummary、plugin host 进程名                                                | 真实游戏 E2E、旧 loader 兼容层清理、Windows 打包（extraResources/签名）、preinstalled 发布工具链与 CDN、真实 ASR 端点、三平台与 desktop E2E |
 
 ### 本轮已落地能力（4.0.0）
 
@@ -117,12 +134,31 @@
 | 治理      | `lint` / `architecture:check --changed` / `source:check` / `git diff --check`            | 0 errors / 0 violations / OK / OK | 133 个既有 warning                                                       |
 | 格式      | 改动文件 `oxfmt --check`                                                                 | 通过（3 个 UI 文件除外）          | `zh-CN.ts`/`en-US.ts`/`SessionPane.tsx` 在 HEAD 基线即不合规，未批量重排 |
 
+### 验证矩阵（2026-11-25 Wave 4 提交后统一回归，Windows）
+
+先说结论：Wave 4 提交前跳过的全量门禁已补跑。首次执行 core 94 例、adapters 11 例失败，根因是 `@zcode/contracts` 的 `dist/` 落后 `src/` 约 9 小时（新增 `ToolSearchMcpDeltaSchema` 等未进构建产物），不是代码回归；按 contracts → shared-types → core → adapters → bootstrap 重建后即清零。**任何拉取后未重建 dist 就跑测试的结论都不可信。**
+
+| 范围      | 命令                                                     | 结果                         | 说明                                                          |
+| --------- | -------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------- |
+| 根类型    | `pnpm run typecheck`                                     | 通过                         | 含 shared/services/ui/desktop/web/mobile/server/relay         |
+| core      | `vitest run`                                             | 527/533                      | 6 例 Windows 夹具问题（`/tmp` 字面路径 3、session id 引号 3） |
+| adapters  | `vitest run`                                             | 367/376（9 skipped）         | 重建 dist 后由 11 失败转为全绿                                |
+| bootstrap | `vitest run`                                             | 181/181                      | 含 plugin-discovery-session-support                           |
+| shared    | `test`                                                   | 165/166                      | 1 例 POSIX 路径分隔符（`managed-worktree`）                   |
+| services  | `test`                                                   | 134/136                      | 2 例 sqlite `EBUSY`（`remoteFirstSendTaskFacts`）             |
+| UI        | `test`                                                   | 227/227                      | 与 Wave 4 断言一致                                            |
+| contracts | `test`                                                   | 3/3                          | —                                                             |
+| CLI       | `test`                                                   | 3/3                          | license-policy                                                |
+| 治理      | `lint` / `architecture:check --changed` / `source:check` | 0 errors / 0 violations / OK | 133 既有 warning                                              |
+
 ### 已知失败判定
 
 - 2026-11-25 Wave 3 后，macOS 上 core 525/525、adapters 359/359、bootstrap 163/163、shared 156/156、services 124/124、UI 192/192 全部通过；此前 Windows 专属路径/临时目录失败未在本机复现。
-- Windows 三平台仍需回归；以下为历史/环境相关风险，不作为产品代码失败：core `/tmp` 路径、adapters `mcp-node-fallback` 并发临时目录、services sqlite WAL `EBUSY`。
-- 未执行：桌面/CLI 真实启动、三平台 E2E、staging/真实端点联调、desktop composer-edit-mode E2E。
-- 冷恢复临时兼容层、composer 完整编辑态、pluginDiscoveryUi UI 激活缺口见“剩余工作与优先级”。
+- 2026-11-25 Wave 4 后 Windows 统一回归：core 527/533、adapters 367/376（9 skipped）、bootstrap 181/181、shared 165/166、services 134/136、UI 227/227、contracts 3/3、CLI 3/3；9 例失败全部为 Windows 环境/夹具可移植性，无功能回归。明细：core `post-compact-file-restore` 1 例与 `tool-executor-read-deny-probe` 2 例为 `/tmp` 字面路径（Windows 解析成 `D:\tmp`）；core `subagent-explore-permission-mode` 3 例为测试自造 session id 内嵌 `{"mode":"build"}`，`"` 在 Windows 文件名非法导致 `mkdir` ENOENT；shared `managed-worktree` 1 例断言 POSIX 分隔符；services `remoteFirstSendTaskFacts` 2 例 sqlite `EBUSY`。
+- **构建前提**：workspace 包通过 `dist` 互相消费，改 `src` 后必须按依赖顺序重建（contracts → shared-types → core → adapters → bootstrap）再跑测试，否则新增导出在运行时为 `undefined`，表现为大面积 `safeParse` 失败伪回归。
+- Windows 三平台仍需回归；以下为历史/环境相关风险，不作为产品代码失败：core `/tmp` 路径、adapters `mcp-node-fallback` 并发临时目录、services sqlite WAL `EBUSY`、shared POSIX 分隔符断言、core session id 含 Windows 非法字符。
+- 未执行：桌面/CLI 真实启动、三平台 E2E、staging/真实端点联调、desktop composer-edit-mode E2E、`pluginDiscoveryUi` 端到端冒烟。
+- composer readiness 门禁、pluginDiscoveryUi UI 测试、plugin host 进程名、阶段 5 缺口见“剩余工作与优先级”。
 
 ### 产品决策登记
 
@@ -132,20 +168,23 @@
 - **workspace MCP**：产品边界为开箱即用，project 声明默认 trusted 并自动连接；protocol 逐项审核只在协议装配路径。
 - **商店地区**：暂无登录区域事实源，暂按 locale 推导；接入真实登录区域时只替换 `resolvePluginStoreRegion` 输入。
 - **旧 loader 兼容层**：保留到游戏插件全链路 E2E 通过后再删除。
-- **冷恢复临时兼容层**：当前把冷恢复对齐 live 旧形状，保证 live/cold 字节一致；live 有序投影迁移完成后删除，不视为长期产品分叉。
+- **冷恢复临时兼容层**：Wave 4 已删除；live 与冷恢复统一走 `buildAssistantEntries` 有序投影。
 - **mcpStartupPolicy 缺省**：runtime 缺省 `blocking`；协议入口/TUI 显式 `background`；自动化/闲时轮强制 `blocking`。
 - **队列编辑锁所有者**：CLI `AgentRuntime.pendingInputEditLocks` 是唯一事实源；投影只由 `TurnSteerEditLockChanged` 派生，bootstrap/UI 不保存锁状态。`editQueueItem` 不再依赖 base revision，并发保护由编辑锁承担。
 - **pluginDiscoveryUi fail-closed**：Host 先删除不可信字段，只有可信连接能力 + CLI 探测能力 + 偏好/resolveInteraction 同时满足才注入；UI hello 与设置生产者未完成前功能保持关闭。
 - **managed-worktree 数据根**：`<dataBaseDir>/.kayingcode/worktrees`，fork carry 前缀 `.kayingcode-carry-*`；shared 以 `./managed-worktree` 子路径导出，避免 renderer 引入 Node 内置模块。
 - **插件配置迁移范围**：`createConfigWithPluginMigrations` 当前只承载 hook script state 异步读取；visualize 插件迁移因产品不存在“曾默认开启”语义未移植。
+- **插件引擎版本映射**：`extensionSummary.engines.zcode` 视为插件 API 版本（`EXTENSION_API_VERSION`，两产品同为 1.4.0），不与应用版本比较；协议键保留 `zcode`，仅用户文案用 KayingCode。
+- **预装工具默认不下载**：产品无默认 CDN，候选列表为空（全部 `target=null`）；只有配置 `KAYINGCODE_PREINSTALLED_TOOLS_CDN_BASE_URL` 才启用自动安装。
+- **插件沙箱来源校验**：必须走 `buildPluginSandboxPluginOrigin`（`kayingcode-sandbox://`），不得写死上游 scheme；写死会让所有 camera/麦克风权限请求在来源校验阶段被拒。
 
 ### 剩余工作与优先级
 
-- **P1（投影/运行时）**：live assistant 有序投影迁移（`commitAssistantToTurnRequest` → `buildAssistantEntries`），迁移后删除冷恢复临时兼容层；补齐 hydrator 未覆盖分支（compaction boundary delivery、provider rounds + delivery、空 usage 锚点）。
-- **P1（MCP 残余）**：可选 401 step-up、pool 完整租约、`retainTools`/内建 server 重启上限；Windows/真实链路复核 ToolSearch 关闭公告。
-- **P1（阶段 4 增强）**：pluginDiscoveryUi 的 UI hello 能力位与 `pluginAutoRecommendationEnabled` 设置生产者、pluginInstall 卡片链路；composer edit-mode 完整交互（上一条消息编辑/应用到其他排队项/失效原因条/readiness 门禁/desktop E2E）；批量删除预检、活动摘要、plugin host 进程名、回复语言远端/Web Host 支持。
-- **P2（阶段 5）**：managed-worktree 装配（`services/node.ts`、project-storage worktree 列/任务查询、UI）；preinstalled-tools、voice-input、selection-comment、settings-search；真实 Blender/TapTap/Playtest E2E；旧 loader 兼容层清理；更新 `UPSTREAM_BASE.json`。`remote context-composition` 主链已对齐，仅缺 shared 模块元数据，不再作为功能缺口。
-- **交付/运维**：PR 与远端 CI、桌面/CLI 真实启动、三平台 E2E、staging/真实端点联调、Desktop 登录 UI。P0 改动尚未提交，需先提交并推送后由 CI 验证。
+- **P1（投影/运行时）**：Wave 4 已完成 live 有序投影迁移（`commitAssistantToTurnRequest` → `buildAssistantEntries`）并删除冷恢复兼容层；剩余复核 hydrator 少数分支（compaction boundary delivery、provider rounds + delivery、空 usage 锚点）。
+- **P1（MCP 残余）**：Wave 4 已补齐 401 step-up、pool 租约、`retainTools`/内建 server 重启上限；剩余 Windows/真实链路复核 ToolSearch 关闭公告。
+- **P1（阶段 4 增强）**：pluginDiscoveryUi 已落地 hello 能力位、设置生产者与 pluginInstall 卡片，剩余 UI 测试与端到端冒烟；composer edit-mode 已落地底部编辑/草稿隔离/失效态/apply-to-queue，剩余 readiness 门禁与 desktop E2E；批量删除预检、活动摘要、回复语言远端/Web Host 已完成；剩余 plugin host 进程名、MCP App open 主动重连（`mcp-ui/CONTRACT.md` 仍为“不主动重连”，需补 `reconnectMcpAppConnection`）。
+- **P2（阶段 5 收尾）**：真实 Blender/TapTap/Playtest E2E 与旧 loader 兼容层清理；Windows 打包 `extraResources`/签名断言、preinstalled 发布工具链与 CDN 基址；真实 ASR 端点配置与 ASR mock E2E；三平台回归、desktop composer/worktree/voice E2E；架构策略为新受管模块登记；更新 `UPSTREAM_BASE.json`。`remote context-composition` 主链已对齐，仅缺 shared 模块元数据，不再作为功能缺口。
+- **交付/运维**：PR 与远端 CI、桌面/CLI 真实启动、三平台 E2E、staging/真实端点联调、Desktop 登录 UI。代码已提交并推送，但分支尚未创建 PR，远端 CI 未运行。
 
 ## 结论（先行）
 
@@ -318,7 +357,7 @@
 
 - **直接采纳**：contracts zod4 + JSON Schema 生成器（附带改三处调用点）、模型重试冷却/加密推理/非法 JSON 标记、compact 策略、i18n 文案、Windows shell 显示名（需 prompt 回归）、迁移 0026 与 `messages(index)`。
 - **适配后采纳**：MCP 重构 + `WaitForMcpServers` + 热加载/目录缓存（保留上游 OAuth/官方鉴权机制，localrun 用 mock；workspaceRoot/identity 作为显式补丁）；协议 v4 新 RPC（映射到 kayingcode 词表、保留冷恢复修复）；turn loop/抢占/子代理；插件 discovery/目录信任；配置 schema/hook 脚本信任；CLI 新 flag（恢复 login/logout，CUA 铸造待评估）。
-- **暂缓**：preinstalled-tools 与 `#preinstalled-*` 依赖、上游 CUA broker 机制评估；永久删除增强仍不采纳（与产品删表决策冲突）；`login/logout` 按新目标恢复上游机制。
+- **暂缓**：preinstalled-tools 与 `#preinstalled-*` 依赖、上游 CUA broker 机制评估；`login/logout` 已按新目标恢复上游机制。
 
 ## 跨层协议、桌面端与架构策略
 
@@ -549,7 +588,7 @@
 - **preinstalled-tools**：机制随阶段 5 上游化；LibreOffice/Python/Pandoc/Poppler/QPDF 的 bundle、签名、安装体积与 Windows shim 单独决策。
 - **Windows 全量签名/NSIS 补丁**：产品发布流水线不同，继续显式例外。
 - **design-runtime / browser-use 设计模式 / windows-runtime-host**：当前登记例外；若上游能力成为依赖再单独评估，不默认恢复。
-- **永久删除增强（0025/purge）**：与产品删表决策冲突，不采纳；只采 `0026` 与 `messages(index)`。
+- **永久删除增强（0025/purge）**：已采纳。`0025_session_permanent_deletion`、`session_purge`、`session_runtime_presence` 与跨进程 in-use 注册随阶段 4 第一批及 Wave 4 落地；原“与产品删表决策冲突”的判断已失效，不再作为例外。
 - **上游文档/测试整批回流**：不整批；但被采纳机制的对应上游测试必须移植。
 
 ## 验收
@@ -661,6 +700,7 @@ P0-2 期间修正了品牌映射：产品保留上游 `@zcode/*` workspace 作�
 - adapters：补齐 `cli-oauth`、`coding-plan-api-key`、`shared-credentials` 及 CLI OAuth 导出。
 - bootstrap：恢复 `auth-login*`（登录/登出、CLI OAuth polling、编码计划材料解析），并从公共入口导出 `loginKayingCodeCli` / `logoutKayingCodeCli` / `loginBigmodelCodingPlan`。
 - CLI：恢复 `login` / `logout` 命令与 `tui-auth`；`RunDependencies` 增加登录注入点；`login` 不再输出“无账号系统”。
+- 修复（2026-11-25）：`buildDesktopOAuthRedirectUriFromEnv` 在 localrun 空端点时回退本地 `kayingcode://oauth/callback`，不再对空 origin 执行 `new URL`；避免 Desktop Host 在 `starting_services` 阶段抛 `ERR_INVALID_URL` 并被误分类为 `sql_failed`。新增 `packages/services/test/oauthConfigUtils.test.ts`。
 
 ### 验证
 
@@ -952,3 +992,5 @@ createConfig
 - 2026-11-25：Wave 2/3 并行推进（managed-worktree 底座、pluginDiscoveryUi 协议/CLI/core/Host、lifecycle hooks、队列编辑锁最小闭环）。最终验证：core 525/525、adapters 359/359、bootstrap 163/163、shared 156/156、services 124/124、UI 192/192、contracts 3/3、CLI 3/3；root/CLI 包 typecheck 通过；lint 0 errors、architecture 0 violations、source:check OK、git diff --check OK。改动未提交。
 - 环境限制（2026-11-25 Wave 3）：未跑 Windows/Linux、桌面/CLI 真实启动、desktop composer-edit-mode E2E、staging/真实端点与 PR CI；3 个 UI 文件（zh-CN/en-US/SessionPane）HEAD 基线即不符合 oxfmt，未批量重排。
 - 2026-11-25：Wave 4 提交（J1 有序投影、J3/J3b 批量删除、J4 活动摘要、J6 MCP 残余、J7 composer 编辑态、K1 settings-search、K2 回复语言远端、J2 留下的 pluginDiscoveryUi 部分改动 + mobile pluginInstall 卡片）。按用户指示跳过最终全量门禁；各工作流定向验证数字见上文，统一回归留给后续测试轮。
+- 2026-11-25：同步 `origin/feat/upstream-sync-4-0-0` 后补跑统一回归（Windows）。首轮 core 94 例、adapters 11 例失败定位为 `@zcode/contracts` `dist` 陈旧（非代码回归），重建依赖链后：core 527/533、adapters 367/376、bootstrap 181/181、shared 165/166、services 134/136、UI 227/227、contracts 3/3、CLI 3/3；root typecheck、lint（0 errors/133 warnings）、source:check、architecture:check 通过。剩余 9 例均为 Windows 夹具可移植性，详见“验证矩阵（Wave 4 提交后统一回归）”与“已知失败判定”。同时订正本文件中已失真的“未提交”状态与阶段完成度。
+- 2026-11-25：Wave 5 开发波次（验收类后置）。8 条并行工作流完成：MCP App open 重连 + 冷启动 ensureReady、plugin host 进程名、settings 行级定位、preinstalled-tools（含 PATH 注入与存储分类）、managed-worktree 全链路（协议/CLI/services/UI/创建接线）、voice-input（含沙箱来源修复）、selection-comment（含滚动重定位与 rewind 剪枝）、pluginExtensionSummary（含商店兼容 UI）。最终：root typecheck 通过、CLI 链重建通过、core 539/545、adapters 369/378、bootstrap 257/257、shared 187/188、services 198/200、UI 330/330、contracts 3/3、CLI 11/11、desktop 新增 25/25、lint 0 errors、architecture 0 violations、source:check 通过。剩余 9 例为既有 Windows 夹具；改动未提交。

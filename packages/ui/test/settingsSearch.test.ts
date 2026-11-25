@@ -8,8 +8,11 @@ import { SettingsSearchSectionTarget } from "@/settings-search/SettingsSearchSec
 import {
   matchesSettingsNavigation,
   settingsNavigationSearchKeys,
+  shouldUseSettingsSearchSectionFallback,
 } from "@/settings-search/settingsNavigationSearch.js";
 import {
+  findSettingsSearchItem,
+  isSettingsSearchId,
   SETTINGS_SEARCH_ITEMS,
   type SettingsSearchAvailability,
   type SettingsSearchId,
@@ -98,6 +101,43 @@ describe("settingsSearchIndex", () => {
       false,
     );
     expect(withoutMemory.some((entry) => entry.section === "memory")).toBe(false);
+  });
+
+  it("平台条件隐藏的行不进入行索引", () => {
+    const withoutMac = buildEntries({ ...allAvailable, macDesktop: false });
+    expect(withoutMac.some((entry) => entry.setting === "settings.fontSmoothing")).toBe(false);
+    expect(withoutMac.some((entry) => entry.setting === "settings.themeMode")).toBe(true);
+
+    const withoutDesktop = buildEntries({
+      ...allAvailable,
+      desktop: false,
+      windowsDesktop: false,
+      windowsHost: false,
+      notWindows: false,
+    });
+    expect(withoutDesktop.some((entry) => entry.setting === "settings.receivePreviewUpdates")).toBe(
+      false,
+    );
+    expect(
+      withoutDesktop.some(
+        (entry) => entry.setting === "settings.desktopChromiumHardwareAcceleration",
+      ),
+    ).toBe(false);
+    expect(withoutDesktop.some((entry) => entry.setting === "settings.themeMode")).toBe(true);
+  });
+
+  it("按 id 查找设置行，未登记的旧 id 返回 undefined", () => {
+    expect(findSettingsSearchItem("settings.themeMode")?.section).toBe("appearance");
+    expect(findSettingsSearchItem("settings.pluginAutoRecommendation")?.section).toBe("general");
+    expect(findSettingsSearchItem("settings.removedRow")).toBeUndefined();
+    expect(isSettingsSearchId("settings.themeMode")).toBe(true);
+    expect(isSettingsSearchId("settings.removedRow")).toBe(false);
+  });
+
+  it("索引只描述入口，不持有任何配置值", () => {
+    for (const item of SETTINGS_SEARCH_ITEMS) {
+      expect(Object.keys(item).sort()).toEqual(["description", "id", "section", "visibility"]);
+    }
   });
 });
 
@@ -190,6 +230,29 @@ describe("resolveSettingsSearchNavigation", () => {
       }),
     ).toEqual({ section: "general" });
   });
+
+  it("导航收敛不修改传入结果，也不携带配置值", () => {
+    const result = Object.freeze({
+      section: "appearance" as const,
+      setting: "settings.themeMode" as const,
+    });
+    const resolved = resolveSettingsSearchNavigation({ result, visibleSections: sections });
+    expect(resolved).toEqual({ section: "appearance", setting: "settings.themeMode" });
+    expect(result).toEqual({ section: "appearance", setting: "settings.themeMode" });
+    expect(Object.keys(resolved).sort()).toEqual(["section", "setting"]);
+  });
+});
+
+describe("shouldUseSettingsSearchSectionFallback", () => {
+  it("行级目标已挂载或仍在等待挂载时让位给设置行", () => {
+    expect(shouldUseSettingsSearchSectionFallback("mounted")).toBe(false);
+    expect(shouldUseSettingsSearchSectionFallback("pending")).toBe(false);
+  });
+
+  it("只到分区或行未挂载（平台隐藏、数据未就绪）时由分区兜底", () => {
+    expect(shouldUseSettingsSearchSectionFallback("none")).toBe(true);
+    expect(shouldUseSettingsSearchSectionFallback("missing")).toBe(true);
+  });
 });
 
 describe("SettingsSearchSectionTarget", () => {
@@ -214,5 +277,20 @@ describe("SettingsSearchSectionTarget", () => {
     );
     expect(otherSection).toContain('data-settings-search-section="general"');
     expect(otherSection).not.toContain("data-settings-search-highlighted");
+  });
+
+  it("行级目标不预先高亮分区，等行挂载失败后再兜底", () => {
+    const html = renderToStaticMarkup(
+      createElement(
+        SettingsSearchSectionTarget,
+        {
+          section: "appearance",
+          target: { section: "appearance", setting: "settings.themeMode" },
+        },
+        createElement("span", null, "目标分区"),
+      ),
+    );
+    expect(html).toContain('data-settings-search-section="appearance"');
+    expect(html).not.toContain("data-settings-search-highlighted");
   });
 });

@@ -225,6 +225,7 @@ export interface AgentRuntimeInternal
   backgroundTaskNotificationsSealed: boolean;
   backgroundTaskNotificationSealReason?: BackgroundTaskNotificationSealReason;
   pendingModelChangeTimeline?: PendingModelChangeTimeline;
+  pendingWorktreeCreation?: import("@zcode/contracts").WorktreeCreationFact;
   sessionStartHookRan: boolean;
   sessionTitleGenerationAttempted: boolean;
   agentTelemetry: RuntimeTelemetryFacade;

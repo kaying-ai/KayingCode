@@ -89,6 +89,11 @@ import {
 import type { LexicalChatInputHandle } from "@/LexicalChatInput.js";
 import { ChatPromptEditor } from "@/prompt-editor/ChatPromptEditor.js";
 import { usePromptEditorDragState } from "@/prompt-editor/usePromptEditorDragState.js";
+import {
+  useComposerVoiceInput,
+  useVoiceInputShortcut,
+  VoiceInputButton,
+} from "@/voice-input/index.js";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 import { advanceComposerDraftRevision } from "@/v4/composer/composerDraftRevision.js";
 import type { AppSlashCommand } from "@/slashCommandHelpers.js";
@@ -151,6 +156,11 @@ import { PptxElementReferenceChip } from "@/v4/composer/PptxElementReferenceChip
 import { useOpenPptxElementReference } from "@/v4/composer/useOpenPptxElementReference.js";
 import type { CodeViewerSource } from "@/lib/codeViewer.js";
 import { useConversationSelectionReferences } from "@/v4/composer/useConversationSelectionReferences.js";
+import {
+  dispatchConversationSelectionEdit,
+  recordSentConversationSelections,
+} from "@/lib/conversationSelectionReference.js";
+import { deleteConversationAnnotationWithUndo } from "@/selection-comment/index.js";
 import { isComposerEditScopeId } from "@/composer-edit-mode/contract.js";
 import { ConversationBackgroundWorkTrigger } from "@/v4/composer/ConversationBackgroundWorkTrigger.js";
 import {
@@ -475,6 +485,8 @@ interface ConversationComposerProps {
    * 退出编辑态只需切回，即可完整恢复原草稿。缺省 = sessionId 对应的普通 scope。
    */
   draftScopeId?: string;
+  /** 当前会话 CLI 支持注释评论时，注释列表提供“编辑/添加评论”入口（在正文编号处打开编辑浮层）。 */
+  selectionCommentEnabled?: boolean;
   /** 编辑态状态条，渲染在输入框卡片内顶部。 */
   editBar?: ReactNode;
   /** 点击原消息位置的「正在下方编辑」占位时递增：只聚焦输入框，不滚动。 */
@@ -494,6 +506,11 @@ interface ConversationComposerProps {
   appSlashCommands?: readonly AppSlashCommand[];
   /** 把 composer 的 drop 路由暴露给整个对话 pane / 桌面草稿标题栏。 */
   onDropTargetControllerChange?: (controller: ConversationDropTargetController | null) => void;
+  /**
+   * 语音输入快捷键（toggleVoiceInput）是否归本 Composer：分屏时由 SessionPane 按 focused pane
+   * 判定，避免一次按键同时启动多个 Composer 的录音。缺省表示不注册快捷键。
+   */
+  ownsKeyboardShortcut?: (event: KeyboardEvent) => boolean;
 }
 
 function formatAttachmentLineCount(attachment: ChatComposerAttachment, locale: string): string {
@@ -553,6 +570,7 @@ function ConversationComposerImpl({
   composerRestoreRequest = null,
   onComposerRestoreApplied,
   draftScopeId: draftScopeIdProp,
+  selectionCommentEnabled = false,
   editBar,
   editFocusRequest = 0,
   editSubmitRequest = 0,
@@ -561,6 +579,7 @@ function ConversationComposerImpl({
   suppressGoalCommands = false,
   appSlashCommands,
   onDropTargetControllerChange,
+  ownsKeyboardShortcut,
 }: ConversationComposerProps) {
   const { intl, locale } = useKayingCodeIntl();
   const services = useOptionalServices();
@@ -622,6 +641,31 @@ function ConversationComposerImpl({
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
   const inputApiRef = useRef<LexicalChatInputHandle | null>(null);
+  // 语音输入只在桌面本机可用（packages/desktop/spec/composer-voice-input.md）；手机远控不显示。
+  // 输入框不可用（禁用，或被审批/问答卡片隐藏）时语音输入一起不可用：按钮禁用、快捷键不注册、
+  // 进行中的录音取消。按钮、快捷键与 hook 共用这一个值。
+  const voiceInputBlocked = disabled || blockingRequestId !== null;
+  const voiceInput = useComposerVoiceInput({
+    inputApiRef,
+    sessionId,
+    enabled: true,
+    blocked: voiceInputBlocked,
+  });
+  const settleVoiceInput = voiceInput.settle;
+  const voiceInputShortcut = useVoiceInputShortcut({
+    enabled: voiceInput.available && !voiceInputBlocked,
+    ownsEvent: ownsKeyboardShortcut,
+    inputApiRef,
+    state: voiceInput.state,
+    toggle: voiceInput.toggle,
+  });
+  const composerMountedRef = useRef(true);
+  useEffect(() => {
+    composerMountedRef.current = true;
+    return () => {
+      composerMountedRef.current = false;
+    };
+  }, []);
   const reportedErrorKeysRef = useRef(new Set<string>());
   const primaryModifierPressed = usePrimaryFollowupModifier();
   const appleKeyboardPlatform = isAppleKeyboardPlatform();
@@ -767,6 +811,9 @@ function ConversationComposerImpl({
     // 编辑态引用跟随 edit scope：原草稿的引用不被编辑内容改写。
     sessionId: activeDraftScopeId,
     workspaceKey,
+    // 只有“作用域就是真实会话”时才剪枝；编辑态与根草稿没有可对照的 rows。
+    liveSourceSessionId: draftScopeIdProp ? null : sessionId,
+    liveSourceRows: draftScopeIdProp ? null : (snapshot?.rows ?? null),
   });
   const hasConversationSelectionReferences = conversationSelectionReferences.length > 0;
 
@@ -1197,7 +1244,37 @@ function ConversationComposerImpl({
       expectedHeldQueueItemIds?: readonly string[],
       existingTelemetrySeed?: ConversationPromptTelemetrySeed,
       requestedDelivery?: "startNow" | "queue" | "guide",
-    ) => {
+    ): Promise<void> => {
+      // 发送时与点击停止一致：先等语音识别的最终结果写入编辑器，再读取草稿发送。
+      // 等待期间重复发送会在下面的 pendingRef 检查处被拦下（后续读取到 pending 前没有 await）。
+      // 没有进行中的语音输入时不等待，普通发送的同步路径不变。
+      const voiceSettled = settleVoiceInput("submit");
+      if (voiceSettled) {
+        // 修复原因：Composer 跨会话复用，等待期间切换会话后，旧提交闭包仍持有 A 的发送函数，
+        // 而草稿目标已指向 B、编辑器正被恢复成 B 的草稿。继续执行可能串发或清错草稿，
+        // 所以等待前冻结目标，目标变化或已卸载就中止本次发送。
+        const target = draftTargetRef.current;
+        await voiceSettled;
+        const current = draftTargetRef.current;
+        if (
+          !composerMountedRef.current ||
+          current.scopeId !== target.scopeId ||
+          current.workspacePath !== target.workspacePath ||
+          current.workspaceIdentity !== target.workspaceIdentity
+        ) {
+          logger.lifecycle.info("[voice-input] submit aborted", { reason: "target-changed" });
+          return;
+        }
+        // 修复原因：本闭包里的附件、上下文引用以及可发送状态都是点击那次渲染的值；
+        // 等待期间用户新增的附件会随消息发出，却因旧 id 列表没被交接和清理。
+        // 交给最新渲染的 submit 重新读取；此时 attempt 已结束，settle 返回 undefined，不会再次等待。
+        return latestSubmitRef.current?.(
+          heldQueueDisposition,
+          expectedHeldQueueItemIds,
+          existingTelemetrySeed,
+          requestedDelivery,
+        );
+      }
       const trimmed = textRef.current.trim();
       const submittedQueueItemIds =
         snapshotRef.current?.queue.items.map((item) => item.queueItemId) ?? [];
@@ -1211,10 +1288,13 @@ function ConversationComposerImpl({
       const currentConversationSelections = conversationSelectionReferences;
       const hasPendingConversationSelections = currentConversationSelections.length > 0;
       // 编辑态提交要求显式完整引用列表（CLI 才区分“删除全部”与“未修改”）；普通发送仍只走正文序列化。
+      // 编辑一条带注释的原消息时评论与 agent 来源必须原样保留，否则等于静默删掉批注。
       const submittedConversationQuotes = isComposerEditScopeId(activeDraftScopeId)
-        ? currentConversationSelections.map((reference) => ({
-            text: reference.text,
-            ...(reference.path ? { path: reference.path } : {}),
+        ? currentConversationSelections.map(({ text, path, comment, agent }) => ({
+            text,
+            ...(path ? { path } : {}),
+            ...(agent ? { agent } : {}),
+            ...(comment ? { comment } : {}),
           }))
         : undefined;
       // 草稿首发 accepted 后同一 composer 会原地从 __draft__ promotion 到
@@ -1456,6 +1536,10 @@ function ConversationComposerImpl({
         currentPptxElementReferences.forEach((reference) =>
           removePptxElementReference(reference.id),
         );
+        // 已发出的注释在正文里改画灰色“已发送”标记；编辑态（edit scope）的引用不属于主时间线。
+        if (sessionId && !draftScopeIdProp) {
+          recordSentConversationSelections(sessionId, workspaceKey, currentConversationSelections);
+        }
         currentConversationSelections.forEach((reference) =>
           removeConversationSelectionReference(reference.id),
         );
@@ -1506,6 +1590,7 @@ function ConversationComposerImpl({
       removeWebElementContext,
       sessionId,
       snapshotDraftOfEditor,
+      settleVoiceInput,
       updateText,
       updateComposerContent,
       webElementContexts,
@@ -1536,6 +1621,11 @@ function ConversationComposerImpl({
     },
     [conversationTelemetry, scheduleDraftPersist, updateComposerContent, updateText],
   );
+
+  // 用户一修改输入框就结束录音（与点击停止一致），不再写临时结果，最终结果写入时不移动光标。
+  const handleUserInputStart = useCallback(() => {
+    void settleVoiceInput("user-input");
+  }, [settleVoiceInput]);
 
   const handleEditorFocus = useCallback(() => {
     conversationTelemetry?.recordComposerFocus();
@@ -2042,7 +2132,25 @@ function ConversationComposerImpl({
             />
             <ConversationSelectionReferenceChip
               references={conversationSelectionReferences}
-              onRemove={removeConversationSelectionReference}
+              // 正文编号对应主 composer scope；编辑态（edit scope）的列表不编号，避免与正文错位。
+              numbered={!draftScopeIdProp}
+              onRemove={(id) => {
+                deleteConversationAnnotationWithUndo({
+                  sessionId: activeDraftScopeId,
+                  workspaceKey,
+                  id,
+                  formatMessage: (messageId) => intl.formatMessage({ id: messageId }),
+                });
+                // 存储里已删除；这里只同步清掉 hook 内的超限提示。
+                removeConversationSelectionReference(id);
+              }}
+              onEdit={
+                // 编号对应主时间线正文；编辑态（edit scope）的引用不在主时间线上画标记。
+                selectionCommentEnabled && sessionId && !draftScopeIdProp
+                  ? (id, fallback) =>
+                      dispatchConversationSelectionEdit({ sessionId, workspaceKey, id, fallback })
+                  : undefined
+              }
               onRemoveAll={clearConversationSelectionReferences}
             />
           </div>
@@ -2071,6 +2179,11 @@ function ConversationComposerImpl({
     pptxElementReferences,
     onOpenCodeViewer,
     openPptxElementReference,
+    activeDraftScopeId,
+    draftScopeIdProp,
+    workspaceKey,
+    sessionId,
+    selectionCommentEnabled,
   ]);
 
   // 编辑态状态条与附件行、正文一起出现：正文由 scope 切换在 rAF 里载入，等它完成再显示顶部内容，
@@ -2131,6 +2244,16 @@ function ConversationComposerImpl({
             onRecoverCustomModelSelection={onRecoverCustomModelSelection}
           />
         </span>
+        {voiceInput.available ? (
+          <VoiceInputButton
+            state={voiceInput.state}
+            onToggle={voiceInput.toggle}
+            subscribeLevel={voiceInput.subscribeLevel}
+            permissionGuide={voiceInput.permissionGuide}
+            shortcut={voiceInputShortcut}
+            disabled={voiceInputBlocked}
+          />
+        ) : null}
         {showStopControl ? (
           <ControlHintTooltip title={stopTooltipTitle} shortcut="Esc">
             <Button
@@ -2173,6 +2296,13 @@ function ConversationComposerImpl({
       activeConfigPicker,
       composerPhase,
       composerUsage,
+      voiceInput.available,
+      voiceInput.state,
+      voiceInput.toggle,
+      voiceInput.subscribeLevel,
+      voiceInput.permissionGuide,
+      voiceInputShortcut,
+      voiceInputBlocked,
       disabled,
       draftConfig,
       draftMode,
@@ -2349,6 +2479,7 @@ function ConversationComposerImpl({
           submitControl={submitControlNode}
           className="p-0"
           onChange={handleEditorChange}
+          onUserInputStart={handleUserInputStart}
           onFocus={handleEditorFocus}
           onSubmit={handleEditorSubmit}
           onWhiteboardMentionSelected={attachmentsApi.handleWhiteboardMentionSelected}

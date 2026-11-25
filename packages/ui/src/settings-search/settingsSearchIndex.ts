@@ -146,6 +146,13 @@ export const SETTINGS_SEARCH_ITEMS = [
     visibility: "all",
   },
   {
+    // 仅在注入 services 时渲染；无 services 的精简 SSR 由分区兜底定位。
+    id: "settings.pluginAutoRecommendation",
+    section: "general",
+    description: "settings.pluginAutoRecommendationDescription",
+    visibility: "all",
+  },
+  {
     id: "settings.modelIoFullRetention",
     section: "general",
     description: "settings.modelIoFullRetentionDescription",
@@ -313,6 +320,20 @@ export const SETTINGS_SEARCH_ITEMS = [
 export type SettingsSearchId = (typeof SETTINGS_SEARCH_ITEMS)[number]["id"];
 
 export type SettingsSearchItem = (typeof SETTINGS_SEARCH_ITEMS)[number];
+
+/** 行 id 的唯一来源；设置行通过 SettingsRow.searchId 引用同一个字面量。 */
+const SETTINGS_SEARCH_ITEM_BY_ID = new Map<string, SettingsSearchItem>(
+  SETTINGS_SEARCH_ITEMS.map((item) => [item.id, item]),
+);
+
+/** 返回已登记设置行；旧版本遗留或未登记的 id 返回 undefined，由调用方降级到分区。 */
+export function findSettingsSearchItem(id: string): SettingsSearchItem | undefined {
+  return isSettingsSearchId(id) ? SETTINGS_SEARCH_ITEM_BY_ID.get(id) : undefined;
+}
+
+export function isSettingsSearchId(id: string): id is SettingsSearchId {
+  return SETTINGS_SEARCH_ITEM_BY_ID.has(id);
+}
 
 export function isSettingsSearchItemVisible(
   item: Pick<SettingsSearchItem, "visibility">,

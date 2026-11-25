@@ -11,6 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select.js";
+import type { SettingsSearchId } from "@/settings-search/contract.js";
+import { useSettingsSearchTarget } from "@/settings-search/SettingsSearchTarget.js";
 import { cn } from "@/components/lib/utils.js";
 
 /**
@@ -107,20 +109,36 @@ export function ThemePreviewCard({
 }
 
 export function SettingsRow({
+  searchId,
   label,
   description,
   control,
   detail,
   controlLayout = "default",
 }: {
+  /**
+   * 稳定定位 id，必须来自 settingsSearchIndex 的 SettingsSearchId。
+   * 设置搜索命中后由本行滚动、聚焦并高亮，而不是只定位到分区。
+   */
+  searchId?: SettingsSearchId;
   label: ReactNode;
   description?: ReactNode;
   control: ReactNode;
   detail?: ReactNode;
   controlLayout?: "default" | "wide";
 }) {
+  const { ref, highlighted } = useSettingsSearchTarget(searchId);
   return (
-    <div className="border-t border-border px-4 py-3 first:border-t-0">
+    <div
+      ref={ref}
+      tabIndex={searchId ? -1 : undefined}
+      data-settings-search-id={searchId}
+      data-settings-search-highlighted={highlighted || undefined}
+      className={cn(
+        "border-t border-border px-4 py-3 first:border-t-0",
+        highlighted && "bg-accent ring-1 ring-inset ring-input-border-focused",
+      )}
+    >
       <div
         className={cn(
           "grid items-center gap-4",

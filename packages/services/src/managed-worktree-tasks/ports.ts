@@ -1,56 +1,27 @@
 import type { CommandAck, CommandEnvelope, CommandKey } from "@zcode/shared/zcode-protocol-v4";
 import type { GitWorktreeRepo } from "#src/git/managed-worktree/contract.js";
 import type { WorktreeRemovalGate } from "#src/managed-worktree-tasks/removal-gate.js";
-import type {
-  ProjectDirectories,
-  ProjectTaskRef,
-  ProjectTree,
-} from "#src/project-storage/contract.js";
+import type { ProjectRepositoryContract } from "#src/project-storage/contract.js";
 import type { ManagedWorktreeWorkspace } from "./contract.js";
 
-/**
- * 受管 worktree 使用的任务行：只读 tasks-index，不复制任务状态。
- * `worktree_root` 精确匹配由仓储实现，服务不按 cwd 猜测归属。
- */
-export interface ManagedWorktreeTaskRow extends ProjectTaskRef {
-  projectId: string | null;
-  title: string;
-  archived: boolean;
-}
+/** 受管 worktree 使用的任务行：只读 tasks-index，不复制任务状态。 */
+export type ManagedWorktreeTaskRow = ReturnType<
+  ProjectRepositoryContract["listTasksByWorktree"]
+>[number];
 
 /**
- * 受管 worktree 服务需要的任务仓储端口。
- *
- * 产品适配：上游 4.0.0 直接把 `ProjectRepositoryContract` 注入（该契约已含 worktree_root/cwd 列与
- * `listTasksByWorktree` / `releaseReservedTask` / `readTaskCwd`）。本仓库 project-storage 尚未落这些
- * worktree 扩展，因此先以窄端口声明本服务实际使用的方法；project-storage 完成 worktree 扩展后，
- * 由真实 repository 实现该端口，装配点在 `packages/services/src/node.ts`（本轮不做 Host 接线）。
+ * 受管 worktree 服务需要的任务仓储端口：直接取真实 ProjectRepositoryContract 的子集。
+ * `worktree_root` 精确匹配、`reserveCreatedTask` 的 cwd/worktreeRoot 与 `releaseReservedTask`
+ * 都由 project-storage 提供，服务不按 cwd 猜测归属。
  */
-export interface ManagedWorktreeTaskRepository {
-  readTree(options?: {
-    includeDeleted?: boolean;
-    includeDeletedTasks?: boolean;
-    includeTasks?: boolean;
-  }): ProjectTree;
-  /** 任务行记录的 cwd（受管 worktree 任务与 workspacePath 不同）；没有这一行时回退 workspacePath。 */
-  resolveSessionDirectories(task: ProjectTaskRef): ProjectDirectories & { cwd?: string };
-  listTasksByWorktree(input: { worktreeRoot: string }): ManagedWorktreeTaskRow[];
-  /**
-   * 普通创建在 CLI 首发前预留任务行：workspace 是项目主目录，cwd/worktreeRoot 只在这里写一次。
-   */
-  reserveCreatedTask(input: {
-    task: Omit<ProjectTaskRef, "taskId"> & { taskId?: string };
-    projectId: string | null;
-    cwd: string;
-    worktreeRoot: string;
-    additionalDirectories?: string[];
-  }): ProjectDirectories & { taskId: string };
-  /**
-   * 撤销一条尚无 CLI 事实的创建预留：released = 已撤销；absent = 没有这一行；
-   * kept = 行已有 CLI 事实（会话已存在），不删除。
-   */
-  releaseReservedTask(input: { task: ProjectTaskRef }): "released" | "absent" | "kept";
-}
+export type ManagedWorktreeTaskRepository = Pick<
+  ProjectRepositoryContract,
+  | "readTree"
+  | "resolveSessionDirectories"
+  | "listTasksByWorktree"
+  | "reserveCreatedTask"
+  | "releaseReservedTask"
+>;
 
 export interface ManagedWorktreeCommand extends ManagedWorktreeWorkspace {
   projectId?: string | null;

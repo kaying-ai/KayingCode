@@ -53,6 +53,7 @@ import type { IExtensionGrantsService } from "./extensions/grants/contract.js";
 import type { IPluginUiBridgeService } from "./plugin-ui-bridge/contract.js";
 import type { IPluginUiSamplingService } from "./plugin-ui-bridge/samplingContract.js";
 import type { IPluginUiAppToolsService } from "./plugin-ui-bridge/appToolsContract.js";
+import type { IVoiceInputService } from "./voice-input/contract.js";
 
 /** UI 层消费的统一服务接口 */
 export interface IServiceAccessor {
@@ -120,6 +121,8 @@ export interface IServiceAccessor {
   readonly pluginUiBridgeService?: IPluginUiBridgeService;
   readonly pluginUiSamplingService?: IPluginUiSamplingService;
   readonly pluginUiAppToolsService?: IPluginUiAppToolsService;
+  /** 语音输入（仅桌面本机 base 连接）；Web / 手机远控 / 远程 workspace 为 undefined。 */
+  readonly voiceInputService?: IVoiceInputService;
   readonly subagentsService: ISubagentsService;
   readonly commandsService: ICommandsService;
   readonly hooksService: IHooksService;

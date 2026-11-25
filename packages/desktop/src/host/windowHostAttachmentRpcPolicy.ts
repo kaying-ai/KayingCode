@@ -312,6 +312,13 @@ export function createTerminalScope(
       assertActive(id);
       return base.onDynamicExit(id);
     },
+    // 只返回本 attachment 自己创建的终端：工作树删除要靠它判断目录下是否仍有常驻会话，
+    // 不能把同一 Host 其它窗口/attachment 的终端算进来，否则会误判 in-use。
+    async listTerminalIdsUnderPath(params) {
+      if (!active) return [];
+      const ids = await base.listTerminalIdsUnderPath(params);
+      return ids.filter((id) => terminals.has(id));
+    },
   };
   return {
     service,

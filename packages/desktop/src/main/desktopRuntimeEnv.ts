@@ -39,7 +39,9 @@ import { getElectronAppPath, isElectronAppPackaged } from "./desktopElectronApp.
 import { resolveCurrentDesktopDataPaths } from "./desktopDataBaseDirBootstrap.js";
 import { DESKTOP_SETTINGS_BASE_DIR_ENV } from "./desktopDataPaths.js";
 
-declare const __KAYINGCODE_PACKAGED_AGENT_TELEMETRY_ENV__: Readonly<Record<string, string>> | undefined;
+declare const __KAYINGCODE_PACKAGED_AGENT_TELEMETRY_ENV__:
+  | Readonly<Record<string, string>>
+  | undefined;
 
 const isLocalDevelopmentRuntime = !isElectronAppPackaged();
 export const desktopRuntimeEnv: KayingCodeRuntimeEnv = isLocalDevelopmentRuntime
@@ -231,7 +233,8 @@ export function resolvePackagedAgentTelemetryEnv(
     OTEL_EXPORTER_OTLP_ENDPOINT: compiledEnv.OTEL_EXPORTER_OTLP_ENDPOINT,
     OTEL_EXPORTER_OTLP_HEADERS: compiledEnv.OTEL_EXPORTER_OTLP_HEADERS,
     OTEL_SERVICE_NAME: compiledEnv.OTEL_SERVICE_NAME,
-    KAYINGCODE_TELEMETRY_RUNTIME_DISTRIBUTION: compiledEnv.KAYINGCODE_TELEMETRY_RUNTIME_DISTRIBUTION,
+    KAYINGCODE_TELEMETRY_RUNTIME_DISTRIBUTION:
+      compiledEnv.KAYINGCODE_TELEMETRY_RUNTIME_DISTRIBUTION,
   });
 }
 
@@ -425,6 +428,37 @@ function resolveBundledRuntimeToolBinaryPath(
     ),
   ].filter((candidate): candidate is string => Boolean(candidate));
 
+  return candidates.find((candidate) => existsSync(candidate));
+}
+
+/** 预装工具的 Windows 入口 shim；其他平台没有。说明见 packages/desktop/src/preinstalled-tools/CONTRACT.md。 */
+export function resolvePreinstalledEntryShimPath(): string | undefined {
+  if (process.platform !== "win32") return undefined;
+  const shimName = "kayingcode-preinstalled-entry-shim.exe";
+  const platformKey = resolvePlatformKeyForPackagedApp();
+  // 与 Agent 二进制相同：开发态运行 cwd 可能是 packages/desktop 或仓库根，按多候选根查找 bundled-tools。
+  const candidates = [
+    isElectronAppPackaged()
+      ? join(process.resourcesPath, "preinstalled-entry-shim", shimName)
+      : null,
+    join(
+      import.meta.dirname,
+      "../../bundled-tools",
+      platformKey,
+      "preinstalled-entry-shim",
+      shimName,
+    ),
+    join(process.cwd(), "bundled-tools", platformKey, "preinstalled-entry-shim", shimName),
+    join(
+      process.cwd(),
+      "packages",
+      "desktop",
+      "bundled-tools",
+      platformKey,
+      "preinstalled-entry-shim",
+      shimName,
+    ),
+  ].filter((candidate): candidate is string => Boolean(candidate));
   return candidates.find((candidate) => existsSync(candidate));
 }
 

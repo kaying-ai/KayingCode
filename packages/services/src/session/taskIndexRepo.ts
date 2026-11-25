@@ -1959,6 +1959,40 @@ export class TaskIndexRepo {
   }
 
   /**
+   * 列出 workspace 下 cwd 位于受管 worktree 的会话 id（`worktree_root` 非空）。
+   *
+   * sessions-index 冷扫描只覆盖 workspace 目录；worktree 任务的 cwd 不在其中，Host 必须按
+   * tasks-index 归属精确提供 id，CLI 才能补出这些任务的摘要（docs/git/worktree.md §6.6.2）。
+   * 共享 `KayingCodeTaskMeta` 尚未声明 worktreeRoot，所以这里单独查询而不复用 listTaskMetas。
+   */
+  async listWorktreeTaskIds(params: {
+    workspacePath: string;
+    workspaceIdentity?: string;
+    provider?: KayingCodeProvider;
+  }): Promise<string[]> {
+    await this.ensureReady();
+    const workspaceKeyValue = workspaceKey({
+      workspacePath: params.workspacePath,
+      workspaceIdentity: params.workspaceIdentity,
+    });
+    const rows = this.getDatabase()
+      .prepare(
+        `SELECT task_id
+        FROM tasks
+        WHERE workspace_key = @workspace_key
+          AND deleted = 0
+          AND worktree_root IS NOT NULL
+          AND (@provider IS NULL OR provider = @provider)
+        ORDER BY updated_at DESC, created_at DESC, task_id DESC`,
+      )
+      .all({
+        workspace_key: workspaceKeyValue,
+        provider: params.provider ?? null,
+      }) as Array<{ task_id: string }>;
+    return rows.map((row) => row.task_id);
+  }
+
+  /**
    * 列出某条 automation 产生的所有 cron session（用于 automation 详情展开、关联查询）。
    * 走 cron_automation_id 索引列，只返回未删除的 session，按创建时间倒序。
    */

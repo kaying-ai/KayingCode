@@ -485,6 +485,7 @@ export { parseEnvConfig, getToolConcurrencyConfig } from "./env-config.adapter.j
 export { KayingCodeConfigFileSchema, type KayingCodeConfigFile } from "./schema.js";
 export { mergeConfigs, createPrioritizedConfig, getScopePriority } from "./config-merger.js";
 export {
+  classifyLocalSessionDirectory,
   createConfig,
   createConfigWithPluginMigrations,
   resolveKayingCodeDataBaseDir,
@@ -492,6 +493,7 @@ export {
   resolveWorkspaceStorageDir,
   type ConfigFactoryOptions,
   type ConfigResult,
+  type LocalSessionDirectoryRelation,
   type PluginConfigSources,
   type PluginOptionLayer,
 } from "./config-factory.js";

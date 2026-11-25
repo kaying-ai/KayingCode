@@ -1654,6 +1654,8 @@ function createManifestFromMarketplaceEntry(
   delete raw.examplePrompts_i18n;
   delete raw.requiresPaidPlan;
   delete raw.regions;
+  // 扩展摘要也是目录层的信息（packages/shared/spec/plugin-extension-summary.md），不是清单的 extension 键。
+  delete raw.extensionSummary;
   return {
     ...raw,
     name: entry.name,
@@ -2198,6 +2200,29 @@ function readStoreRegions(value: unknown): PluginStoreRegion[] | undefined {
   if (!Array.isArray(value)) return undefined;
   const regions = STORE_REGIONS.filter((region) => value.includes(region));
   return regions.length > 0 ? regions : undefined;
+}
+
+/** 目录条目的扩展摘要（packages/shared/spec/plugin-extension-summary.md §4.2）。CLI 只透传，不判断兼容。 */
+export interface PluginExtensionSummary {
+  engines: { zcode: string };
+  grants: string[];
+}
+
+/**
+ * 从目录条目读扩展摘要：只认 engines.zcode 是非空字符串的条目，grants 只留字符串，其余键丢掉。
+ * 协议字段是 strict 的，丢掉未知键才不会让 App 解析失败。范围格式不检查，由 App 判断。
+ */
+export function parseEntryExtensionSummary(
+  entry: Record<string, unknown>,
+): PluginExtensionSummary | undefined {
+  const summary = entry.extensionSummary;
+  if (!isRecord(summary) || !isRecord(summary.engines)) return undefined;
+  const range = summary.engines.zcode;
+  if (typeof range !== "string" || range.trim().length === 0) return undefined;
+  const grants = Array.isArray(summary.grants)
+    ? summary.grants.filter((grant): grant is string => typeof grant === "string")
+    : [];
+  return { engines: { zcode: range }, grants };
 }
 
 /** author 字段兼容 string 与 {name,url}（plugin.json 与目录条目共用此规则）。 */

@@ -2,6 +2,12 @@ import {
   BROWSER_LOCAL_PREVIEW_PRIVILEGES,
   installBrowserLocalPreview,
 } from "@desktop/main/browser-local-preview/index.js";
+import { resolvePreinstalledToolsRelease } from "@zcode/shared/preinstalled-tools";
+import {
+  spawnPreinstalledToolsProcess,
+  loadPreinstalledToolsCatalog,
+  type PreinstalledToolsProcessHandle,
+} from "@desktop/preinstalled-tools/index.js";
 import { createRemoteConversationTelemetryDispatcher } from "@zcode/shared/conversation-telemetry";
 import { installRequestSecurityDiagnostics } from "./request-security-edition/index.js";
 import { createLocalTtftExporter } from "./localTtftExporter.js";
@@ -186,6 +192,7 @@ import {
   resolveBundledGlmBinaryPath,
   resolveRemoteAssetDirs,
   resolveKayingCodeEndpointEnvBaseOrigin,
+  resolvePreinstalledEntryShimPath,
   desktopRuntimeEnv,
   runtimeApplicationName,
   runtimeHomePath,
@@ -698,6 +705,8 @@ const hostRunningTaskCountMap = new Map<ElectronUtilityProcess, number>();
 
 // 常驻 cron scheduler 进程句柄；app ready 后拉起，退出前销毁。
 let cronScheduler: CronSchedulerHandle | null = null;
+// 预装文档工具的 utilityProcess；Main 只持有句柄，业务状态由子进程查询/推送。
+let preinstalledToolsProcess: PreinstalledToolsProcessHandle | undefined;
 // host → main 的定时任务派发结果，转交给 scheduler 结算。经模块变量转发以避免 spawn 顺序耦合。
 function forwardCronRunResult(
   result: Parameters<CronSchedulerHandle["handleCronRunResult"]>[0],
@@ -1330,6 +1339,8 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
   cronScheduler = null;
   const extensionHostToDispose = extensionHostSupervisor;
   extensionHostSupervisor = null;
+  const preinstalledToolsToDispose = preinstalledToolsProcess;
+  preinstalledToolsProcess = undefined;
 
   const hostProcesses = [
     ...new Set([...windowHostProcessMap.values(), ...listDisposingHostProcesses()]),
@@ -1363,6 +1374,13 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
         await extensionHostToDispose?.dispose();
       } catch (error) {
         logger.warn(`[app-quit] extension host dispose failed (${reason}):`, error);
+      }
+    })(),
+    (async () => {
+      try {
+        await preinstalledToolsToDispose?.dispose();
+      } catch (error) {
+        logger.warn(`[app-quit] preinstalled tools dispose failed (${reason}):`, error);
       }
     })(),
     // remote session、attachment 和 transport 都由窗口 Host 持有；这里先清理
@@ -2329,6 +2347,32 @@ app.whenReady().then(async () => {
   if (!loadedBootstrapLocale) {
     currentApplicationLocale = resolveSystemApplicationLocale();
   }
+
+  // 清单只属于预装进程；异步读取不能成为 Host 或聊天的启动屏障。
+  // 必须在 bootstrap 的 setDataBaseDir 之后取数据根，安装根才跟随用户自定义数据目录。
+  const windowsEntryShim = resolvePreinstalledEntryShimPath();
+  if (process.platform === "win32" && !windowsEntryShim) {
+    // 入口 shim 尚未接入打包流程时，Windows 上安装会被拒绝；先记录明确原因，避免静默失败。
+    logger.warn(
+      "[preinstalled-tools] Windows entry shim is missing; prepare:preinstalled-entry-shim must run before packaging",
+    );
+  }
+  const preinstalledToolsConfiguration = loadPreinstalledToolsCatalog(logger).then((tools) => ({
+    dataRoot: getKayingCodeDataRootDir(),
+    release: resolvePreinstalledToolsRelease({
+      runtimeEnv: desktopRuntimeEnv,
+      productFlavor: KAYINGCODE_PRODUCT_FLAVOR,
+    }),
+    tools,
+    windowsEntryShim,
+  }));
+  preinstalledToolsProcess = spawnPreinstalledToolsProcess({
+    configuration: preinstalledToolsConfiguration,
+    hostProcessLocalEnv,
+    logger,
+    windows: getApplicationWindows,
+  });
+
   // Electron 的 net.request 只能在 app ready 后使用；灰度请求仍是旁路预热，不阻塞首个 Host。
   // 预热曾在读取持久化语言之前启动，X-Client-Language 会带默认语言并进入 1 小时缓存；
   // 必须在 currentApplicationLocale 确定之后再启动。

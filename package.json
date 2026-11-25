@@ -4,6 +4,14 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
+  "imports": {
+    "#libreoffice/*": "./scripts/preinstalled-tools/libreoffice/*.mjs",
+    "#preinstalled-common/*": "./scripts/preinstalled-tools/common/*.mjs",
+    "#preinstalled-python/*": "./scripts/preinstalled-tools/python/*.mjs",
+    "#preinstalled-qpdf/*": "./scripts/preinstalled-tools/qpdf/*.mjs",
+    "#preinstalled-pandoc/*": "./scripts/preinstalled-tools/pandoc/*.mjs",
+    "#preinstalled-poppler/*": "./scripts/preinstalled-tools/poppler/*.mjs"
+  },
   "scripts": {
     "dev:web": "concurrently -k -n server,web -c blue,green \"pnpm --filter @zcode/server run dev\" \"pnpm --filter @zcode/web run dev\"",
     "dev:desktop": "pnpm run dev:desktop:prod",
@@ -84,11 +92,14 @@
     "postject": "1.0.0-alpha.6",
     "release-it": "^19.2.4",
     "spdx-expression-parse": "4.0.0",
+    "tar-stream": "3.1.8",
     "ts-morph": "^28.0.0",
     "tsx": "^4.19.4",
     "turbo": "2.9.14",
     "typescript": "^6.0.2",
+    "unbzip2-stream": "1.4.3",
     "yaml": "^2.9.0",
+    "yauzl": "3.3.0",
     "yazl": "^3.3.1"
   },
   "peerDependencies": {

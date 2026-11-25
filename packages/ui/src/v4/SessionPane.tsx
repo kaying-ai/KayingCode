@@ -66,6 +66,18 @@ import {
 import { useWorkflowRunJournalSummaries } from "@/hooks/useWorkflowRunJournalSummaries.js";
 import { usePlanIdentitySnapshot } from "@/hooks/usePlanIdentitySnapshot.js";
 import { useBaseWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
+import {
+  ForkDestinationMenu,
+  buildDraftCreateSessionPayload,
+  forkSessionToWorktree,
+  formatManagedWorktreeError,
+  readWorktreeDraftSelection,
+  startWorktreeTask,
+  useOptionalManagedWorktreeContext,
+  useTaskWorktreeEntry,
+  useWorktreeDraftSelection,
+  type ForkMenuAnchor,
+} from "@/managed-worktrees/index.js";
 import { useWorkspaceHomePath } from "@/hooks/useWorkspaceHomePath.js";
 import { prepareWorkspaceWithKayingCodeSessionService } from "@/hooks/useWorkspacePrepare.js";
 import { decodeCustomModelValue, encodeCustomModelValue } from "@/lib/kayingcodeCustomModelValue.js";
@@ -239,8 +251,10 @@ import {
 import {
   clearConversationSelectionReferenceScope,
   dispatchConversationSelectionAdd,
+  type ConversationSelectionAppendResult,
   type ConversationSelectionReference,
 } from "@/lib/conversationSelectionReference.js";
+import { useSelectionCommentSupport } from "@/selection-comment/index.js";
 
 export interface SessionPaneProps {
   paneId: string;
@@ -482,6 +496,9 @@ export function SessionPane({
   const { intl } = useKayingCodeIntl();
   const slashCommands = useSlashCommands(workspacePath, workspaceIdentity);
   const baseWorkspaceServices = useBaseWorkspaceServices();
+  // 受管 worktree 的宿主上下文：能力门控、创建视图与任务归属都来自 Provider；
+  // SessionPane 独立渲染（无 Provider）时缺省不提供 worktree 入口，保持普通发送/分叉。
+  const managedWorktreeContext = useOptionalManagedWorktreeContext();
   const workspaceHomePath = useWorkspaceHomePath({
     workspacePath,
     workspaceIdentity,
@@ -1461,9 +1478,10 @@ export function SessionPane({
     [onOpenWorkflowRunDirectory, remoteSessionId, workspaceIdentity, workspacePath],
   );
   const handleAddSelectionToCurrentTask = useCallback(
-    (reference: ConversationSelectionReference) => {
-      if (!sessionId) return;
-      dispatchConversationSelectionAdd({
+    (reference: ConversationSelectionReference): ConversationSelectionAppendResult | undefined => {
+      if (!sessionId) return undefined;
+      // 返回值交给注释浮层：被条数/总长上限拒绝时浮层保持打开、输入保留。
+      return dispatchConversationSelectionAdd({
         targetSessionId: sessionId,
         workspaceKey,
         reference,
@@ -1874,8 +1892,12 @@ export function SessionPane({
   // ── 草稿态 v4 draft session 预热（m5）──
   // pane 未绑定会话时后台建 phase=draft 会话作预热载体：配置写 CAS 直达、首发复用。
   // 对外绑定语义不变（shell activeTaskId 仍 null），预热会话只是 pane 内部 effective 订阅目标。
+  // worktree 草稿不预热：cwd 由 Host 建好 worktree 后一次确定，预热会话只在主目录，
+  // 复用会把首条消息发到错误 cwd（上游 §3.2 同一裁决）。
+  const worktreeDraftSelected =
+    useWorktreeDraftSelection(workspacePath, workspaceIdentity) !== undefined;
   const { binding: prewarmBinding } = useDraftSessionPrewarm({
-    enabled: sessionId === null && draftAgentStartupAllowed,
+    enabled: sessionId === null && draftAgentStartupAllowed && !worktreeDraftSelected,
     workspaceKey,
     paneId,
     invalidationVersion: draftRuntimeInvalidationVersion,
@@ -2220,6 +2242,50 @@ export function SessionPane({
           submission = { ...submission, modelSelection: chosen };
         }
       }
+      // worktree 草稿的首发由 Host 编排：先建 worktree，再在项目 workspace 下创建会话并发送首条消息
+      // （managed-worktrees/CONTRACT.md §8）。信封与普通首发同形，进度与结果都来自 Host 的创建记录。
+      const draftWorktree =
+        sessionId === null
+          ? readWorktreeDraftSelection(workspacePath, workspaceIdentity)
+          : undefined;
+      if (draftWorktree !== undefined) {
+        const projectId = useKayingCodeSessionStore
+          .getState()
+          .getWorkspaceState(workspacePath, workspaceIdentity).draftProjectId;
+        // slash 命令没有 worktree 语义：不能把 /compact 之类当首条消息写进新会话。
+        if (slashCommand !== null) {
+          toast(intl.formatMessage({ id: "managedWorktrees.error.generic" }));
+          return "blocked" as const;
+        }
+        const draftConfigPayload = buildDraftCreateConfigPayload(
+          { ...draftConfigRef.current, modelSelection: submission.modelSelection },
+          appFollowupMode,
+        );
+        const started = await startWorktreeTask({
+          service: baseWorkspaceServices.managedWorktreeService,
+          workspacePath,
+          ...(workspaceIdentity ? { workspaceIdentity } : {}),
+          projectId,
+          ref: draftWorktree,
+          firstInput: {
+            text: effectiveText,
+            submission,
+            ...(readyAttachments.length > 0 ? { attachments: readyAttachments } : {}),
+            configPayload: draftConfigPayload,
+          },
+        });
+        if (started.status === "started") {
+          onAcceptedSelection?.();
+          // 主区切到创建记录；会话启动后由 Provider 的 settlement 选中（§8）。
+          managedWorktreeContext?.viewCreation(started.creationId);
+          return "sent" as const;
+        }
+        if (started.status === "rejected") {
+          toast(formatManagedWorktreeError(intl, started.error));
+        }
+        // in-flight/unavailable/rejected 都保留草稿：composer 只在 "sent" 后清空正文。
+        return "blocked" as const;
+      }
       const prewarmTargetBeforeSend =
         sessionId === null ? prewarmBindingRef.current?.sessionId : null;
       if (prewarmTargetBeforeSend) {
@@ -2388,11 +2454,11 @@ export function SessionPane({
         if (readyAttachments.length === 0 && !sharedContextRefs?.length) {
           const ack = await dispatchSubmissionCommand(
             "createSession",
-            {
-              workspaceId: workspaceKey,
-              firstInput: { text: effectiveText, ...submission },
-              ...draftConfigPayload,
-            },
+            // 与 worktree 首发共用同一 payload builder，避免出现第二种 createSession 形状。
+            buildDraftCreateSessionPayload({
+              workspaceKey,
+              firstInput: { text: effectiveText, submission, configPayload: draftConfigPayload },
+            }),
             null,
             undefined,
             undefined,
@@ -2490,6 +2556,7 @@ export function SessionPane({
       }
     },
     [
+      baseWorkspaceServices.managedWorktreeService,
       dispatchCommand,
       recommendStartPlan,
       captureAcceptedModelSelection,
@@ -2499,6 +2566,7 @@ export function SessionPane({
       appSlashCommands,
       appFollowupMode,
       handleDraftSessionCreated,
+      managedWorktreeContext,
       reportDraftCreated,
       handleDraftSwitchMode,
       handleOpenSelectionSideConversationWithPrompt,
@@ -2857,7 +2925,43 @@ export function SessionPane({
     [sessionId, workspaceKey],
   );
 
-  const handleFork = useCallback(
+  // fork 目的地：父任务是否已在受管 worktree 中只从 listWorktrees 的任务归属派生
+  // （产品 KayingCodeTaskMeta 没有 worktreeRoot/cwd），按 workspaceIdentity + workspacePath + taskId 匹配。
+  const sessionWorktreeEntry = useTaskWorktreeEntry({
+    workspacePath,
+    workspaceIdentity,
+    taskId: sessionId,
+  });
+  const forkWorktreeVisible = Boolean(
+    managedWorktreeContext?.support.visible &&
+    managedWorktreeContext.workspacePath === workspacePath &&
+    (managedWorktreeContext.workspaceIdentity ?? "") === (workspaceIdentity ?? ""),
+  );
+  const forkWorktreeAvailable = Boolean(managedWorktreeContext?.support.available);
+  const [forkDestination, setForkDestination] = useState<{
+    target: ConversationRowTarget;
+    anchor: ForkMenuAnchor;
+  } | null>(null);
+  const lastPointerPositionRef = useRef<ForkMenuAnchor | null>(null);
+  useEffect(() => {
+    // 行内 fork 动作只回传 row target（CONTRACT §8）：菜单以最近一次指针位置或当前焦点
+    // 元素矩形为锚点，不改行组件也不新增第二套行状态。
+    const onPointerDown = (event: PointerEvent) => {
+      lastPointerPositionRef.current = { x: event.clientX, y: event.clientY };
+    };
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => window.removeEventListener("pointerdown", onPointerDown, true);
+  }, []);
+  const readForkMenuAnchor = useCallback((): ForkMenuAnchor => {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) {
+      const rect = active.getBoundingClientRect();
+      if (rect.width > 0 || rect.height > 0) return { x: rect.left, y: rect.bottom };
+    }
+    return lastPointerPositionRef.current ?? { x: 0, y: 0 };
+  }, []);
+  /** 原地分叉：与 worktree 分叉共用同一 CAS 语义（baseRevision + logEpoch）。 */
+  const forkInPlace = useCallback(
     (target: ConversationRowTarget) => {
       const current = snapshotRef.current;
       if (!sessionId || current === null) return;
@@ -2881,6 +2985,59 @@ export function SessionPane({
     },
     [dispatchCommand, onSessionCreated, sessionId],
   );
+  /**
+   * 行内 fork 入口：worktree 入口可见时先选目的地（原地 / 新 worktree），
+   * 不以 worktree 能力的入口（非仓库、远程 workspace）保持原来的一键原地分叉。
+   */
+  const handleFork = useCallback(
+    (target: ConversationRowTarget) => {
+      if (!forkWorktreeVisible) {
+        forkInPlace(target);
+        return;
+      }
+      setForkDestination({ target, anchor: readForkMenuAnchor() });
+    },
+    [forkInPlace, forkWorktreeVisible, readForkMenuAnchor],
+  );
+  const handleForkDestinationOpenChange = useCallback((open: boolean) => {
+    if (!open) setForkDestination(null);
+  }, []);
+  const handleForkHere = useCallback(() => {
+    const pending = forkDestination;
+    setForkDestination(null);
+    if (pending) forkInPlace(pending.target);
+  }, [forkDestination, forkInPlace]);
+  const handleForkToWorktree = useCallback(() => {
+    const pending = forkDestination;
+    setForkDestination(null);
+    const current = snapshotRef.current;
+    if (!pending || !sessionId || current === null) return;
+    // 与原地分叉同一 CAS；Host 建 worktree、预留子任务并注入 targetCwd 后转发给项目 CLI，
+    // 子任务启动后由 Provider 的 settlement 选中（CONTRACT §8）。
+    void forkSessionToWorktree({
+      service: baseWorkspaceServices.managedWorktreeService,
+      workspacePath,
+      ...(workspaceIdentity ? { workspaceIdentity } : {}),
+      sessionId,
+      target: pending.target,
+      baseRevision: current.revision,
+      ...(current.logEpoch ? { baseLogEpoch: current.logEpoch } : {}),
+    }).then((result) => {
+      if (result.status === "started") {
+        managedWorktreeContext?.viewCreation(result.creationId);
+        return;
+      }
+      if (result.status === "rejected") toast(formatManagedWorktreeError(intl, result.error));
+    });
+  }, [
+    baseWorkspaceServices.managedWorktreeService,
+    forkDestination,
+    intl,
+    managedWorktreeContext,
+    sessionId,
+    workspaceIdentity,
+    workspacePath,
+  ]);
 
   const handleEdit = useCallback(
     async (
@@ -3449,6 +3606,10 @@ export function SessionPane({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [focused, handleStop, readOnly, sessionId, snapshot?.control.canStop]);
 
+  // 语音输入快捷键归属：与 Esc 停止同一口径「快捷键走 focused pane」。
+  // 非 focused pane 传 undefined，useVoiceInputShortcut 不注册窗口监听。
+  const ownsComposerKeyboardShortcut = useCallback(() => true, []);
+
   // handleStop 带 source 参数（button / escape 两个调用点），但 ConversationComposer 是 memo：
   // 直接写 onStop={() => handleStop("button")} 每次 render 都换引用，memo 白做，而 composer
   // 恰好是每次输入都可能重渲染的组件。这里固定 button 版的引用，不动 handleStop 的双入口设计。
@@ -3518,6 +3679,13 @@ export function SessionPane({
   // 提交时先 stop barrier 再 rewind/rerun；UI 不应再用 completed gate 把入口整轮隐藏。
   const editActionsEnabled = !readOnly && !selectionSideChat && Boolean(sessionId);
   const isDraft = sessionId === null;
+  // 选区“注释”只对当前 workspace CLI 声明 conversationQuoteComment 时开放；旧 CLI 会剥掉评论。
+  // 辅助对话在本仓不提供选区动作，注释入口也随之一并关闭，避免 composer 出现无目标编辑按钮。
+  const selectionCommentSupported = useSelectionCommentSupport(
+    workspacePath,
+    workspaceIdentity,
+    Boolean(sessionId) && !readOnly && !selectionSideChat,
+  );
   // 滚动恢复必须使用与 sessionId 匹配的 lease projection。切换 session 的 render 与
   // passive effect 不在同一时刻，旧 lease 的 rows 若提前交给 timeline，会让新记忆按旧
   // 内容高度 clamp，后续目标 rows 到达时也无法区分这次临时落点。
@@ -3775,6 +3943,8 @@ export function SessionPane({
       externalTextInsertRequest={focused && sessionId === null ? composerTextInsertRequest : null}
       onExternalTextInsertApplied={handleExternalTextInsertApplied}
       autoFocusEnabled={focused}
+      // 语音输入快捷键只在 focused pane 生效：分屏时一次按键不应同时启动多个 Composer 的录音。
+      ownsKeyboardShortcut={focused ? ownsComposerKeyboardShortcut : undefined}
       disabled={connecting || draftRuntimeRebuilding || composerEdit.pendingLockQueueItemId !== null}
       workspacePath={workspacePath}
       workspaceIdentity={workspaceIdentity}
@@ -3795,6 +3965,8 @@ export function SessionPane({
       onTextChange={handleComposerTextChange}
       onSubmissionSettled={handleComposerSubmissionSettled}
       draftScopeId={composerEditSession?.scopeId}
+      // 注释列表的编辑入口只在当前 CLI 支持评论时出现（编号仍与正文标记一一对应）。
+      selectionCommentEnabled={selectionCommentSupported}
       editFocusRequest={composerEdit.editSession?.focusRequest ?? 0}
       editSubmitRequest={composerEditSubmitRequest}
       editPrefill={
@@ -4108,6 +4280,9 @@ export function SessionPane({
                   ? {
                       enabled: focused && !blockingInteractionId,
                       sideActionDisabled: selectionSideActionBlocked,
+                      commentEnabled: selectionCommentSupported,
+                      // 正文标记与 composer 列表共用主 composer 的引用作用域。
+                      annotationWorkspaceKey: workspaceKey,
                       onAddToCurrentTask: handleAddSelectionToCurrentTask,
                       onAskInSideChat: handleOpenSelectionSideConversation,
                     }
@@ -4128,6 +4303,18 @@ export function SessionPane({
           error={null}
           onApply={() => {}}
           onConversationOnly={handleComposerEditConflictConversationOnly}
+        />
+      ) : null}
+      {/* fork 目的地菜单只在 worktree 入口可见时存在；关闭后清空目标，避免迟到点击重放。 */}
+      {forkWorktreeVisible ? (
+        <ForkDestinationMenu
+          open={forkDestination !== null}
+          onOpenChange={handleForkDestinationOpenChange}
+          anchor={forkDestination?.anchor ?? null}
+          worktreeAvailable={forkWorktreeAvailable}
+          inWorktree={sessionWorktreeEntry !== null}
+          onForkHere={handleForkHere}
+          onForkToWorktree={handleForkToWorktree}
         />
       ) : null}
     </div>

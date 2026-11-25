@@ -34,8 +34,9 @@ import {
 import {
   buildStoreItems,
   canUpdatePluginItem,
-  isPluginUpdatePending,
+  hasInstallableUpdate,
   isPluginVisibleForStoreRegion,
+  isStoreItemInstallBlocked,
   resolveItemDisplayName,
   resolvePluginDisplayName,
   resolvePluginStoreRegion,
@@ -292,6 +293,8 @@ export function PluginStorePage({
 
   const handleInstall = useCallback(
     async (item: StorePluginItem) => {
+      // 示例提示词对未安装条目也走这里：不兼容的版本不能装，按钮之外的入口同样挡住。
+      if (isStoreItemInstallBlocked(item)) return;
       if (item.restorable) {
         await restoreBuiltin(item.id, pluginManagementService);
       } else {
@@ -353,7 +356,7 @@ export function PluginStorePage({
     }
     const pendingCount = usePluginManagementStore
       .getState()
-      .installedPlugins.filter((item) => isPluginUpdatePending(item.updateStatus)).length;
+      .installedPlugins.filter(hasInstallableUpdate).length;
     if (pendingCount > 0) {
       toast(
         intl.formatMessage(

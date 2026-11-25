@@ -1,6 +1,6 @@
 import type { SettingsSectionId } from "@/lib/settingsNavigation.js";
 import {
-  SETTINGS_SEARCH_ITEMS,
+  findSettingsSearchItem,
   type SettingsSearchId,
 } from "@/settings-search/settingsSearchIndex.js";
 
@@ -37,10 +37,8 @@ export function resolveSettingsSearchNavigation({
     };
   }
   const setting = result.setting;
-  if (
-    setting &&
-    !SETTINGS_SEARCH_ITEMS.some((item) => item.id === setting && item.section === result.section)
-  ) {
+  const item = setting ? findSettingsSearchItem(setting) : undefined;
+  if (setting && (!item || item.section !== result.section)) {
     return { section: result.section };
   }
   return setting ? { section: result.section, setting } : { section: result.section };

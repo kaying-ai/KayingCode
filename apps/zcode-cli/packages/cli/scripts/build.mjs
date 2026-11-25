@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { chmod, readFile, rm } from "node:fs/promises";
 import { basename, dirname, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -141,11 +142,31 @@ export const resolveBuildOptions = (args = [], env = process.env) => {
   };
 };
 
+const readSharedSubpathAliases = (rootDirectory) => {
+  const manifest = JSON.parse(
+    readFileSync(resolve(rootDirectory, "packages/shared/package.json"), "utf8"),
+  );
+  const aliases = {};
+  for (const [subpath, target] of Object.entries(manifest.exports ?? {})) {
+    if (subpath === "." || typeof target !== "string" || !target.startsWith("./")) continue;
+    aliases[`@zcode/shared/${subpath.slice(2)}`] = resolve(
+      rootDirectory,
+      "packages/shared",
+      target,
+    );
+  }
+  return aliases;
+};
+
 export const resolveBuildAliases = ({
   cliDirectory: _cliDirectory = cliRoot,
   rootDirectory = projectRoot,
-} = {}) => ({
-  "@zcode/shared-types": resolve(rootDirectory, "apps/zcode-cli/packages/shared-types/dist/index.js"),
+} = {}) => {
+  const aliases = {
+    // 从 shared package exports 生成全部子路径，避免每次新增 subpath 都漏声明；
+    // esbuild alias 按前缀改写，漏声明会被错误拼成 `src/index.ts/<subpath>`。
+    ...readSharedSubpathAliases(rootDirectory),
+    "@zcode/shared-types": resolve(rootDirectory, "apps/zcode-cli/packages/shared-types/dist/index.js"),
   // plugin-host 启动只需这些独立入口，不能经通用 alias 重新求值 shared 总入口。
   "@zcode/shared/runtime-env": resolve(rootDirectory, "packages/shared/src/runtimeEnv.ts"),
   "@zcode/shared/mcp": resolve(rootDirectory, "packages/shared/src/mcp.ts"),
@@ -245,7 +266,12 @@ export const resolveBuildAliases = ({
   ),
   "@zcode/shared": resolve(rootDirectory, "packages/shared/src/index.ts"),
   "@zcode/core": resolve(rootDirectory, "apps/zcode-cli/packages/core/dist/index.js"),
-});
+  };
+  // 长 key 必须先于短 key，避免 `preinstalled-tools/node` 被 `preinstalled-tools` 前缀命中。
+  return Object.fromEntries(
+    Object.entries(aliases).sort(([left], [right]) => right.length - left.length),
+  );
+};
 
 export const buildCli = async ({
   cliDirectory = cliRoot,

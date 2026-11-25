@@ -19,6 +19,10 @@
 - 文件划分：`service.ts` 创建流程与对外接口；`removal.ts` 删除流程与"请 CLI 卸载目录内会话"；
   `removal-gate.ts` 删除租约与会话操作闸门；`ports.ts` 注入端口。
 - 所有外部副作用经 `ManagedWorktreeServicePorts`（`ports.ts`）注入，由 `node.ts` 装配。
-- 产品适配：本仓库 `project-storage` 尚未落上游的 worktree 扩展（`worktree_root` / cwd 列、
-  `listTasksByWorktree`、`releaseReservedTask`），`ports.ts` 先用窄端口 `ManagedWorktreeTaskRepository`
-  声明服务所需子集；project-storage 完成扩展后由真实 repository 实现该端口，再在 `node.ts` 接线。
+- `ports.ts` 的任务仓储端口是真实 `ProjectRepositoryContract` 的子集（`readTree`、
+  `resolveSessionDirectories`、`listTasksByWorktree`、`reserveCreatedTask`、`releaseReservedTask`）；
+  装配点直接注入 `taskIndexRepo.getProjectRepository()`。
+- 协议门禁：`supportsWorktreeCwd` 探测 `runtime/capabilities.worktreeCwd`（按物理 CLI 连接缓存，
+  只认严格 true，失败不缓存）；删除通过 `session/releaseUnderDirectory` 由 CLI 判定驻留会话忙闲，
+  忙时返回 `worktree-in-use/running` 且不删除目录，卸载失败映射为 `session-close-failed`。
+  详见 `packages/services/spec/managed-worktree.md` 的「协议门禁」。

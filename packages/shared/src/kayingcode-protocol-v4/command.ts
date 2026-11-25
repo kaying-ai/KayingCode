@@ -7,7 +7,11 @@ import { conversationQuotesSchema } from "../conversationSelection.js";
 // conversation rewind 无独立命令（裁决：= editUserQuery 的 UI 入口）；
 // workspace-only 文件撤销走 applyFileRewind，不截断聊天历史。
 import { z } from "zod";
-import { conversationRowTargetSchema, timestampSchema } from "./core.js";
+import {
+  conversationRowTargetSchema,
+  timestampSchema,
+  v4ColdResumeWorkspaceSchema,
+} from "./core.js";
 import { attachmentRefSchema } from "./attachment-ref.js";
 import { turnHeaderRowSchema } from "./rows.js";
 import { v4ConversationFileRewindPreviewResultSchema } from "./transport.js";
@@ -36,6 +40,37 @@ import { conversationInputSourceSchema } from "./input-intent.js";
 export type { SharedContextRef } from "./shared-context-ref.js";
 export * from "./workflow-command-rejections.js";
 
+/**
+ * 受管 worktree 的创建结果（docs/git/worktree.md §6.6.4）。CLI 把它写成会话历史中的
+ * timeline part（timelineType = "worktree_creation"），V4 投影为 worktreeCreated 标记。
+ */
+export const worktreeCreationRecordSchema = z
+  .object({
+    /** worktree 根目录。 */
+    path: z.string().trim().min(1),
+    /** 检出的 commit。 */
+    sha: z.string().trim().min(1),
+    /** 用户选择的起点；null = 源目录当前 HEAD。 */
+    ref: z.string().min(1).nullable(),
+    /** git 与拷贝输出的末尾。 */
+    output: z.string().max(64 * 1024),
+  })
+  .strict();
+export type WorktreeCreationRecord = z.infer<typeof worktreeCreationRecordSchema>;
+
+/**
+ * forkAssistant 把子会话放到同一 workspace 下的另一个 cwd（受管 worktree，§8.2）。
+ * childSessionId 由 Host 预分配。strict：未声明字段直接拒绝，不静默丢弃。
+ */
+export const forkTargetCwdSchema = z
+  .object({
+    cwd: z.string().trim().min(1),
+    childSessionId: z.string().trim().min(1),
+    worktreeCreation: worktreeCreationRecordSchema,
+  })
+  .strict();
+export type ForkTargetCwd = z.infer<typeof forkTargetCwdSchema>;
+
 // sendText / editUserQuery / sendQueuedNow 共用的执行材料不变量：modelExecution 只能依附
 // 本次 modelSelection，禁止在缺 Selection 时单独补供凭据（历史消息 rewind 后不复用旧凭据）。
 function requireModelSelectionForExecution(
@@ -59,6 +94,12 @@ export const commandPayloadSchemas = {
     sessionId: z.string().min(1).optional(),
     additionalDirectories: z.array(z.string().min(1)).max(256).optional(),
     workspaceId: z.string(),
+    // 会话 cwd 与 workspace 不同（受管 worktree，docs/git/worktree.md §1.1）。只允许本地
+    // workspace；只有 Host 的 worktree 服务能设置，renderer 发出的 createSession 带此字段时
+    // Host 拒绝。旧 CLI 的 z.object 会静默丢弃，所以 Host 必须先确认 capabilities.worktreeCwd。
+    cwd: z.string().trim().min(1).optional(),
+    // 与 cwd 同时出现：CLI 把它写成第一轮的 "已创建 worktree" timeline part。
+    worktreeCreation: worktreeCreationRecordSchema.optional(),
     permissionScope: z.literal("session").optional(),
     firstInput: z
       .object({
@@ -67,6 +108,10 @@ export const commandPayloadSchemas = {
         modelSelection: modelSelectionSchema.optional(),
         mode: submissionModeSchema.optional(),
         planEnabled: z.boolean().optional(),
+        // 与 sendText.source 同一契约（扩展代建会话的首条消息）。旧 CLI 的 z.object 会静默剥掉它，
+        // 消息照常创建却没有来源，所以带 extension 来源时 Host 必须先确认
+        // runtime/capabilities.extensionInputSource。
+        source: conversationInputSourceSchema.optional(),
       })
       .optional(),
     config: createSessionRequestedConfigSchema.optional(),
@@ -170,7 +215,14 @@ export const commandPayloadSchemas = {
   // 因为 admission 与当前 revision 无关，不走 CAS；sourceCommandId 提供幂等边界。
   compact: z.object({ modelSelection: modelSelectionSchema.optional() }),
   // running 时对稳定 assistant row 可用。
-  forkAssistant: z.object({ target: conversationRowTargetSchema }),
+  forkAssistant: z.object({
+    target: conversationRowTargetSchema,
+    // 子会话留在同一 workspace，cwd 换成新的受管 worktree（docs/git/worktree.md §8.2）。
+    // 缺省 = 父会话 cwd，行为不变。旧 CLI 会静默丢弃该字段并 fork 到父目录，
+    // 所以 Host 必须先确认 runtime/capabilities.worktreeCwd 再发送。
+    // 附加目录不在这里下发：由 Host 在子会话 create/resume/subscribe 时统一下发（I16）。
+    targetCwd: forkTargetCwdSchema.optional(),
+  }),
   applyFileRewind: z.object({ target: conversationRowTargetSchema }),
   editUserQuery: z
     .object({
@@ -371,6 +423,7 @@ export const ROW_TARGETING_COMMANDS: ReadonlySet<CommandType> = new Set([
 
 // ── 信封 ──
 export const commandEnvelopeSchema = z.object({
+  workspace: v4ColdResumeWorkspaceSchema,
   /** 仅 Host 根据当前附件握手注入；未知 CLI 不发送。 */
   pluginDiscoveryUi: z.literal(true).optional(),
   /** Host 可信 attachment 注入；CLI 保留到原 input intent。 */

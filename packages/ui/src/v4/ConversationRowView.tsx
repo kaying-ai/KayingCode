@@ -40,6 +40,7 @@ import type {
   TurnHeaderRow,
   UserInputRow,
 } from "@zcode/shared/kayingcode-protocol-v4";
+import { formatPluginDisplayName } from "@/plugin-ui/domain/pluginDisplayName.js";
 import { AssistantPreviewCards } from "@/AssistantPreviewCards.js";
 import { AssistantCodeCommentCards } from "@/AssistantCodeCommentCards.js";
 import { useAssistantCodeCommentFeatureEnabled } from "@/AssistantCodeCommentFeatureProvider.js";
@@ -992,6 +993,28 @@ const UserInputRowView = memo(function UserInputRowView({
             </ConversationUserInputBody>
           ) : null}
           {epilogue === undefined ? null : <ConversationUserInputEpilogue text={epilogue} />}
+        </div>
+      ) : null}
+      {row.source?.kind === "genUi" ? (
+        <div
+          className="mt-1 text-right text-ui-sm text-foreground-subtlest"
+          data-v4-user-input-source="genUi"
+        >
+          {intl.formatMessage({ id: "genUi.from" }, { name: row.source.title || "Gen UI" })}
+        </div>
+      ) : null}
+      {row.source?.kind === "pluginUi" || row.source?.kind === "extension" ? (
+        // 插件 UI 或扩展代发：来源来自 CLI 持久化的 intent.source，不由 renderer 推断。
+        // 两者同一句文案；名字取插件 id 的名字部分，桌面与手机一致。
+        <div
+          data-v4-user-input-source={row.source.pluginId}
+          data-v4-user-input-source-kind={row.source.kind}
+          className="mt-1 text-right text-ui-sm text-foreground-subtlest"
+        >
+          {intl.formatMessage(
+            { id: "pluginUi.fromPlugin" },
+            { name: formatPluginDisplayName(row.source.pluginId) },
+          )}
         </div>
       ) : null}
       {status ? (

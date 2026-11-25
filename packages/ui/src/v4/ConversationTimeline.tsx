@@ -85,7 +85,10 @@ import {
 } from "@/v4/timelineScrollAnchor.js";
 import { useConversationTimelineFind } from "@/v4/useConversationTimelineFind.js";
 import { ConversationSelectionTooltip } from "@/v4/ConversationSelectionTooltip.js";
-import type { ConversationSelectionReference } from "@/lib/conversationSelectionReference.js";
+import type {
+  ConversationSelectionAppendResult,
+  ConversationSelectionReference,
+} from "@/lib/conversationSelectionReference.js";
 
 // memo 组件参数中的 `pendingGuides = []` 会在每次调用时创建新引用，
 // 让未传该属性的渲染绕过稳定引用边界；共享只读空数组可保持默认值恒定。
@@ -319,8 +322,14 @@ interface ConversationTimelineProps {
   selectionActions?: {
     enabled: boolean;
     sideActionDisabled?: boolean;
-    onAddToCurrentTask: (reference: ConversationSelectionReference) => void;
-    onAskInSideChat: (reference: ConversationSelectionReference) => void;
+    /** 当前会话 CLI 声明 conversationQuoteComment 时才提供“注释”。 */
+    commentEnabled?: boolean;
+    /** 主 composer 引用作用域的 workspaceKey；提供时正文画注释标记并可点编号编辑。 */
+    annotationWorkspaceKey?: string;
+    onAddToCurrentTask: (
+      reference: ConversationSelectionReference,
+    ) => ConversationSelectionAppendResult | undefined;
+    onAskInSideChat?: (reference: ConversationSelectionReference) => void;
   };
 }
 
@@ -1630,6 +1639,8 @@ function ConversationTimelineImpl({
           sourceSessionId={sessionKey}
           enabled={selectionActions.enabled}
           sideActionDisabled={selectionActions.sideActionDisabled}
+          commentEnabled={selectionActions.commentEnabled}
+          annotationWorkspaceKey={selectionActions.annotationWorkspaceKey}
           onAddToCurrentTask={selectionActions.onAddToCurrentTask}
           onAskInSideChat={selectionActions.onAskInSideChat}
         />

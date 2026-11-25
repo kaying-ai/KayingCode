@@ -282,6 +282,9 @@ export { ISettingsSyncService } from "./settings-sync/settingsSync.js";
 
 export { IFeedbackService } from "./feedback/feedback.js";
 export type { FeedbackUploadProgress } from "./feedback/feedback.js";
+// 语音输入：契约可进 renderer，实现只从 @zcode/services/node 装配（services/node.ts）。
+export { IVoiceInputService } from "./voice-input/index.js";
+export type { VoiceInputErrorCode, VoiceInputEvent } from "./voice-input/index.js";
 export { IPromptAttachmentTransferService } from "./prompt-attachment-transfer/promptAttachmentTransfer.js";
 export type {
   PromptAttachmentStageParams,

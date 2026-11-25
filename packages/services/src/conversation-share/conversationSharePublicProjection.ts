@@ -274,6 +274,8 @@ function projectTimelineMarker(
     case "forkNotice":
     case "forkCreated":
     case "checkpointRestored":
+    // 已在 retainedRows 中过滤；走到这里说明调用方绕过了过滤。
+    case "worktreeCreated":
       throwProjectionError(
         "invalid_conversation",
         "Timeline references outside the shared projection are not supported",
@@ -647,9 +649,13 @@ export function buildConversationSharePublicProjection(input: {
   }
 
   // 本地运行投影包含 subagent 详情和写入态标识，不能直接作为公开载荷；
+  // "已创建 worktree"标记含本机路径与 git 输出，属于本地执行环境，同样不进入公开载荷。
   // 必须先过滤非 V1 Row，再基于剩余内容生成一套闭合的公开 ID。
   const retainedRows = input.rows.filter(
-    (row) => row.kind !== "subagent" && row.kind !== "hookInvocation",
+    (row) =>
+      row.kind !== "subagent" &&
+      row.kind !== "hookInvocation" &&
+      !(row.kind === "timelineMarker" && row.marker.type === "worktreeCreated"),
   );
   const sourceArtifactRows = retainedRows.filter(
     (row): row is ArtifactRow => row.kind === "artifact",

@@ -85,6 +85,7 @@ import {
   createWindowHostExtensions,
   getPluginUserOptionsReader,
   getAppConfigDir,
+  getKayingCodeDataRootDir,
   type AppControlServiceHandle,
   type WindowHostExtensions,
   OffPeakModelUnavailableError,
@@ -131,7 +132,11 @@ import {
   type WorkspaceConnectionTarget,
   REMOTE_BIND_CANCELED_ERROR_CODE,
   REMOTE_WORKSPACE_BIND_SESSION_MISSING_ERROR_CODE,
+  KAYINGCODE_PRODUCT_FLAVOR,
+  resolveKayingCodeRuntimeEnv,
 } from "@zcode/shared";
+import { resolvePreinstalledToolsRelease } from "@zcode/shared/preinstalled-tools";
+import { resolvePreinstalledToolsBinDir } from "@zcode/shared/preinstalled-tools/node";
 import { createCredentialCipherBridge } from "@zcode/shared/credential-security";
 import {
   parseHostIncomingMessageEvent,
@@ -3976,6 +3981,15 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
           log: (message, details) => logger.warn(message, details),
           establishOwner: () => {
             const initializedServices = createLocalServices({
+              // 固定目录与发布目标无关；准备完成后，既有会话下一条命令即可找到入口。
+              // 不读取安装记录、不等待预装进程：是否有入口由 services 的 spawn 边界判定。
+              preinstalledToolsBinDir: resolvePreinstalledToolsBinDir({
+                dataRoot: getKayingCodeDataRootDir(),
+                release: resolvePreinstalledToolsRelease({
+                  runtimeEnv: resolveKayingCodeRuntimeEnv(process.env),
+                  productFlavor: KAYINGCODE_PRODUCT_FLAVOR,
+                }),
+              }),
               parentPort,
               credentialCipherProvider: credentialCipherBridge.cipher,
               settingService,

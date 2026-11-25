@@ -278,6 +278,8 @@ export interface V4CommandCoreHost {
     sessionId?: string;
     additionalDirectories?: string[];
     workspaceId: string;
+    /** 会话 cwd 与 workspace 不同（受管 worktree）；只允许本地 workspace。 */
+    cwd?: string;
     permissionScope?: "session";
     mcpServers?: CommandPayloadMap["createSession"]["mcpServers"];
     /** host 判定的 Off-Peak 工具面门禁；缺省不注册工具。 */
@@ -309,6 +311,8 @@ export interface V4CommandCoreHost {
       goalBoundary: StableForkGoalBoundaryMetadata;
       sourceCommandId: string;
       revisionAtDecision: number;
+      /** 协议原样透传；校验（仅本地）与项目身份派生由宿主负责。 */
+      targetCwd?: CommandPayloadMap["forkAssistant"]["targetCwd"];
     },
   ): Promise<{ forkedSessionId: string }>;
   /** @deprecated 仅旧宿主结构兼容；新 editUserQuery 永不调用，显式 forkAssistant 不受影响。 */

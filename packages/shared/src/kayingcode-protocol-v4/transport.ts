@@ -467,6 +467,11 @@ export const v4ConversationSubscribeParamsSchema = subscribeParamsSchema.extend(
   workspace: kayingcodeWorkspaceRefSchema.optional(),
   /** host 从当前 remote workspace 的 tasks-index 精确读取的旧任务归属 allowlist。 */
   legacyTaskIds: z.array(z.string().min(1)).max(MAX_LEGACY_TASK_IDS_PER_SUBSCRIBE).optional(),
+  /**
+   * 本地 workspace 下 cwd 位于受管 worktree 的会话 id（目录扫描看不到）。
+   * Host 从 tasks-index 精确提供；CLI 只读校验归属后补入摘要（docs/git/worktree.md §6.6.2）。
+   */
+  worktreeSessionIds: z.array(z.string().min(1)).max(MAX_LEGACY_TASK_IDS_PER_SUBSCRIBE).optional(),
   // 仅供 host→CLI cold resume 使用；live conversation 不消费该 hint。
   resumeThoughtLevel: z.string().trim().min(1).optional(),
   /**
@@ -583,6 +588,8 @@ export type V4ConversationRowsRangeResult = z.infer<typeof v4ConversationRowsRan
 export const v4ConversationPlansParamsSchema = z
   .object({
     sessionId: z.string().min(1),
+    /** 可信 attachment 的 workspace：冷恢复按它取项目身份、按存储 cwd 执行。 */
+    workspace: kayingcodeWorkspaceRefSchema.optional(),
   })
   .strict();
 export type V4ConversationPlansParams = z.infer<typeof v4ConversationPlansParamsSchema>;

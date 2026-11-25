@@ -89,7 +89,10 @@ export function getConversationMessageProjectionPolicy(
   }
 
   if (semantics) {
-    if (semantics.kind === "timeline_event") {
+    // 修复原因：辅助对话复制父历史时保留原 kind，只把 uiVisibility 改成 hidden。原来先判
+    // timeline_event 就返回 timelineOnly，父任务的「已创建 worktree」「分叉自…」会显示在辅助对话里。
+    // 显式 hidden 优先：复制件落到下面的 providerVisibility 分支，和其他继承历史一样只进模型上下文。
+    if (semantics.kind === "timeline_event" && semantics.uiVisibility !== "hidden") {
       return "timelineOnly";
     }
     if (

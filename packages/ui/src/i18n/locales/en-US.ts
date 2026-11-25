@@ -1,6 +1,69 @@
 /** English translations */
 const enUS: Record<string, string> = {
   "login.oauth.regionTag.bigmodel": "China",
+  "preinstalledTools.purpose.python":
+    "Runs document plugin scripts and provides spreadsheet, Word, and PDF libraries",
+  "preinstalledTools.purpose.qpdf": "Splits, merges, encrypts, and repairs PDF files",
+  "preinstalledTools.purpose.pandoc": "Reads the contents of Word documents",
+  "preinstalledTools.purpose.poppler": "Converts PDF pages to images and extracts text",
+  "preinstalledTools.purpose.libreoffice":
+    "For document to PDF conversion, presentation conversion, and spreadsheet formula recalculation",
+  "preinstalledTools.phase.queued": "Waiting for other tools to finish preparing…",
+  "preinstalledTools.phase.verifying": "Verifying files…",
+  "preinstalledTools.phase.extracting": "Extracting…",
+  "preinstalledTools.phase.checking": "Checking whether the tool can run…",
+  "preinstalledTools.status.not-installed": "Not installed",
+  "preinstalledTools.status.preparing": "Preparing",
+  "preinstalledTools.status.ready": "Ready",
+  "preinstalledTools.status.failed": "Preparation failed",
+  "preinstalledTools.status.update-available": "Update available",
+  "preinstalledTools.title": "Preinstalled tools",
+  "preinstalledTools.description": "These tools are installed on this computer for document tasks.",
+  "preinstalledTools.loading": "Loading…",
+  "preinstalledTools.loadFailed":
+    "Preinstalled tools could not start. Restart KayingCode and try again. If the problem continues, report it via Help → Report an issue.",
+  "preinstalledTools.unavailable": "This version does not provide this tool yet.",
+  "preinstalledTools.autoInstall": "Automatic preinstall",
+  "preinstalledTools.autoInstallDescription":
+    "Prepare tools in the background when KayingCode starts. Turning this off stops future automatic downloads. Installed tools remain available.",
+  "preinstalledTools.agentEnabled": "Agent uses preinstalled version",
+  "preinstalledTools.agentEnabledDescription":
+    "Turn this off to let the Agent use {name} already installed on this computer.",
+  "preinstalledTools.entryOutOfSync":
+    "Your setting is saved but has not taken effect. Please retry.",
+  "preinstalledTools.deletionBlocked": "{name} is being used by the Agent. Please try again later.",
+  "preinstalledTools.download": "Download",
+  "preinstalledTools.update": "Update",
+  "preinstalledTools.cancel": "Cancel download",
+  "preinstalledTools.retry": "Retry",
+  "preinstalledTools.delete": "Delete",
+  "preinstalledTools.deleteTitle": "Delete {name}?",
+  "preinstalledTools.deleteDescription": "This will free about {size} GB of disk space.",
+  "preinstalledTools.deleteAutoNotice":
+    "With automatic preinstall enabled, KayingCode will download it again the next time it starts.",
+  "preinstalledTools.deleteNotice.python":
+    "Python packages added by the Agent will also be deleted.",
+  "preinstalledTools.deleteCancel": "Cancel",
+  "preinstalledTools.commandFailed": "The operation could not be completed. Please retry.",
+  "preinstalledTools.readyInfo": "Version {version} · {size} GB used",
+  "preinstalledTools.downloadInfo": "Downloading {loaded} / {total} MB",
+  "preinstalledTools.sizeInfo":
+    "About {download} MB to download; {installed} GB after installation",
+  "preinstalledTools.updateInfo":
+    "Currently using version {current}. Version {version} requires about {download} MB to download and {installed} GB to install.",
+  "preinstalledTools.currentInfo": "Currently using version {current}.",
+  "preinstalledTools.remoteNotice":
+    "A remote workspace is open. This dialog manages this computer and does not install tools on the remote device.",
+  "preinstalledTools.error.network":
+    "Cannot connect to the download server. Check your network or proxy settings.",
+  "preinstalledTools.error.interrupted": "Download interrupted. Please retry.",
+  "preinstalledTools.error.disk-space":
+    "Not enough disk space. About {size} GB of free space is required.",
+  "preinstalledTools.error.checksum": "The downloaded file is corrupted. Please retry.",
+  "preinstalledTools.error.extract": "Extraction failed. Please retry.",
+  "preinstalledTools.error.runtime":
+    "The tool cannot run on this computer. Report the issue via Help → Report an issue.",
+  "preinstalledTools.error.unsupported": "This system is not supported yet.",
   "login.oauth.regionTag.zai": "Global",
   "webRemoteControl.botChannel.unavailable":
     "Bot Channels configuration is unavailable for this connection.",
@@ -1011,6 +1074,24 @@ const enUS: Record<string, string> = {
   "chat.selections.limit.count": "You can attach at most 8 conversation selections.",
   "chat.selections.limit.total":
     "Conversation selections can contain at most 16,000 characters in total.",
+  "selectionComment.action": "Annotate",
+  "selectionComment.placeholder": "Optional comment to send with this quote",
+  "selectionComment.hint": "Can be left empty · Shift + ↵ for new line",
+  "selectionComment.save": "Add annotation",
+  "selectionComment.addTitle": "Add annotation · comment optional",
+  "selectionComment.editTitle": "Edit annotation",
+  "selectionComment.editHint": "Leave empty to keep only the quoted text",
+  "selectionComment.editSave": "Save",
+  "selectionComment.delete": "Delete annotation",
+  "selectionComment.addComment": "Add comment",
+  "selectionComment.deleted": "Annotation deleted",
+  "selectionComment.undo": "Undo",
+  "selectionComment.sentTitle": "Sent with your message",
+  "selectionComment.listHeader": "{count} annotations will be sent with your next message",
+  "selectionComment.listHint": "Numbers match the reply",
+  "selectionComment.removeAll": "Remove all annotations",
+  "selectionComment.count": "{count} annotations",
+  "selectionComment.remove": "Delete annotation",
   "sidePane.openTabDescription": "Choose a tab to open in the side pane.",
   "sidePane.openFile": "Open file",
   "sidePane.openFileDescription": "Open a file from the current workspace in the side panel.",
@@ -1323,6 +1404,94 @@ const enUS: Record<string, string> = {
     "Another Git operation is still in progress. Finish it before switching branches.",
   "git.branchSwitcher.error.branchInOtherWorktree":
     "That branch is already checked out in another worktree.",
+  "managedWorktrees.name": "{repo} · {bucket}",
+  "managedWorktrees.taskLabel": "Worktree task",
+  "managedWorktrees.entry.label": "worktree",
+  "managedWorktrees.entry.tooltip":
+    "Run in a new worktree: an isolated copy that works in parallel with your local checkout",
+  "managedWorktrees.entry.unsupported": "This Agent version doesn't support worktrees",
+  "managedWorktrees.entry.notRepository": "The project folder isn't a Git repository",
+  "managedWorktrees.entry.remote": "Worktrees are available only for local projects",
+  "managedWorktrees.manage": "Worktrees",
+  "managedWorktrees.manage.tooltip": "Manage worktrees for this project",
+  "managedWorktrees.error.not-repository": "The project folder isn't a Git repository",
+  "managedWorktrees.error.invalid-start-ref": "The selected starting point doesn't exist",
+  "managedWorktrees.error.start-ref-missing-subdir":
+    "The selected starting point has no project folder",
+  "managedWorktrees.error.bucket-exhausted": "Couldn't allocate a worktree folder",
+  "managedWorktrees.error.worktree-dirty": "The worktree has uncommitted changes",
+  "managedWorktrees.error.worktree-in-use": "A task is using this worktree",
+  "managedWorktrees.error.not-managed": "This folder isn't a worktree managed by KayingCode",
+  "managedWorktrees.error.local-only": "Worktrees are available only for local projects",
+  "managedWorktrees.error.git-failed": "The Git operation failed",
+  "managedWorktrees.error.copy-failed": "Couldn't copy files listed in .worktreeinclude",
+  "managedWorktrees.error.unsupported-agent": "This Agent version doesn't support worktrees",
+  "managedWorktrees.error.session-failed":
+    "The worktree was created, but the task failed to start",
+  "managedWorktrees.error.carry-failed":
+    "Couldn't carry uncommitted changes into the new worktree",
+  "managedWorktrees.error.session-close-failed":
+    "Couldn't unload the tasks using this worktree. The worktree was kept.",
+  "managedWorktrees.error.release-unsupported":
+    "This Agent version can't unload tasks resident in the worktree. The worktree was kept.",
+  "managedWorktrees.error.removing": "This worktree is being deleted. Try again later.",
+  "managedWorktrees.error.generic": "The worktree operation failed",
+  "managedWorktrees.ref.title": "Create the new worktree from",
+  "managedWorktrees.ref.currentHead": "Current HEAD ({ref})",
+  "managedWorktrees.ref.detached": "detached · {sha}",
+  "managedWorktrees.ref.localBranches": "Local branches",
+  "managedWorktrees.ref.remoteBranches": "Remote branches",
+  "managedWorktrees.ref.note":
+    "The new worktree is created from the selected branch. Your local branch does not change. Uncommitted changes are not included.",
+  "managedWorktrees.creation.creating": "Creating worktree",
+  "managedWorktrees.creation.startingSession": "Starting task",
+  "managedWorktrees.creation.failed": "Worktree setup failed",
+  "managedWorktrees.creation.forkTitle": "Fork in a new worktree",
+  "managedWorktrees.creation.retry": "Retry",
+  "managedWorktrees.creation.continueLocal": "Don't use worktree",
+  "managedWorktrees.creation.dismiss": "Dismiss",
+  "managedWorktrees.creation.showOutput": "Show output",
+  "managedWorktrees.creation.hideOutput": "Hide output",
+  "managedWorktrees.creation.sidebarRow": "Creating worktree…",
+  "managedWorktrees.created.title": "Worktree created",
+  "managedWorktrees.list.inProgress": "In progress",
+  "managedWorktrees.dialog.title": "Worktrees",
+  "managedWorktrees.dialog.description": "Worktrees that KayingCode manages for {project}",
+  "managedWorktrees.dialog.loadFailed": "Couldn't load worktrees",
+  "managedWorktrees.dialog.empty": "No worktrees yet",
+  "managedWorktrees.dialog.detached": "detached · {sha}",
+  "managedWorktrees.dialog.dirty": "Modified",
+  "managedWorktrees.dialog.missing": "Directory missing",
+  "managedWorktrees.dialog.noTasks": "No tasks",
+  "managedWorktrees.dialog.openTask": "Open task",
+  "managedWorktrees.dialog.untitledTask": "Untitled task",
+  "managedWorktrees.dialog.archived": "Archived",
+  "managedWorktrees.dialog.delete": "Delete worktree",
+  "managedWorktrees.dialog.prune": "Remove record",
+  "managedWorktrees.dialog.pruneFailed": "Couldn't remove the record",
+  "managedWorktrees.dialog.confirm.title": "Delete worktree {name}?",
+  "managedWorktrees.dialog.confirm.directory": "The worktree directory will be deleted.",
+  "managedWorktrees.dialog.confirm.ignored":
+    "Ignored files, such as dependencies and build output, are also deleted.",
+  "managedWorktrees.dialog.confirm.tasks":
+    "Tasks that use it are kept, but they become read-only.",
+  "managedWorktrees.dialog.confirm.discardChanges":
+    "This worktree has uncommitted changes. They will be discarded.",
+  "managedWorktrees.dialog.error.dirty": "The worktree has uncommitted changes",
+  "managedWorktrees.dialog.error.running": "A task is running",
+  "managedWorktrees.dialog.error.terminal":
+    "Close the terminals running in this directory first",
+  "managedWorktrees.dialog.error.creating": "This worktree is still being created",
+  "managedWorktrees.dialog.error.tasks": "A task is using this worktree",
+  "managedWorktrees.dialog.error.removing": "This worktree is being deleted",
+  "managedWorktrees.dialog.error.inUse": "A session is still resident in this worktree",
+  "managedWorktrees.dialog.error.releaseUnsupported":
+    "This Agent version can't unload resident sessions. The worktree was kept.",
+  "managedWorktrees.dialog.error.sessionClose":
+    "Couldn't unload the tasks using this worktree. The worktree was kept.",
+  "managedWorktrees.dialog.error.notManaged": "This folder isn't a managed worktree",
+  "managedWorktrees.dialog.error.gitFailed": "The Git operation failed",
+  "managedWorktrees.dialog.error.generic": "Couldn't delete the worktree",
   "git.branchSwitcher.error.unknown": "Switching branches failed. Please try again.",
   "git.branchSwitcher.error.requestFailed": "Branch operation failed: {error}",
   "gitGraph.title": "Git Graph",
@@ -2104,6 +2273,7 @@ const enUS: Record<string, string> = {
   "settings.shortcuts.command.nextConversation": "Next Task",
   "settings.shortcuts.command.toggleInterfaceMode": "Toggle coding/office mode",
   "settings.shortcuts.command.openOnboarding": "Toggle onboarding",
+  "settings.shortcuts.command.toggleVoiceInput": "Start or Stop Voice Input",
   "settings.shortcuts.command.navigateBack": "Navigate Back",
   "settings.shortcuts.command.navigateForward": "Navigate Forward",
   "settings.shortcuts.command.openModelMenu": "Open Model Menu",
@@ -2406,6 +2576,7 @@ const enUS: Record<string, string> = {
   "resourceManager.storage.category.backups": "Backups",
   "resourceManager.storage.category.exports": "Exports & feedback bundles",
   "resourceManager.storage.category.runtimes": "Agent runtimes & plugins",
+  "resourceManager.storage.category.preinstalledTools": "Preinstalled tools",
   "resourceManager.storage.category.config": "Settings, credentials & workspace",
   "resourceManager.storage.category.other": "Other",
   "resourceManager.storage.categoryDescription.sessionStore":
@@ -2426,6 +2597,8 @@ const enUS: Record<string, string> = {
     "Exported log bundles and feedback attachments.",
   "resourceManager.storage.categoryDescription.runtimes":
     "Bundled agent runtimes, Computer Use components and plugins.",
+  "resourceManager.storage.categoryDescription.preinstalledTools":
+    "Managed document tools. Delete them from Help → Preinstalled tools.",
   "resourceManager.storage.categoryDescription.config":
     "Settings, credentials, memories and default workspace files.",
   "resourceManager.storage.categoryDescription.other":
@@ -3503,6 +3676,19 @@ const enUS: Record<string, string> = {
   "settings.plugins.store.viewMoreFew": "See {names}",
   "settings.plugins.store.showLess": "Show less",
   "settings.plugins.store.install": "Install",
+  "settings.plugins.store.extension.requiresUpdate": "Requires newer KayingCode",
+  "settings.plugins.store.extension.incompatibleHint":
+    "This plugin needs a newer version of KayingCode. Update KayingCode, then install it.",
+  "settings.plugins.store.extension.updateBlockedHint":
+    "The latest version needs a newer KayingCode. Update KayingCode to install this update.",
+  "settings.plugins.store.extension.title": "Includes resident code",
+  "settings.plugins.store.extension.description":
+    "When enabled, the plugin's extension code keeps running inside KayingCode.",
+  "settings.plugins.store.extension.engineRequirement": "Requires plugin API {range}",
+  "settings.plugins.store.extension.grantsTitle": "Requested permissions",
+  "settings.plugins.store.extension.noGrants": "No permissions requested",
+  "settings.plugins.store.extension.consentNote":
+    "For information only. After you install, the plugin can use these permissions only after you grant them in the permission dialog.",
   "settings.plugins.store.paidPlanBadge": "Coding Plan",
   "settings.plugins.store.requiresPaidPlan": "This plugin works better with a Coding Plan",
   "settings.plugins.store.tryNow": "Try now",
@@ -6924,6 +7110,10 @@ const enUS: Record<string, string> = {
   "extensions.grants.holder": "“{plugin}” ({tiers})",
   "extensions.grants.needsConsent": "Needs permission",
   "extensions.grants.revokedToast": "Revoked the permissions of “{plugin}”",
+  "extensions.grants.tier.notifications": "Send system notifications",
+  "extensions.grants.tier.sessions.fullAccess": "Read and change sessions, with full access",
+  "extensions.grants.tier.sessions.read": "Read sessions",
+  "extensions.grants.tier.sessions.write": "Read and change sessions",
   "extensions.launcher.reload": "Reload",
   "extensions.launcher.stopped": "Extensions stopped",
   "extensions.launcher.stoppedDescription": "Stopped restarting after repeated crashes or hangs.",
@@ -6965,6 +7155,8 @@ const enUS: Record<string, string> = {
   "extensions.view.loading": "Loading the extension view…",
   "extensions.view.unavailable": "This extension view is not available right now.",
   "extensions.view.unsupported": "Extension views are not supported here.",
+  "genUi.from": "From interactive view {name}",
+  "pluginUi.fromPlugin": "From plugin {name}",
   "pluginUi.followUp.cancel": "Cancel",
   "pluginUi.followUp.description": "From plugin {name}. You can edit it before sending.",
   "pluginUi.followUp.send": "Send",
@@ -6987,6 +7179,51 @@ const enUS: Record<string, string> = {
     "No plugin UI is available in this project. Check whether the plugin is enabled.",
   "settings.plugins.store.ui.unsupported": "Plugin UI is available in local desktop projects only.",
   "sidePane.launcher.empty": "No recommended app plugins yet",
+  "voiceInput.button.start": "Voice input",
+  "voiceInput.button.connecting": "Connecting to speech recognition…",
+  "voiceInput.button.stop": "Stop recording",
+  "voiceInput.button.recognizing": "Recognizing…",
+  "voiceInput.action.openPrivacySettings": "Open System Settings",
+  "voiceInput.action.openSoundSettings": "Open Sound Settings",
+  "voiceInput.permission.title": "Microphone access needed",
+  "voiceInput.permission.description.mac":
+    'Click "Request again", then choose "Allow" in the system dialog. You can also turn on KayingCode in System Settings › Privacy & Security › Microphone.',
+  "voiceInput.permission.reauthorize": "Request again",
+  "voiceInput.permission.restartTitle": "Restart KayingCode",
+  "voiceInput.permission.restartDescription":
+    'The microphone permission was reset. Restart KayingCode, click the microphone, then choose "Allow" in the system dialog.',
+  "voiceInput.permission.relaunch": "Restart KayingCode",
+  "voiceInput.permission.granted":
+    "Microphone access is on. Click the microphone to start voice input.",
+  "voiceInput.permission.description.windows":
+    'In Settings › Privacy & security › Microphone, turn on both "Microphone access" and "Let desktop apps access your microphone".',
+  "voiceInput.error.permissionDenied.linux":
+    "Cannot access the microphone. Check the system microphone permission and the PulseAudio / PipeWire input device.",
+  "voiceInput.error.silent":
+    "No sound came from the microphone. Usually the system microphone permission is off or the wrong input device is selected.",
+  "voiceInput.error.silent.linux":
+    "No sound came from the microphone. Check the PulseAudio / PipeWire input device and volume.",
+  "voiceInput.error.noDevice": "No microphone found. Connect a microphone and try again.",
+  "voiceInput.error.noDevice.linux":
+    "No microphone found. Connect a microphone and check the PulseAudio / PipeWire input device.",
+  "voiceInput.error.deviceBusy": "The microphone cannot be used. Another app may be using it.",
+  "voiceInput.error.deviceBusy.linux":
+    "The microphone cannot be used. Another app may be using it. Check the PulseAudio / PipeWire input device.",
+  "voiceInput.error.device_ended": "The microphone was disconnected. Voice input was cancelled.",
+  "voiceInput.error.too_quiet":
+    "No sound detected. Check that the microphone is not muted or too far away.",
+  "voiceInput.error.audio_too_short": "The recording is too short. Try again.",
+  "voiceInput.error.no_speech":
+    "No speech was recognized. Move closer to the microphone and try again.",
+  "voiceInput.error.network": "Cannot connect to speech recognition. Check your network.",
+  "voiceInput.error.proxy":
+    'Cannot connect to speech recognition through the HTTP proxy. Make sure the proxy supports WebSocket, or add the service address to "No proxy", then restart the app.',
+  "voiceInput.error.rate_limited": "Speech recognition is busy. Try again later.",
+  "voiceInput.error.unavailable": "Speech recognition is unavailable. Try again later.",
+  "voiceInput.error.upstream_timeout": "Speech recognition timed out. Try again.",
+  "voiceInput.error.audio_limit_exceeded":
+    "The recording reached the maximum length. The recognized text was kept.",
+  "voiceInput.error.failed": "Speech recognition failed. Try again.",
 };
 
 export default enUS;

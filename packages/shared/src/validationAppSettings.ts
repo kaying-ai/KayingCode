@@ -589,6 +589,10 @@ const appSettingsObjectSchema = z.object({
   providerFamilyDomainMigrated: z.boolean().default(false),
   nativeSearchEnhancementsEnabled: z.boolean().default(true),
   toolSearchMode: appToolSearchModeSchema.default("off"),
+  // 预装文档工具的全局偏好；缺省由预装进程按「自动开启、全部工具启用」解释。
+  // 只有预装进程写这两项，设置页 UI 通过设置服务 patch；spec 见 packages/shared/spec/preinstalled-tools.md。
+  preinstalledToolsAutoInstall: z.boolean().optional(),
+  preinstalledToolsAgentDisabled: z.array(z.string().min(1)).optional(),
   onboardingOccupation: appSettingsOccupationSchema.nullish(),
   proactiveSuggestionsEnabled: z.boolean().optional(),
   memoryEnabled: z.boolean().default(false),
@@ -689,6 +693,8 @@ export const appSettingsPatchSchema = z.object({
   providerFamilyDomainMigrated: z.boolean().optional(),
   nativeSearchEnhancementsEnabled: z.boolean().optional(),
   toolSearchMode: appToolSearchModeSchema.optional(),
+  preinstalledToolsAutoInstall: z.boolean().optional(),
+  preinstalledToolsAgentDisabled: z.array(z.string().min(1)).optional(),
   onboardingOccupation: z
     .enum([
       "office",

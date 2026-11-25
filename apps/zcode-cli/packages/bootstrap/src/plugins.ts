@@ -36,6 +36,7 @@ import {
   loadKnownMarketplacesSync,
   loadMarketplaceManifestSync,
   parseMarketplaceSourceInput,
+  parseEntryExtensionSummary,
   parseEntryStoreListing,
   readPluginSourceIdentityPin,
   removeMarketplace,
@@ -48,6 +49,7 @@ import {
   type InstalledPluginRecord,
   type KnownMarketplaceRecord,
   type MarketplaceSource,
+  type PluginExtensionSummary,
   type PluginMarketplaceEntry,
 } from "@zcode/adapters/plugins";
 import type {
@@ -129,6 +131,8 @@ export interface KayingCodeAvailablePluginData {
   hookDetails?: PluginHookDetail[];
   // 商店信息（显示名/icon/分类/作者/链接/hero/示例提示词），来自目录条目。
   listing?: PluginStoreListing;
+  // 目录条目的扩展摘要（packages/shared/spec/plugin-extension-summary.md）。协议层按请求参数决定是否放进 listing。
+  extensionSummary?: PluginExtensionSummary;
 }
 
 export interface KayingCodeInstalledPluginData {
@@ -147,6 +151,8 @@ export interface KayingCodeInstalledPluginData {
   latestVersion?: string;
   // 已安装插件的商店信息由目录条目按 id join 得到（市场被移除时缺失，UI 走降级）。
   listing?: PluginStoreListing;
+  // 目录里最新版条目的扩展摘要（不是已装版本的）；App 据此判断最新版能不能装。
+  extensionSummary?: PluginExtensionSummary;
 }
 
 export interface KayingCodePluginsOverviewData {
@@ -362,6 +368,7 @@ export async function getKayingCodePluginsOverview(
   const latestPinByPluginId = new Map<string, { version?: string; sha?: string }>();
   // 同时按 id 收集目录条目的商店信息，供已安装插件 join（详情/图标条/管理视图共用）。
   const listingByPluginId = new Map<string, PluginStoreListing>();
+  const extensionSummaryByPluginId = new Map<string, PluginExtensionSummary>();
   const availablePlugins = catalogs.flatMap((catalog) =>
     catalog.entries.map((entry) => {
       const data = toAvailablePluginData(entry, catalog.summary.id, installedIds);
@@ -372,6 +379,7 @@ export async function getKayingCodePluginsOverview(
           : {}),
       });
       if (entry.listing) listingByPluginId.set(data.id, entry.listing);
+      if (data.extensionSummary) extensionSummaryByPluginId.set(data.id, data.extensionSummary);
       return data;
     }),
   );
@@ -416,11 +424,13 @@ export async function getKayingCodePluginsOverview(
       // latestVersion 展示：优先用 manifest 的 version；否则用最新 sha（短 7 位）让 UI 有可读提示。
       const latestLabel = pin?.version ?? (pin?.sha ? pin.sha.slice(0, 7) : undefined);
       const listing = listingByPluginId.get(record.id);
+      const extensionSummary = extensionSummaryByPluginId.get(record.id);
       return {
         ...data,
         updateStatus,
         ...(latestLabel ? { latestVersion: latestLabel } : {}),
         ...(listing ? { listing } : {}),
+        ...(extensionSummary ? { extensionSummary } : {}),
       };
     }),
     restorableBuiltins,
@@ -1414,6 +1424,8 @@ function toAvailablePluginData(
   installedIds: ReadonlySet<string>,
 ): KayingCodeAvailablePluginData {
   const id = `${entry.name}@${marketplace}`;
+  // 从原始条目读：旧版本缓存的目录不用迁移，下次 overview 就能读到。
+  const extensionSummary = parseEntryExtensionSummary(entry.raw);
   return {
     id,
     name: entry.name,
@@ -1423,6 +1435,7 @@ function toAvailablePluginData(
     installed: installedIds.has(id),
     componentTypes: inferComponentTypes(entry.raw),
     ...(entry.listing ? { listing: entry.listing } : {}),
+    ...(extensionSummary ? { extensionSummary } : {}),
   };
 }
 
@@ -1446,6 +1459,8 @@ function toInstalledPluginData(
   };
 }
 
+const CATALOG_CLAIMED_COMPONENT_TYPES = ["ui", "extension"] as const;
+
 function inferComponentTypes(raw: Record<string, unknown>): string[] {
   const types: string[] = [];
   if ("agents" in raw) types.push("agent");
@@ -1454,7 +1469,12 @@ function inferComponentTypes(raw: Record<string, unknown>): string[] {
   if ("hooks" in raw) types.push("hook");
   if ("mcpServers" in raw) types.push("mcp");
   if ("lspServers" in raw) types.push("lsp");
-  if (Array.isArray(raw.componentTypes) && raw.componentTypes.includes("ui")) types.push("ui");
+  // 目录自报的 ui / extension 只是安装前的宣传，装上后以实际清单为准；CLI 只透传、不判断兼容。
+  for (const claimed of CATALOG_CLAIMED_COMPONENT_TYPES) {
+    if (Array.isArray(raw.componentTypes) && raw.componentTypes.includes(claimed)) {
+      types.push(claimed);
+    }
+  }
   return types;
 }
 

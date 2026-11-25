@@ -164,6 +164,29 @@ export const kayingcodeRuntimeCapabilitiesSchema = z.object({
   independentPlanState: z.boolean().optional(),
   /** CLI 认识 rowsRange 的 residency 参数；旧 CLI 会剥掉它并冷恢复，Host 据此拒绝转发。 */
   residentRowsRange: z.boolean().optional(),
+  /**
+   * CLI 支持"会话 cwd 与 workspace 不同"：createSession.cwd / worktreeCreation、
+   * forkAssistant.targetCwd、按 Host 请求的 workspace key 冷恢复（docs/git/worktree.md §9.3）。
+   * 旧 CLI 会静默丢弃这些字段，Host 据此决定是否开放 worktree 入口。
+   */
+  worktreeCwd: z.boolean().optional(),
+  /**
+   * CLI 认识 `{kind:"extension"}` 输入来源（sendText.source、createSession.firstInput.source）。
+   * 旧 CLI 对 sendText 整条拒绝、对 firstInput 静默剥掉来源，Host 据此决定能否代扩展发消息
+   * （packages/shared/spec/conversation-input-source.md §7）。
+   */
+  extensionInputSource: z.boolean().optional(),
+  /**
+   * CLI 认识对话引用上的 comment / agent 字段（选区批注）。旧 CLI 的 quote schema 非 strict，
+   * 会静默剥掉这两个字段：用户看到批注而模型收不到，所以 App 据此决定是否提供“批注”入口。
+   */
+  conversationQuoteComment: z.boolean().optional(),
+  /**
+   * CLI 认识 plugins/overview 的 includeExtensionSummary 参数，并按它在商店信息里带 extensionSummary
+   * （packages/shared/spec/plugin-extension-summary.md）。参数与结果的 schema 都是 strict：旧 CLI 拒绝
+   * 新参数，旧 services 拒绝新字段，所以 services 只在看到这一位时才要这个字段。
+   */
+  pluginExtensionSummary: z.boolean().optional(),
 });
 export const kayingcodeRuntimeCapabilitiesParamsSchema = z
   .object({
@@ -2555,6 +2578,22 @@ export const kayingcodeSessionCloseResultSchema = z
   })
   .strict();
 export type KayingCodeSessionCloseResult = z.infer<typeof kayingcodeSessionCloseResultSchema>;
+/**
+ * 卸载 cwd 位于 directory 内的全部驻留会话；任一会话忙时全部不卸载（docs/git/worktree.md §8.3）。
+ * 随 worktreeCwd 能力提供。
+ */
+export const kayingcodeSessionReleaseUnderDirectoryParamsSchema = z
+  .object({ directory: nonEmptyString })
+  .strict();
+export type KayingCodeSessionReleaseUnderDirectoryParams = z.infer<
+  typeof kayingcodeSessionReleaseUnderDirectoryParamsSchema
+>;
+export const kayingcodeSessionReleaseUnderDirectoryResultSchema = z
+  .object({ released: z.array(nonEmptyString), busy: z.array(nonEmptyString) })
+  .strict();
+export type KayingCodeSessionReleaseUnderDirectoryResult = z.infer<
+  typeof kayingcodeSessionReleaseUnderDirectoryResultSchema
+>;
 export const kayingcodeWorkspaceReadPresentationParamsSchema = z
   .object({ workspace: kayingcodeWorkspaceRefSchema })
   .strict();
@@ -3877,6 +3916,21 @@ export type KayingCodePluginsSetEnabledResult = z.infer<
   typeof kayingcodePluginsSetEnabledResultSchema
 >;
 
+/**
+ * 目录条目的扩展摘要（packages/shared/spec/plugin-extension-summary.md）：插件要求的插件 API 版本范围与
+ * 扩展申请的权限档位。CLI 只透传、只留这两个键；App 用 isExtensionEngineCompatible 判断。
+ * grants 是开放的字符串数组：以后新增的档位不能让旧 App 整页解析失败。
+ */
+export const kayingcodePluginExtensionSummarySchema = z
+  .object({
+    engines: z.object({ zcode: z.string().min(1) }).strict(),
+    grants: z.array(z.string()),
+  })
+  .strict();
+export type KayingCodePluginExtensionSummary = z.infer<
+  typeof kayingcodePluginExtensionSummarySchema
+>;
+
 /** 插件商店定向展示的区域：`cn` 国内、`global` 海外（packages/shared/spec/plugin-store-regions.md）。 */
 export const kayingcodePluginStoreRegionSchema = z.enum(["cn", "global"]);
 export type KayingCodePluginStoreRegion = z.infer<typeof kayingcodePluginStoreRegionSchema>;
@@ -3908,6 +3962,12 @@ export const kayingcodePluginStoreListingSchema = z
      * 不参与安装门禁与计费，命名也不绑定具体套餐商品名。
      */
     requiresPaidPlan: z.boolean().optional(),
+    /**
+     * 带扩展的插件：只在 plugins/overview 带 includeExtensionSummary 时出现（能力位见
+     * packages/shared/spec/plugin-extension-summary.md）。已装插件的 listing 来自目录最新版条目，
+     * 所以这里是最新版的摘要。
+     */
+    extensionSummary: kayingcodePluginExtensionSummarySchema.optional(),
     /**
      * 目录条目声明的可见区域：`cn` 国内、`global` 海外；缺省表示所有区域可见。
      * CLI 读目录时只透传这两个值（未知值丢弃，strict 协议才不会整页解析失败），
@@ -4013,6 +4073,8 @@ export const kayingcodePluginsOverviewParamsSchema = z
   .object({
     workspace: kayingcodeWorkspaceRefSchema,
     configScope: kayingcodePluginScopeSchema.optional(),
+    /** 要商店信息里的 extensionSummary。只发给声明了 pluginExtensionSummary 的 CLI。 */
+    includeExtensionSummary: z.boolean().optional(),
   })
   .strict();
 export const kayingcodePluginsOverviewResultSchema = z
@@ -4614,6 +4676,7 @@ export const kayingcodeProtocolMethods = {
   sessionCompact: "session/compact",
   sessionGoal: "session/goal",
   sessionClose: "session/close",
+  sessionReleaseUnderDirectory: "session/releaseUnderDirectory",
   // setModel 仍被 kayingcodeSessionService 的 desktop 旧链路消费；replayable
   // switchModelConfig 已直接由目标 Environment Registry 解析 Selection。
   sessionSetModel: "session/setModel",

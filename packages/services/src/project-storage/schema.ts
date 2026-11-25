@@ -98,3 +98,23 @@ CREATE TABLE IF NOT EXISTS session_creation_commands (
   session_id TEXT NOT NULL,
   PRIMARY KEY (workspace_key, client_id, command_id)
 );`;
+
+/**
+ * 受管 worktree 任务的 worktree 根目录。只由 Host 在 reserveCreatedTask 时与 root_path 一起写入一次；
+ * NULL 表示不是 worktree 任务。部分索引供"哪些任务在用这个 worktree"精确匹配，旧行全部为 NULL。
+ */
+export const TASK_WORKTREE_ROOT_SQL = `
+ALTER TABLE tasks ADD COLUMN worktree_root TEXT;
+CREATE INDEX IF NOT EXISTS idx_tasks_host_worktree ON tasks(host_id, worktree_root) WHERE worktree_root IS NOT NULL;`;
+
+/** 加列步骤可在表级恢复后重入（恢复保留加法 schema，只删除迁移记录），因此由 apply 执行。 */
+export function addTaskWorktreeRoot(db: DatabaseSync): void {
+  if (!tableExists(db, "tasks")) return;
+  const existing = new Set(
+    (db.prepare("PRAGMA table_info(tasks)").all() as { name: string }[]).map((row) => row.name),
+  );
+  if (!existing.has("worktree_root")) db.exec("ALTER TABLE tasks ADD COLUMN worktree_root TEXT");
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_tasks_host_worktree ON tasks(host_id, worktree_root) WHERE worktree_root IS NOT NULL",
+  );
+}

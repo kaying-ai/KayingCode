@@ -7,6 +7,7 @@ import {
   hostResponseMessageSchema,
 } from "@zcode/shared";
 import type { BroadcastMessage } from "@zcode/services";
+import { isExtensionHostControlMessage } from "./extensionHostMessages.js";
 import { logger } from "./logger.js";
 
 /**
@@ -24,6 +25,16 @@ const MAX_BROADCAST_CLAIMS = 1_024;
 const BROADCAST_CLAIM_RESERVATION_TTL_MS = 5_000;
 const BROADCAST_CLAIM_RETRY_MS = 250;
 let claimTokenSequence = 0;
+
+/** 只记录类型与顶层字段名，定位协议错配时不输出整条消息。 */
+function describeHostMessage(message: unknown) {
+  if (typeof message !== "object" || message === null) return { valueType: typeof message };
+  const type = (message as { type?: unknown }).type;
+  return {
+    type: typeof type === "string" ? type.slice(0, 64) : typeof type,
+    keys: Object.keys(message).slice(0, 8),
+  };
+}
 
 type BroadcastClaimRecord = {
   token: string;
@@ -54,9 +65,14 @@ export class BroadcastHub {
     this.processes.set(windowId, child);
 
     child.on("message", (msg: unknown) => {
+      if (isExtensionHostControlMessage(msg)) return;
       const result = hostResponseMessageSchema.safeParse(msg);
       if (!result.success) {
-        logger.warn("[BroadcastHub] invalid host response message:", formatZodError(result.error));
+        logger.warn(
+          "[BroadcastHub] invalid host response message:",
+          describeHostMessage(msg),
+          formatZodError(result.error),
+        );
         return;
       }
       if (result.data.type === HostResponseTypes.Broadcast) {

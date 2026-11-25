@@ -82,6 +82,9 @@ export async function createWorkspaceKayingCodeApp(
   const readReplyLanguage = options.readReplyLanguage ?? createReplyLanguageReader(context);
   return context.deps.createKayingCodeApp({
     ...options,
+    // 会话所属 workspace 的对外 key：受管 worktree 会话 = 项目，不等于工作目录
+    // （docs/git/worktree.md §9.3）。Hook Trust admission / 审核 request / MCP 授权头都用它。
+    workspaceKey: workspace.workspaceKey,
     onOffPeakLifecycleEvent: (event) =>
       context.notify({
         method: V4_NOTIFICATIONS.offPeakLifecycle,

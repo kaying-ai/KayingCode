@@ -81,6 +81,12 @@ export function createWorkspaceHookRuntimeSecurity(input: {
   emitReviewEvent?: (event: WorkspaceHookReviewLifecycleEvent) => Promise<void>;
   /** 解析受管 worktree 数据根目录用（KAYINGCODE_DATA_BASE_DIR）；缺省 process.env。 */
   env?: Record<string, string | undefined>;
+  /**
+   * 会话 workspaceKey（本地 = workspacePath，远程 = identity）。AdmissionUpdated 与审核 request
+   * 对外只发它；snapshot.workspaceIdentity 是 Trust identity，只用于 record/policy/revision（D23）。
+   * 缺省回落 snapshot.workspaceIdentity。
+   */
+  workspaceKey?: string;
   logger: Logger;
   projectConfigPath?: string;
   policy?: WorkspaceHookPolicy;
@@ -96,6 +102,7 @@ export function createWorkspaceHookRuntimeSecurity(input: {
   homeDir?: string;
 }): WorkspaceHookRuntimeSecurity | undefined {
   if (!input.snapshot) return undefined;
+  const externalWorkspaceIdentity = input.workspaceKey ?? input.snapshot.workspaceIdentity;
   const policyProvider =
     input.policyProvider ?? new InMemoryWorkspaceHookPolicyProvider(input.policy);
   const coordinator = new WorkspaceHookTrustCoordinator({
@@ -169,13 +176,15 @@ export function createWorkspaceHookRuntimeSecurity(input: {
       }),
       sessionId: input.sessionId,
       store: store as NonNullable<typeof store>,
+      // 对外 workspaceKey：会话所属 workspace 的 key（受管 worktree = 项目）；snapshot 里是 Trust identity。
+      workspaceKey: externalWorkspaceIdentity,
       // target 的 workspaceIdentity 是 workspaceKey：本地按路径解析 Trust identity。
       // 修复原因（第三轮 CR-02）：远程 Trust identity 由 host 与执行目录构造，曾把整个 workspaceKey
       // 当作路径传入，得到 host:/remote:… 而与 snapshot 永远不等，远程会话的审核与撤销全部失败。
       // 远程 key 必须是本会话的 workspaceKey，再按本会话的执行目录解析；其他 key 原样返回，随后被判 mismatch。
       resolveTargetTrustIdentity: (workspaceKey) =>
         isRemoteWorkspaceIdentity(workspaceKey) &&
-        workspaceKey !== input.snapshot!.workspaceIdentity
+        workspaceKey !== externalWorkspaceIdentity
           ? Promise.resolve(workspaceKey)
           : resolveWorkspaceHookTrustIdentityForWorkspace({
               ...(isRemoteWorkspaceIdentity(workspaceKey)
