@@ -1,6 +1,6 @@
 import { mkdtemp, mkdir, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { expect, it, vi } from "vitest";
 import type { SessionId, WorkspaceId } from "@zcode/contracts";
 import { createSqliteSessionStore } from "@zcode/adapters/storage";
@@ -11,10 +11,20 @@ import { createTestSessionEventStore } from "../../core/tests/test-event-store.j
 import { listSessions } from "../src/kayingcode-protocol/server-operations.js";
 import type { KayingCodeProtocolAgentServerContext } from "../src/kayingcode-protocol/server-types.js";
 
+/**
+ * Bash 的 cwd 捕获由 Git Bash 的 `pwd -P` 写回，再经 gitBashPathToWindowsPath 还原。
+ * Windows 下 tmpdir() 落在 Git Bash 的 /tmp 挂载点，`pwd -P` 只回 /tmp/...，无法映射回
+ * 盘符路径，resolvedCwd 会被判为不可用。这里把夹具放在 tmpdir 的父目录（/c/Users/...），
+ * 仍由测试清理，同时保留“成功后回写 cwd”的断言。
+ */
+function workspaceTempParent(): string {
+  return process.platform === "win32" ? dirname(tmpdir()) : tmpdir();
+}
+
 it.each([false, true])(
   "Bash cd before Agent preserves durable workspace (remote=%s)",
   async (remote) => {
-    const root = await realpath(await mkdtemp(join(tmpdir(), "subagent-workspace-")));
+    const root = await realpath(await mkdtemp(join(workspaceTempParent(), "subagent-workspace-")));
     const workspacePath = join(root, "project");
     const cwd = join(workspacePath, "src");
     await mkdir(cwd, { recursive: true });

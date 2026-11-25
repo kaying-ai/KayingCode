@@ -240,7 +240,9 @@ describe("provider built-in tool rounds", () => {
 // ─── 评审回归：终态判断、断流作废、缺少结果 ────────────────────────────────────
 
 function fixtureFrames(fixture: string): string[] {
-  return fixture.split("\n\n").filter((frame) => frame.trim().length > 0);
+  // fixtures/*.sse 在 Git 中是 LF，但 Windows 的 core.autocrlf=true 会检出成 CRLF；
+  // 按行结束符无关的方式切帧，避免筛选不到 content_block 帧而让注入失效。
+  return fixture.split(/\r?\n\r?\n/u).filter((frame) => frame.trim().length > 0);
 }
 
 function frameData(frame: string): Record<string, unknown> | undefined {
