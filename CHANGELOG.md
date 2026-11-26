@@ -1,5 +1,119 @@
 # Changelog
 
+## [0.3.0](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.4...kaying-code-v0.3.0) (2026-11-26)
+
+### Features
+
+* **desktop:** persist and surface the agent reply language ([269d054](https://github.com/kaying-ai/KayingCode/commit/269d054c204a5592656ab6329a2441dd027e21cf))
+
+* **plugin:** adopt manifest discovery, load isolation and private plugin options ([eb3c6c1](https://github.com/kaying-ai/KayingCode/commit/eb3c6c1c6aa1dcf6fc6ada3546702f8ddf96232d))
+  * add upstream plugin discovery contract and unified manifest parsing\n- isolate per-plugin load failures with plugin_load_failed diagnostics\n- move plugin secrets and workspace options to private storage; ignore project plugins.options\n- stage workspace plugin declaration/trust, live inventory and watch modules for async discovery integration\n- update Phase 2 progress and remaining trust/live-inventory work
+
+* **upstream:** add agent always-background CLI switch ([2e7ae67](https://github.com/kaying-ai/KayingCode/commit/2e7ae67c4f17f50ef1201edd9f2d7d3419bf5d54))
+  * parse --agent-always-background on|off for prompt, target and TUI
+  * pass subagents.alwaysBackground through headless and TUI runtime config
+  * keep product default foreground; document the launch-only scope in help
+
+* **upstream:** add input preemption and Agent background controls ([19afaa1](https://github.com/kaying-ai/KayingCode/commit/19afaa1ec822191acf5e9a413c51522e72235563))
+  * add InputPreemption abort reason/control contracts and executor slot
+  * let foreground subagents move to background on immediate-send preemption
+  * add alwaysBackground Agent option with product-default foreground behavior
+  * add preemption unit tests and bundled game plugin loader acceptance test
+  * record stage 4/5 progress in spec
+
+* **upstream:** add MCP tool catalog, WaitForMcpServers and runtime session views ([a165d05](https://github.com/kaying-ai/KayingCode/commit/a165d0527e15708235248beaf3848554d70e1558))
+  * add McpToolCatalogPort, tool catalog cache and transport error classification/retry
+  * expose tool snapshots, waitForServer and snapshot listeners in adapter and pool
+  * add WaitForMcpServers contract/tool, gated by MCP port presence
+  * add core mcp/runtime session view and merge catalog-only tools while connecting
+  * wire shared in-memory tool catalog through bootstrap and runtime config changes
+
+* **upstream:** add reply language announcements and RPC ([13f96c1](https://github.com/kaying-ai/KayingCode/commit/13f96c11b1a8a8a6ce45b79fc0de82a6887a787d))
+
+* **upstream:** add stage 4 storage migrations, ReadTopicResource and browser state ([123d1c6](https://github.com/kaying-ai/KayingCode/commit/123d1c65a66445ac93a1871849b6c646d7892999))
+  * add session purge/runtime presence schema and dwf parent-session index migrations
+  * add ReadTopicResource tool contract/reader gated by topicResourcePort
+  * restore Playwright storage state support and --browser-state/--no-browser-state
+  * await async plugin bootstrap APIs in CLI plugin commands
+  * record stage 4 progress and remaining CLI/runtime parity items
+
+* **upstream:** adopt async plugin system, workspace trust and live catalogs ([f36df01](https://github.com/kaying-ai/KayingCode/commit/f36df010beec2c2fe1f5bb6061109215be365a22))
+  * switch plugin discovery to upstream async material-cache loader and workspace trust admission
+  * add skill live catalog and MCP configuration source, wired into app startup and shutdown
+  * add plugins/workspaceTrust protocol, service and settings UI with pending/trusted states
+  * keep localrun marketplace boundaries, dual-brand MCP env and .kayingcode-plugin fallback
+  * add targeted trust/live-catalog tests, spec updates and trust documentation
+
+* **upstream:** adopt Windows cmd readonly policy ([85a330c](https://github.com/kaying-ai/KayingCode/commit/85a330c6cb9ffa51a2319eff78bc7e291f6ae7f2))
+  * add cmd-readonly contract/policy and CMD-only execution checks
+  * use CMD read-only classification for Bash and Memory executor when the session runs through cmd.exe
+  * port upstream 127-case policy tests
+
+* **upstream:** adopt ZCode 4.0.0 protocol baseline and account mechanisms ([01cb03b](https://github.com/kaying-ai/KayingCode/commit/01cb03b1101128ba4c9fc07db05d5ea2dc8ffcf7))
+  * complete upstream protocol inventory and three-way merge POC; add protocol parity and contracts schema gates\n- merge architecture policy candidate with staged managed enablement\n- migrate CLI contracts to zod 4.6.5 and z.toJSONSchema\n- restore upstream OAuth service, credential generation guards, CLI login/logout and CLI OAuth adapters\n- add Relay client API and OAuth mock/proxy routes with contract tests\n- defer desktop login UI, live endpoint validation and staging deployment
+
+* **upstream:** adopt ZCode 4.0.0 wave 4 parity ([f14e863](https://github.com/kaying-ai/KayingCode/commit/f14e86364b78ac271779002807d5104e127739f2))
+  * core: live ordered assistant projection via buildAssistantEntries; remove cold-restore legacy shim; hydrator delivery branches
+  * mcp: startup policy/deniedTools/tool-search delivery, 401 step-up, pool lease, retainTools and builtin restart caps
+  * session: queue edit lock + full composer edit-mode; archive permanent deletion with batch preview/execute and runtime presence
+  * runtime prefs: activitySummaryDismissed authoritative watermark (bootstrap/UI/mobile)
+  * plugins: pluginDiscoveryUi hello/capability, plugin install card and auto-recommendation preference (partial)
+  * ui: settings navigation search; desktop remote/web reply language via host settings
+  * platform: browser backend identity and control scopes; managed-worktree foundation; hook verify-before-dispatch
+  * tests: vitest migration fixes for ui/cli entry points
+
+* **upstream:** complete wave 5 parity and localrun startup hardening ([aacbf3e](https://github.com/kaying-ai/KayingCode/commit/aacbf3e2960844585501201f15dc23ab4c9dc787))
+  * land managed-worktree, preinstalled tools, voice input, selection comments, plugin extension summary and extension input source
+  * finish settings search, plugin host naming and MCP App reconnect
+  * guard localrun OAuth/help config against empty endpoints
+  * ignore extension-host control frames in host response buses
+  * generate shared subpath build aliases and pin chokidar for desktop agent builds
+
+* **upstream:** enforce live MCP tool admission at execution ([b11290d](https://github.com/kaying-ai/KayingCode/commit/b11290dca61a805e28066c2b281f27caee6804bf))
+
+* **upstream:** expose MCP tool memory snapshots ([3a4c196](https://github.com/kaying-ai/KayingCode/commit/3a4c196e911200912658c49f250b574f97523e87))
+  * add McpServerToolSnapshot and optional getToolSnapshot on McpPort
+  * version tool lists on initial and list_changed refresh, keep descriptors across reconnects
+  * aggregate leased adapter snapshots in the connection pool with connection-scoped versions
+  * add stdio snapshot tests and stage 3 spec notes
+
+* **upstream:** gate total tokens reminder behind CLI switch ([c64c573](https://github.com/kaying-ai/KayingCode/commit/c64c573efc7d706555cf28ba008bc8301dfef4b7))
+
+* **upstream:** reconcile MCP servers from live configuration source ([ead9c72](https://github.com/kaying-ai/KayingCode/commit/ead9c72ac7f740ce25ab1e06c7163eef568f898a))
+  * subscribe AgentRuntime to McpConfigurationSource and reconnect on snapshots
+  * re-register MCP tools after reconcile and guard stale generations on shutdown
+  * fix core zod4 leftovers (issues API, optional Edit.replace_all) so core builds
+  * add core reconcile test and stage 3 spec notes
+
+* **upstream:** regionalize plugin store listings ([b0936de](https://github.com/kaying-ai/KayingCode/commit/b0936de5701d4148762a515acd2a12d6fc59d69c))
+
+* **upstream:** resolve late MCP tools and live tool search ([bfe6f6f](https://github.com/kaying-ai/KayingCode/commit/bfe6f6f9b8e593d115df684118ae590ca529f25b))
+
+* **upstream:** retry project token transport failures ([88719fd](https://github.com/kaying-ai/KayingCode/commit/88719fde390b561f8df63c703acf4f29a43ad45c))
+
+* **upstream:** wire token reminder and background subagent prefs ([37f96b9](https://github.com/kaying-ai/KayingCode/commit/37f96b90a32147a823b7530a925fe615f93e7c32))
+
+
+### Chores
+
+* **upstream:** advance baseline to ZCode 4.0.0 ([430546b](https://github.com/kaying-ai/KayingCode/commit/430546bf98e7404b1f1d888439e81c5218893b4f))
+
+
+### Documentation
+
+* **spec:** consolidate upstream sync status ([e67391d](https://github.com/kaying-ai/KayingCode/commit/e67391de2438bfa57208bd3b4eab15a64192729b))
+
+* **spec:** record wave 2 MCP, regions and test debt ([f8bbbda](https://github.com/kaying-ai/KayingCode/commit/f8bbbdab3e4eb4cc96280343854e567ab8ce2bb3))
+
+* **spec:** record wave 4 status and remaining parity items ([ec1179a](https://github.com/kaying-ai/KayingCode/commit/ec1179adc45f6eddfe15888498b75970601a8e90))
+
+* **upstream:** mark stage 2/3 delivery status and remaining parity items ([6fe0114](https://github.com/kaying-ai/KayingCode/commit/6fe01147e502f601854bc66fc7e2c6e0711a8e17))
+
+
+### Refactorings
+
+* **web:** derive upstream source from UPSTREAM_BASE.json ([91e7d0a](https://github.com/kaying-ai/KayingCode/commit/91e7d0ab2e8d58ac4c08d03f56e93b45b8107542))
+
 ## [0.2.4](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.3...kaying-code-v0.2.4) (2026-11-23)
 
 ### Bug Fixes
