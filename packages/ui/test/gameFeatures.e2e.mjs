@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- 单条真实浏览器流程覆盖四个标签、内嵌浏览器、外链跳转与截图；拆分会重复启动 Vite/Chromium。 */
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -106,6 +107,7 @@ try {
   );
   assert.deepEqual(await content.getByRole("tab").allTextContents(), [
     "我的游戏",
+    "游戏AI热点",
     "游戏排行",
     "免费 Token",
   ]);
@@ -115,7 +117,7 @@ try {
   await content.getByTestId("game-center-tab-tapmaker-projects").focus();
   await page.keyboard.press("ArrowRight");
   assert.equal(
-    await content.getByTestId("game-center-tab-game-ranking").getAttribute("aria-selected"),
+    await content.getByTestId("game-center-tab-game-ai-hot").getAttribute("aria-selected"),
     "true",
   );
   await page.keyboard.press("Home");
@@ -134,6 +136,12 @@ try {
   assert.equal(
     await page.evaluate(() => window.fixture.external.at(-1)),
     "https://www.taptap.cn/top/download",
+  );
+  await content.getByTestId("game-center-tab-game-ai-hot").click();
+  await content.getByRole("button", { name: "在浏览器中打开" }).click();
+  assert.equal(
+    await page.evaluate(() => window.fixture.external.at(-1)),
+    "https://daily.kayingcode.kaying.ai/",
   );
   await content.getByRole("button", { name: "返回对话" }).click();
   await waitClosed();

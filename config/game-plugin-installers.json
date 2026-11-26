@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "catalog": {
+    "name": "open-zcode-game-plugins",
+    "url": "https://raw.githubusercontent.com/kaying-ai/open-zcode-game-plugins/main/catalog.json",
+    "repositoryUrl": "https://github.com/kaying-ai/open-zcode-game-plugins"
+  },
+  "installers": [
+    {
+      "name": "kaying-for-ui",
+      "version": "0.2.0",
+      "host": "kayingcode",
+      "displayName": {
+        "zh-CN": "游戏界面设计UI设计-咖影",
+        "en": "Game UI Design & Handoff"
+      },
+      "description": {
+        "zh-CN": "游戏 UI 设计与交付全流程：从 GDD/PRD、风格契约、页面视觉到组件拆解、切图、图集打包与 Godot/Unity/Cocos 引擎 JSON 交付；零依赖 Node CLI，开箱即用。",
+        "en": "Game UI design and handoff workflow: from GDD/PRD and design specs to screen extension, component breakdown, sprite slicing, atlas packing, and Godot/Unity/Cocos JSON handoff. Zero-dependency Node CLI."
+      },
+      "engines": [],
+      "stages": ["development", "assets"],
+      "source": {
+        "kind": "open-source",
+        "tier": "official",
+        "repositoryUrl": "https://gitee.com/citiao/kaying-for-ui"
+      },
+      "addedAt": "2026-11-26"
+    }
+  ]
+}

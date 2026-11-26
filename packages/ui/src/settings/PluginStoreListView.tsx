@@ -1,7 +1,11 @@
 import { useIsOfficeMode } from "@/hooks/useInterfaceMode.js";
 /* eslint-disable max-lines -- 商店列表页把搜索/公开-个人分段/Featured/分类折叠聚合成一个连贯浏览面，拆散反而难以维持 1:1 布局。 */
 import { useMemo, useState } from "react";
-import type { PluginStoreOrder, KayingCodePluginMarketplaceSummary } from "@zcode/shared";
+import type {
+  GamePluginInstaller,
+  PluginStoreOrder,
+  KayingCodePluginMarketplaceSummary,
+} from "@zcode/shared";
 import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID } from "@zcode/shared";
 import { cn } from "@/components/lib/utils.js";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
@@ -42,6 +46,7 @@ export function PluginStoreListView({
   onSegmentChange,
   gameFilters,
   onGameFiltersChange,
+  onInstallGamePluginWithAgent,
 }: {
   items: StorePluginItem[];
   order?: PluginStoreOrder | null;
@@ -54,6 +59,7 @@ export function PluginStoreListView({
   onSegmentChange: (segment: PluginStoreSegment) => void;
   gameFilters: GameDevelopmentFilters;
   onGameFiltersChange: (filters: GameDevelopmentFilters) => void;
+  onInstallGamePluginWithAgent: (installer: GamePluginInstaller) => void;
 }) {
   const { intl, locale } = useKayingCodeIntl();
   const isOfficeMode = useIsOfficeMode();
@@ -179,6 +185,7 @@ export function PluginStoreListView({
           query={query}
           onQueryChange={onQueryChange}
           loading={loading}
+          onInstallWithAgent={onInstallGamePluginWithAgent}
         />
       ) : keyword ? (
         <StoreSection

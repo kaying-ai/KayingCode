@@ -42,7 +42,12 @@ import {
   resolvePluginStoreRegion,
   type StorePluginItem,
 } from "@/settings/pluginStoreListing.js";
-import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID } from "@zcode/shared";
+import {
+  GAME_PLUGIN_INSTALLER_CATALOG,
+  KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID,
+  type GamePluginInstaller,
+} from "@zcode/shared";
+import { buildGamePluginInstallerInstruction } from "@/settings/gamePluginInstallers.js";
 import { PluginUninstallConfirmDialog } from "@/settings/PluginUninstallConfirmDialog.js";
 import { usePluginUninstall } from "@/settings/usePluginUninstall.js";
 import { claimMarketplaceAutoRefresh } from "@/settings/officialMarketplaceAutoRefresh.js";
@@ -404,6 +409,40 @@ export function PluginStorePage({
     [handleInstall, locale, onCreateTask, workspacePath],
   );
 
+  /**
+   * 可安装占位不是安装 API：复制指令、切到对话区并预填草稿，由用户提交后交给 Agent。
+   * 剪贴板失败不阻断跳转，toast 按实际结果区分（spec/game-development-plugin-installers.md）。
+   */
+  const handleInstallGamePluginWithAgent = useCallback(
+    async (installer: GamePluginInstaller) => {
+      if (!workspacePath || !onCreateTask) return;
+      const instruction = buildGamePluginInstallerInstruction({
+        installer,
+        catalog: GAME_PLUGIN_INSTALLER_CATALOG,
+        locale,
+      });
+      let copied = false;
+      try {
+        if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(instruction);
+          copied = true;
+        }
+      } catch {
+        copied = false;
+      }
+      toast(
+        intl.formatMessage({
+          id: copied
+            ? "settings.plugins.game.installer.copied"
+            : "settings.plugins.game.installer.prefilled",
+        }),
+        { variant: copied ? "success" : "info" },
+      );
+      onCreateTask({ initialPrompt: instruction });
+    },
+    [intl, locale, onCreateTask, workspacePath],
+  );
+
   const actions: PluginStoreActions = useMemo(
     () => ({
       onOpenDetail: openDetail,
@@ -599,6 +638,9 @@ export function PluginStorePage({
           onSegmentChange={setSegment}
           gameFilters={gameFilters}
           onGameFiltersChange={setGameFilters}
+          onInstallGamePluginWithAgent={(installer) =>
+            void handleInstallGamePluginWithAgent(installer)
+          }
         />
       )}
 

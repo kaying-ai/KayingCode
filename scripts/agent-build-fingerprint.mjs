@@ -35,9 +35,11 @@ const INPUT_ROOTS = [
   // 构建期配置与脚本
   "config/provider",
   "config/official-plugins.json",
+  "config/game-plugin-installers.json",
   ".oxfmtrc.json",
   "scripts/official-plugin-catalog.mjs",
   "scripts/generate-official-plugin-catalog.mjs",
+  "scripts/generate-game-plugin-installers.mjs",
   "scripts/builtin-provider-config.mjs",
   "scripts/load-endpoint-env.mjs",
   "scripts/build-desktop-agent-cli.mjs",

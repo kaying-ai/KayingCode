@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink, Gamepad2, Trophy, Zap } from "lucide-react";
+import { ArrowLeft, ExternalLink, Flame, Gamepad2, Trophy, Zap } from "lucide-react";
 import { lazy, Suspense, useState, type KeyboardEvent } from "react";
 import { createUuid } from "@zcode/shared";
 import { cn } from "@/components/lib/utils.js";
@@ -18,7 +18,12 @@ const Projects = lazy(() =>
   import("./TapMakerProjectsPage.js").then((module) => ({ default: module.TapMakerProjectsPage })),
 );
 
-const TAB_ICONS = { "tapmaker-projects": Gamepad2, "game-ranking": Trophy, "free-token": Zap };
+const TAB_ICONS = {
+  "tapmaker-projects": Gamepad2,
+  "game-ai-hot": Flame,
+  "game-ranking": Trophy,
+  "free-token": Zap,
+};
 
 export function GameFeatureMainView({
   page,

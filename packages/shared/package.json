@@ -32,6 +32,7 @@
     "./workspace-hook-review-monotonicity": "./src/workspace-hook-review-monotonicity.ts",
     "./workspace-hook-trust-store-file": "./src/workspace-hook-trust-store-file.ts",
     "./managed-worktree": "./src/managed-worktree/index.ts",
+    "./agent-cli-shim": "./src/agent-cli-shim/index.ts",
     "./channel-mention": "./src/channel-mention.ts",
     "./usage-quota": "./src/usage-quota.ts",
     "./gen-ui": "./src/gen-ui/index.ts",

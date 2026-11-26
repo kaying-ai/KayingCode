@@ -28,6 +28,10 @@ import {
   shouldInjectEmbeddedSearchBashPrelude,
   supportsEmbeddedSearchShellSelection,
 } from "../../embedded-search/shell.js";
+import {
+  prependAgentCliShimPath,
+  resolveAgentCliShimDir,
+} from "@zcode/shared/agent-cli-shim";
 import type {
   ToolEntry,
   ToolExecutionContext,
@@ -433,6 +437,9 @@ async function emitProgressEvent(
 
 function createBashSessionEnv(context: ToolExecutionContext): Record<string, string> {
   // 工作区根目录是会话创建时的工作目录，不随 `cd` 变化。
+  // PATH 前置 Agent CLI shim 目录：桌面打包态的 kayingcode 不在系统 PATH，
+  // 插件目录协议需要稳定命令（见 apps/zcode-cli/packages/cli/spec/agent-cli-shim.md）。
+  const shimDir = resolveAgentCliShimDir(process.env);
   return {
     CLAUDE_CODE_SESSION_ID: context.sessionId,
     CLAUDE_PROJECT_DIR: context.workspaceRoot,
@@ -441,6 +448,7 @@ function createBashSessionEnv(context: ToolExecutionContext): Record<string, str
     ZCODE_SESSION_ID: context.sessionId,
     KAYINGCODE_PROJECT_DIR: context.workspaceRoot,
     KAYINGCODE_SESSION_ID: context.sessionId,
+    PATH: prependAgentCliShimPath(process.env.PATH, shimDir, process.platform),
   };
 }
 

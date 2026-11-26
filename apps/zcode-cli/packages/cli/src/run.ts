@@ -34,6 +34,7 @@ import {
 } from "./browser-state-option.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
+import { ensureAgentCliShim } from "./agent-cli-shim.js";
 import {
   DEFAULT_CLI_WORKFLOW_MODE,
   normalizeWorkflowModeOption,
@@ -282,6 +283,12 @@ const runKayingCodeProtocolCommand = async (
       throw new Error(`Failed to load environment file: ${dotenvResult.path}`, {
         cause: dotenvResult.error,
       });
+    }
+
+    // Agent 的 Bash 会话需要稳定的 kayingcode 入口；存储迁移/插件宿主不生成，
+    // 避免把内部子进程当成 Agent 运行环境（spec/agent-cli-shim.md）。
+    if (!prepareStorageOnly) {
+      await ensureAgentCliShim({ env, logger: deps.logger });
     }
 
     const runProtocolAgent =
@@ -736,6 +743,8 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
         pluginsCommandFlags(parsed.values),
       );
     case "tui":
+      // TUI 里的 Agent 同样需要 kayingcode 入口；内容不变时写入是幂等的。
+      await ensureAgentCliShim({ env: commandDeps.env ?? env, logger: commandDeps.logger });
       return await runTuiCommand(
         ctx,
         options,
