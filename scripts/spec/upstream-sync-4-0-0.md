@@ -1,7 +1,7 @@
 # ZCode 4.0.0 采纳评估与升级方案
 
-状态：实施中（2026-11-25）。分支 `feat/upstream-sync-4-0-0` 已推送到 `origin`（25 个提交，HEAD `ec1179ad`）；Wave 1–4 已提交，Wave 5 改动在当前工作区（未提交，220 个路径）。阶段 0 完成；阶段 1 基本完成（Desktop 登录 UI/真实端点/staging 待做）；阶段 2 完成；阶段 3 完成；阶段 4 主链完成（剩余 composer E2E、pluginDiscoveryUi UI 测试）；阶段 5 基本完成（managed-worktree 全链路、preinstalled-tools、voice-input、selection-comment、pluginExtensionSummary、settings 行级定位均已落地；剩余真实游戏 E2E、旧 loader 清理、打包与资源发布）。分支尚未创建 PR，远端 CI 未运行。`UPSTREAM_BASE.json` 仍保持 3.18.2，待阶段 5 收尾验收后再更新。
-来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为当前采纳基线 `fec97590`（3.18.2）。
+状态：实施中（2026-11-26）。分支 `feat/upstream-sync-4-0-0` 已推送到 `origin`（HEAD `aacbf3e2`）；Wave 1–5 均已提交。阶段 0 完成；阶段 1 基本完成（Desktop 登录 UI/真实端点/staging 待做）；阶段 2 完成；阶段 3 完成；阶段 4 主链完成（剩余 composer E2E、pluginDiscoveryUi UI 测试）；阶段 5 基本完成（managed-worktree 全链路、preinstalled-tools、voice-input、selection-comment、pluginExtensionSummary、settings 行级定位均已落地；剩余真实游戏 E2E、旧 loader 清理、打包与资源发布）。分支尚未创建 PR，远端 CI 未运行。`UPSTREAM_BASE.json` 已于 2026-11-26 按维护者决定更新到 4.0.0（`a4b44451`），阶段 5 剩余验收项不因基线更新而关闭，见“基线更新决策”。
+来源：官方 `zai-org/ZCode` 标签 `v4.0.0`，`upstream/main` 提交 `a4b44451`（Source-Commit `acfaa5b7a5d245d5b84fbe37ef2c0d0748f97cdf`），其父提交为上一采纳基线 `fec97590`（3.18.2）。
 产品基线：`main` 提交 `a4efa81d`（kaying-code-v0.2.4）。
 
 ## 目标与原则（2026-11-24 修订）
@@ -31,7 +31,7 @@
   - `88719fde` 项目 Token 传输重试 `-32033`；`c64c573e` 额度提醒开关；`13f96c11` 回复语言协议/core；`269d054c` Desktop 回复语言设置。
   - `73aa5811` 旧测试迁移 vitest；`37f96b90` runtime prefs；`b11290dc` MCP 执行准入。
   - `bfe6f6f9` MCP 晚到解析/实时 ToolSearch；`b0936de5` 商店 regions；`7f26496f` 测试 helper；`f8bbbdab` 本文档记录。
-- `UPSTREAM_BASE.json` 仍为 3.18.2（`fec97590`）；阶段 5 完整验收前不更新。
+- `UPSTREAM_BASE.json` 已更新为 4.0.0（`a4b44451`，2026-11-26）；阶段 5 剩余验收项仍按“剩余工作与优先级”单独跟踪。
 
 ### P0 并行收尾（2026-11-25）
 
@@ -89,6 +89,12 @@
 | 3 MCP             | 完成     | 工具快照/目录缓存、配置 reconcile、WaitForMcpServers、HTTP 重试、McpSessionView 执行准入、mcpStartupPolicy/startMcpStartup、deniedTools、ToolSearch delivery/公告                                                                                        | —（Wave 4 已补齐 401 step-up、pool 租约、`retainTools`/重启上限）                                                                           |
 | 4 CLI 运行时/跨层 | 主链完成 | 存储迁移、ReadTopicResource、browser-state、InputPreemption、cmd 只读、`-32033`、额度提醒、回复语言、runtime prefs、live tool 晚绑定、商店 regions、ToolSearch 交付链、core 投影、Browser 身份、lifecycle hooks、队列编辑锁、pluginDiscoveryUi 协议/Host | composer edit-mode E2E、pluginDiscoveryUi UI 测试与端到端冒烟                                                                               |
 | 5 游戏/上游补齐   | 基本完成 | 游戏插件 loader 验收、CUA 对齐评估、旧测试 helper 恢复、settings-search 行级定位、managed-worktree 全链路、preinstalled-tools、voice-input、selection-comment、pluginExtensionSummary、plugin host 进程名                                                | 真实游戏 E2E、旧 loader 兼容层清理、Windows 打包（extraResources/签名）、preinstalled 发布工具链与 CDN、真实 ASR 端点、三平台与 desktop E2E |
+
+### 基线更新决策（2026-11-26）
+
+- 维护者决定将 `UPSTREAM_BASE.json` 从 3.18.2（`fec97590`）提前更新到 4.0.0（`a4b44451`），使设置页“ZCode 版本号”反映当前代码实际采用的 4.0.0。
+- 偏离原计划“M4 全部验收后才更新”：阶段 5 的真实游戏 E2E、三平台回归、Windows 打包/CDN 与架构策略登记仍未完成；这些缺口继续保留在“剩余工作与优先级”，不因基线更新视为已验收。
+- 影响范围：后续上游采纳从 4.0.0 起比较；`ZCODE_UPSTREAM_VERSION` 随下一次桌面构建显示 4.0.0。验证依据：2026-11-26 本机 `pnpm run dev:desktop` 启动成功（数据库 ready、local services、插件/MCP、Extension Host、Provider Registry 正常），以及 typecheck/lint/source/architecture 与定向测试通过。
 
 ### 本轮已落地能力（4.0.0）
 
@@ -182,8 +188,8 @@
 
 - **P1（投影/运行时）**：Wave 4 已完成 live 有序投影迁移（`commitAssistantToTurnRequest` → `buildAssistantEntries`）并删除冷恢复兼容层；剩余复核 hydrator 少数分支（compaction boundary delivery、provider rounds + delivery、空 usage 锚点）。
 - **P1（MCP 残余）**：Wave 4 已补齐 401 step-up、pool 租约、`retainTools`/内建 server 重启上限；剩余 Windows/真实链路复核 ToolSearch 关闭公告。
-- **P1（阶段 4 增强）**：pluginDiscoveryUi 已落地 hello 能力位、设置生产者与 pluginInstall 卡片，剩余 UI 测试与端到端冒烟；composer edit-mode 已落地底部编辑/草稿隔离/失效态/apply-to-queue，剩余 readiness 门禁与 desktop E2E；批量删除预检、活动摘要、回复语言远端/Web Host 已完成；剩余 plugin host 进程名、MCP App open 主动重连（`mcp-ui/CONTRACT.md` 仍为“不主动重连”，需补 `reconnectMcpAppConnection`）。
-- **P2（阶段 5 收尾）**：真实 Blender/TapTap/Playtest E2E 与旧 loader 兼容层清理；Windows 打包 `extraResources`/签名断言、preinstalled 发布工具链与 CDN 基址；真实 ASR 端点配置与 ASR mock E2E；三平台回归、desktop composer/worktree/voice E2E；架构策略为新受管模块登记；更新 `UPSTREAM_BASE.json`。`remote context-composition` 主链已对齐，仅缺 shared 模块元数据，不再作为功能缺口。
+- **P1（阶段 4 增强）**：pluginDiscoveryUi 已落地 hello 能力位、设置生产者与 pluginInstall 卡片，剩余 UI 测试与端到端冒烟；composer edit-mode 已落地底部编辑/草稿隔离/失效态/apply-to-queue，剩余 readiness 门禁与 desktop E2E；批量删除预检、活动摘要、回复语言远端/Web Host 已完成；plugin host 进程名、MCP App open 主动重连已在 Wave 5 完成。
+- **P2（阶段 5 收尾）**：真实 Blender/TapTap/Playtest E2E 与旧 loader 兼容层清理；Windows 打包 `extraResources`/签名断言、preinstalled 发布工具链与 CDN 基址；真实 ASR 端点配置与 ASR mock E2E；三平台回归、desktop composer/worktree/voice E2E；架构策略为新受管模块登记。`UPSTREAM_BASE.json` 已按维护者决定更新到 4.0.0，剩余验收项见“基线更新决策”。`remote context-composition` 主链已对齐，仅缺 shared 模块元数据，不再作为功能缺口。
 - **交付/运维**：PR 与远端 CI、桌面/CLI 真实启动、三平台 E2E、staging/真实端点联调、Desktop 登录 UI。代码已提交并推送，但分支尚未创建 PR，远端 CI 未运行。
 
 ## 结论（先行）
@@ -601,7 +607,7 @@
 - 交互改动验证桌面与手机 Web；协议改动同时验证 desktop continuous 与 mobile replayable 两条链路。
 - 三平台验证：macOS/Windows/Linux 的插件发现、工作区信任、MCP 连接与市场安装；Windows 额外验证路径与 shim 相关用例。
 - 发布前按 `kaying-code-preflight-v<版本>` 流程预验收；三套签名构建全部通过后再打正式标签。
-- 全部阶段验收通过后才更新 `UPSTREAM_BASE.json` 到 `a4b44451`；中途保持 `fec97590` 基线并在提交说明记录剩余范围。
+- 默认全部阶段验收通过后才更新 `UPSTREAM_BASE.json` 到 `a4b44451`；本次按维护者决定提前更新，偏离原因、影响与剩余验收范围见“基线更新决策”。
 
 ## 风险与工作量
 
