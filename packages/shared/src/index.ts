@@ -412,6 +412,8 @@ export * from "./rewardsBridge.js";
 export * from "./session-debug.js";
 export { redactFeedbackText } from "./feedbackPrivacy.js";
 export * from "./game-development-plugin-listing.js";
+export * from "./game-plugin-installers.js";
+export * from "./game-plugin-installers.generated.js";
 export * from "./plugin-skill-details.js";
 
 export * from "./channel-mention.js";

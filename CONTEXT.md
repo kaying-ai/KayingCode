@@ -44,7 +44,11 @@ _Avoid_: 在市场列表中重复展示已安装插件横条；安装与启停�
 _Avoid_: 在线更新、检查商店新版本
 
 **Game Development Segment（游戏开发专区）**:
-插件市场中的游戏场景汇总入口，在现有通用/个人分段旁展示；只投影带游戏场景元数据的内置插件，不新增安装来源。左侧按游戏引擎筛选，右上按游戏生命周期筛选。开源指完整插件源码公开，必须显式声明 GitHub 仓库；缺少声明不等同闭源。具体规则见 `packages/ui/spec/game-development-plugins.md`。
+插件市场中的游戏场景汇总入口，在现有通用/个人分段旁展示；投影带游戏场景元数据的内置插件，并在其后展示可安装占位分组，不新增安装来源。左侧按游戏引擎筛选，右上按游戏生命周期筛选。开源指完整插件源码公开，必须显式声明 GitHub 仓库；缺少声明不等同闭源。具体规则见 `packages/ui/spec/game-development-plugins.md`。
+
+**Installable Game Plugin Placeholder（可安装游戏插件占位）**:
+游戏开发专区中代表社区目录插件的一类卡片。占位由 `config/game-plugin-installers.json` 登记，不是内置插件、不进入 inventory；点击只复制安装指令并预填对话草稿，由用户提交后交给 Agent 从目录下载并安装。同名插件已安装时复用内置卡片的启用开关与菜单，不出现「看着没装、详情已安装」的割裂。开源占位按 `source.tier` 显示「开源 · 官方」或「开源 · 社区」角标。规则见 `packages/ui/spec/game-development-plugin-installers.md`。
+_Avoid_: 未安装内置插件、远程商店条目
 
 ### 元数据
 

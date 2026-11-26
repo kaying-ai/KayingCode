@@ -1,5 +1,4 @@
 import { cn } from "@/components/lib/utils.js";
-import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 import { PluginStoreAvatar } from "@/settings/PluginStoreAvatar.js";
 import { GameDevelopmentPluginBanner } from "@/settings/GameDevelopmentPluginBanner.js";
 import {
@@ -26,7 +25,6 @@ export function GameDevelopmentPluginCard({
   actions: PluginStoreActions;
   locale: string;
 }) {
-  const { intl } = useKayingCodeIntl();
   const name = resolveItemDisplayName(item, locale);
   const description = resolveItemDescription(item, locale);
   return (
@@ -69,16 +67,6 @@ export function GameDevelopmentPluginCard({
             </p>
           ) : null}
         </div>
-      </div>
-      <div className="flex flex-wrap gap-1">
-        {item.listing?.gameDevelopment?.stages.map((stage) => (
-          <span
-            key={stage}
-            className="rounded-md bg-surface px-1.5 py-0.5 text-ui-xs leading-tight text-foreground-subtle"
-          >
-            {intl.formatMessage({ id: `settings.plugins.game.stage.${stage}` })}
-          </span>
-        ))}
       </div>
       <div className="mt-auto flex min-w-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 border-t border-card-border pt-1.5">
         {item.installed ? (

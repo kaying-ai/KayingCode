@@ -1,17 +1,25 @@
 import { useMemo } from "react";
 import { Gamepad2, X } from "lucide-react";
-import { GAME_DEVELOPMENT_ENGINES, GAME_DEVELOPMENT_STAGES } from "@zcode/shared";
+import supportQr from "@/assets/support-contact-qr.png";
+import {
+  GAME_DEVELOPMENT_ENGINES,
+  GAME_DEVELOPMENT_STAGES,
+  GAME_PLUGIN_INSTALLERS,
+  type GamePluginInstaller,
+} from "@zcode/shared";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 import type { PluginStoreActions } from "@/settings/PluginStoreCard.js";
 import { GameDevelopmentPluginCard } from "@/settings/GameDevelopmentPluginCard.js";
+import { GamePluginInstallerCard } from "@/settings/GamePluginInstallerCard.js";
 import type { StorePluginItem } from "@/settings/pluginStoreListing.js";
 import {
   DEFAULT_GAME_DEVELOPMENT_FILTERS,
   filterGameDevelopmentPlugins,
   type GameDevelopmentFilters,
 } from "@/settings/gameDevelopmentPlugins.js";
+import { filterGamePluginInstallers } from "@/settings/gamePluginInstallers.js";
 
 const SOURCE_GROUPS = ["open-source", "closed-source", "unspecified"] as const;
 
@@ -23,6 +31,7 @@ export function GameDevelopmentPluginsView({
   query,
   onQueryChange,
   loading,
+  onInstallWithAgent,
 }: {
   items: StorePluginItem[];
   actions: PluginStoreActions;
@@ -31,6 +40,7 @@ export function GameDevelopmentPluginsView({
   query: string;
   onQueryChange: (query: string) => void;
   loading: boolean;
+  onInstallWithAgent: (installer: GamePluginInstaller) => void;
 }) {
   const { intl, locale } = useKayingCodeIntl();
   const message = (key: string) => intl.formatMessage({ id: `settings.plugins.game.${key}` });
@@ -38,9 +48,27 @@ export function GameDevelopmentPluginsView({
     () => filterGameDevelopmentPlugins(items, filters, query, locale),
     [items, filters, query, locale],
   );
+  const installerResults = useMemo(
+    () => filterGamePluginInstallers(GAME_PLUGIN_INSTALLERS, filters, query, locale),
+    [filters, query, locale],
+  );
+  // 已安装事实来自 inventory（任意 marketplace），卡片据此复用标准启停控件。
+  const installedItemByName = useMemo(() => {
+    const map = new Map<string, StorePluginItem>();
+    for (const item of items) {
+      if (item.installed) map.set(item.name.toLocaleLowerCase(), item);
+    }
+    return map;
+  }, [items]);
   const engineCounts = useMemo(() => {
     const stageItems = filterGameDevelopmentPlugins(
       items,
+      { stage: filters.stage, engine: "all" },
+      query,
+      locale,
+    );
+    const stageInstallers = filterGamePluginInstallers(
+      GAME_PLUGIN_INSTALLERS,
       { stage: filters.stage, engine: "all" },
       query,
       locale,
@@ -53,7 +81,13 @@ export function GameDevelopmentPluginsView({
             engine === "all" ||
             !item.listing?.gameDevelopment?.engines.length ||
             item.listing.gameDevelopment.engines.some((value) => value === engine),
-        ).length,
+        ).length +
+          stageInstallers.filter(
+            (installer) =>
+              engine === "all" ||
+              installer.engines.length === 0 ||
+              installer.engines.some((value) => value === engine),
+          ).length,
       ]),
     );
   }, [items, filters.stage, query, locale]);
@@ -142,6 +176,19 @@ export function GameDevelopmentPluginsView({
           <p className="mt-3 text-ui-xs leading-relaxed text-foreground-subtlest">
             {message("engineHint")}
           </p>
+          <div
+            data-testid="game-support-qr"
+            className="mt-4 hidden rounded-xl border border-card-border bg-card p-3 sm:block"
+          >
+            <img
+              src={supportQr}
+              alt={message("supportQrAlt")}
+              className="aspect-square w-full rounded-md bg-white"
+            />
+            <p className="mt-2 text-ui-xs leading-relaxed text-foreground-subtle">
+              {message("supportQrHint")}
+            </p>
+          </div>
         </aside>
 
         <div className="@container/game min-w-0 space-y-3">
@@ -155,7 +202,7 @@ export function GameDevelopmentPluginsView({
                 ? intl.formatMessage({ id: "settings.plugins.marketplace.catalogLoading" })
                 : intl.formatMessage(
                     { id: "settings.plugins.game.count" },
-                    { count: String(results.length) },
+                    { count: String(results.length + installerResults.length) },
                   )}
             </p>
             {hasFilters ? (
@@ -165,7 +212,7 @@ export function GameDevelopmentPluginsView({
               </Button>
             ) : null}
           </div>
-          {results.length === 0 ? (
+          {results.length === 0 && installerResults.length === 0 ? (
             <div
               data-testid="game-plugins-empty"
               className="rounded-xl border border-dashed border-border px-5 py-10 text-center"
@@ -184,34 +231,69 @@ export function GameDevelopmentPluginsView({
               ) : null}
             </div>
           ) : (
-            SOURCE_GROUPS.map((source) => {
-              const group = results.filter(
-                (item) => (item.listing?.gameDevelopment?.source?.kind ?? "unspecified") === source,
-              );
-              if (group.length === 0) return null;
-              return (
-                <section key={source} data-testid={`game-source-${source}`} className="space-y-2.5">
-                  {source !== "unspecified" ? (
-                    <h3 className="flex items-center gap-2 text-ui-base font-medium text-foreground">
-                      {message(`source.${source}`)}
-                      <span className="text-ui-xs font-normal text-foreground-subtlest">
-                        {group.length}
-                      </span>
-                    </h3>
-                  ) : null}
+            <>
+              {SOURCE_GROUPS.map((source) => {
+                const group = results.filter(
+                  (item) =>
+                    (item.listing?.gameDevelopment?.source?.kind ?? "unspecified") === source,
+                );
+                if (group.length === 0) return null;
+                return (
+                  <section
+                    key={source}
+                    data-testid={`game-source-${source}`}
+                    className="space-y-2.5"
+                  >
+                    {source !== "unspecified" ? (
+                      <h3 className="flex items-center gap-2 text-ui-base font-medium text-foreground">
+                        {message(`source.${source}`)}
+                        <span className="text-ui-xs font-normal text-foreground-subtlest">
+                          {group.length}
+                        </span>
+                      </h3>
+                    ) : null}
+                    <div className="grid min-w-0 gap-3 @xl/game:grid-cols-2">
+                      {group.map((item) => (
+                        <GameDevelopmentPluginCard
+                          key={item.id}
+                          item={item}
+                          actions={actions}
+                          locale={locale}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                );
+              })}
+              {installerResults.length > 0 ? (
+                <section
+                  data-testid="game-installable-plugins"
+                  className="space-y-2.5"
+                  aria-label={message("installer.group")}
+                >
+                  <h3 className="flex items-center gap-2 text-ui-base font-medium text-foreground">
+                    {message("installer.group")}
+                    <span className="text-ui-xs font-normal text-foreground-subtlest">
+                      {installerResults.length}
+                    </span>
+                  </h3>
                   <div className="grid min-w-0 gap-3 @xl/game:grid-cols-2">
-                    {group.map((item) => (
-                      <GameDevelopmentPluginCard
-                        key={item.id}
-                        item={item}
-                        actions={actions}
+                    {installerResults.map((installer) => (
+                      <GamePluginInstallerCard
+                        key={installer.name}
+                        installer={installer}
                         locale={locale}
+                        installedItem={
+                          installedItemByName.get(installer.name.toLocaleLowerCase()) ?? null
+                        }
+                        actions={actions}
+                        onInstall={onInstallWithAgent}
                       />
                     ))}
                   </div>
                 </section>
-              );
-            })
+              ) : null}
+            </>
           )}
         </div>
       </div>

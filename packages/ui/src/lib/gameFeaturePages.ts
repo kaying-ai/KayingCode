@@ -7,6 +7,13 @@ export const GAME_FEATURE_PAGES = [
     url: null,
   },
   {
+    id: "game-ai-hot",
+    labelKey: "gameFeatures.aiHot",
+    titleKey: "gameFeatures.aiHotTitle",
+    descriptionKey: "gameFeatures.aiHotDescription",
+    url: "https://daily.kayingcode.kaying.ai/",
+  },
+  {
     id: "game-ranking",
     labelKey: "gameFeatures.gameRanking",
     titleKey: "gameFeatures.gameRankingTitle",

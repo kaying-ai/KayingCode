@@ -9,12 +9,14 @@ import {
 test("game center defaults to the TapMaker list and keeps source destinations", () => {
   assert.deepEqual(
     GAME_FEATURE_PAGES.map((page) => page.id),
-    ["tapmaker-projects", "game-ranking", "free-token"],
+    ["tapmaker-projects", "game-ai-hot", "game-ranking", "free-token"],
   );
   assert.equal(DEFAULT_GAME_FEATURE_PAGE, "tapmaker-projects");
   assert.equal(GAME_FEATURE_PAGES[0].labelKey, "gameFeatures.myGames");
-  assert.equal(GAME_FEATURE_PAGES[1].url, "https://www.taptap.cn/top/download");
-  assert.equal(GAME_FEATURE_PAGES[2].url, "https://www.kayingai.com/freellm");
+  assert.equal(GAME_FEATURE_PAGES[1].labelKey, "gameFeatures.aiHot");
+  assert.equal(GAME_FEATURE_PAGES[1].url, "https://daily.kayingcode.kaying.ai/");
+  assert.equal(GAME_FEATURE_PAGES[2].url, "https://www.taptap.cn/top/download");
+  assert.equal(GAME_FEATURE_PAGES[3].url, "https://www.kayingai.com/freellm");
 });
 
 test("feature routes belong to the main view and exclude other sidebar destinations", () => {

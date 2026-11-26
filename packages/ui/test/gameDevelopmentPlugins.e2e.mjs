@@ -67,8 +67,6 @@ try {
     await cards.getAttribute("data-plugin-id"),
     "kaying-game-playtest@kayingcode-plugins-official",
   );
-  await cards.getByText("新游发现", { exact: true }).waitFor();
-  await cards.getByText("游戏测试", { exact: true }).waitFor();
   await page.getByTestId("game-clear-filters").click();
   assert.equal(await page.getByTestId("game-lifecycle-filter").locator("select").count(), 0);
   await page.getByTestId("game-engine-taptap-maker").click();
