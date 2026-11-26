@@ -15,7 +15,7 @@ const server = await createServer({
   // 固定构建版本，验证组件读取 define 而不是硬编码或运行时默认值。
   define: {
     __KAYINGCODE_VERSION__: JSON.stringify("1.2.3-qa"),
-    __ZCODE_UPSTREAM_VERSION__: JSON.stringify("3.17.2-qa"),
+    __ZCODE_UPSTREAM_VERSION__: JSON.stringify("4.0.0-qa"),
   },
   optimizeDeps: { include: ["react", "react-dom/client", "react/jsx-runtime"] },
   server: { host: "127.0.0.1", port: 0, fs: { allow: [resolve(import.meta.dirname, "../../..")] } },
@@ -42,7 +42,7 @@ try {
   assert.equal(await region.getByText("KayingCode 构建版本号", { exact: true }).count(), 1);
   assert.equal(await region.getByText("ZCode 构建版本号", { exact: true }).count(), 1);
   assert.equal(await region.getByText("1.2.3-qa", { exact: true }).count(), 1);
-  assert.equal(await region.getByText("3.17.2-qa", { exact: true }).count(), 1);
+  assert.equal(await region.getByText("4.0.0-qa", { exact: true }).count(), 1);
   await region.getByRole("button", { name: "访问官网" }).click();
   assert.equal(await page.evaluate(() => window.__openedExternal), "https://kayingai.com");
 

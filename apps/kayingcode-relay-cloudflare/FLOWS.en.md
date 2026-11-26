@@ -100,7 +100,7 @@ Multiple terminals cannot occupy the same SID concurrently. Terminal logout remo
 
 ```mermaid
 flowchart TD
-  P[Pinned official commit in upstream-web.json] --> G[Git export to .cache/upstream-web]
+  P[Pinned official commit in UPSTREAM_BASE.json] --> G[Git export to .cache/upstream-web]
   G --> B[Account adapters / bootstrap / branding + core hash verification]
   E[Build-time KAYINGCODE_REMOTE_ORIGIN] --> B
   B --> V[Vite base=/remote/ to packages/web/dist]

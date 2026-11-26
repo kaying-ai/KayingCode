@@ -94,7 +94,8 @@
 
 - 维护者决定将 `UPSTREAM_BASE.json` 从 3.18.2（`fec97590`）提前更新到 4.0.0（`a4b44451`），使设置页“ZCode 版本号”反映当前代码实际采用的 4.0.0。
 - 偏离原计划“M4 全部验收后才更新”：阶段 5 的真实游戏 E2E、三平台回归、Windows 打包/CDN 与架构策略登记仍未完成；这些缺口继续保留在“剩余工作与优先级”，不因基线更新视为已验收。
-- 影响范围：后续上游采纳从 4.0.0 起比较；`ZCODE_UPSTREAM_VERSION` 随下一次桌面构建显示 4.0.0。验证依据：2026-11-26 本机 `pnpm run dev:desktop` 启动成功（数据库 ready、local services、插件/MCP、Extension Host、Provider Registry 正常），以及 typecheck/lint/source/architecture 与定向测试通过。
+- 影响范围：后续上游采纳从 4.0.0 起比较；`ZCODE_UPSTREAM_VERSION` 随下一次桌面构建显示 4.0.0。Web 上游来源也改为直接读取 `UPSTREAM_BASE.json`，`packages/web/upstream-web.json` 只保留 `relayOrigin`/`overrides`，不再重复维护 repo/commit/version。
+- 验证依据：2026-11-26 本机 `pnpm run dev:desktop` 启动成功（数据库 ready、local services、插件/MCP、Extension Host、Provider Registry 正常）；`pnpm --filter @zcode/web run build:upstream` 以 4.0.0 成功构建，web 测试 15/15；以及 typecheck/lint/source/architecture 与定向测试通过。
 
 ### 本轮已落地能力（4.0.0）
 

@@ -6,7 +6,7 @@
 
 构建导出排除不参与 Web 编译的根 docs 目录，避免 Windows tar 处理上游中文文档路径失败；其余固定源码与工作台哈希验证保持。Vite 通过当前 Node 执行真实 JS 入口，不执行平台专用的 .bin shell shim，支持 Windows 及含空格的仓库路径。
 
-Web 制品直接构建官方 ZCode 固定提交的 packages/web、packages/ui 及其源码依赖，不能再以本仓 RelayApp、RelayComposer 或裁剪后的 Root 拼接移动工作台。固定提交记录在 upstream-web.json，本次采用已验收的 3.18.2，并与全仓 UPSTREAM_BASE 保持同一提交；上游源码导出到忽略的缓存目录，不把上游桌面、旧 CUA 或营销服务接回本地产品运行时。
+Web 制品直接构建官方 ZCode 固定提交的 packages/web、packages/ui 及其源码依赖，不能再以本仓 RelayApp、RelayComposer 或裁剪后的 Root 拼接移动工作台。固定提交、版本与仓库统一来自根 `UPSTREAM_BASE.json`；`upstream-web.json` 只保留 Web 专属的 `relayOrigin` 与允许的账号适配文件，避免版本号多处维护。上游源码导出到忽略的缓存目录，不把上游桌面、旧 CUA 或营销服务接回本地产品运行时。
 
 页面、设备列表、项目与会话导航、输入、工具、附件、终端及断线恢复均以上游 Web 为准。允许替换产品部署配置、账号适配器和下述纯品牌展示，构建记录上游提交与全部覆盖文件。禁止对上游工作台行为或连接逻辑打补丁来迁就旧 Relay。
 

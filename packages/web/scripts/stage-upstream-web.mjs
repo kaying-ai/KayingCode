@@ -1,18 +1,10 @@
 import { spawn } from "node:child_process";
 import { pipeline } from "node:stream/promises";
-import {
-  mkdir,
-  readFile,
-  readdir,
-  stat,
-  symlink,
-  copyFile,
-  writeFile,
-  rm,
-} from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, symlink, copyFile, writeFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { readUpstreamBase } from "../../../scripts/upstream-version.mjs";
 import { applyUpstreamBranding } from "./apply-upstream-branding.mjs";
 import { applyMobileWebview, MOBILE_PROJECT_ADAPTERS } from "./apply-mobile-webview.mjs";
 import { applyWorkspaceIdentity, WORKSPACE_IDENTITY_FILES } from "./apply-workspace-identity.mjs";
@@ -24,6 +16,23 @@ const STAGE_STATE_FILE = ".stage-state.json";
 // 同一份 stage 只允许一个进程抽取/打补丁；另一个进程等待标记出现后直接复用。
 const LOCK_TIMEOUT_MS = 20 * 60_000;
 const LOCK_STALE_MS = 10 * 60_000;
+
+/**
+ * 上游 repo/commit/version 的唯一来源是根 UPSTREAM_BASE.json；
+ * web 目录只维护 relayOrigin 与允许的账号适配文件，避免版本号两处漂移。
+ */
+async function readUpstreamWebConfig({ webRoot, repoRoot }) {
+  const base = readUpstreamBase(repoRoot);
+  if (!base) throw new Error("UPSTREAM_BASE.json is missing or invalid");
+  const webConfig = JSON.parse(await readFile(resolve(webRoot, "upstream-web.json"), "utf8"));
+  return {
+    repo: base.repo,
+    commit: base.commit,
+    version: base.version,
+    relayOrigin: webConfig.relayOrigin,
+    overrides: Array.isArray(webConfig.overrides) ? webConfig.overrides : [],
+  };
+}
 
 /**
  * 计算 staging 输入的指纹。
@@ -39,6 +48,7 @@ async function hashFile(path) {
 
 async function computeFingerprint({ webRoot, repoRoot, source, relayOrigin }) {
   const inputs = [
+    resolve(repoRoot, "UPSTREAM_BASE.json"),
     resolve(webRoot, "upstream-web.json"),
     resolve(webRoot, "scripts/stage-upstream-web.mjs"),
     resolve(webRoot, "scripts/apply-upstream-branding.mjs"),
@@ -211,11 +221,10 @@ async function applyOverrides({ webRoot, stage, source }) {
  * 将固定官方提交导出到 `.cache/upstream-web/<commit>` 并记录补丁结果。
  *
  * web（工作台）和 web-share（/cn/share 分享页）都从同一份导出构建，
- * 这样分享页继续使用官方 3.18.2 的 share/auth 源码，不需要把上游源码复制回产品目录。
+ * 这样分享页继续使用固定官方提交的 share/auth 源码，不需要把上游源码复制回产品目录。
  */
 export async function stageUpstreamWeb({ webRoot, repoRoot, force = false }) {
-  const rawSource = await readFile(resolve(webRoot, "upstream-web.json"), "utf8");
-  const source = JSON.parse(rawSource);
+  const source = await readUpstreamWebConfig({ webRoot, repoRoot });
   if (!/^[a-f0-9]{40}$/.test(source.commit)) throw new Error("Invalid upstream commit");
   if (source.repo !== "https://github.com/zai-org/ZCode")
     throw new Error("Official upstream required");
@@ -268,8 +277,11 @@ export async function stageUpstreamWeb({ webRoot, repoRoot, force = false }) {
     html = html.replace('src="/src/main.tsx"', 'src="/src/kaying-bootstrap.ts"');
     await writeFile(htmlPath, html);
     // HTML 同时包含品牌与授权 bootstrap 适配，记录最终 staged 源码哈希以便审计。
-    branding.files.find((file) => file.path === "packages/web/index.html").sha256 =
-      createHash("sha256").update(html).digest("hex");
+    branding.files.find((file) => file.path === "packages/web/index.html").sha256 = createHash(
+      "sha256",
+    )
+      .update(html)
+      .digest("hex");
     await writeFile(
       resolve(stage, "packages/web/src/kaying-bootstrap.ts"),
       'import { initializeAccount } from "./auth/webAuthService.js";\nawait initializeAccount();\nawait import("./main.js");\n',

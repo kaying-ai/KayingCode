@@ -4,12 +4,11 @@ import { promisify } from "node:util";
 import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
+import { readUpstreamBase } from "../../../scripts/upstream-version.mjs";
 import { applyUpstreamBranding, BRAND_SOURCE_FILES } from "../scripts/apply-upstream-branding.mjs";
 const exec = promisify(execFile);
 const repoRoot = resolve(import.meta.dirname, "../../..");
-const config = JSON.parse(
-  await readFile(resolve(repoRoot, "packages/web/upstream-web.json"), "utf8"),
-);
+const config = readUpstreamBase(repoRoot);
 test("brands official startup and workbench art while preserving behavior and provider identity", async () => {
   const stage = await mkdtemp(resolve(tmpdir(), "upstream-branding-"));
   try {

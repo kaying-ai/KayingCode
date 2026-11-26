@@ -107,7 +107,7 @@ export KAYINGCODE_DATA_BASE_DIR=/srv/kayingcode-review
 
 `build:web` writes the review origin into `packages/web/dist` and `public/`. Rebuild with the production origin before any production deployment.
 
-Generate public through build:web and deploy it as a build artifact. packages/web/upstream-web.json pins the official source. Missing Git objects are fetched without moving the product branch. The manifest contains source, relayOrigin and audit hashes. Both third-party notices ship with assets. Material verification is explicit rather than a requirement to clear the entire backlog before packaging; see [license policy](../../third-party/SPEC.md).
+Generate public through build:web and deploy it as a build artifact. The root UPSTREAM_BASE.json pins the official source; packages/web/upstream-web.json keeps only Web-specific configuration. Missing Git objects are fetched without moving the product branch. The manifest contains source, relayOrigin and audit hashes. Both third-party notices ship with assets. Material verification is explicit rather than a requirement to clear the entire backlog before packaging; see [license policy](../../third-party/SPEC.md).
 
 ## 5. Desktop and mobile onboarding
 

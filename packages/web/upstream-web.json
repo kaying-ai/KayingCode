@@ -1,10 +1,4 @@
 {
-  "repo": "https://github.com/zai-org/ZCode",
-  "commit": "fec975905a2abd4c07e35c40d51fa097a2258ec9",
-  "version": "3.18.2",
   "relayOrigin": "https://relay.service.kaying.ai",
-  "overrides": [
-    "src/auth/webAuthService.ts",
-    "src/auth/WebLoginPage.tsx"
-  ]
+  "overrides": ["src/auth/webAuthService.ts", "src/auth/WebLoginPage.tsx"]
 }

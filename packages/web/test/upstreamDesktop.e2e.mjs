@@ -4,7 +4,10 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { readUpstreamBase } from "../../../scripts/upstream-version.mjs";
 const exec = promisify(execFile);
+const repo = resolve(import.meta.dirname, "../../..");
+const upstream = readUpstreamBase(repo);
 const cdp = process.env.UPSTREAM_WEB_E2E_CDP;
 if (!cdp || !["127.0.0.1", "localhost"].includes(new URL(cdp).hostname))
   throw new Error("Set UPSTREAM_WEB_E2E_CDP to the local Desktop CDP endpoint");
@@ -111,7 +114,7 @@ try {
     resolve(artifacts, "result.json"),
     JSON.stringify(
       {
-        upstream: "3.18.2",
+        upstream: upstream.version,
         route: "/remote/v4",
         fragmentRemoved: true,
         existingSessionOpened: true,
