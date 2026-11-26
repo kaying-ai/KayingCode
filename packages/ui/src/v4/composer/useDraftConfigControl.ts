@@ -45,6 +45,26 @@ import { useKayingCodeSessionStore } from "@/store/kayingcodeSessionStore.js";
 /** 目录水合单飞（per workspaceKey）：draft、已有 session 和严格模式双挂载共享一次 RPC。 */
 const workspaceCatalogHydrationFlights = new Map<string, Promise<void>>();
 
+/**
+ * Composer 草稿 scope：composer 编辑态传入 editScopeId 时借用独立 scope（docs/ui/composer-edit-mode.md），
+ * 原 session 草稿不动；未传时完全沿用 session scope，行为不变。
+ */
+export function resolveComposerDraftScopeId(params: {
+  sessionId: string | null;
+  editScopeId?: string | null;
+}): string {
+  if (params.sessionId === null) return V4_DRAFT_SCOPE_ROOT;
+  return params.editScopeId ?? params.sessionId;
+}
+
+/** edit scope 的草稿只在 renderer 内存：不写 localStorage，刷新后只恢复原草稿。 */
+export function shouldPersistComposerDraftScope(params: {
+  sessionId: string | null;
+  editScopeId?: string | null;
+}): boolean {
+  return params.sessionId === null || !params.editScopeId;
+}
+
 function applyDraftModelSelection(
   current: Partial<SessionConfigState>,
   model: ModelSelection,
@@ -114,6 +134,10 @@ export function useDraftConfigControl(params: {
   /** provider registry 已通过 renderer readiness 门禁后才允许拉起 Agent。 */
   agentStartupAllowed?: boolean;
   modelSelectionService: IModelSelectionService | null;
+  /** composer 编辑态使用的独立草稿 scope；只在该 scope 内读写，原 session 草稿不被改写。 */
+  editScopeId?: string | null;
+  /** 进入编辑态时预置的 edit scope 草稿；只在 editScopeId 生效时使用。 */
+  editDraft?: V4ComposerDraft | null;
 }): DraftConfigControl {
   const {
     workspacePath,
@@ -123,6 +147,8 @@ export function useDraftConfigControl(params: {
     sessionConfig,
     agentStartupAllowed = true,
     modelSelectionService,
+    editScopeId = null,
+    editDraft = null,
   } = params;
   const workspaceKey = workspaceIdentity?.trim() || workspacePath;
   const displayProvider = provider ?? KAYINGCODE_AGENT_PROVIDER;
@@ -133,7 +159,9 @@ export function useDraftConfigControl(params: {
   );
   const { settings: sharedSettings } = useSettings();
   const appFollowupMode = resolveAppFollowupMode(sharedSettings);
-  const scopeId = sessionId ?? V4_DRAFT_SCOPE_ROOT;
+  const scopeId = resolveComposerDraftScopeId({ sessionId, editScopeId });
+  const isEditScope = sessionId !== null && editScopeId !== null && editScopeId !== undefined;
+  const persistDraftToStorage = shouldPersistComposerDraftScope({ sessionId, editScopeId });
   const composerClientNamespace = useComposerClientNamespace();
   // 草稿项目归属由 store 唯一持有；Root 点击 New task 时写入，读取端不另存副本。
   const draftProjectId = useKayingCodeSessionStore(
@@ -165,14 +193,22 @@ export function useDraftConfigControl(params: {
     draftFocusVersion,
     draftScope ? composerScopeKey(draftScope) : null,
   ]);
+  // editDraft 与 scopeId 一一对应（每次编辑新 scope）；用 ref 取本轮预置内容，
+  // 避免把 editDraft 引用变化当成新的 scope 重新载入。
+  const editDraftRef = useRef(editDraft);
+  editDraftRef.current = editDraft;
   const loadedScope = useMemo(
     () => ({
       scopeKey,
-      draft: readV4ComposerDraft(workspacePath, workspaceIdentity, scopeId, draftScope) ?? {
-        text: "",
-        updatedAt: 0,
-        ...(sessionId !== null && navigationInitialization ? navigationInitialization.config : {}),
-      },
+      draft: isEditScope
+        ? (editDraftRef.current ?? { text: "", updatedAt: 0 })
+        : (readV4ComposerDraft(workspacePath, workspaceIdentity, scopeId, draftScope) ?? {
+            text: "",
+            updatedAt: 0,
+            ...(sessionId !== null && navigationInitialization
+              ? navigationInitialization.config
+              : {}),
+          }),
     }),
     [scopeKey],
   );
@@ -238,8 +274,10 @@ export function useDraftConfigControl(params: {
   const draftConfigRef = useRef(draftConfig);
   draftConfigRef.current = draftConfig;
   // Root 草稿按项目 scope 持久化；项目/分组意图始终以 store 为权威，不能被旧草稿回滚。
+  // edit scope 只留在内存（docs/ui/composer-edit-mode.md），不写盘也不参与 promotion。
   const persistDraft = useCallback(
     (value: V4ComposerDraft) => {
+      if (!persistDraftToStorage) return false;
       const workspace = useKayingCodeSessionStore
         .getState()
         .getWorkspaceState(workspacePath, workspaceIdentity);
@@ -261,7 +299,7 @@ export function useDraftConfigControl(params: {
         draftScope,
       );
     },
-    [draftScope, scopeId, workspaceIdentity, workspacePath],
+    [draftScope, persistDraftToStorage, scopeId, workspaceIdentity, workspacePath],
   );
   // 初始化只消费一次；消费后 store 清空，后续 Snapshot 不得再次覆盖用户选择。
   useEffect(() => {

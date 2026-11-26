@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import { getDefaultLogDir } from "../src/logging/index.js";
 import { getDefaultSessionDbPath } from "../src/storage/session-store/paths.js";
 import { resolveDefaultOutputRootDir } from "../src/exec/execution-utils.js";
@@ -9,36 +11,22 @@ import { resolveWorkspaceHookTrustStorePath } from "../src/storage/workspace-hoo
 
 test("Agent defaults use the Desktop data base directory when provided", async () => {
   const previous = process.env.KAYINGCODE_DATA_BASE_DIR;
-  process.env.KAYINGCODE_DATA_BASE_DIR = "/tmp/kaying-agent-new-root";
+  // 基目录必须是本平台的绝对路径：resolveWorkspaceHookTrustStorePath 会 resolve() 基目录，
+  // 在 Windows 上 "/tmp/..." 会被解析成 "D:\\tmp\\..."，与 join() 的原始字符串不一致。
+  const dataBaseDir = mkdtempSync(join(tmpdir(), "kaying-agent-data-root-"));
+  process.env.KAYINGCODE_DATA_BASE_DIR = dataBaseDir;
   try {
-    assert.equal(
-      getDefaultLogDir(),
-      join(process.env.KAYINGCODE_DATA_BASE_DIR, ".kayingcode/cli/log"),
-    );
-    assert.equal(
-      getDefaultSessionDbPath(),
-      join(
-        process.env.KAYINGCODE_DATA_BASE_DIR,
-        ".kayingcode/cli/db/db.sqlite",
-      ),
-    );
-    assert.equal(
-      resolveDefaultOutputRootDir(),
-      join(process.env.KAYINGCODE_DATA_BASE_DIR, ".kayingcode/cli/exec"),
-    );
-    assert.equal(
-      getDefaultWorkflowRoot(),
-      join(process.env.KAYINGCODE_DATA_BASE_DIR, ".kayingcode/cli/workflows"),
-    );
+    assert.equal(getDefaultLogDir(), join(dataBaseDir, ".kayingcode/cli/log"));
+    assert.equal(getDefaultSessionDbPath(), join(dataBaseDir, ".kayingcode/cli/db/db.sqlite"));
+    assert.equal(resolveDefaultOutputRootDir(), join(dataBaseDir, ".kayingcode/cli/exec"));
+    assert.equal(getDefaultWorkflowRoot(), join(dataBaseDir, ".kayingcode/cli/workflows"));
     assert.equal(
       await resolveWorkspaceHookTrustStorePath(),
-      join(
-        process.env.KAYINGCODE_DATA_BASE_DIR,
-        ".kayingcode/security/workspace-hook-trust-v1.json",
-      ),
+      join(dataBaseDir, ".kayingcode/security/workspace-hook-trust-v1.json"),
     );
   } finally {
     if (previous === undefined) delete process.env.KAYINGCODE_DATA_BASE_DIR;
     else process.env.KAYINGCODE_DATA_BASE_DIR = previous;
+    rmSync(dataBaseDir, { recursive: true, force: true });
   }
 });

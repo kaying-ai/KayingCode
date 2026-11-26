@@ -89,6 +89,7 @@ export async function executeTools(
     subagentModelOverride: options?.subagentModelOverride,
     model: options?.model,
     toolSearch: options?.toolSearch,
+    responseId: options?.responseId,
   });
   let results: ToolExecutionResult[] = [];
 

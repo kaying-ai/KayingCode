@@ -660,11 +660,29 @@ export interface ModelChangeTimelinePart extends TimelinePartBase {
   toModel?: TimelineModelSelection & { label: string };
 }
 
+/** 受管 worktree 的创建结果（docs/git/worktree.md §6.6.4）；由 Host 创建 worktree 后交给 CLI 落盘。 */
+export interface WorktreeCreationFact {
+  /** worktree 根目录。 */
+  path: string;
+  /** 检出的 commit。 */
+  sha: string;
+  /** 用户选择的起点；null = 源目录当前 HEAD。 */
+  ref: string | null;
+  /** git 与拷贝输出的末尾。 */
+  output: string;
+}
+
+export interface WorktreeCreationTimelinePart extends TimelinePartBase {
+  timelineType: "worktree_creation";
+  worktreeCreation: WorktreeCreationFact;
+}
+
 export type TimelinePart =
   | ContextCompactionTimelinePart
   | GoalVerificationTimelinePart
   | SessionForkTimelinePart
-  | ModelChangeTimelinePart;
+  | ModelChangeTimelinePart
+  | WorktreeCreationTimelinePart;
 
 export type TimelinePartDraft = TimelinePart extends infer Part
   ? Part extends TimelinePart
@@ -1170,7 +1188,53 @@ export interface LocalSettingStorePort {
   }): CollaborationMode | Promise<CollaborationMode>;
 }
 
+/** 永久删除只保留身份与附件引用元数据，不备份会话正文。 */
+export interface SessionDeletionReference {
+  sessionId: SessionId;
+  artifactId: string;
+  referrers: Array<{ sessionId: SessionId; title: string }>;
+}
+export interface SessionDeletionSnapshot {
+  workspacePath?: string;
+  workspaceIdentity?: string;
+  revision: string;
+  sessionIds: SessionId[];
+  forks: Array<{ sessionId: SessionId; title: string }>;
+  references: SessionDeletionReference[];
+  foreignRuntime: boolean;
+  localRuntimeIds: SessionId[];
+  pendingWork: boolean;
+  deleting: boolean;
+  completed: boolean;
+}
+/**
+ * scanArtifactReferences=false：调用方已确认 owned tree 没有 artifact 文件，跳过引用扫描
+ * （删除凭据仍有保留附件时照样扫描）。缺省为 true。预检、执行与写锁内复检必须传同一判定。
+ */
+export interface SessionDeletionInspectOptions {
+  scanArtifactReferences?: boolean;
+}
+
 export interface SessionStorePort {
+  inspectSessionDeletion?(
+    sessionID: SessionId,
+    options?: SessionDeletionInspectOptions,
+  ): Promise<SessionDeletionSnapshot>;
+  /** 一批根共用一次扫描；结果按入参顺序，与逐个 inspectSessionDeletion 一致。 */
+  inspectSessionDeletions?(
+    targets: ReadonlyArray<{ sessionId: SessionId } & SessionDeletionInspectOptions>,
+  ): Promise<SessionDeletionSnapshot[]>;
+  beginSessionDeletion?(
+    sessionID: SessionId,
+    revision: string,
+    operationId: string,
+    retained: Array<{ sessionId: SessionId; artifactId: string }>,
+    options?: SessionDeletionInspectOptions,
+  ): Promise<void>;
+  completeSessionDeletion?(sessionID: SessionId): Promise<void>;
+  registerSessionRuntime?(sessionID: SessionId): Promise<void>;
+  unregisterSessionRuntime?(sessionID: SessionId): Promise<void>;
+  assertSessionNotDeleting?(sessionID: SessionId): Promise<void>;
   createSession(input: CreateSessionInput): Promise<SessionInfo>;
   /** legacy 兼容原语；V4 stable/compact-edit fork 禁止调用，统一走 commitForkBundle。 */
   createForkedSessionWithMetadata?(

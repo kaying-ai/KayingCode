@@ -173,6 +173,10 @@ import {
   settingsToConfigOptions,
 } from "./kayingcodeConfigOptions.js";
 import { registerMemoryDiagnosticsProvider } from "#src/memoryDiagnostics.js";
+import {
+  createArchivedTaskPermanentDeletionService,
+  type ArchivedTaskDeletionProtocolPort,
+} from "#src/session/archivedTaskPermanentDeletion.js";
 
 interface TaskOverlay {
   archived?: boolean;
@@ -303,6 +307,16 @@ export function createKayingCodeTaskServiceAdapter(
   }));
   const taskIndexRepo = options.taskIndexRepo ?? new TaskIndexRepo();
   const taskIndexSyncer = options.taskIndexSyncer;
+  // 永久删除的协议细节（批量预检分批、旧 CLI 回退、单根映射）收在单独服务里；
+  // adapter 只负责任务索引收口和 UI 事件。
+  const archivedTaskPermanentDeletion = createArchivedTaskPermanentDeletionService({
+    previewSessionDeletions: (params) =>
+      options.kayingcodeAgentService.previewSessionDeletions(params),
+    previewSessionDeletion: (params) =>
+      options.kayingcodeAgentService.previewSessionDeletion(params),
+    executeSessionDeletion: (params) =>
+      options.kayingcodeAgentService.executeSessionDeletion(params),
+  } satisfies ArchivedTaskDeletionProtocolPort);
 
   // 之前 adapter 自带 notifySyncerSession 时把 syncer 视为可选；现在 syncer 是构造必填项，
   // 简化为直接调用，避免每个 callsite 都做空判断。
@@ -3185,6 +3199,37 @@ export function createKayingCodeTaskServiceAdapter(
         failed: result.failedTaskIds.length,
         durationMs: Date.now() - startedAt,
       });
+      return result;
+    },
+
+    async previewArchivedTaskDeletion(params) {
+      return archivedTaskPermanentDeletion.previewArchivedTaskDeletion(params);
+    },
+
+    async previewArchivedTaskDeletions(params) {
+      return archivedTaskPermanentDeletion.previewArchivedTaskDeletions(params);
+    },
+
+    async permanentlyDeleteArchivedTask(params) {
+      const result = await archivedTaskPermanentDeletion.permanentlyDeleteArchivedTask({
+        ...params,
+        operationId: params.operationId ?? randomUUID(),
+      });
+      if (result.status !== "deleted") return result;
+      // 会话正文已物理删除；任务索引仍要落 deleted tombstone，否则归档列表在
+      // 下一次刷新时会把没有 session 的旧行重新展示出来。
+      let meta: KayingCodeTaskMeta | undefined;
+      try {
+        meta = (await taskIndexRepo.deleteArchivedTask(params)) ?? undefined;
+      } catch (error) {
+        logger.warn(undefined, "[ArchivedTaskDeletion] 永久删除后清理 task index 失败", {
+          ...params,
+          error,
+        });
+      }
+      setOverlay(params, { deleted: true });
+      // 即使索引行已不在归档态也发一次事件，驱动所有观察端重拉 membership。
+      emitWorkspaceTaskListChanged(params, meta, "task_deleted");
       return result;
     },
 

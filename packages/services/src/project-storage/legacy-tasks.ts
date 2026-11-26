@@ -193,10 +193,50 @@ export function reconcileLegacy(db: DatabaseSync, ownerHostId?: string): void {
   }
 }
 
+/** 父任务运行在受管 worktree 中时，同目录 fork 子任务行要继承的位置。 */
+export interface InheritedWorktreePlacement {
+  rootPath: string;
+  worktreeRoot: string;
+  executionDirectories: string | null;
+}
+
+/**
+ * 同目录 fork 子任务的 cwd 唯一来自父行。子任务行有两个首次写入点（CLI 首次上报、App Control
+ * 分叉预留），两处都在各自写事务中调用这里；父任务不在 worktree 中时返回 null，沿用普通规则。
+ * 附加目录一并继承，避免按项目 roots 推导时把源仓库交给 worktree 任务。
+ */
+export function readInheritedWorktreePlacement(
+  db: DatabaseSync,
+  parent: { workspaceKey: string; hostId: string; taskId: string },
+): InheritedWorktreePlacement | null {
+  const row = db
+    .prepare(
+      "SELECT root_path,worktree_root,execution_directories FROM tasks WHERE workspace_key=? AND task_id=? AND host_id=?",
+    )
+    .get(parent.workspaceKey, parent.taskId, parent.hostId) as
+    | {
+        root_path: string | null;
+        worktree_root: string | null;
+        execution_directories: string | null;
+      }
+    | undefined;
+  if (!row || row.worktree_root === null || row.root_path === null) return null;
+  return {
+    rootPath: row.root_path,
+    worktreeRoot: row.worktree_root,
+    executionDirectories: row.execution_directories,
+  };
+}
+
 /** 新版本插入身份和首次归属，不借旧列生成 CLI 事实。调用方与 INSERT 共用写事务。 */
 export function admitTaskIdentity(
   db: DatabaseSync,
-  task: { workspacePath: string; workspaceIdentity?: string; taskId: string },
+  task: {
+    workspacePath: string;
+    workspaceIdentity?: string;
+    taskId: string;
+    forkedFromTaskId?: string;
+  },
   ownerHostId?: string,
 ): void {
   const key = resolveWorkspaceKey(task);
@@ -212,15 +252,42 @@ export function admitTaskIdentity(
       (row.host_id !== hostId || hostId === "local" || row.project_id != null))
   )
     return;
+  // 同目录 fork 的子会话与父会话共用 cwd；父任务在受管 worktree 中时，cwd 不等于 workspace_path。
+  // 只在行尚未归属（首次事实）时继承，已有归属的行不重算目录。
+  const forkedFromTaskId =
+    task.forkedFromTaskId ??
+    (typeof row.forked_from_task_id === "string" ? row.forked_from_task_id : undefined);
+  const placement =
+    row.host_id == null && forkedFromTaskId
+      ? readInheritedWorktreePlacement(db, {
+          workspaceKey: key,
+          hostId,
+          taskId: forkedFromTaskId,
+        })
+      : null;
   // 首次摄入继承 fork 父任务；只允许后续事实修复当前远端 owner 的缺失归属，不重算本地 NULL。
   const projectId = discoveredProject(db, {
     workspace_key: key,
     task_id: task.taskId,
     root_path: task.workspacePath,
     host_id: hostId,
-    forked_from_task_id:
-      typeof row.forked_from_task_id === "string" ? row.forked_from_task_id : null,
+    forked_from_task_id: forkedFromTaskId ?? null,
   });
+  if (placement) {
+    db.prepare(
+      "UPDATE tasks SET host_id=?,root_path=?,worktree_root=?,execution_directories=?,project_id=?,handoff_pending=handoff_pending | ? WHERE workspace_key=? AND task_id=? AND host_id IS NULL",
+    ).run(
+      hostId,
+      placement.rootPath,
+      placement.worktreeRoot,
+      placement.executionDirectories,
+      projectId,
+      OWNERSHIP_DECIDED,
+      key,
+      task.taskId,
+    );
+    return;
+  }
   db.prepare(`UPDATE tasks SET host_id=?,root_path=workspace_path,project_id=?,handoff_pending=handoff_pending | ?
     WHERE workspace_key=? AND task_id=? AND (host_id IS NULL OR (host_id=? AND project_id IS NULL))`).run(
     hostId,
@@ -230,13 +297,13 @@ export function admitTaskIdentity(
     task.taskId,
     hostId,
   );
-  if (row.host_id == null && row.forked_from_task_id) {
+  if (row.host_id == null && forkedFromTaskId) {
     // 首条 fork 事实先到时也继承固化目录，不能因 ACK/通知顺序改变恢复后的执行范围。
     db.prepare(`UPDATE tasks SET execution_directories=(SELECT execution_directories FROM tasks
       WHERE workspace_key=? AND task_id=? AND host_id=? AND root_path=?)
       WHERE workspace_key=? AND task_id=? AND execution_directories IS NULL`).run(
       key,
-      String(row.forked_from_task_id),
+      forkedFromTaskId,
       hostId,
       task.workspacePath,
       key,

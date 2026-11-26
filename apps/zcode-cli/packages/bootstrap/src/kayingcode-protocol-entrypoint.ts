@@ -349,6 +349,8 @@ export async function runKayingCodeProtocolAgent(
                   }),
               }
             : {}),
+          // 桌面交互入口：首个请求不等全部 MCP server，自动任务轮次仍由 runtime 改为等待。
+          mcpStartupPolicy: "background",
           providerEndpointRoutingPort,
           officialCommandEnv: (sessionId, workspace) =>
             activeOfficialCommandEndpoint.envForSession(sessionId, workspace),

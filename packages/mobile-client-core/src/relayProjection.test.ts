@@ -153,6 +153,56 @@ test("投影：snapshot 全量替换 rows 与控制状态", () => {
   assert.equal(projection.olderHasMore, true);
 });
 
+test("投影：activitySummaryDismissed 随 snapshot/state.updated 复制", () => {
+  const projection = new RelayConversationProjection();
+  projection.applyFrame({
+    topic: "conversation/session-1",
+    subscriptionId: "sub-1",
+    fromSeq: 0,
+    toSeq: 1,
+    sentAt: 0,
+    payload: {
+      kind: "snapshot",
+      snapshot: {
+        sessionId: "session-1",
+        rows: { window: [], totalCount: 0, firstRowId: null },
+        activitySummaryDismissed: {
+          at: 10,
+          workIds: ["w1"],
+          subagentIds: ["s1"],
+          workflowRunIds: ["r1"],
+        },
+        pendingInteractions: [],
+      },
+    },
+  } as unknown as ConversationTopicFrame);
+  assert.deepEqual(projection.activitySummaryDismissed, {
+    at: 10,
+    workIds: ["w1"],
+    subagentIds: ["s1"],
+    workflowRunIds: ["r1"],
+  });
+
+  projection.applyFrame(
+    deltasFrame([
+      {
+        op: "state.updated",
+        patch: {
+          revision: 2,
+          activitySummaryDismissed: {
+            at: 20,
+            workIds: [],
+            subagentIds: [],
+            workflowRunIds: [],
+          },
+        },
+      },
+    ]),
+  );
+  assert.equal(projection.activitySummaryDismissed?.at, 20);
+  assert.deepEqual(projection.activitySummaryDismissed?.workIds, []);
+});
+
 test("投影：pendingInteractions 保存全集供作答（MOB-C-006）", () => {
   const projection = new RelayConversationProjection();
   const interaction = {

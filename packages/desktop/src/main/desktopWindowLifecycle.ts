@@ -62,6 +62,8 @@ export function createWindow(options: {
   initialDesktopZoomLevel?: number;
   initialWindowSize?: DesktopWindowSize;
   currentApplicationLocale?: () => Locale;
+  /** spawn 时刻 Main 持有的 Agent 回复语言；后续变化由 reply-language-changed 推送。 */
+  currentReplyLanguage?: () => string | null;
   persistWindowSize?: (state: DesktopWindowSize) => Promise<void>;
   /** Main 模块初始化期已开始的异步环境采集；通常在 renderer dom-ready 前完成。 */
   runtimeProcessEnvPatchPromise?: Promise<Record<string, string>>;
@@ -79,6 +81,8 @@ export function createWindow(options: {
   awaitFirstHostSpawnDecision?: () => Promise<void>;
   /** Local Host map insertion completed; presentation facts can now be replayed safely. */
   onHostProcessReady?: (windowKey: number) => void;
+  /** 窗口已销毁：Main 侧按 windowId 持有的 browser 资源身份/作用域必须在此释放。 */
+  onWindowClosed?: (windowId: number) => void;
   resolveBrowserViewOwner?: Parameters<typeof createBrowserWindow>[0]["resolveBrowserViewOwner"];
 }) {
   const win = createBrowserWindow({
@@ -217,6 +221,8 @@ export function createWindow(options: {
         remoteAssets: options.remoteAssets,
         // Host 的 X-Client-Language 以 Main 的实时界面语言为准；与后续变更消息同端口按序到达。
         ...(options.currentApplicationLocale ? { locale: options.currentApplicationLocale() } : {}),
+        // 回复语言与 InitLocal 同端口按序到达；变更后由 reply-language-changed 覆盖。
+        ...(options.currentReplyLanguage ? { replyLanguage: options.currentReplyLanguage() } : {}),
       });
       options.windowHostProcessMap.set(wcId, child);
       options.onHostProcessReady?.(wcId);
@@ -281,6 +287,8 @@ export function createWindow(options: {
     // renderer 销毁后不会再上报 0，先移除窗口计数再重新聚合，避免角标永久残留。
     removeWindowUnreadCount(options.windowUnreadCountMap, browserWindowId);
     syncApplicationUnreadBadge(options.windowUnreadCountMap);
+    // browser 资源身份/作用域由 Main 按 windowId 持有，窗口销毁后必须同步清理。
+    options.onWindowClosed?.(browserWindowId);
     options.logger.info(`[createWindow] window closed, killing host process (${label})`);
     const child = options.windowHostProcessMap.get(wcId);
     if (child) {

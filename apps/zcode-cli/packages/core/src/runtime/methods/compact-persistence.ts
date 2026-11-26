@@ -1,3 +1,4 @@
+import type { ToolSearchDelivery } from "@zcode/contracts";
 import {
   CompactTrigger,
   CompactTimelineDisplay,
@@ -296,6 +297,7 @@ export async function persistCompactSummary(
     operationId?: string;
     leadingReminderEntries?: readonly RuntimeMessageEntry[];
     postCompactReminderEntries?: readonly RuntimeMessageEntry[];
+    toolSearchDelivery?: ToolSearchDelivery;
   },
 ): Promise<void> {
   if (!this.sessionStore) return;
@@ -331,6 +333,10 @@ export async function persistCompactSummary(
         transcriptVisibility: "hidden",
       },
       system: this.config.systemPrompt,
+      // compact summary 也要携带被保留引用的已交付定义，冷恢复后的首个请求才不需要重发。
+      ...(options?.toolSearchDelivery
+        ? { metadata: { toolSearchDelivery: options.toolSearchDelivery } }
+        : {}),
     },
     parts: [
       {

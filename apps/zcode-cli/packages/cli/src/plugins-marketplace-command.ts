@@ -47,7 +47,7 @@ export async function runMarketplaceCommand(
     }
     case "list": {
       if (rest.length > 0) throw new PluginsUsageError();
-      const overview = (await resolveDep(deps, "getPluginsOverview"))(base);
+      const overview = await (await resolveDep(deps, "getPluginsOverview"))(base);
       ctx.stdout.write(
         options.json
           ? formatJson(overview.marketplaces.map(formatMarketplaceJson))

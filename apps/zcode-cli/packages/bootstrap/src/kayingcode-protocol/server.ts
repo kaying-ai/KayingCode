@@ -15,7 +15,9 @@ import {
   kayingcodeWorkspaceCancelGenerateTextParamsSchema,
   kayingcodeWorkspaceHookTrustGrantParamsSchema,
 } from "@zcode/shared";
-import type { BrowserControlPort } from "@zcode/contracts";
+import type { BrowserControlPort, SessionId } from "@zcode/contracts";
+import { resolve } from "node:path";
+import { resolveWorkspaceHookTrustIdentityForWorkspace } from "@zcode/adapters/config";
 import type {
   McpElicitationRequest,
   McpElicitationResult,
@@ -38,10 +40,12 @@ import type {
   KayingCodeProtocolRequest,
   KayingCodeProtocolRequestId,
   KayingCodeProtocolResponse,
+  KayingCodeWorkspaceRef,
 } from "@zcode/shared";
 import {
   cancelBackgroundTask,
   closeSession,
+  releaseSessionsUnderDirectory,
   compactSession,
   createSession,
   forkSession,
@@ -85,6 +89,7 @@ import {
   resetPluginConfig,
   restoreBuiltinPlugin,
   setPluginEnabled,
+  setPluginWorkspaceTrust,
   uninstallPlugin,
   updatePlugin,
   refreshLocalPluginSource,
@@ -139,7 +144,13 @@ import {
   getSessionLifecycle,
   shutdownSessionRuntime,
 } from "./session-residency.js";
-import { measureSessionData, purgeSessionData } from "./session-data/index.js";
+import {
+  executeSessionDeletion,
+  measureSessionData,
+  previewSessionDeletion,
+  previewSessionDeletions,
+  purgeSessionData,
+} from "./session-data/index.js";
 import {
   DEFAULT_SESSION_RESIDENT_HIGH_WATER_COUNT,
   SessionResidentPool,
@@ -173,17 +184,29 @@ type KayingCodeProtocolOutboundMessage = KayingCodeProtocolNotification | Kaying
 /**
  * Trust store 落盘后各 session 的 coordinator
  * 内存镜像（仅创建时 load）不会自动更新，已信任 Hook 继续被拒、banner pendingCount
- * 停留旧值。pretrust 授权成功后按 workspaceKey 通知所有匹配的活跃 session 重载。
+ * 停留旧值。pretrust 授权成功后按 Trust identity 通知所有匹配的活跃 session 重载。
  * 独立导出为纯调度函数（不触网、不发事件），便于回归测试直接构造 sessions Map。
  */
 export async function notifyWorkspaceHookTrustGrantSessions(input: {
-  grantedWorkspaceKey?: string;
+  grantedWorkspace?: KayingCodeWorkspaceRef;
   sessions: Map<string, KayingCodeProtocolSessionRecord>;
 }): Promise<void> {
-  if (!input.grantedWorkspaceKey) return;
+  if (!input.grantedWorkspace) return;
+  // Trust record 按 Trust identity 共享（D23）：源仓库授予后，同进程内它的受管 worktree
+  // session 也必须重载；按 workspaceKey 过滤会漏掉 worktree。跨进程的通知由 Host 负责。
+  const trustIdentityOf = (workspace: KayingCodeWorkspaceRef) =>
+    resolveWorkspaceHookTrustIdentityForWorkspace({
+      workspacePath: resolve(workspace.workspacePath),
+      ...(workspace.workspaceIdentity?.trim()
+        ? { workspaceIdentity: workspace.workspaceIdentity.trim() }
+        : {}),
+    });
+  const granted = await trustIdentityOf(input.grantedWorkspace);
+  const records = [...input.sessions.values()];
+  const identities = await Promise.all(records.map((record) => trustIdentityOf(record.workspace)));
   await Promise.all(
-    [...input.sessions.values()]
-      .filter((record) => record.workspace.workspaceKey === input.grantedWorkspaceKey)
+    records
+      .filter((_record, index) => identities[index] === granted)
       .map((record) => record.app.reloadWorkspaceHookTrust()),
   );
 }
@@ -563,6 +586,14 @@ export class KayingCodeProtocolAgentServer {
     // request id 可在前一请求完成后复用；新请求不能继承未消费的旧 outbox。
     this.postResponseOutbox.delete(request.id);
     let releaseResidencyOperation: (() => void) | undefined;
+    const deletionRequest =
+      request.method === V4_METHODS.sessionDeletionPreview ||
+      request.method === V4_METHODS.sessionDeletionPreviewBatch ||
+      request.method === V4_METHODS.sessionDeletionExecute;
+    const requestSessionIds = deletionRequest ? [] : collectResidencySessionIds(request.params);
+    const requestCounts = (this.context.sessionRequestCounts ??= new Map<string, number>());
+    // 运行态还未进入 busy 的异步请求也必须阻止删除，避免确认期间恢复与删除交错。
+    for (const id of requestSessionIds) requestCounts.set(id, (requestCounts.get(id) ?? 0) + 1);
     try {
       // subscribe hydration、workspace 配置与 resume 都可能跨 await。若只看
       // session 当前状态，sampler 会在 handler 持有旧 record 时把它关闭。进程级 lease
@@ -577,6 +608,9 @@ export class KayingCodeProtocolAgentServer {
         releaseResidencyOperation = await this.context.sessionResidentPool?.acquireOperation(
           lifecycleMutation ? undefined : collectResidencySessionIds(request.params),
         );
+      if (!deletionRequest)
+        for (const id of collectResidencySessionIds(request.params))
+          await this.context.deps.sessionStore?.assertSessionNotDeleting?.(id as SessionId);
       const result = await this.dispatchRequest(request);
       return this.ok(request.id, result);
     } catch (error) {
@@ -585,6 +619,11 @@ export class KayingCodeProtocolAgentServer {
       return this.fail(request.id, protocolError.code, protocolError.message, protocolError.data);
     } finally {
       releaseResidencyOperation?.();
+      for (const id of requestSessionIds) {
+        const remaining = (requestCounts.get(id) ?? 1) - 1;
+        if (remaining) requestCounts.set(id, remaining);
+        else requestCounts.delete(id);
+      }
     }
   }
 
@@ -709,6 +748,12 @@ export class KayingCodeProtocolAgentServer {
       case V4_METHODS.conversationContextComposition:
         return await getConversationContextComposition(this.context, request.params);
       // 项目数据彻底删除：不经 v4Gateway 会话投影，直接操作本进程的 store 与会话注册表。
+      case V4_METHODS.sessionDeletionPreview:
+        return previewSessionDeletion(this.context, request.params);
+      case V4_METHODS.sessionDeletionPreviewBatch:
+        return previewSessionDeletions(this.context, request.params);
+      case V4_METHODS.sessionDeletionExecute:
+        return executeSessionDeletion(this.context, request.params);
       case V4_METHODS.sessionDataMeasure:
         return await measureSessionData(this.context, request.params);
       case V4_METHODS.sessionDataPurge:
@@ -778,6 +823,8 @@ export class KayingCodeProtocolAgentServer {
         return await setMode(this.context, request.params);
       case kayingcodeProtocolMethods.sessionClose:
         return await closeSession(this.context, request.params);
+      case kayingcodeProtocolMethods.sessionReleaseUnderDirectory:
+        return await releaseSessionsUnderDirectory(this.context, request.params);
       case kayingcodeProtocolMethods.workspaceReadPresentation:
         return await readWorkspacePresentation(this.context, request.params);
       case kayingcodeProtocolMethods.workspaceHookTrustGrant: {
@@ -788,12 +835,11 @@ export class KayingCodeProtocolAgentServer {
         if (grantResult.accepted) {
           await notifyWorkspaceHookTrustGrantSessions({
             // dispatch 层的 params 是弱类型；grant 内部已用同一 schema parse 过，这里
-            // safeParse 只为取出 workspaceKey 做匹配，失败即跳过通知（防御，正常必成功）。
-            grantedWorkspaceKey: kayingcodeWorkspaceHookTrustGrantParamsSchema.safeParse(
+            // safeParse 只为取出 workspace 做匹配，失败即跳过通知（防御，正常必成功）。
+            grantedWorkspace: kayingcodeWorkspaceHookTrustGrantParamsSchema.safeParse(
               request.params,
             ).success
               ? kayingcodeWorkspaceHookTrustGrantParamsSchema.parse(request.params).workspace
-                  .workspaceKey
               : undefined,
             sessions: this.context.sessions,
           });
@@ -892,6 +938,8 @@ export class KayingCodeProtocolAgentServer {
         return await this.withPluginOperationSignal(request, (signal) =>
           setPluginEnabled(this.context, request.params, signal),
         );
+      case kayingcodeProtocolMethods.pluginsWorkspaceTrust:
+        return await setPluginWorkspaceTrust(this.context, request.params);
       case kayingcodeProtocolMethods.pluginsOverview:
         return await getPluginsOverview(this.context, request.params);
       case kayingcodeProtocolMethods.processChildProcesses:
@@ -905,12 +953,24 @@ export class KayingCodeProtocolAgentServer {
           params.hostCapabilities?.sessionWorkspaceRouting === true;
         return {
           sessionLifecycleWorkspace: true,
+          pluginDiscoveryUi: true,
           sessionWorkspaceRouting: true,
           independentPlanState: true,
           historyFirst: true,
           sessionDirectorySource: true,
           residentRowsRange: true,
           genUiContext: true,
+          // 会话 cwd 可与 workspace 不同（受管 worktree）：createSession.cwd / worktreeCreation、
+          // forkAssistant.targetCwd、按 Host workspace key 冷恢复。旧 Host 的结果 schema 非 strict。
+          worktreeCwd: true,
+          // CLI 认识 {kind:"extension"} 输入来源：sendText.source 与 createSession.firstInput.source
+          // 都随 canonical intent 落库并投影到 userInput 行（packages/shared/spec/conversation-input-source.md §7）。
+          extensionInputSource: true,
+          // 对话引用的 comment / agent 字段会进入模型输入（选区批注）；旧 CLI 会静默剥掉。
+          conversationQuoteComment: true,
+          // plugins/overview 认识 includeExtensionSummary，并按它在商店信息里带扩展摘要
+          // （packages/shared/spec/plugin-extension-summary.md）。
+          pluginExtensionSummary: true,
         };
       }
       case kayingcodeProtocolMethods.pluginsLocalSourceAdd:

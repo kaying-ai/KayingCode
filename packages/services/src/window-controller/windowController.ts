@@ -13,7 +13,12 @@ import type {
   WindowHostTaskAddress,
 } from "@zcode/shared/kayingcode-protocol-v4";
 import { createServiceDescriptor } from "../descriptors.js";
-import type { KayingCodeArchivedTaskDeletionResult } from "#src/session/kayingcodeTaskService.js";
+import type {
+  KayingCodeArchivedTaskDeletionPreview,
+  KayingCodeArchivedTaskDeletionPreviewBatchResult,
+  KayingCodeArchivedTaskDeletionResult,
+  KayingCodeArchivedTaskPermanentDeletionResult,
+} from "#src/session/kayingcodeTaskService.js";
 import type {
   KayingCodeTaskListItem,
   KayingCodeTaskListQuery,
@@ -66,6 +71,21 @@ export interface IWindowControllerService {
     address: WindowHostTaskAddress;
     taskIds: string[];
   }): Promise<KayingCodeArchivedTaskDeletionResult>;
+  /** 归档永久删除的单根预检；供单项入口复用与批量路由一致的 owner 校验。 */
+  previewArchivedTaskDeletion(params: {
+    address: WindowHostTaskAddress;
+  }): Promise<KayingCodeArchivedTaskDeletionPreview>;
+  /** 归档永久删除的批量预检；结果顺序与去重后的 taskIds 一致。 */
+  previewArchivedTaskDeletions(params: {
+    address: WindowHostTaskAddress;
+    taskIds: string[];
+  }): Promise<KayingCodeArchivedTaskDeletionPreviewBatchResult>;
+  /** 执行永久删除；成功后由 Host 收敛 source 投影，UI 再刷新归档列表。 */
+  permanentlyDeleteArchivedTask(params: {
+    address: WindowHostTaskAddress;
+    revision: string;
+    operationId?: string;
+  }): Promise<KayingCodeArchivedTaskPermanentDeletionResult>;
   listTaskList(params: KayingCodeTaskListQuery): Promise<WindowHostControllerTaskListResult>;
   /**
    * 直接读取所属 owner 的轻量 meta；未读 CAS 不得使用可能降级为旧快照的列表投影。

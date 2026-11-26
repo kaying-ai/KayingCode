@@ -107,7 +107,7 @@ export KAYINGCODE_DATA_BASE_DIR=/srv/kayingcode-review
 
 注意：`build:web` 会把审核 origin 写入 `packages/web/dist` 和 `public/`；之后若要发布生产，必须用生产 origin 重新构建再部署。
 
-public 是构建产物目录，通过 build:web 生成并部署。Web 来源由 packages/web/upstream-web.json 固定；构建必要时只获取该官方提交，不移动产品分支。manifest 写入来源、relayOrigin 和审计哈希。两份第三方声明随资产交付；材料检查为显式命令，不是全仓待办清零后才允许打包，见 [许可规则](../../third-party/SPEC.md)。
+public 是构建产物目录，通过 build:web 生成并部署。Web 来源由根 UPSTREAM_BASE.json 固定，packages/web/upstream-web.json 只保留 Web 专属配置；构建必要时只获取该官方提交，不移动产品分支。manifest 写入来源、relayOrigin 和审计哈希。两份第三方声明随资产交付；材料检查为显式命令，不是全仓待办清零后才允许打包，见 [许可规则](../../third-party/SPEC.md)。
 
 ## 5. Desktop 与手机接入
 

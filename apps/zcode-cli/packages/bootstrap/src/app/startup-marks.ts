@@ -1,7 +1,9 @@
 import type { ConfigResult } from "@zcode/adapters/config";
-import { discoverNodePluginsSync } from "@zcode/adapters/plugins";
+import { discoverNodePlugins } from "@zcode/adapters/plugins";
 import type { AgentRuntimeConfig } from "@zcode/core";
 import type { Logger, McpServerConfig, PluginLoadOutcome } from "@zcode/contracts";
+import { resolvePluginSecretsPath, withPluginSecrets } from "../plugin-secrets.js";
+import { resolveWorkspacePluginDiscovery } from "../workspace-plugin-trust/index.js";
 import type { StartupTimer } from "../startup-logging.js";
 import { resolveOfficialPluginRoots } from "./bundled-plugins.js";
 import { DEFAULT_ENABLED_OFFICIAL_PLUGIN_IDS } from "./official-plugin-definitions.js";
@@ -9,34 +11,65 @@ import { getPluginStorageRoot } from "./paths.js";
 import type { KayingCodeAppOptions } from "./types.js";
 import { filterVisualizeSkillRoots } from "./visualize-skill-gate.js";
 
-export function resolveStartupPlugins(input: {
+export async function resolveStartupPlugins(input: {
   cliStorageRoot: string;
   configResult: ConfigResult;
   env?: NodeJS.ProcessEnv;
   logger?: Logger;
-  options: Pick<KayingCodeAppOptions, "officialPluginRoots" | "pluginStorageRoot" | "includeVisualize">;
+  options: Pick<
+    KayingCodeAppOptions,
+    "officialPluginRoots" | "pluginDiscovery" | "pluginStorageRoot" | "runtimeConfig" | "includeVisualize"
+  >;
   startupTimer: StartupTimer;
   workingDirectory: string;
-}): PluginLoadOutcome {
+  workspaceIdentity?: string;
+  remoteSessionId?: string;
+}): Promise<PluginLoadOutcome> {
   const pluginStorageRoot =
     input.options.pluginStorageRoot ?? getPluginStorageRoot(input.cliStorageRoot);
-  const pluginOutcome = discoverNodePluginsSync({
-    config: input.configResult.config.plugins,
+  // 会话运行时的 MCP 展开也要读到私有文件里的敏感值（与 resolveKayingCodePlugins 同一叠加）。
+  const secrets = await withPluginSecrets(
+    input.configResult,
+    resolvePluginSecretsPath(pluginStorageRoot),
+    input.logger,
+  );
+  const workspaceIdentity =
+    input.workspaceIdentity ?? input.options.runtimeConfig?.memory?.workspaceIdentity;
+  const remoteSessionId = input.remoteSessionId ?? input.options.runtimeConfig?.remoteSessionId;
+  const pluginOutcome = await (
+    input.options.pluginDiscovery
+      ? input.options.pluginDiscovery.discoverPlugins.bind(input.options.pluginDiscovery)
+      : discoverNodePlugins
+  )({
+    workspaceIdentity,
+    remoteSessionId,
+    config: secrets.configResult.config.plugins,
     env: input.env ?? process.env,
-    officialPluginRoots: resolveOfficialPluginRoots({
+    officialPluginRoots: await resolveOfficialPluginRoots({
       extraRoots: input.options.officialPluginRoots,
       logger: input.logger,
       storageRoot: pluginStorageRoot,
-      suppressedBuiltins: new Set(input.configResult.config.plugins.suppressedBuiltins),
+      suppressedBuiltins: new Set(secrets.configResult.config.plugins.suppressedBuiltins),
     }),
     // defaultEnabled 的 official plugin (如 skill-creator) 只有在这里
-    // 把名单传给 discoverNodePluginsSync 才会真正默认开启。CLI 子命令路径
+    // 把名单传给 discoverNodePlugins 才会真正默认开启。CLI 子命令路径
     // (resolveKayingCodePlugins) 和应用启动路径都要传，否则 `/skill skill-creator` 在会话里
     // 报 "Skill not found: skill-creator"，但 `kayingcode plugins list` 却显示它是 enabled。
     officialPluginsEnabledByDefault: DEFAULT_ENABLED_OFFICIAL_PLUGIN_IDS,
     storageRoot: pluginStorageRoot,
     workingDirectory: input.workingDirectory,
+    // 项目目录插件按会话启动时的信任记录准入；会话运行中新增的信任不热加载。
+    workspacePlugins: await resolveWorkspacePluginDiscovery({
+      configResult: secrets.configResult,
+      env: input.env,
+      logger: input.logger,
+      workingDirectory: input.workingDirectory,
+      workspaceIdentity,
+    }),
   });
+  if (secrets.diagnostics.length > 0) {
+    pluginOutcome.diagnostics = [...pluginOutcome.diagnostics, ...secrets.diagnostics];
+  }
   pluginOutcome.skillRoots = filterVisualizeSkillRoots(
     pluginOutcome.skillRoots,
     input.options.includeVisualize,

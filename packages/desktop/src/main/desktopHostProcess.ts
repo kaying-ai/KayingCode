@@ -100,6 +100,10 @@ export interface HostInitMessage {
   }>;
   agentSpawnFallbackCwd?: string;
   remoteAssets?: RemoteAssetDirs;
+  /** Main 的实时界面语言；后续变化由 application-locale-changed 推送。 */
+  locale?: string;
+  /** Main 持有的 Agent 回复语言；后续变化由 reply-language-changed 推送。 */
+  replyLanguage?: string | null;
   /** Main 解析后的 KayingCode Built-in Provider Config 路径；Host/Services 不感知 Electron 安装布局。 */
   kayingcodeBuiltinProviderConfigFilePath: string;
   /** Main 提前异步采集并过滤的本机 runtime 环境；只允许传给 InitLocal。 */

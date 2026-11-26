@@ -24,10 +24,16 @@ type DesktopBrowserPlatformBridge = Pick<
   | "getPathForFile"
   | "saveFile"
   | "printPageToPdf"
+  | "microphone"
 >;
 
 // Rebase 集成：browser bridge 若继续内联在 renderer 入口，会让入口越过 max-lines 门禁。
 // 独立对象只做 preload 委托与旧 bridge 兼容兜底，不持有 Browser 业务状态。
+//
+// 语音输入：三个 preload 方法已由 packages/client 的 window.kayingcode 声明维护；
+// 任一个缺失即视为旧 preload，microphone 保持 undefined，UI 隐藏语音输入入口。
+const microphoneBridge = window.kayingcode;
+
 export const desktopBrowserPlatformBridge = {
   getPathForFile: (file) =>
     file instanceof File ? (window.kayingcode?.getPathForFile?.(file) ?? null) : null,
@@ -38,6 +44,17 @@ export const desktopBrowserPlatformBridge = {
   printPageToPdf: window.kayingcode?.printPageToPdf
     ? () => window.kayingcode?.printPageToPdf!()
     : undefined,
+  // 与 printPageToPdf 一样按 preload 是否提供决定能力是否存在，UI 据此决定是否显示语音输入。
+  microphone:
+    microphoneBridge.ensureMicrophoneAccess &&
+    microphoneBridge.resetMicrophoneAccess &&
+    microphoneBridge.openMicrophoneSettings
+      ? {
+          ensureAccess: () => microphoneBridge.ensureMicrophoneAccess!(),
+          resetAccess: () => microphoneBridge.resetMicrophoneAccess!(),
+          openSettings: (target) => microphoneBridge.openMicrophoneSettings!(target),
+        }
+      : undefined,
   onBrowserViewDownloadStarted: (handler) =>
     window.kayingcode.onBrowserViewDownloadStarted?.(handler) ?? (() => {}),
   onBrowserViewReady: (handler) => window.kayingcode?.onBrowserViewReady?.(handler) ?? (() => {}),

@@ -30,6 +30,19 @@ export function InteractionCard({
       </View>
     );
   }
+  // pluginInstall 卡片由电脑端插件商店承载；手机端只提示跳转，不重复实现安装交互。
+  if (payload.kind === "pluginInstall") {
+    const actionLabel = payload.action === "install" ? "安装" : "启用";
+    return (
+      <View className="interaction surface-card">
+        <Text className="list-title">插件{actionLabel}请求</Text>
+        <Text className="caption">
+          {payload.displayName ?? payload.name} · {payload.reason}
+        </Text>
+        <Text className="caption">请在电脑端完成{actionLabel}。</Text>
+      </View>
+    );
+  }
   const questions = payload.kind === "userInput" ? (payload.questions ?? []) : [];
   return (
     <View className="interaction surface-card">

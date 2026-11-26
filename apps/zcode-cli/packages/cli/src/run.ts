@@ -27,6 +27,11 @@ import { isPluginHostInvocation, runPluginHostCommand } from "./plugin-host-comm
 import { isDwfChildInvocation, runDwfChildCommand } from "./dwf-child-command.js";
 import { runPrompt } from "./prompt-command.js";
 import { runPluginsCommand, type PluginsCommandFlags } from "./plugins-command.js";
+import { runLoginCommand, runLogoutCommand } from "./login-command.js";
+import {
+  resolveBrowserStateSelection,
+  validateBrowserStateFlags,
+} from "./browser-state-option.js";
 import { runSkillsCommand } from "./skills-command.js";
 import { runTuiCommand } from "./tui-command.js";
 import {
@@ -414,6 +419,17 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     ctx.stderr.write(`${BROWSER_EXECUTABLE_REQUIRES_HEADLESS_ERROR}\n`);
     return 1;
   }
+  const browserStateExplicitPath = parsed.values["browser-state"] as string | undefined;
+  const browserStateDisabled = parsed.values["no-browser-state"] === true;
+  const browserStateFlagError = validateBrowserStateFlags({
+    browserUse,
+    explicitPath: browserStateExplicitPath,
+    disabled: browserStateDisabled,
+  });
+  if (browserStateFlagError) {
+    ctx.stderr.write(`${browserStateFlagError}\n`);
+    return 1;
+  }
 
   const resumeRequest: CliResumeRequest = {
     continueSession: parsed.values.continue === true,
@@ -450,6 +466,27 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     return 1;
   }
   const toolsearchMode = parsedToolsearchMode.data;
+  const totalTokensReminderOption = parsed.values["total-tokens-reminder"];
+  if (
+    totalTokensReminderOption !== undefined &&
+    totalTokensReminderOption !== "on" &&
+    totalTokensReminderOption !== "off"
+  ) {
+    ctx.stderr.write("--total-tokens-reminder must be one of on, off.\n");
+    return 1;
+  }
+  const totalTokensReminder = totalTokensReminderOption === "on";
+  const agentAlwaysBackgroundOption = parsed.values["agent-always-background"];
+  if (
+    agentAlwaysBackgroundOption !== undefined &&
+    agentAlwaysBackgroundOption !== "on" &&
+    agentAlwaysBackgroundOption !== "off"
+  ) {
+    ctx.stderr.write("--agent-always-background must be one of on, off.\n");
+    return 1;
+  }
+  // 产品默认前台；显式 on 才启用上游 4.0 的总后台形态。
+  const agentAlwaysBackground = agentAlwaysBackgroundOption === "on";
   const forceMcs = parsed.values["force-mcs"] === true;
   let targetRequest: CliTargetRequest | undefined;
   try {
@@ -462,6 +499,32 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
 
   if (targetRequest && typeof parsed.values.prompt === "string") {
     ctx.stderr.write(`${TARGET_CONFLICTS_WITH_PROMPT_ERROR}\n`);
+    return 1;
+  }
+
+  if (
+    agentAlwaysBackgroundOption !== undefined &&
+    !isForceMcsSupportedInvocation({
+      positionals: parsed.positionals,
+      prompt: parsed.values.prompt as string | undefined,
+      targetRequest,
+    })
+  ) {
+    ctx.stderr.write(
+      "--agent-always-background can only be used with --prompt, --target, or tui.\n",
+    );
+    return 1;
+  }
+
+  if (
+    totalTokensReminderOption !== undefined &&
+    !isForceMcsSupportedInvocation({
+      positionals: parsed.positionals,
+      prompt: parsed.values.prompt as string | undefined,
+      targetRequest,
+    })
+  ) {
+    ctx.stderr.write("--total-tokens-reminder can only be used with --prompt, --target, or tui.\n");
     return 1;
   }
 
@@ -562,6 +625,30 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     },
   };
 
+  if (browserUse === "headless") {
+    const browserState = await resolveBrowserStateSelection({
+      explicitPath: browserStateExplicitPath,
+      disabled: browserStateDisabled,
+      launchCwd: commandDeps.cwd ? commandDeps.cwd() : process.cwd(),
+      env,
+      platform: process.platform,
+    });
+    if (!browserState.ok) {
+      ctx.stderr.write(`${browserState.error}\n`);
+      return 1;
+    }
+    for (const notice of browserState.notices) ctx.stderr.write(`${notice}\n`);
+    if (browserState.selection) {
+      options.browserState = browserState.selection;
+    }
+    if (browserState.logFields) {
+      commandDeps.logger?.debug?.("Browser state resolved", {
+        ...browserState.logFields,
+        event: "cli.browser_state.resolved",
+      });
+    }
+  }
+
   if (typeof parsed.values.prompt === "string") {
     return await runPrompt(
       ctx,
@@ -577,6 +664,8 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       toolsearchMode,
       presentationSurface,
       workflowMode,
+      agentAlwaysBackground,
+      totalTokensReminder,
     );
   }
 
@@ -595,6 +684,8 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
       toolsearchMode,
       presentationSurface,
       workflowMode,
+      agentAlwaysBackground,
+      totalTokensReminder,
     );
   }
 
@@ -617,12 +708,15 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
     case "doctor":
       return runDoctor(ctx, options, workingDirectory);
     case "login":
-    case "logout":
-      // KayingCode.localrun：无账号登录；保留命令名只为兼容旧脚本，明确提示走模型 Key。
-      ctx.stdout.write(
-        "KayingCode has no account login. Configure a model API key or custom endpoint in settings.\n",
+      return await runLoginCommand(
+        ctx,
+        options,
+        commandDeps,
+        parsed.values["no-browser"] === true,
+        parsed.positionals.slice(1),
       );
-      return 0;
+    case "logout":
+      return await runLogoutCommand(ctx, options, commandDeps);
     case "skills":
       return await runSkillsCommand(ctx, options, commandDeps, parsed.positionals.slice(1));
     case "commands":
@@ -653,6 +747,8 @@ export const run = async (ctx: RunContext, deps: RunDependencies = {}): Promise<
         forceMcs,
         toolsearchMode,
         workflowMode,
+        agentAlwaysBackground,
+        totalTokensReminder,
       );
     default:
       ctx.stderr.write(`Unknown command: ${commandName(parsed.positionals)}\n\n`);

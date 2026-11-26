@@ -1,10 +1,7 @@
 /* eslint-disable max-lines -- KayingCode task wrapper service 接口集中承载 app/runtime API，拆散会让替换阶段更难追踪。 */
 import type { Event } from "@zcode/rpc";
 import { ServiceChannels } from "@zcode/shared";
-import type {
-  CommandAck,
-  CommandPayloadMap,
-} from "@zcode/shared/kayingcode-protocol-v4";
+import type { CommandAck, CommandPayloadMap } from "@zcode/shared/kayingcode-protocol-v4";
 import { createServiceDescriptor } from "#src/descriptors.js";
 import type {
   KayingCodeImportSessionsResult,
@@ -57,6 +54,11 @@ import type {
   KayingCodeTaskGroup,
   KayingCodeTaskGroupColor,
 } from "#src/session/kayingcodeTaskListTypes.js";
+import type {
+  ArchivedTaskPermanentDeletionPreview,
+  ArchivedTaskPermanentDeletionPreviewBatchResult,
+  ArchivedTaskPermanentDeletionResult,
+} from "#src/session/archivedTaskPermanentDeletion.js";
 
 export interface KayingCodeTaskSnapshotWithEtagResult {
   snapshot: KayingCodeTaskSnapshot | null;
@@ -70,6 +72,14 @@ export interface KayingCodeArchivedTaskDeletionResult {
   skippedTaskIds: string[];
   failedTaskIds: string[];
 }
+
+export type {
+  KayingCodeArchivedTaskDeletionPreviewReason,
+  ArchivedTaskPermanentDeletionPreview as KayingCodeArchivedTaskDeletionPreview,
+  ArchivedTaskPermanentDeletionPreviewItem as KayingCodeArchivedTaskDeletionPreviewItem,
+  ArchivedTaskPermanentDeletionPreviewBatchResult as KayingCodeArchivedTaskDeletionPreviewBatchResult,
+  ArchivedTaskPermanentDeletionResult as KayingCodeArchivedTaskPermanentDeletionResult,
+} from "./archivedTaskPermanentDeletion.js";
 
 /** 一次模型请求里出现的消息内容片段（文本 / 工具调用 / 工具结果 / 其他原始结构）。 */
 export type KayingCodeModelTrajectoryContentPart =
@@ -508,7 +518,9 @@ export interface IKayingCodeTaskService {
   }): Promise<KayingCodeGroupedTaskViewStructure>;
 
   /** 一次性提交 grouped 视图最终排序和 membership，服务层用 sqlite transaction 落库 */
-  applyGroupedTaskViewOrder(params: KayingCodeGroupedTaskViewOrderInput): Promise<KayingCodeGroupedTaskView>;
+  applyGroupedTaskViewOrder(
+    params: KayingCodeGroupedTaskViewOrderInput,
+  ): Promise<KayingCodeGroupedTaskView>;
 
   /** 列出 workspace 下所有已归档 task */
   listArchivedTasks(params: {
@@ -719,6 +731,39 @@ export interface IKayingCodeTaskService {
     workspaceIdentity?: string;
     taskIds: string[];
   }): Promise<KayingCodeArchivedTaskDeletionResult>;
+
+  /**
+   * 永久删除前预检单个归档 task：返回 revision、owned tree、fork 保留项、
+   * 共享附件与 blocked 原因。没有对应 CLI 能力时抛 method-not-found。
+   */
+  previewArchivedTaskDeletion(params: {
+    taskId: string;
+    workspacePath: string;
+    workspaceIdentity?: string;
+  }): Promise<ArchivedTaskPermanentDeletionPreview>;
+
+  /**
+   * 批量预检归档 task；一次 CLI 扫描覆盖整批，结果按去重后的入参顺序返回，
+   * 单项失败只记在该项的 errorCode 上。
+   */
+  previewArchivedTaskDeletions(params: {
+    workspacePath: string;
+    workspaceIdentity?: string;
+    taskIds: string[];
+  }): Promise<ArchivedTaskPermanentDeletionPreviewBatchResult>;
+
+  /**
+   * 执行永久删除，必须带上同一目标最新一次预检的 revision。
+   * status=blocked 表示条件不满足未删除；incomplete 表示已进入写屏障但需重试完成。
+   */
+  permanentlyDeleteArchivedTask(params: {
+    taskId: string;
+    workspacePath: string;
+    workspaceIdentity?: string;
+    revision: string;
+    /** 缺省由 adapter 生成；同一 confirm 重试可复用同一 operationId。 */
+    operationId?: string;
+  }): Promise<ArchivedTaskPermanentDeletionResult>;
 
   /** 重命名已持久化的 task */
   renameTask(params: {

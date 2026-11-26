@@ -40,6 +40,7 @@ interface PluginManagementServiceDependencies {
     | "validatePlugin"
     | "describePlugin"
     | "setPluginEnabled"
+    | "setWorkspacePluginTrust"
   >;
 }
 
@@ -104,5 +105,7 @@ export function createPluginManagementService(
     describePlugin: (params) => agent.describePlugin(params),
     setPluginEnabled: (params) =>
       observe(params.enabled ? "enable" : "disable", params, () => agent.setPluginEnabled(params)),
+    setWorkspacePluginTrust: (params) =>
+      observe("workspace_trust", params, () => agent.setWorkspacePluginTrust(params)),
   };
 }

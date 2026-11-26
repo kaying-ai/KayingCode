@@ -49,6 +49,7 @@ import type {
 } from "@zcode/shared";
 import type {
   BackgroundWorkSummary,
+  ConversationSnapshot,
   GoalState,
   PlanState,
   ToolCallRow,
@@ -114,6 +115,8 @@ interface ConversationStatusPanelProps {
   plan?: PlanState | null;
   backgroundWorks?: readonly BackgroundWorkSummary[];
   runningSubagents?: readonly KayingCodeSessionRunningSubagent[];
+  /** 上一批活动结果的收起水位；缺席 = 旧 CLI/旧快照，结束结果继续可见。 */
+  activitySummaryDismissed?: ConversationSnapshot["activitySummaryDismissed"];
   /** 本会话 `snapshot.workflowRuns.runs`；与 backgroundWorks 在模型层按 workId ≡ runId 联接。 */
   workflowRuns?: readonly WorkflowRunState[];
   /**
@@ -1716,6 +1719,7 @@ function ConversationStatusPanelImpl({
   plan,
   backgroundWorks = EMPTY_BACKGROUND_WORKS,
   runningSubagents = EMPTY_RUNNING_SUBAGENTS,
+  activitySummaryDismissed,
   workflowRuns = EMPTY_WORKFLOW_RUNS,
   endedWorkflowRunCount = 0,
   endedSubagentCount = 0,
@@ -1761,6 +1765,7 @@ function ConversationStatusPanelImpl({
         backgroundWorks,
         runningSubagents,
         workflowRuns,
+        activitySummaryDismissed,
       }),
     [
       isOfficeMode,
@@ -1773,6 +1778,7 @@ function ConversationStatusPanelImpl({
       plan,
       runningSubagents,
       workflowRuns,
+      activitySummaryDismissed,
       workspacePath,
     ],
   );

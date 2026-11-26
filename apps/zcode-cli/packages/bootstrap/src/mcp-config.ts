@@ -1,4 +1,5 @@
 import type {
+  McpConfigurationSnapshot,
   McpPort,
   McpServerConfig,
   McpServerStatus,
@@ -116,4 +117,31 @@ function getConfiguredServerStatus(
 ): McpServerStatus["status"] {
   if (config.enabled === false) return "disabled";
   return untrustedServerNames.has(name) ? "untrusted" : "disconnected";
+}
+
+/** 用户覆盖插件，宿主身份最后合并；首次加载和热更新共用。 */
+export function resolveEffectiveMcpConfiguration(input: {
+  enabled: boolean;
+  servers: Record<string, McpServerConfig>;
+  pluginServers?: Record<string, McpServerConfig>;
+  explicit?: Partial<McpConfigurationSnapshot>;
+  builtInServers?: Record<string, McpServerConfig>;
+  computerUse?: boolean;
+}): { configuredServers: Record<string, McpServerConfig>; mcp: McpConfigurationSnapshot } {
+  const configured = {
+    ...input.pluginServers,
+    ...(input.explicit?.servers ?? input.servers),
+    ...input.builtInServers,
+  };
+  const trusted = resolveTrustedOfficialCuaServerNames(configured, input.pluginServers ?? {});
+  const bridgeNames = new Set(trusted);
+  if (input.computerUse && configured.node_repl) bridgeNames.add("node_repl");
+  return {
+    configuredServers: configured,
+    mcp: {
+      enabled: input.explicit?.enabled ?? input.enabled,
+      servers: omitMcpServers(configured, new Set(), bridgeNames),
+      trustedOfficialCuaServerNames: [...trusted],
+    },
+  };
 }

@@ -13,6 +13,7 @@ import {
   type PluginUserOptionsReader,
 } from "#src/kayingcode-agent/pluginHostQueriesClient.js";
 import { createContextCompositionClient } from "#src/kayingcode-agent/contextCompositionClient.js";
+import type { ReplyLanguageResolver } from "#src/kayingcode-agent/replyLanguage.js";
 import { tapMakerProjectsRequestSchema, tapMakerProjectsResultSchema } from "@zcode/shared";
 import {
   localTtftFactsSchema,
@@ -25,7 +26,18 @@ import {
   ensureGenUiContextSupport,
   ensureIndependentPlanSupport,
   supportsHistoryFirst,
+  supportsPluginDiscoveryUi,
+  supportsPluginExtensionSummary,
 } from "./independentPlanSupport.js";
+import {
+  gateConversationQuoteComment,
+  supportsConversationQuoteComment as probeConversationQuoteCommentSupport,
+} from "./conversationQuoteCommentSupport.js";
+import { supportsExtensionInputSource as probeExtensionInputSourceSupport } from "./extensionInputSourceSupport.js";
+import {
+  requestSessionReleaseUnderDirectory,
+  supportsWorktreeCwd as probeWorktreeCwdSupport,
+} from "./worktreeCwdSupport.js";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { Emitter } from "@zcode/rpc";
@@ -46,6 +58,8 @@ import {
   KAYINGCODE_AGENT_PROVIDER_NOT_READY_CODE,
   KAYINGCODE_AGENT_PROVIDER_NOT_READY_REASON,
   KAYINGCODE_MODEL_REASONING_SEPARATOR,
+  KAYINGCODE_PROVIDER_PROJECT_TOKEN_NETWORK_ERROR,
+  isProjectTokenTransportFailureCode,
   isRemoteWorkspaceIdentity,
   KAYINGCODE_PROTOCOL_NAME,
   KAYINGCODE_PROTOCOL_VERSION,
@@ -73,6 +87,7 @@ import {
   kayingcodePluginOperationProgressNotificationSchema,
   kayingcodePluginsRestoreBuiltinResultSchema,
   kayingcodePluginsSetEnabledResultSchema,
+  kayingcodePluginsWorkspaceTrustResultSchema,
   kayingcodePluginsCancelOperationResultSchema,
   kayingcodePluginsUninstallResultSchema,
   kayingcodePluginsValidateResultSchema,
@@ -106,6 +121,7 @@ import {
   kayingcodeSessionEventSchema,
   kayingcodeSessionSendResultSchema,
   kayingcodeSessionRequestRuntimePreferencesParamsSchema,
+  kayingcodeSessionReadReplyLanguageParamsSchema,
   kayingcodeSessionRuntimePreferencesResultSchema,
   kayingcodeSessionStateSnapshotSchema,
   kayingcodeSessionSubscribeResultSchema,
@@ -148,7 +164,10 @@ import {
   mergeAutomationMutationToolDenylist,
   mergeOffPeakMutationToolDenylist,
 } from "#src/kayingcode-agent/automationToolPolicy.js";
-import { KAYINGCODE_AGENT_RUNTIME_UNAVAILABLE_CODE } from "./kayingcodeAgent.js";
+import {
+  HOST_WORKTREE_COMMAND,
+  KAYINGCODE_AGENT_RUNTIME_UNAVAILABLE_CODE,
+} from "./kayingcodeAgent.js";
 import type {
   KayingCodeProtocolRequestId,
   ModelSelection,
@@ -198,6 +217,7 @@ import type {
   KayingCodeAgentSetModeParams,
   KayingCodeAgentSetModelParams,
   KayingCodeAgentSetPluginEnabledParams,
+  KayingCodeAgentSetPluginWorkspaceTrustParams,
   KayingCodeAgentSetThoughtLevelParams,
   KayingCodeAgentPluginMentionItemsParams,
   KayingCodeAgentPluginReferenceCatalogParams,
@@ -299,6 +319,9 @@ import {
   v4ConversationResyncResultSchema,
   v4ConversationSubscribeResultSchema,
   v4ConversationUsageResultSchema,
+  v4SessionDeletionPreviewBatchResultSchema,
+  v4SessionDeletionPreviewSchema,
+  v4SessionDeletionResultSchema,
   v4SessionsIndexSubscribeResultSchema,
   v4UsageStatsResultSchema,
   v4WorkspaceConfigSubscribeResultSchema,
@@ -466,6 +489,20 @@ function buildWorkspaceRef(params: KayingCodeAgentWorkspaceTarget): KayingCodeWo
     remoteSessionId: params.remoteSessionId,
     workspaceKey: resolveWorkspaceKey(params),
   };
+}
+
+/**
+ * 会触发冷恢复的 V4 命令信封带上当前 attachment 的 workspace（docs/git/worktree.md §9.3）。
+ * 修复原因：rename/delete 等会话级命令可能在 runtime 卸载后先到；CLI 按存储的 cwd 重建身份时，
+ * 受管 worktree 会话的 key 会变成 worktree 路径。只对本地 workspace 注入：远程 Source Server
+ * 可能是不认识该字段的旧版本，worktree 也只支持本地。
+ */
+function coldResumeWorkspace(params: KayingCodeAgentWorkspaceTarget): {
+  workspace?: KayingCodeWorkspaceRef;
+} {
+  return params.workspaceIdentity?.trim() || params.remoteSessionId
+    ? {}
+    : { workspace: buildWorkspaceRef(params) };
 }
 
 // 已保存工作流的 target 是否带 workspace：项目档、以及
@@ -899,6 +936,11 @@ interface CreateKayingCodeAgentServiceOptions extends Omit<
   modelSelectionReadinessSource?: ModelSelectionReadinessSource;
   sessionRuntimePreferencesAuthority?: "local" | "external";
   /**
+   * Agent 回复语言（Host 级只读来源，null 为未设置），应答 CLI 的 session/readReplyLanguage。
+   * 本机 Host 同步读内存；Web/远端 Host 可按需异步读取本 Host 的 Setting。
+   */
+  resolveReplyLanguage?: ReplyLanguageResolver;
+  /**
    * 新会话创建前的 Host 归属预留；返回本次创建固化的执行目录。
    * 缺省表示该装配不提供项目服务：调用方携带 projectId 时必须显式失败
    * （project.creation-unavailable），不能把有项目的任务静默创建成全局任务。
@@ -909,6 +951,18 @@ interface CreateKayingCodeAgentServiceOptions extends Omit<
       additionalDirectories?: string[];
     },
   ) => Promise<string[]>;
+  /** fork 提交后、ACK 返回前完成 Host 归属交接；duplicate 重放须幂等。 */
+  prepareForkCreation?: (
+    target: KayingCodeAgentSessionTarget & { parentSessionId: string },
+  ) => Promise<void>;
+  /**
+   * 会话操作闸门（受管 worktree 删除租约）：会话命令与冷订阅经它执行，会话 cwd 位于删除中的
+   * worktree 时被拒绝。由受管 worktree 服务提供。
+   */
+  runSessionOperation?: <T>(
+    target: KayingCodeAgentSessionTarget,
+    operation: () => Promise<T>,
+  ) => Promise<T>;
   resolveSessionRuntimePreferences?: (
     scope: KayingCodeSessionRuntimePreferencesScope,
   ) => Promise<KayingCodeSessionRuntimePreferencesResult>;
@@ -1325,17 +1379,29 @@ export function createKayingCodeAgentService(
       });
     } catch (error) {
       if (pendingProviderRuntimeHeaders.get(params.key) !== params.pending) return;
+      const errorMessage = error instanceof Error ? error.message : String(error);
       logger.warn(undefined, "KayingCode provider runtime headers 应用失败", {
         modelId: params.pending.request.modelSelection.modelId,
         providerId: params.pending.request.providerId,
         requestId: params.pending.request.requestId,
         sessionId: params.pending.request.sessionId,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
         workspaceKey: resolveWorkspaceKey(params.pending.request.workspace),
       });
+      // 修复原因（ZCT-2122890271808978944 等）：冷缓存换证遇到断网/超时原先只回
+      // headersApplied:false，Agent 视为不可重试，整轮在首次模型尝试前结束。
+      // 换证客户端只抛固定码（见 ProjectAccessTokenClient），这里仅把两个传输故障码
+      // 改用结构化 RPC 错误码，交给 Agent 的 network_error 预算；其它失败保持原应答。
+      if (isProjectTokenTransportFailureCode(errorMessage)) {
+        await params.pending.client.respondError(params.pending.protocolRequestId, {
+          code: KAYINGCODE_PROVIDER_PROJECT_TOKEN_NETWORK_ERROR,
+          message: errorMessage,
+        });
+        return;
+      }
       await params.pending.client.respond(params.pending.protocolRequestId, {
         headersApplied: false,
-        errorMessage: error instanceof Error ? error.message : String(error),
+        errorMessage,
       });
     } finally {
       if (pendingProviderRuntimeHeaders.get(params.key) === params.pending) {
@@ -2177,6 +2243,46 @@ export function createKayingCodeAgentService(
         }
       }),
       client.onRequest((request) => {
+        // 回复语言是 Host 级的值，不按 workspace 路由；从内存同步应答，不做 IO。
+        if (request.method === kayingcodeProtocolMethods.sessionReadReplyLanguage) {
+          if (!kayingcodeSessionReadReplyLanguageParamsSchema.safeParse(request.params).success) {
+            void client
+              .respondError(request.id, {
+                code: -32602,
+                message: "Invalid reply language request",
+              })
+              .catch(() => {});
+            return;
+          }
+          // 注入的值已在 Host 收消息时按 replyLanguageSchema 校验，这里不再重复。
+          // 远端/Web Host 的 resolver 需要读 Setting（异步）；读取失败返回 RPC error，
+          // 由 CLI 按读取失败跳过本轮，不能回答 null（null 会清除已有语言公告）。
+          const resolveReplyLanguage = options?.resolveReplyLanguage;
+          if (!resolveReplyLanguage) {
+            void client.respond(request.id, { language: null }).catch(() => {});
+            return;
+          }
+          void (async () => {
+            let language: string | null;
+            try {
+              language = await resolveReplyLanguage();
+            } catch (error) {
+              logger.warn(undefined, "回复语言读取失败", {
+                error: error instanceof Error ? error.message : String(error),
+                workspaceKey: resolveWorkspaceKey(workspace),
+              });
+              await client
+                .respondError(request.id, {
+                  code: -32603,
+                  message: "Reply language unavailable",
+                })
+                .catch(() => {});
+              return;
+            }
+            await client.respond(request.id, { language }).catch(() => {});
+          })();
+          return;
+        }
         if (appControl?.handle(request)) return;
         if (request.method === kayingcodeProtocolMethods.sessionRequestRuntimePreferences) {
           const reportResponseFailure = (error: unknown): void => {
@@ -3340,6 +3446,25 @@ export function createKayingCodeAgentService(
     return !params.workspaceIdentity || !isRemoteWorkspaceIdentity(params.workspaceIdentity);
   }
 
+  /** 仅 Host 内受管 worktree 服务设置的 Symbol 标记；RPC 调用方无法序列化伪造。 */
+  function isHostWorktreeCommand(params: KayingCodeAgentConversationCommandParams): boolean {
+    return (params as { [HOST_WORKTREE_COMMAND]?: unknown })[HOST_WORKTREE_COMMAND] === true;
+  }
+
+  /**
+   * cwd / worktreeCreation / targetCwd 是 Host 与 CLI 的内部放置字段，只允许 Host 的 worktree
+   * 服务设置；渲染进程与手机经 RPC 传来的 JSON 无法携带 Symbol 键，因此不能伪造。
+   * 旧 CLI 会静默丢弃这些字段，正式下发前还必须通过 capabilities.worktreeCwd 探测。
+   */
+  function assertNoHostOnlyWorktreeFields(envelope: CommandEnvelope): void {
+    const payload = (envelope.payload ?? {}) as Record<string, unknown>;
+    const forbidden =
+      envelope.type === "createSession"
+        ? payload.cwd !== undefined || payload.worktreeCreation !== undefined
+        : envelope.type === "forkAssistant" && payload.targetCwd !== undefined;
+    if (forbidden) throw new Error("worktree.host-only-field");
+  }
+
   /**
    * 动态工作流「提供」（服务端灰度）：Host 判定一次并在本进程内固定。理由：
    *   1. 同一次判定同时喂给 workspace/updateDynamicWorkflowPolicy 和 session flag，两者不会
@@ -3428,6 +3553,9 @@ export function createKayingCodeAgentService(
     params: KayingCodeAgentConversationCommandParams,
   ): Promise<CommandEnvelope> {
     const envelope = params.envelope;
+    // cwd / worktreeCreation / targetCwd 只允许 Host 的 worktree 服务设置：渲染进程与手机经 RPC
+    // 传来的 JSON 无法携带 Symbol 键，因此不能伪造。
+    if (!isHostWorktreeCommand(params)) assertNoHostOnlyWorktreeFields(envelope);
     if (envelope.type === "createSession") {
       // V4 createSession 绕过 legacy session/create 的参数构造，工具面 flag 必须在
       // 信封处同源注入；门禁 false 时不写字段（缺省即 fail-closed，与 legacy 一致）。
@@ -3590,6 +3718,7 @@ export function createKayingCodeAgentService(
       const normalizedPreferences: KayingCodeAgentAppRuntimePreferences = {
         ...preferences,
         modelIoFullRetentionEnabled: preferences.modelIoFullRetentionEnabled === true,
+        pluginAutoRecommendationEnabled: preferences.pluginAutoRecommendationEnabled === true,
       };
       latestAppRuntimePreferences = normalizedPreferences;
       const activeClients = [...activeClientsByWorkspaceKey.values()];
@@ -3881,6 +4010,48 @@ export function createKayingCodeAgentService(
         V4_METHODS.conversationUsage,
         { sessionId: params.sessionId },
         v4ConversationUsageResultSchema,
+      );
+    },
+
+    async previewSessionDeletion(params: KayingCodeAgentSessionTarget) {
+      const client = await getReadOnlyClient(params);
+      return client.request(
+        V4_METHODS.sessionDeletionPreview,
+        { sessionId: params.sessionId, workspace: buildWorkspaceRef(params) },
+        v4SessionDeletionPreviewSchema,
+      );
+    },
+
+    async previewSessionDeletions(
+      params: KayingCodeAgentWorkspaceTarget & { sessionIds: string[] },
+    ) {
+      const client = await getReadOnlyClient(params);
+      return client.request(
+        V4_METHODS.sessionDeletionPreviewBatch,
+        {
+          items: params.sessionIds.map((sessionId) => ({
+            sessionId,
+            workspace: buildWorkspaceRef(params),
+          })),
+        },
+        v4SessionDeletionPreviewBatchResultSchema,
+      );
+    },
+
+    async executeSessionDeletion(
+      params: KayingCodeAgentSessionTarget & { revision: string; operationId: string },
+    ) {
+      // 删除必须走可写 client：只读 runtime 不持有 sessionDataFiles 的执行面。
+      const client = await getClient(params);
+      return client.request(
+        V4_METHODS.sessionDeletionExecute,
+        {
+          sessionId: params.sessionId,
+          workspace: buildWorkspaceRef(params),
+          revision: params.revision,
+          operationId: params.operationId,
+        },
+        v4SessionDeletionResultSchema,
       );
     },
 
@@ -4330,11 +4501,15 @@ export function createKayingCodeAgentService(
 
     async getPluginsOverview(params: KayingCodeAgentPluginViewParams) {
       const client = await getPluginManagementClient();
+      // 扩展摘要只向声明了能力位的 CLI 要（packages/services/spec/plugin-extension-summary.md）：参数与结果
+      // 都是 strict，旧 CLI 收到新参数整条拒绝；不要时 CLI 也不带，旧 services 不会解析到新键。
+      const includeExtensionSummary = await supportsPluginExtensionSummary(client);
       return client.request(
         kayingcodeProtocolMethods.pluginsOverview,
         {
           workspace: buildWorkspaceRef(params),
           ...(params.configScope ? { configScope: params.configScope } : {}),
+          ...(includeExtensionSummary ? { includeExtensionSummary: true } : {}),
         },
         kayingcodePluginsOverviewResultSchema,
         { timeoutMs: PLUGIN_MANAGEMENT_REQUEST_TIMEOUT_MS },
@@ -4597,6 +4772,21 @@ export function createKayingCodeAgentService(
           ...(params.scope ? { scope: params.scope } : {}),
         },
         kayingcodePluginsSetEnabledResultSchema,
+        { timeoutMs: PLUGIN_MANAGEMENT_REQUEST_TIMEOUT_MS },
+      );
+    },
+
+    async setWorkspacePluginTrust(params: KayingCodeAgentSetPluginWorkspaceTrustParams) {
+      const client = await getPluginManagementClient();
+      return client.request(
+        kayingcodeProtocolMethods.pluginsWorkspaceTrust,
+        {
+          workspace: buildWorkspaceRef(params),
+          pluginRoot: params.pluginRoot,
+          declarationDigest: params.declarationDigest,
+          trusted: params.trusted,
+        },
+        kayingcodePluginsWorkspaceTrustResultSchema,
         { timeoutMs: PLUGIN_MANAGEMENT_REQUEST_TIMEOUT_MS },
       );
     },
@@ -4964,6 +5154,59 @@ export function createKayingCodeAgentService(
       return result.closed ?? true;
     },
 
+    async releaseSessionsUnderDirectory(params) {
+      // 绝不为卸载拉起 CLI：没有进程时没有驻留会话。
+      const client = processManager.getExistingClient(params);
+      if (!client || client.isDisposed) return { released: [], busy: [] };
+      // 会话选择与忙闲只由 CLI 的驻留表判定；传输失败收敛成 typed failure，调用方不得据此删目录。
+      return await requestSessionReleaseUnderDirectory(client, params.directory);
+    },
+
+    async queryCommandResult(params) {
+      // 命令结果是 CLI 的事实；进程已退出时以只读方式拉起，读取持久化的命令记录。
+      const client = await getReadOnlyClient(params);
+      const result = await client.request(
+        V4_METHODS.commandsQuery,
+        commandsQueryParamsSchema.parse({ commands: [params.key] }),
+        commandsQueryResultSchema,
+      );
+      return result.results[0]?.result ?? "unknown";
+    },
+
+    async supportsWorktreeCwd(target) {
+      // 能力属于具体 CLI 连接：getClient 复用同一连接时命中同一探测缓存，换代后重新探测。
+      // 连接/探测失败按不支持处理（fail closed），避免旧 CLI 静默丢弃 cwd / targetCwd。
+      try {
+        const client = await getClient(target);
+        return await probeWorktreeCwdSupport(client);
+      } catch {
+        return false;
+      }
+    },
+
+    async supportsConversationQuoteComment(target) {
+      // 能力属于具体 CLI 连接：getClient 复用同一连接时命中同一探测缓存，换代后重新探测。
+      // 连接/探测失败按不支持处理（fail closed），入口只对会真正保留批注的 CLI 开放。
+      try {
+        const client = await getClient(target);
+        return await probeConversationQuoteCommentSupport(client);
+      } catch {
+        return false;
+      }
+    },
+
+    async supportsExtensionInputSource(target) {
+      // 与 supportsWorktreeCwd / supportsConversationQuoteComment 同一探测模式：按物理 CLI 连接
+      // 缓存，换代后重新探测。旧 CLI 会把来源静默剥掉或整条拒绝，未声明时 fail closed，
+      // 调用方（app-control / 扩展网关）报 unavailable，不退化成不标来源后发送。
+      try {
+        const client = await getClient(target);
+        return await probeExtensionInputSourceSupport(client);
+      } catch {
+        return false;
+      }
+    },
+
     async setModel(params: KayingCodeAgentSetModelParams) {
       const startedAt = Date.now();
       const client = await getClient(params);
@@ -5267,6 +5510,9 @@ export function createKayingCodeAgentService(
           compression: "none" as const,
           workspaceHookReview: true,
           independentPlanState: true,
+          // 与 connection scope 的 hello 同一份能力集：直连 base service 的宿主消费者
+          // 也能据此声明插件发现 UI；真正注入仍要 CLI runtimeCapabilities 探测通过。
+          pluginDiscovery: true,
         },
         auth: {},
       };
@@ -5348,6 +5594,9 @@ export function createKayingCodeAgentService(
           clientMode: connection.clientMode,
           // 与 clientMode 同族的可信位：只由连接 clientHello 注入，调用方不能伪造。
           ...(connection.workflowRunDeltas === true ? { workflowRunDeltas: true } : {}),
+          ...(connection.pluginDiscoveryUi === true && (await supportsPluginDiscoveryUi(client))
+            ? { pluginDiscoveryUi: true }
+            : {}),
           ...(historyFirst
             ? {
                 historyFirst: true,
@@ -5473,7 +5722,61 @@ export function createKayingCodeAgentService(
           };
         }
       }
+      const trustedConnection = readTrustedKayingCodeAgentV4Connection(params);
+      // 来自 UI 的同名字段永远不是授权；relay 透传的是下游握手。旧 CLI 严格校验，缺席比发送 false 安全。
+      delete envelope.pluginDiscoveryUi;
+      if (
+        envelope.type === "createSession" &&
+        envelope.payload &&
+        typeof envelope.payload === "object"
+      ) {
+        const { pluginDiscoveryToolEnabled: _untrusted, ...payload } = envelope.payload as Record<
+          string,
+          unknown
+        >;
+        envelope.payload = payload;
+      }
+      if (
+        trustedConnection?.pluginDiscoveryUi === true &&
+        (await supportsPluginDiscoveryUi(client))
+      ) {
+        // 偏好控制下一次输入的工具面；已展示的确认卡片仍可完成或跳过，避免关开关后卡住旧轮。
+        if (
+          latestAppRuntimePreferences?.pluginAutoRecommendationEnabled === true ||
+          envelope.type === "resolveInteraction"
+        ) {
+          envelope.pluginDiscoveryUi = true;
+        }
+      }
+      // 半旧 CLI 会静默剥掉引用上的 comment / agent；只在 CLI 声明 conversationQuoteComment 时
+      // 才把字段发出去，否则在 Host 边界剥掉。无批注的普通引用不触发能力探测。
+      // 以原始命令为基准，避免前面的 payload 归一化（browserAmbientContext 重建等）提前丢字段。
+      envelope = await gateConversationQuoteComment(envelope, client, params.envelope);
+      // 冷恢复命令必须复用 Host 的 workspace key：rename/delete 等在 runtime 卸载后先到的
+      // 会话级命令要由 CLI 按 worktree 路径以上的 workspace 身份恢复，而不是按存储的 cwd 猜测。
+      envelope = { ...envelope, ...coldResumeWorkspace(params) };
       const ack: CommandAck = await client.request(V4_METHODS.command, envelope, commandAckSchema);
+      // targetCwd 已由产品协议声明；按已解析 payload 判断，不能读原始 payload 猜测，
+      // 否则 schema 归一化后的 fork 会被误当"普通 fork"继承父目录并覆盖预留 worktree。
+      const forkTargetCwd =
+        envelope.type === "forkAssistant"
+          ? commandPayloadSchemas.forkAssistant.parse(envelope.payload).targetCwd
+          : undefined;
+      if (
+        envelope.type === "forkAssistant" &&
+        envelope.sessionId &&
+        // fork 到新 worktree 已由 Host 在发送前预留目标 cwd；ACK 不能再按父目录继承并覆盖它。
+        !forkTargetCwd &&
+        (ack.status === "accepted" || ack.status === "duplicate") &&
+        ack.result?.type === "forkAssistant"
+      ) {
+        // 正文提交不代表 Host 组织态已写入；等待归属交接再允许界面立即打开，失败可重放同一 ACK。
+        await options?.prepareForkCreation?.({
+          ...params,
+          sessionId: ack.result.sessionId,
+          parentSessionId: envelope.sessionId,
+        });
+      }
       // Prompt command 在 committed TurnStarted 或 committed WorkspaceHookReviewRequested
       // 任一 authority 到达后即返回；人工审核不能占用 Host RPC，因此继续使用统一默认
       // timeout/watchdog。放宽到审核领域 deadline 只会掩盖串行协议队列死锁。
@@ -5897,6 +6200,29 @@ export function createKayingCodeAgentService(
           });
         }
       }
+      // 本地 worktree 任务的 cwd 不是 workspace 目录，CLI 按 directory 冷扫描看不到它们；
+      // 从 tasks-index 精确提供 id（docs/git/worktree.md §6.6.2）。读取失败只影响这些任务的摘要。
+      let worktreeSessionIds: string[] = [];
+      if (!params.workspaceIdentity?.trim()) {
+        try {
+          worktreeSessionIds = (
+            await automationTaskIndexRepo.listWorktreeTaskIds({
+              workspacePath: params.workspacePath,
+              provider: KAYINGCODE_AGENT_PROVIDER,
+            })
+          ).slice(0, MAX_LEGACY_TASK_IDS_PER_SUBSCRIBE);
+        } catch (error) {
+          logger.warn(
+            undefined,
+            "读取 worktree 任务列表失败，sessions-index 不含这些任务的冷摘要",
+            {
+              error: error instanceof Error ? error.message : String(error),
+              event: "sessions_index.worktree_task_ids_read_failed",
+              workspacePath: params.workspacePath,
+            },
+          );
+        }
+      }
       const result = await client.request(
         V4_METHODS.conversationSubscribe,
         {
@@ -5904,6 +6230,7 @@ export function createKayingCodeAgentService(
           connectionId: connection.connectionId,
           clientMode: connection.clientMode,
           ...(legacyTaskIds.length > 0 ? { legacyTaskIds } : {}),
+          ...(worktreeSessionIds.length > 0 ? { worktreeSessionIds } : {}),
           ...(params.base ? { base: params.base } : {}),
           ...(params.visibility ? { visibility: params.visibility } : {}),
         },
@@ -6035,12 +6362,39 @@ export function createKayingCodeAgentService(
     },
   };
 
+  // 删除 worktree 期间拒绝其中会话的新命令与冷订阅，避免在正被删除的目录里启动 turn 或恢复会话。
+  const runSessionOperation = options?.runSessionOperation;
+  if (runSessionOperation) {
+    const send = service.sendConversationCommandV4.bind(service);
+    service.sendConversationCommandV4 = (params) => {
+      const sessionId = params.envelope.sessionId;
+      return sessionId
+        ? runSessionOperation(sessionTargetOf(params, sessionId), () => send(params))
+        : send(params);
+    };
+    const subscribe = service.subscribeConversationV4.bind(service);
+    service.subscribeConversationV4 = (params) =>
+      runSessionOperation(sessionTargetOf(params, params.sessionId), () => subscribe(params));
+  }
+
   // 敏感设置读取不挂在 service 对象上：service 会整体登记进 ServiceCollection 并经 RPC 暴露，
   // ProxyChannel 按属性名分派，所以只放进侧表，由 Window Host 进程内取用。
   inProcessPluginUserOptionsReaders.set(service, {
     readPluginUserOptions: (params) => pluginHostQueries.readPluginUserOptions(params),
   });
   return service;
+}
+
+/** 只保留会话操作需要的 workspace 目标，避免把 projectId / clientMode 带进闸门。 */
+function sessionTargetOf(
+  workspace: { workspacePath: string; workspaceIdentity?: string },
+  sessionId: string,
+): KayingCodeAgentSessionTarget {
+  return {
+    workspacePath: workspace.workspacePath,
+    ...(workspace.workspaceIdentity ? { workspaceIdentity: workspace.workspaceIdentity } : {}),
+    sessionId,
+  };
 }
 
 /**

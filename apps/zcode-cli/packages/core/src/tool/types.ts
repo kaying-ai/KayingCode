@@ -15,6 +15,8 @@ import type {
   DynamicWorkflowSnippetPort,
   EmbeddedSearchBackend,
   ExecutionPort,
+  InputPreemptionControl,
+  InputPreemptionHandling,
   ExecutionShellSelection,
   FileSystemPort,
   HttpClientPort,
@@ -54,6 +56,7 @@ import type {
   TraceContext,
   TraceId,
   TurnId,
+  WaitForMcpServersOutput,
   WorkflowEscalatePort,
   WorkflowPort,
   WorkflowSubmitPort,
@@ -139,7 +142,25 @@ export interface BackgroundTaskControlPort {
   ): Promise<BackgroundTaskControlStopResult>;
 }
 
+/**
+ * WaitForMcpServers 的运行时端口。会话视图是唯一状态来源：端口只按名称选目标、等待离开连接状态并分类，
+ * 不发起连接或授权。servers 缺省时等全部 pending；没有 pending 时报告失败的 server。
+ */
+export interface McpServerWaitPort {
+  waitForServers(
+    servers: readonly string[] | undefined,
+    signal?: AbortSignal,
+  ): Promise<WaitForMcpServersOutput>;
+}
+
+/** executor 侧的输入抢占接管点：工具经 `register` 注册判断函数，executor 用 `decide` 取结果。 */
+export interface InputPreemptionSlot extends InputPreemptionControl {
+  /** 没有注册判断函数时返回 `cancel`。 */
+  decide(): InputPreemptionHandling;
+}
+
 export interface ToolExecutionContext {
+  inputPreemption?: InputPreemptionControl;
   toolSearch?: ToolSearchExecutionContext;
   toolCallId: string;
   /**
@@ -193,6 +214,8 @@ export interface ToolExecutionContext {
   dynamicWorkflowSnippetPort?: DynamicWorkflowSnippetPort;
   /** 模型目录端口；缺席则 ListModels 报能力缺席，CreateWorkflow 的 subagent_model 被拒。 */
   modelCatalogPort?: ModelCatalogPort;
+  /** WaitForMcpServers 的端口；缺席则该工具报能力缺席。 */
+  mcpServerWaitPort?: McpServerWaitPort;
   runtimeTaskRegistry?: RuntimeTaskRegistry;
   readFileState?: ReadFileStateMap;
   recordReadFileStateMetadata?: (metadata: PersistedReadFileStateMetadata) => void;
@@ -287,6 +310,7 @@ export interface ToolInputResolutionContext {
    * 不静默放行一个宿主解不了的字符串。
    */
   modelCatalogPort?: ModelCatalogPort;
+  mcpServerWaitPort?: McpServerWaitPort;
   sessionId?: string;
   /**
    * 「这个会话此刻加载着某个技能吗」的探针（handlers/workflow-skill-gate.ts）。由 runtime 用
@@ -330,6 +354,13 @@ export interface ToolEntry extends ToolContractDeclaration {
    */
   resultArtifactContentType?: string;
   metadata: ToolMetadata;
+  /**
+   * provider contract 已冻结后，把 advertisement entry 原子切换为当前 live execution entry。
+   * 该步骤发生在输入校验、Hook 和权限判断之前，不能改变 provider-visible contracts。
+   */
+  resolveForExecution?: (input: {
+    signal?: AbortSignal;
+  }) => Promise<{ status: "ready"; entry: ToolEntry } | { status: "unavailable"; message: string }>;
   /**
    * 只由宿主验证后的可信来源写入；不能从模型可见的 MCP 名称或 descriptor 推导。
    */

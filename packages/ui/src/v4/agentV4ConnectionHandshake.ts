@@ -4,6 +4,7 @@ import type { IKayingCodeAgentService } from "@zcode/services";
 import {
   V4_WIRE_PROTOCOL_VERSION,
   helloMessageSchema,
+  type ClientHello,
   type HelloMessage,
 } from "@zcode/shared/kayingcode-protocol-v4";
 import { getV4ClientId } from "@/v4/commandFactory.js";
@@ -23,6 +24,13 @@ export function ensureAgentV4ConnectionHandshake(
 
   const handshake = (async () => {
     const hello = helloMessageSchema.parse(await service.helloConversationV4());
+    // 声明规则是**单向**的：只有 Host 先在 hello 里宣告能力位，客户端才能回声明。
+    // clientHello 的 capabilities 是 `.strict()` 的，向旧 Host 发它不认识的键会让整条
+    // clientHello 解析失败、连接握不上手——不是降级，是整个会话面板打不开。
+    const capabilities: NonNullable<ClientHello["capabilities"]> = {
+      workspaceHookReviewUi: true,
+      ...(hello.capabilities.pluginDiscovery === true ? { pluginDiscoveryUi: true } : {}),
+    };
     await service.initializeConversationV4({
       kind: "clientHello",
       protocolVersion: V4_WIRE_PROTOCOL_VERSION,
@@ -31,7 +39,7 @@ export function ensureAgentV4ConnectionHandshake(
       clientId: getV4ClientId(),
       clientKind: hello.clientMode === "desktop-continuous" ? "desktop" : "web",
       appVersion: "unknown",
-      capabilities: { workspaceHookReviewUi: true },
+      capabilities,
     });
     return hello;
   })();

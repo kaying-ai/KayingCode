@@ -1,6 +1,69 @@
 /** English translations */
 const enUS: Record<string, string> = {
   "login.oauth.regionTag.bigmodel": "China",
+  "preinstalledTools.purpose.python":
+    "Runs document plugin scripts and provides spreadsheet, Word, and PDF libraries",
+  "preinstalledTools.purpose.qpdf": "Splits, merges, encrypts, and repairs PDF files",
+  "preinstalledTools.purpose.pandoc": "Reads the contents of Word documents",
+  "preinstalledTools.purpose.poppler": "Converts PDF pages to images and extracts text",
+  "preinstalledTools.purpose.libreoffice":
+    "For document to PDF conversion, presentation conversion, and spreadsheet formula recalculation",
+  "preinstalledTools.phase.queued": "Waiting for other tools to finish preparing…",
+  "preinstalledTools.phase.verifying": "Verifying files…",
+  "preinstalledTools.phase.extracting": "Extracting…",
+  "preinstalledTools.phase.checking": "Checking whether the tool can run…",
+  "preinstalledTools.status.not-installed": "Not installed",
+  "preinstalledTools.status.preparing": "Preparing",
+  "preinstalledTools.status.ready": "Ready",
+  "preinstalledTools.status.failed": "Preparation failed",
+  "preinstalledTools.status.update-available": "Update available",
+  "preinstalledTools.title": "Preinstalled tools",
+  "preinstalledTools.description": "These tools are installed on this computer for document tasks.",
+  "preinstalledTools.loading": "Loading…",
+  "preinstalledTools.loadFailed":
+    "Preinstalled tools could not start. Restart KayingCode and try again. If the problem continues, report it via Help → Report an issue.",
+  "preinstalledTools.unavailable": "This version does not provide this tool yet.",
+  "preinstalledTools.autoInstall": "Automatic preinstall",
+  "preinstalledTools.autoInstallDescription":
+    "Prepare tools in the background when KayingCode starts. Turning this off stops future automatic downloads. Installed tools remain available.",
+  "preinstalledTools.agentEnabled": "Agent uses preinstalled version",
+  "preinstalledTools.agentEnabledDescription":
+    "Turn this off to let the Agent use {name} already installed on this computer.",
+  "preinstalledTools.entryOutOfSync":
+    "Your setting is saved but has not taken effect. Please retry.",
+  "preinstalledTools.deletionBlocked": "{name} is being used by the Agent. Please try again later.",
+  "preinstalledTools.download": "Download",
+  "preinstalledTools.update": "Update",
+  "preinstalledTools.cancel": "Cancel download",
+  "preinstalledTools.retry": "Retry",
+  "preinstalledTools.delete": "Delete",
+  "preinstalledTools.deleteTitle": "Delete {name}?",
+  "preinstalledTools.deleteDescription": "This will free about {size} GB of disk space.",
+  "preinstalledTools.deleteAutoNotice":
+    "With automatic preinstall enabled, KayingCode will download it again the next time it starts.",
+  "preinstalledTools.deleteNotice.python":
+    "Python packages added by the Agent will also be deleted.",
+  "preinstalledTools.deleteCancel": "Cancel",
+  "preinstalledTools.commandFailed": "The operation could not be completed. Please retry.",
+  "preinstalledTools.readyInfo": "Version {version} · {size} GB used",
+  "preinstalledTools.downloadInfo": "Downloading {loaded} / {total} MB",
+  "preinstalledTools.sizeInfo":
+    "About {download} MB to download; {installed} GB after installation",
+  "preinstalledTools.updateInfo":
+    "Currently using version {current}. Version {version} requires about {download} MB to download and {installed} GB to install.",
+  "preinstalledTools.currentInfo": "Currently using version {current}.",
+  "preinstalledTools.remoteNotice":
+    "A remote workspace is open. This dialog manages this computer and does not install tools on the remote device.",
+  "preinstalledTools.error.network":
+    "Cannot connect to the download server. Check your network or proxy settings.",
+  "preinstalledTools.error.interrupted": "Download interrupted. Please retry.",
+  "preinstalledTools.error.disk-space":
+    "Not enough disk space. About {size} GB of free space is required.",
+  "preinstalledTools.error.checksum": "The downloaded file is corrupted. Please retry.",
+  "preinstalledTools.error.extract": "Extraction failed. Please retry.",
+  "preinstalledTools.error.runtime":
+    "The tool cannot run on this computer. Report the issue via Help → Report an issue.",
+  "preinstalledTools.error.unsupported": "This system is not supported yet.",
   "login.oauth.regionTag.zai": "Global",
   "webRemoteControl.botChannel.unavailable":
     "Bot Channels configuration is unavailable for this connection.",
@@ -675,6 +738,19 @@ const enUS: Record<string, string> = {
   "settings.plugins.installLocal.failed": "Failed to install local plugin from {path}",
   "pluginCreator.unavailable":
     "Plugin Creator is unavailable. Check the connection, then enable or restore Plugin Creator in the marketplace and retry.",
+  "plugin.discovery.confirmTitle": "Official plugin recommendation",
+  "plugin.discovery.official": "KayingCode official marketplace",
+  "plugin.discovery.installAndEnable": "Install and enable in this workspace",
+  "plugin.discovery.enableInWorkspace": "Enable in this workspace",
+  "plugin.discovery.workspaceInstall":
+    "Install the plugin and enable it in this workspace. Other workspace settings stay unchanged; configuration or authorization may still be required.",
+  "plugin.discovery.workspaceEnable": "Enable this plugin in the current workspace.",
+  "plugin.discovery.userInstall":
+    "Installed plugins are saved for this user. Configuration or authorization may still be required.",
+  "plugin.discovery.responseFailed": "Could not submit your choice. Please try again.",
+  "plugin.discovery.skip": "Skip",
+  "plugin.discovery.install": "Install",
+  "plugin.discovery.enable": "Enable",
   "settings.create.action": "New",
   "settings.resourceActions.import": "Import",
   "settings.resourceActions.export": "Export",
@@ -775,6 +851,37 @@ const enUS: Record<string, string> = {
   "taskList.deleteAllArchivedResult": "Deleted {deleted}, skipped {skipped}, failed {failed}.",
   "taskList.deleteAllArchivedError":
     "The operation or list refresh failed. Refresh to check the remaining tasks.",
+  "taskList.permanentDelete": "Delete permanently",
+  "taskList.permanentDeleteMenu": "Permanently delete archived tasks…",
+  "taskList.permanentDeleteTitle": "Permanently delete {count} archived tasks?",
+  "taskList.permanentDeleteSingleTitle": "Permanently delete this archived task?",
+  "taskList.permanentDeleteDescription":
+    "Session history, checkpoints and task data will be removed from disk. Shared attachments referenced by other tasks are kept. This cannot be undone.",
+  "taskList.permanentDeleteBusy": "Deleting permanently…",
+  "taskList.permanentDeletePreviewCollecting": "Checking what will be deleted…",
+  "taskList.permanentDeletePreviewSummary":
+    "Tasks to delete: {count}. Kept forks: {forks}. Files to remove: {files}. Shared attachments kept: {artifacts}.",
+  "taskList.permanentDeleteBlockedCount": "Blocked: {count}",
+  "taskList.permanentDeleteResult":
+    "Permanently deleted {deleted}, blocked {blocked}, incomplete {incomplete}, failed {failed}.",
+  "taskList.permanentDeleteError": "Permanent deletion failed: {reason}",
+  "taskList.permanentDeleteItem": "{task} ({workspace}): {reason}",
+  "taskList.permanentDeleteIncompleteHint":
+    "Some files were already removed. Run permanent deletion again to finish.",
+  "taskList.permanentDeletePreviewFailed": "Preview failed: {reason}",
+  "taskList.permanentDeleteBlocked": "Cannot delete: {reason}",
+  "taskList.permanentDeleteBlocked.running": "The task is still running. Stop it first.",
+  "taskList.permanentDeleteBlocked.in-use": "The task is open in another window or process.",
+  "taskList.permanentDeleteBlocked.not-found": "Session data for this task was not found.",
+  "taskList.permanentDeleteBlocked.not-archived": "The task is no longer archived.",
+  "taskList.permanentDeleteBlocked.unavailable": "Session data is currently unavailable.",
+  "taskList.permanentDeleteBlocked.changed":
+    "Session data changed after preview. Preview again before deleting.",
+  "taskList.permanentDeleteBlocked.deleting":
+    "Deletion is already in progress. Retry after it finishes.",
+  "taskList.permanentDeleteBlocked.unsupported":
+    "The connected agent does not support permanent deletion. Update it first.",
+  "taskList.permanentDeleteBlocked.unknown": "The deletion was rejected ({reason}).",
   "confirmDialog.taskArchiveTitle": "Archive this task?",
   "confirmDialog.taskArchiveDescription":
     "Task “{taskTitle}” will move to the archive list and can still be restored later.",
@@ -967,6 +1074,24 @@ const enUS: Record<string, string> = {
   "chat.selections.limit.count": "You can attach at most 8 conversation selections.",
   "chat.selections.limit.total":
     "Conversation selections can contain at most 16,000 characters in total.",
+  "selectionComment.action": "Annotate",
+  "selectionComment.placeholder": "Optional comment to send with this quote",
+  "selectionComment.hint": "Can be left empty · Shift + ↵ for new line",
+  "selectionComment.save": "Add annotation",
+  "selectionComment.addTitle": "Add annotation · comment optional",
+  "selectionComment.editTitle": "Edit annotation",
+  "selectionComment.editHint": "Leave empty to keep only the quoted text",
+  "selectionComment.editSave": "Save",
+  "selectionComment.delete": "Delete annotation",
+  "selectionComment.addComment": "Add comment",
+  "selectionComment.deleted": "Annotation deleted",
+  "selectionComment.undo": "Undo",
+  "selectionComment.sentTitle": "Sent with your message",
+  "selectionComment.listHeader": "{count} annotations will be sent with your next message",
+  "selectionComment.listHint": "Numbers match the reply",
+  "selectionComment.removeAll": "Remove all annotations",
+  "selectionComment.count": "{count} annotations",
+  "selectionComment.remove": "Delete annotation",
   "sidePane.openTabDescription": "Choose a tab to open in the side pane.",
   "sidePane.openFile": "Open file",
   "sidePane.openFileDescription": "Open a file from the current workspace in the side panel.",
@@ -1279,6 +1404,94 @@ const enUS: Record<string, string> = {
     "Another Git operation is still in progress. Finish it before switching branches.",
   "git.branchSwitcher.error.branchInOtherWorktree":
     "That branch is already checked out in another worktree.",
+  "managedWorktrees.name": "{repo} · {bucket}",
+  "managedWorktrees.taskLabel": "Worktree task",
+  "managedWorktrees.entry.label": "worktree",
+  "managedWorktrees.entry.tooltip":
+    "Run in a new worktree: an isolated copy that works in parallel with your local checkout",
+  "managedWorktrees.entry.unsupported": "This Agent version doesn't support worktrees",
+  "managedWorktrees.entry.notRepository": "The project folder isn't a Git repository",
+  "managedWorktrees.entry.remote": "Worktrees are available only for local projects",
+  "managedWorktrees.manage": "Worktrees",
+  "managedWorktrees.manage.tooltip": "Manage worktrees for this project",
+  "managedWorktrees.error.not-repository": "The project folder isn't a Git repository",
+  "managedWorktrees.error.invalid-start-ref": "The selected starting point doesn't exist",
+  "managedWorktrees.error.start-ref-missing-subdir":
+    "The selected starting point has no project folder",
+  "managedWorktrees.error.bucket-exhausted": "Couldn't allocate a worktree folder",
+  "managedWorktrees.error.worktree-dirty": "The worktree has uncommitted changes",
+  "managedWorktrees.error.worktree-in-use": "A task is using this worktree",
+  "managedWorktrees.error.not-managed": "This folder isn't a worktree managed by KayingCode",
+  "managedWorktrees.error.local-only": "Worktrees are available only for local projects",
+  "managedWorktrees.error.git-failed": "The Git operation failed",
+  "managedWorktrees.error.copy-failed": "Couldn't copy files listed in .worktreeinclude",
+  "managedWorktrees.error.unsupported-agent": "This Agent version doesn't support worktrees",
+  "managedWorktrees.error.session-failed":
+    "The worktree was created, but the task failed to start",
+  "managedWorktrees.error.carry-failed":
+    "Couldn't carry uncommitted changes into the new worktree",
+  "managedWorktrees.error.session-close-failed":
+    "Couldn't unload the tasks using this worktree. The worktree was kept.",
+  "managedWorktrees.error.release-unsupported":
+    "This Agent version can't unload tasks resident in the worktree. The worktree was kept.",
+  "managedWorktrees.error.removing": "This worktree is being deleted. Try again later.",
+  "managedWorktrees.error.generic": "The worktree operation failed",
+  "managedWorktrees.ref.title": "Create the new worktree from",
+  "managedWorktrees.ref.currentHead": "Current HEAD ({ref})",
+  "managedWorktrees.ref.detached": "detached · {sha}",
+  "managedWorktrees.ref.localBranches": "Local branches",
+  "managedWorktrees.ref.remoteBranches": "Remote branches",
+  "managedWorktrees.ref.note":
+    "The new worktree is created from the selected branch. Your local branch does not change. Uncommitted changes are not included.",
+  "managedWorktrees.creation.creating": "Creating worktree",
+  "managedWorktrees.creation.startingSession": "Starting task",
+  "managedWorktrees.creation.failed": "Worktree setup failed",
+  "managedWorktrees.creation.forkTitle": "Fork in a new worktree",
+  "managedWorktrees.creation.retry": "Retry",
+  "managedWorktrees.creation.continueLocal": "Don't use worktree",
+  "managedWorktrees.creation.dismiss": "Dismiss",
+  "managedWorktrees.creation.showOutput": "Show output",
+  "managedWorktrees.creation.hideOutput": "Hide output",
+  "managedWorktrees.creation.sidebarRow": "Creating worktree…",
+  "managedWorktrees.created.title": "Worktree created",
+  "managedWorktrees.list.inProgress": "In progress",
+  "managedWorktrees.dialog.title": "Worktrees",
+  "managedWorktrees.dialog.description": "Worktrees that KayingCode manages for {project}",
+  "managedWorktrees.dialog.loadFailed": "Couldn't load worktrees",
+  "managedWorktrees.dialog.empty": "No worktrees yet",
+  "managedWorktrees.dialog.detached": "detached · {sha}",
+  "managedWorktrees.dialog.dirty": "Modified",
+  "managedWorktrees.dialog.missing": "Directory missing",
+  "managedWorktrees.dialog.noTasks": "No tasks",
+  "managedWorktrees.dialog.openTask": "Open task",
+  "managedWorktrees.dialog.untitledTask": "Untitled task",
+  "managedWorktrees.dialog.archived": "Archived",
+  "managedWorktrees.dialog.delete": "Delete worktree",
+  "managedWorktrees.dialog.prune": "Remove record",
+  "managedWorktrees.dialog.pruneFailed": "Couldn't remove the record",
+  "managedWorktrees.dialog.confirm.title": "Delete worktree {name}?",
+  "managedWorktrees.dialog.confirm.directory": "The worktree directory will be deleted.",
+  "managedWorktrees.dialog.confirm.ignored":
+    "Ignored files, such as dependencies and build output, are also deleted.",
+  "managedWorktrees.dialog.confirm.tasks":
+    "Tasks that use it are kept, but they become read-only.",
+  "managedWorktrees.dialog.confirm.discardChanges":
+    "This worktree has uncommitted changes. They will be discarded.",
+  "managedWorktrees.dialog.error.dirty": "The worktree has uncommitted changes",
+  "managedWorktrees.dialog.error.running": "A task is running",
+  "managedWorktrees.dialog.error.terminal":
+    "Close the terminals running in this directory first",
+  "managedWorktrees.dialog.error.creating": "This worktree is still being created",
+  "managedWorktrees.dialog.error.tasks": "A task is using this worktree",
+  "managedWorktrees.dialog.error.removing": "This worktree is being deleted",
+  "managedWorktrees.dialog.error.inUse": "A session is still resident in this worktree",
+  "managedWorktrees.dialog.error.releaseUnsupported":
+    "This Agent version can't unload resident sessions. The worktree was kept.",
+  "managedWorktrees.dialog.error.sessionClose":
+    "Couldn't unload the tasks using this worktree. The worktree was kept.",
+  "managedWorktrees.dialog.error.notManaged": "This folder isn't a managed worktree",
+  "managedWorktrees.dialog.error.gitFailed": "The Git operation failed",
+  "managedWorktrees.dialog.error.generic": "Couldn't delete the worktree",
   "git.branchSwitcher.error.unknown": "Switching branches failed. Please try again.",
   "git.branchSwitcher.error.requestFailed": "Branch operation failed: {error}",
   "gitGraph.title": "Git Graph",
@@ -2060,6 +2273,7 @@ const enUS: Record<string, string> = {
   "settings.shortcuts.command.nextConversation": "Next Task",
   "settings.shortcuts.command.toggleInterfaceMode": "Toggle coding/office mode",
   "settings.shortcuts.command.openOnboarding": "Toggle onboarding",
+  "settings.shortcuts.command.toggleVoiceInput": "Start or Stop Voice Input",
   "settings.shortcuts.command.navigateBack": "Navigate Back",
   "settings.shortcuts.command.navigateForward": "Navigate Forward",
   "settings.shortcuts.command.openModelMenu": "Open Model Menu",
@@ -2086,6 +2300,11 @@ const enUS: Record<string, string> = {
   "settings.systemDescription": "These preferences affect the current window experience.",
   "settings.locale": "Language",
   "settings.localeDescription": "Choose the display language used by the application UI.",
+  "settings.replyLanguage": "Reply language",
+  "settings.replyLanguageDescription":
+    "The Agent replies in this language. Leave empty to follow the conversation language.",
+  "settings.replyLanguagePlaceholder": "For example: English, 简体中文, 日本語",
+  "settings.replyLanguageSavedHint": "Reply language saved",
   "settings.terminalProfile": "Inherit system terminal profile",
   "settings.terminalProfileDescription":
     "When launching the built-in terminal, inherit login shell environment, proxy, Kubernetes variables, and local terminal font when possible.",
@@ -2200,6 +2419,12 @@ const enUS: Record<string, string> = {
     "Show full reasoning inside the message stream. When off, the first reasoning item in each turn remains visible.",
   "settings.messageStreamShowTodos": "Show todos",
   "settings.messageStreamShowTodosDescription": "Show Todo tool cards inside the message stream. ",
+  "settings.totalTokensReminder": "Token budget reminder",
+  "settings.totalTokensReminderDescription":
+    "Give the model a fixed token budget and the amount left each turn, in new sessions and sessions restored after an app restart. It is only a reminder and does not limit usage. Active sessions keep their current setting.",
+  "settings.agentAlwaysBackground": "Always run subagents in the background",
+  "settings.agentAlwaysBackgroundDescription":
+    "Subagents always start in the background and their results arrive in a later turn, so you can keep working while they run. Turn this off to let the model choose: subagents then run in the foreground unless it asks for the background. Applies to new sessions and sessions restored after an app restart; active sessions keep their current setting.",
   "settings.toolGroupingExplore": "Group exploration tools",
   "settings.toolGroupingExploreDescription":
     "Group consecutive reads and searches into an Explore section.",
@@ -2217,6 +2442,10 @@ const enUS: Record<string, string> = {
   "settings.askUserQuestionAutoResolution": "Automatically continue questions",
   "settings.askUserQuestionAutoResolutionDescription":
     "When enabled, Agent questions automatically continue after 5 minutes without an answer. When disabled, current and future questions wait for your response.",
+  "settings.pluginAutoRecommendation": "Automatic plugin recommendations",
+  "settings.pluginAutoRecommendationDescription":
+    "Let the agent find and recommend plugins in conversations. When off, you can still install plugins in Settings. Applies from your next message. Installation requires confirmation.",
+  "settings.pluginAutoRecommendationSaveError": "Could not save. Try again.",
   "settings.modelIoFullRetention": "Keep complete model I/O",
   "settings.modelIoFullRetentionDescription":
     "Keep complete model requests and responses without compression, size limits, or automatic deletion.",
@@ -2347,6 +2576,7 @@ const enUS: Record<string, string> = {
   "resourceManager.storage.category.backups": "Backups",
   "resourceManager.storage.category.exports": "Exports & feedback bundles",
   "resourceManager.storage.category.runtimes": "Agent runtimes & plugins",
+  "resourceManager.storage.category.preinstalledTools": "Preinstalled tools",
   "resourceManager.storage.category.config": "Settings, credentials & workspace",
   "resourceManager.storage.category.other": "Other",
   "resourceManager.storage.categoryDescription.sessionStore":
@@ -2367,6 +2597,8 @@ const enUS: Record<string, string> = {
     "Exported log bundles and feedback attachments.",
   "resourceManager.storage.categoryDescription.runtimes":
     "Bundled agent runtimes, Computer Use components and plugins.",
+  "resourceManager.storage.categoryDescription.preinstalledTools":
+    "Managed document tools. Delete them from Help → Preinstalled tools.",
   "resourceManager.storage.categoryDescription.config":
     "Settings, credentials, memories and default workspace files.",
   "resourceManager.storage.categoryDescription.other":
@@ -2693,6 +2925,14 @@ const enUS: Record<string, string> = {
   "settings.plugins.toggle.workspaceDisabled":
     "Disabled {plugin} in this workspace (overriding User default)",
   "settings.plugins.toggle.failed": "Couldn't update {plugin}. Try again.",
+  "settings.plugins.workspaceTrust.pending": "Pending trust",
+  "settings.plugins.workspaceTrust.pendingHint":
+    "This plugin comes from a project directory. Review and trust it before it can be enabled.",
+  "settings.plugins.workspaceTrust.trust": "Trust",
+  "settings.plugins.workspaceTrust.trusted": "Trusted {plugin}",
+  "settings.plugins.workspaceTrust.changed":
+    "{plugin} changed since review. Review it again before trusting.",
+  "settings.plugins.workspaceTrust.failed": "Couldn't trust {plugin}. Try again.",
   "settings.plugins.status.enabled": "Enabled",
   "settings.plugins.status.disabled": "Disabled",
   "settings.modelProviderDescription":
@@ -3335,6 +3575,11 @@ const enUS: Record<string, string> = {
   "settings.plugin.tab.mcps": "MCP",
   "settings.plugin.tab.skills": "Skills",
   "settings.plugin.tab.commands": "Commands",
+  "settings.search.title": "Search settings",
+  "settings.search.description": "Find a setting and jump to it",
+  "settings.search.results": "Search results",
+  "settings.search.empty": "No matching settings",
+  "settings.search.section": "Settings section",
   "settings.search.clear": "Clear search",
   "settings.plugin.plugins.installed": "Installed",
   "settings.plugin.plugins.builtIn": "Built-in",
@@ -3431,6 +3676,19 @@ const enUS: Record<string, string> = {
   "settings.plugins.store.viewMoreFew": "See {names}",
   "settings.plugins.store.showLess": "Show less",
   "settings.plugins.store.install": "Install",
+  "settings.plugins.store.extension.requiresUpdate": "Requires newer KayingCode",
+  "settings.plugins.store.extension.incompatibleHint":
+    "This plugin needs a newer version of KayingCode. Update KayingCode, then install it.",
+  "settings.plugins.store.extension.updateBlockedHint":
+    "The latest version needs a newer KayingCode. Update KayingCode to install this update.",
+  "settings.plugins.store.extension.title": "Includes resident code",
+  "settings.plugins.store.extension.description":
+    "When enabled, the plugin's extension code keeps running inside KayingCode.",
+  "settings.plugins.store.extension.engineRequirement": "Requires plugin API {range}",
+  "settings.plugins.store.extension.grantsTitle": "Requested permissions",
+  "settings.plugins.store.extension.noGrants": "No permissions requested",
+  "settings.plugins.store.extension.consentNote":
+    "For information only. After you install, the plugin can use these permissions only after you grant them in the permission dialog.",
   "settings.plugins.store.paidPlanBadge": "Coding Plan",
   "settings.plugins.store.requiresPaidPlan": "This plugin works better with a Coding Plan",
   "settings.plugins.store.tryNow": "Try now",
@@ -4062,6 +4320,39 @@ const enUS: Record<string, string> = {
   "chat.queue.editDraftConflict":
     "Send or clear the current draft before editing a queued message.",
   "chat.queue.editRestoreFailed": "Couldn't return the queued message to the composer. Try again.",
+  "chat.queue.editLockedByOther": "Being edited in another window or device",
+  "chat.queue.releaseEdit": "Release",
+  "chat.composerEdit.editingUserQuery": "Editing your last message",
+  "chat.composerEdit.editingQueueItem": "Editing queued message",
+  "chat.composerEdit.inComposerHint": "Editing below",
+  "chat.composerEdit.cancel": "Cancel editing",
+  "chat.composerEdit.busy": "Wait for the current send or upload to finish before editing.",
+  "chat.composerEdit.switchTitle": "Discard current edits?",
+  "chat.composerEdit.switchDescription":
+    "Switching to another message discards your current edits.",
+  "chat.composerEdit.switchConfirm": "Discard and switch",
+  "chat.composerEdit.lockFailed.reserved": "This message is being sent and can't be edited",
+  "chat.composerEdit.lockFailed.locked": "This message is being edited in another window or device",
+  "chat.composerEdit.lockFailed.generic": "Couldn't edit this message. Try again.",
+  "chat.composerEdit.saveFailed": "Couldn't save the edit. Try again.",
+  "chat.composerEdit.invalid.notLatest":
+    "This is no longer the last message; sending will create a new message",
+  "chat.composerEdit.invalid.queueItemRemoved":
+    "The queued message is no longer in the queue; sending will create a new message",
+  "chat.composerEdit.invalid.editLockLost":
+    "Editing was released by another device; sending will create a new message",
+  "chat.composerEdit.applyQueue.title": "Apply to queued messages?",
+  "chat.composerEdit.applyQueue.modelAndMode":
+    "You changed the permission to {mode} and the model to {model}. Apply this to all queued messages too?",
+  "chat.composerEdit.applyQueue.model":
+    "You changed the model to {model}. Apply this to all queued messages too?",
+  "chat.composerEdit.applyQueue.mode":
+    "You changed the permission to {mode}. Apply this to all queued messages too?",
+  "chat.composerEdit.applyQueue.confirm": "Apply to queue",
+  "chat.composerEdit.applyQueue.cancel": "Only this message",
+  "chat.composerEdit.applyQueue.failed": "Could not apply to queued messages",
+  "chat.composerEdit.kindMismatch.goal": "A goal message must keep the /goal prefix.",
+  "chat.composerEdit.kindMismatch.text": "A regular message can't be changed into a /goal command.",
   "chat.queue.remove": "Remove queued message",
   "chat.queue.turnSteer.steering": "Steering conversation",
   "chat.queue.paused.stopped": "The queue was paused because you stopped the current response",
@@ -6805,9 +7096,12 @@ const enUS: Record<string, string> = {
   "extensions.activation.failedToast": "Could not update the extension",
   "extensions.activation.needsConfirmation": "Needs confirmation",
   "extensions.activation.review": "Review",
-  "extensions.grants.dialog.body":  "Extension code runs in the same process as other extensions, with no isolation between them. Any enabled extension can technically use the permissions granted here. Only enable plugins you trust.\n\nRead: the titles, status and full conversations of all sessions, including tool output. Write: create, fork, send messages to, interrupt, rename, open, archive and pin any session on this computer. If the target session runs in full access mode, a message from the plugin makes the Agent run tools directly.\n\nSessions in the plugin's project: the plugin can also approve or deny tool calls for you, answer the Agent's questions and switch the permission mode.\n\nActions started by a plugin show their source and are written to the audit log.",
-  "extensions.grants.dialog.fullAccessBody":  "Full access: the plugin can switch sessions in its project to full access, so the Agent reads and writes files, runs commands and uses the network without asking. Only grant this to plugins you trust.",
-  "extensions.grants.dialog.notificationsBody":  "System notifications: the plugin can show system notifications while the window is in the background, with the plugin name before the title. At most 1 per minute and 20 per day. You can turn them off on the plugin details page; nothing is shown while system notifications are off in Settings.",
+  "extensions.grants.dialog.body":
+    "Extension code runs in the same process as other extensions, with no isolation between them. Any enabled extension can technically use the permissions granted here. Only enable plugins you trust.\n\nRead: the titles, status and full conversations of all sessions, including tool output. Write: create, fork, send messages to, interrupt, rename, open, archive and pin any session on this computer. If the target session runs in full access mode, a message from the plugin makes the Agent run tools directly.\n\nSessions in the plugin's project: the plugin can also approve or deny tool calls for you, answer the Agent's questions and switch the permission mode.\n\nActions started by a plugin show their source and are written to the audit log.",
+  "extensions.grants.dialog.fullAccessBody":
+    "Full access: the plugin can switch sessions in its project to full access, so the Agent reads and writes files, runs commands and uses the network without asking. Only grant this to plugins you trust.",
+  "extensions.grants.dialog.notificationsBody":
+    "System notifications: the plugin can show system notifications while the window is in the background, with the plugin name before the title. At most 1 per minute and 20 per day. You can turn them off on the plugin details page; nothing is shown while system notifications are off in Settings.",
   "extensions.grants.enable.confirm": "Enable",
   "extensions.grants.enable.title": "Enable “{plugin}”?",
   "extensions.grants.failedToast": "Couldn't update the extension permission",
@@ -6816,6 +7110,10 @@ const enUS: Record<string, string> = {
   "extensions.grants.holder": "“{plugin}” ({tiers})",
   "extensions.grants.needsConsent": "Needs permission",
   "extensions.grants.revokedToast": "Revoked the permissions of “{plugin}”",
+  "extensions.grants.tier.notifications": "Send system notifications",
+  "extensions.grants.tier.sessions.fullAccess": "Read and change sessions, with full access",
+  "extensions.grants.tier.sessions.read": "Read sessions",
+  "extensions.grants.tier.sessions.write": "Read and change sessions",
   "extensions.launcher.reload": "Reload",
   "extensions.launcher.stopped": "Extensions stopped",
   "extensions.launcher.stoppedDescription": "Stopped restarting after repeated crashes or hangs.",
@@ -6844,17 +7142,21 @@ const enUS: Record<string, string> = {
   "extensions.permissions.action.failed": "{action} (failed)",
   "extensions.permissions.note": "Any enabled extension can technically use these permissions.",
   "extensions.permissions.notifications": "System notifications",
-  "extensions.permissions.notificationsNote":  "When system notifications are off in Settings, nothing is shown even if this is on.",
+  "extensions.permissions.notificationsNote":
+    "When system notifications are off in Settings, nothing is shown even if this is on.",
   "extensions.permissions.recent": "Recent actions",
   "extensions.permissions.revoke": "Revoke",
   "extensions.permissions.title": "Permissions",
   "extensions.state.invalid": "Invalid manifest",
   "extensions.state.reasonWithPath": "{path}: {reason}",
   "extensions.view.failed": "The extension view failed to load: {reason}",
-  "extensions.view.hostNotRunning":  "Extensions are not running. The view reopens when they recover.",
+  "extensions.view.hostNotRunning":
+    "Extensions are not running. The view reopens when they recover.",
   "extensions.view.loading": "Loading the extension view…",
   "extensions.view.unavailable": "This extension view is not available right now.",
   "extensions.view.unsupported": "Extension views are not supported here.",
+  "genUi.from": "From interactive view {name}",
+  "pluginUi.fromPlugin": "From plugin {name}",
   "pluginUi.followUp.cancel": "Cancel",
   "pluginUi.followUp.description": "From plugin {name}. You can edit it before sending.",
   "pluginUi.followUp.send": "Send",
@@ -6870,11 +7172,58 @@ const enUS: Record<string, string> = {
   "pluginUi.retry": "Reload",
   "pluginUi.unpin": "Stop keeping expanded",
   "settings.plugins.store.segment.community": "Community",
-  "settings.plugins.store.ui.needsSession":  "Open this plugin in an available session of the current project.",
+  "settings.plugins.store.ui.needsSession":
+    "Open this plugin in an available session of the current project.",
   "settings.plugins.store.ui.open": "Open",
-  "settings.plugins.store.ui.unavailable":  "No plugin UI is available in this project. Check whether the plugin is enabled.",
+  "settings.plugins.store.ui.unavailable":
+    "No plugin UI is available in this project. Check whether the plugin is enabled.",
   "settings.plugins.store.ui.unsupported": "Plugin UI is available in local desktop projects only.",
   "sidePane.launcher.empty": "No recommended app plugins yet",
+  "voiceInput.button.start": "Voice input",
+  "voiceInput.button.connecting": "Connecting to speech recognition…",
+  "voiceInput.button.stop": "Stop recording",
+  "voiceInput.button.recognizing": "Recognizing…",
+  "voiceInput.action.openPrivacySettings": "Open System Settings",
+  "voiceInput.action.openSoundSettings": "Open Sound Settings",
+  "voiceInput.permission.title": "Microphone access needed",
+  "voiceInput.permission.description.mac":
+    'Click "Request again", then choose "Allow" in the system dialog. You can also turn on KayingCode in System Settings › Privacy & Security › Microphone.',
+  "voiceInput.permission.reauthorize": "Request again",
+  "voiceInput.permission.restartTitle": "Restart KayingCode",
+  "voiceInput.permission.restartDescription":
+    'The microphone permission was reset. Restart KayingCode, click the microphone, then choose "Allow" in the system dialog.',
+  "voiceInput.permission.relaunch": "Restart KayingCode",
+  "voiceInput.permission.granted":
+    "Microphone access is on. Click the microphone to start voice input.",
+  "voiceInput.permission.description.windows":
+    'In Settings › Privacy & security › Microphone, turn on both "Microphone access" and "Let desktop apps access your microphone".',
+  "voiceInput.error.permissionDenied.linux":
+    "Cannot access the microphone. Check the system microphone permission and the PulseAudio / PipeWire input device.",
+  "voiceInput.error.silent":
+    "No sound came from the microphone. Usually the system microphone permission is off or the wrong input device is selected.",
+  "voiceInput.error.silent.linux":
+    "No sound came from the microphone. Check the PulseAudio / PipeWire input device and volume.",
+  "voiceInput.error.noDevice": "No microphone found. Connect a microphone and try again.",
+  "voiceInput.error.noDevice.linux":
+    "No microphone found. Connect a microphone and check the PulseAudio / PipeWire input device.",
+  "voiceInput.error.deviceBusy": "The microphone cannot be used. Another app may be using it.",
+  "voiceInput.error.deviceBusy.linux":
+    "The microphone cannot be used. Another app may be using it. Check the PulseAudio / PipeWire input device.",
+  "voiceInput.error.device_ended": "The microphone was disconnected. Voice input was cancelled.",
+  "voiceInput.error.too_quiet":
+    "No sound detected. Check that the microphone is not muted or too far away.",
+  "voiceInput.error.audio_too_short": "The recording is too short. Try again.",
+  "voiceInput.error.no_speech":
+    "No speech was recognized. Move closer to the microphone and try again.",
+  "voiceInput.error.network": "Cannot connect to speech recognition. Check your network.",
+  "voiceInput.error.proxy":
+    'Cannot connect to speech recognition through the HTTP proxy. Make sure the proxy supports WebSocket, or add the service address to "No proxy", then restart the app.',
+  "voiceInput.error.rate_limited": "Speech recognition is busy. Try again later.",
+  "voiceInput.error.unavailable": "Speech recognition is unavailable. Try again later.",
+  "voiceInput.error.upstream_timeout": "Speech recognition timed out. Try again.",
+  "voiceInput.error.audio_limit_exceeded":
+    "The recording reached the maximum length. The recognized text was kept.",
+  "voiceInput.error.failed": "Speech recognition failed. Try again.",
 };
 
 export default enUS;

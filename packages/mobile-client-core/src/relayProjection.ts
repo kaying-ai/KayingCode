@@ -6,6 +6,7 @@
 // usage/queue/goal/plan/backgroundWorks/subagents）与 CAS 定序事实（revision/logEpoch）；
 // resync 快照只带尾部窗口，已翻回的历史用 keep-old merge 保留。
 import type {
+  ActivitySummaryDismissed,
   BackgroundWorkSummary,
   ConversationDelta,
   ConversationRow,
@@ -47,6 +48,8 @@ export class RelayConversationProjection {
   plan: PlanState | null = null;
   backgroundWorks: BackgroundWorkSummary[] = [];
   subagents: SubagentProjectionState | null = null;
+  /** 活动摘要收起水位；与桌面共享 CLI 权威投影，移动端只读。 */
+  activitySummaryDismissed: ActivitySummaryDismissed | null = null;
   /** 等待交互全集（permission/userInput 作答；workspaceHookReview 提示去电脑端）。 */
   pendingInteractions: PendingInteraction[] = [];
   /** 更早历史是否还有；null = 尚未得知（初始快照未截断）。 */
@@ -110,6 +113,7 @@ export class RelayConversationProjection {
     this.plan = snapshot.plan ?? null;
     this.backgroundWorks = [...(snapshot.backgroundWorks ?? [])];
     this.subagents = snapshot.subagents ?? null;
+    this.activitySummaryDismissed = snapshot.activitySummaryDismissed ?? null;
     this.pendingInteractions = [...(snapshot.pendingInteractions ?? [])];
     this.refreshOlderHasMore();
   }
@@ -159,6 +163,9 @@ export class RelayConversationProjection {
         if (patch.plan !== undefined) this.plan = patch.plan;
         if (patch.backgroundWorks) this.backgroundWorks = [...patch.backgroundWorks];
         if (patch.subagents) this.subagents = patch.subagents;
+        if (patch.activitySummaryDismissed) {
+          this.activitySummaryDismissed = patch.activitySummaryDismissed;
+        }
         if (patch.pendingInteractions) {
           this.pendingInteractions = [...patch.pendingInteractions];
         }

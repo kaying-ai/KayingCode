@@ -104,7 +104,7 @@ async function runPluginsListCommand(
   flags: PluginsCommandFlags,
 ): Promise<number> {
   const base = baseOptions(deps);
-  const outcome = (await resolveDep(deps, "listPlugins"))(base);
+  const outcome = await (await resolveDep(deps, "listPlugins"))(base);
   const installed = outcome.plugins.map((plugin) => formatPluginJson(plugin, outcome.diagnostics));
   if (!flags.available) {
 
@@ -121,7 +121,7 @@ async function runPluginsListCommand(
     ctx.stderr.write(formatDiagnosticLines(orphaned));
     return 1;
   }
-  const overview = (await resolveDep(deps, "getPluginsOverview"))(base);
+  const overview = await (await resolveDep(deps, "getPluginsOverview"))(base);
   if (options.json) {
     ctx.stdout.write(
       formatJson({
@@ -167,7 +167,7 @@ async function runPluginsInstallCommand(
   const { name } = splitPluginIdentifier(identifier);
   let { marketplace } = splitPluginIdentifier(identifier);
   if (!marketplace) {
-    const overview = (await resolveDep(deps, "getPluginsOverview"))(base);
+    const overview = await (await resolveDep(deps, "getPluginsOverview"))(base);
     const matches = overview.availablePlugins.filter((plugin) => plugin.name === name);
     if (matches.length > 1) throw ambiguousPluginError(matches.map((plugin) => plugin.id));
     if (matches.length === 0 || !matches[0]) {
@@ -305,7 +305,7 @@ async function runPluginsDisableCommand(
   const listPlugins = await resolveDep(deps, "listPlugins");
   const setPluginEnabled = await resolveDep(deps, "setPluginEnabled");
   const entries: Array<{ plugin: PluginListItem; result?: SetKayingCodePluginEnabledResult; error?: string }> = [];
-  for (const plugin of listPlugins(base).plugins) {
+  for (const plugin of (await listPlugins(base)).plugins) {
     if (!plugin.enabled) continue;
     try {
       entries.push({ plugin, result: await setPluginEnabled({ ...base, enabled: false, plugin: plugin.id }) });
@@ -314,7 +314,9 @@ async function runPluginsDisableCommand(
     }
   }
   // 写的是 user 层；workspace/project 层的 enabledPlugins=true 优先级更高、盖不掉，所以按 effective 态复查。
-  const stillEnabled = new Set(listPlugins(base).plugins.filter((p) => p.enabled).map((p) => p.id));
+  const stillEnabled = new Set(
+    (await listPlugins(base)).plugins.filter((p) => p.enabled).map((p) => p.id),
+  );
   const failed = entries.filter((entry) => entry.error || stillEnabled.has(entry.plugin.id));
   if (options.json) {
     ctx.stdout.write(

@@ -22,8 +22,11 @@ interface CreatePluginFacadeOptions {
   configResult: ConfigResult;
   env?: NodeJS.ProcessEnv;
   officialPluginRoots?: string[];
+  pluginDiscovery?: KayingCodeAppOptions["pluginDiscovery"];
   pluginStorageRoot?: string;
+  remoteSessionId?: string;
   workingDirectory: string;
+  workspaceIdentity?: string;
 }
 
 function createPluginFacade(options: CreatePluginFacadeOptions): PluginFacade {
@@ -35,8 +38,11 @@ function createPluginFacade(options: CreatePluginFacadeOptions): PluginFacade {
     configResult: currentConfigResult(options.configResult, enabledPlugins, suppressedBuiltins),
     env: options.env,
     officialPluginRoots: options.officialPluginRoots,
+    pluginDiscovery: options.pluginDiscovery,
     pluginStorageRoot: options.pluginStorageRoot,
+    remoteSessionId: options.remoteSessionId,
     workingDirectory: options.workingDirectory,
+    workspaceIdentity: options.workspaceIdentity,
   });
 
   return {
@@ -88,8 +94,11 @@ export function createPluginFacadeForApp(input: {
     configResult: input.configResult,
     env: input.options.env,
     officialPluginRoots: input.options.officialPluginRoots,
+    pluginDiscovery: input.options.pluginDiscovery,
     pluginStorageRoot: input.options.pluginStorageRoot,
+    remoteSessionId: input.options.runtimeConfig?.remoteSessionId,
     workingDirectory: input.workingDirectory,
+    workspaceIdentity: input.options.runtimeConfig?.memory?.workspaceIdentity,
   });
 }
 

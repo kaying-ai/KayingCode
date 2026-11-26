@@ -5,6 +5,7 @@ import {
   persistAnnouncements,
 } from "./context-refresh.js";
 import { getTurnTools } from "./turn-tool-visibility.js";
+import { createLiveToolSearchContext, latchMcpServerWait } from "./mcp.js";
 import { refreshOffPeakTurnAfterTakeover } from "../off-peak/turn.js";
 import { appendRuntimeAgentListing } from "../helpers/agent-listing.js";
 import { beginLocalTurnPreparation } from "@zcode/contracts";
@@ -41,6 +42,7 @@ import { isRealUserPrompt } from "../helpers/provider-entry-origins.js";
 import {
   consumeTotalTokensBudget,
   decideTotalTokensReminder,
+  isTotalTokensReminderEnabled,
   reanchorTotalTokensBudget,
   type InputAttachmentCollectionReason,
 } from "../helpers/total-tokens-budget.js";
@@ -48,6 +50,8 @@ import { formatTotalTokensReminder } from "../../context/total-tokens.js";
 import { inputRoleOf } from "../helpers/provider-entry-origins.js";
 import {
   evaluateRapidRefill,
+  isAutomationMutationRestrictedTurn,
+  isOffPeakCreateRestrictedTurn,
   MAX_CONSECUTIVE_RAPID_REFILLS,
   RAPID_REFILL_TOOL_TURN_THRESHOLD,
   recordCompactHistoryRound,
@@ -98,9 +102,29 @@ export async function runRegularTurnLoop(
     }
 
     const finishMcp = beginLocalTurnPreparation(state.turnTraceContext, "mcp");
-    await this.initializeMcp(state.turnTraceContext);
-    // tools/list_changed 只在回合开始前生效。
-    await this.refreshMcpToolsIfChanged(state.turnTraceContext);
+    // 只有正常新请求才应用最新 MCP 列表；断流重试、准入重试、续写等恢复请求沿用原请求的工具列表。
+    const mcpToolListRefreshed = Boolean(state.inputAttachmentCollectionPending);
+    // 自动任务（automation / 闲时）无人交互，即使会话策略是 background 也等启动结束。
+    const mcpBackground =
+      this.mcpStartupPolicy === "background" &&
+      !isAutomationMutationRestrictedTurn(state) &&
+      !isOffPeakCreateRestrictedTurn(state);
+    if (mcpToolListRefreshed) {
+      const mcpView = await this.initializeMcp(state.turnTraceContext, {
+        background: mcpBackground,
+      });
+      if (state.pluginReferenceInput !== undefined) {
+        const pluginReferenceInput = state.pluginReferenceInput;
+        state.pluginReferenceInput = undefined;
+        await this.injectPluginReferenceReminderFromTurn(
+          pluginReferenceInput,
+          state.turnTraceContext,
+          state.turnRequestState,
+          mcpView,
+          state.toolDisallowlist,
+        );
+      }
+    }
     finishMcp();
     throwIfTurnAborted(state.turnAbortSignal);
     const finishTools = beginLocalTurnPreparation(state.turnTraceContext, "tools");
@@ -203,6 +227,13 @@ export async function runRegularTurnLoop(
       entries: requestEntries,
       traceContext: state.turnTraceContext,
     });
+    // 实时 MCP 目录：ToolSearch 读取当前会话视图，不使用启动时的快照。
+    Object.assign(
+      prepared.toolSearch,
+      createLiveToolSearchContext(this, state, prepared.toolSearch),
+    );
+    // 请求真正发送了 WaitForMcpServers 才锁存；重试、续写看到同一份工具列表。
+    latchMcpServerWait(this, prepared.request.tools);
     this.logger?.debug("ToolSearch request exposure", {
       event: "tool.search.exposure",
       enabled: prepared.toolSearch.enabled,
@@ -250,6 +281,8 @@ export async function runRegularTurnLoop(
       iteration: state.toolCallCount === 0 ? 0 : Math.ceil(state.toolCallCount / 10),
     });
 
+    // 本次请求候选的交付增量：只有随成功 assistant 提交时才固化进历史，投影/估算不写入。
+    state.turnRequestState.toolSearchDelivery = prepared.delivery;
     const result = await runModelBackedTurnStep.call(this, state, {
       drainedSteerForNextRequest,
       latestRealUserMessageIndex: providerProjection.diagnostics.latestRealUserMessageIndex,
@@ -404,6 +437,8 @@ async function appendTotalTokensReminder(
   reason: InputAttachmentCollectionReason,
   fromUser: boolean,
 ): Promise<void> {
+  // 上游 4.0：提醒改为显式开关，缺省不产生附件；关闭时 compaction 前后也不重述。
+  if (!isTotalTokensReminderEnabled(runtime.config)) return;
   const entries = state.turnRequestState.entries;
   const decision = decideTotalTokensReminder({
     reason,
@@ -441,6 +476,7 @@ async function appendToolSearchAnnouncement(
     tools,
     registry: runtime.getToolRegistry(),
     entries: state.turnRequestState.entries,
+    mcp: runtime.mcpServerStatusFacts,
   });
   // 公告正文和增量事实必须先一起落盘；否则 fork/resume 会把已公告工具重新当成首次出现。
   await persistAnnouncements(

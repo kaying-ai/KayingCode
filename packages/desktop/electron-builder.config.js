@@ -730,6 +730,8 @@ export default {
     electronLanguages: ["en", "zh_CN"],
     extendInfo: {
       NSAppleEventsUsageDescription: `${desktopProductIdentity.productName} needs Apple Events access to coordinate local automation workflows with user-approved desktop apps.`,
+      // 语音输入（packages/desktop/spec/composer-voice-input.md）：缺失该 key 时 askForMediaAccess 直接失败。
+      NSMicrophoneUsageDescription: `${desktopProductIdentity.productName} needs microphone access to turn your speech into text when you use voice input.`,
     },
     // 预签名脚本走的是原生 codesign，要求完整的 "Developer ID Application: ..." 身份串；
     // 但 electron-builder 的 mac.identity 在 26.x 下会拒绝带此前缀的名字。

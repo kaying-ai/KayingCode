@@ -4,6 +4,7 @@ import {
   Archive,
   Clock,
   CloudUpload,
+  GitBranch,
   ListTree,
   LoaderIcon,
   Moon,
@@ -12,6 +13,11 @@ import {
 } from "lucide-react";
 import { isCronTask, isOffPeakTask, type KayingCodeTaskMeta } from "@zcode/shared";
 import { TID_TASK_ARCHIVE, TID_TASK_ITEM, testId } from "@zcode/shared";
+import {
+  formatWorktreeLabel,
+  managedWorktreeTestIds,
+  useTaskWorktreeEntry,
+} from "@/managed-worktrees/index.js";
 import { Badge } from "@/components/ui/badge.js";
 import { Button } from "@/components/ui/button.js";
 import { cn } from "@/components/lib/utils.js";
@@ -388,6 +394,21 @@ export const MemoTaskItem = memo(function TaskListItem({
   });
   const taskTitleWithChanges = formatTaskTitleWithChanges(taskTitle, taskChangeSummary, intl);
   const workspaceLabel = getPathLeaf(task.workspacePath);
+  // worktree 标识只读 listWorktrees 的任务归属（tasks-index worktree_root），按 workspaceIdentity
+  // 与 taskId 匹配；产品共享 KayingCodeTaskMeta 尚未声明 worktreeRoot（CONTRACT.md §7）。
+  const worktreeEntry = useTaskWorktreeEntry({
+    workspacePath: task.workspacePath,
+    ...(task.workspaceIdentity ? { workspaceIdentity: task.workspaceIdentity } : {}),
+    taskId: task.taskId,
+  });
+  const worktreeLabel = formatWorktreeLabel(intl, worktreeEntry?.path);
+  const worktreeIcon = worktreeLabel ? (
+    <GitBranch
+      data-testid={managedWorktreeTestIds.taskRowIcon}
+      aria-label={intl.formatMessage({ id: "managedWorktrees.taskLabel" })}
+      className="size-3.5 shrink-0"
+    />
+  ) : null;
   const taskItemKey = `${buildTaskWorkspaceKey(task.workspacePath, task.workspaceIdentity)}:${task.taskId}`;
   // 工作流运行行：标题下的第二条通道，
   // 与前置 16px 槽（error > unread > spinner）互不占位。只在会话带 run 摘要时挂组件。
@@ -646,7 +667,7 @@ export const MemoTaskItem = memo(function TaskListItem({
           </div>
           <div className="flex min-w-0 items-center justify-between gap-2 text-ui-base text-foreground-subtle h-6">
             <div className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate">{workspaceLabel}</span>
+              <span className="truncate">{worktreeLabel ?? workspaceLabel}</span>
             </div>
             <div className="ml-auto flex shrink-0 items-center justify-end gap-1.5">
               {!hasPendingInteraction ? (
@@ -682,6 +703,7 @@ export const MemoTaskItem = memo(function TaskListItem({
                       className="size-3.5 shrink-0"
                     />
                   ) : null}
+                  {worktreeIcon}
                   <span className="mr-1">{taskTimeLabel}</span>
                 </span>
               ) : null}
@@ -773,6 +795,7 @@ export const MemoTaskItem = memo(function TaskListItem({
                     className="size-3.5 shrink-0"
                   />
                 ) : null}
+                {worktreeIcon}
                 {taskTimeLabel}
               </span>
             ) : null}

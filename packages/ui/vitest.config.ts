@@ -8,7 +8,8 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["test/**/*.test.ts", "src/**/*.test.ts"],
+    // 组件测试使用 .tsx（jsdom + createRoot）；共享 locale 文件的 .test.ts 保持原规则。
+    include: ["test/**/*.test.ts", "test/**/*.test.tsx", "src/**/*.test.ts", "src/**/*.test.tsx"],
     setupFiles: [fileURLToPath(new URL("../../vitest.setup.ts", import.meta.url))],
     hookTimeout: 30_000,
     testTimeout: 30_000,

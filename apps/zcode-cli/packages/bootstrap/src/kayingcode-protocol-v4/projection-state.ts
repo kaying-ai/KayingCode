@@ -110,6 +110,8 @@ export interface AvailabilityContext {
   goalVerifying: boolean;
   queueLength: number;
   autoDrain: boolean;
+  /** 队首正被 composer 编辑态冻结（docs/ui/composer-edit-mode.md）；缺省 = 未冻结。 */
+  queueHeadEditLocked?: boolean;
 }
 
 // 裁决表与 packages/formal-proof/src/model.ts 的 evaluate 逐条对齐
@@ -172,6 +174,11 @@ export function computeInputRouting(
   if (context.phase === "running" || context.phase === "prewarming") {
     return { mode: followupMode === "guide" ? "guide" : "enqueue" };
   }
+  // 队首冻结且自动续跑开启时，空闲态的队列只是在等编辑结束；新输入排到队尾保持 FIFO，
+  // 不能 startNow 越过冻结项，也不弹暂停队列确认（那是 autoDrain=false 的语义）。
+  if (context.queueHeadEditLocked && context.queueLength > 0 && context.autoDrain) {
+    return { mode: "enqueue", reasonCode: "queueHeadEditLocked" };
+  }
   // completed + queue>0 + autoDrain=false 时，输入不静默入队；
   // 客户端呈现 clear/keep 选择，disposition 随 command 上行。
   const completed =
@@ -196,6 +203,7 @@ const REVISION_BEARING_PATCH_KEYS: ReadonlyArray<keyof StatePatch> = [
   "queue",
   "pendingInteractions",
   "backgroundWorks",
+  "activitySummaryDismissed",
   "subagents",
   "goal",
   "plan",

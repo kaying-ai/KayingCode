@@ -6,7 +6,6 @@ import {
   ArrowRightLeftIcon,
   CheckIcon,
   CopyIcon,
-  FileClockIcon,
   FileIcon,
   GitBranchIcon,
   GoalIcon,
@@ -19,10 +18,7 @@ import {
 import {
   TID_V4_EDIT,
   TID_V4_EDIT_ATTACHMENT_REMOVE,
-  TID_V4_EDIT_CANCEL,
-  TID_V4_EDIT_INPUT,
-  TID_V4_EDIT_SUBMIT,
-  TID_V4_EDIT_REWIND_WORKSPACE,
+  TID_V4_EDIT_IN_COMPOSER_HINT,
   TID_V4_FEEDBACK_DISLIKE,
   TID_V4_FEEDBACK_LIKE,
   TID_V4_FORK,
@@ -34,7 +30,6 @@ import type {
   AttachmentRef,
   ArtifactRow,
   AssistantTextRow,
-  CommandAck,
   ConversationRow,
   ConversationRowTarget,
   HookInvocationRow,
@@ -44,8 +39,8 @@ import type {
   ToolCallRow,
   TurnHeaderRow,
   UserInputRow,
-  V4ConversationFileRewindPreviewResult,
 } from "@zcode/shared/kayingcode-protocol-v4";
+import { formatPluginDisplayName } from "@/plugin-ui/domain/pluginDisplayName.js";
 import { AssistantPreviewCards } from "@/AssistantPreviewCards.js";
 import { AssistantCodeCommentCards } from "@/AssistantCodeCommentCards.js";
 import { useAssistantCodeCommentFeatureEnabled } from "@/AssistantCodeCommentFeatureProvider.js";
@@ -72,8 +67,6 @@ import {
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning.js";
 import { cn } from "@/components/lib/utils.js";
-import { Button } from "@/components/ui/button.js";
-import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { WorkflowToolSummary } from "@/v4/WorkflowToolSummary.js";
 import { readWorkflowName } from "@/ToolCallBlocks/renderers/createWorkflowInput.js";
 import { isAmendWorkflowToolCall } from "@/lib/workflowToolNames.js";
@@ -95,8 +88,6 @@ import {
   type AssistantCodeCommentCard,
 } from "@/lib/assistantCodeComment.js";
 import { resolveProviderLabel } from "@/lib/registryProviderView.js";
-import type { LexicalChatInputHandle } from "@/LexicalChatInput.js";
-import { ChatPromptEditor } from "@/prompt-editor/ChatPromptEditor.js";
 import { resolveToolCallIdentity } from "@/lib/toolIdentity.js";
 import {
   isConversationReasoningRowVisible,
@@ -107,13 +98,12 @@ import { CodeCommentAttachmentChip } from "@/v4/composer/CodeCommentAttachmentCh
 import {
   countComposerPromptContexts,
   parseComposerPromptContexts,
-  serializeComposerPromptContexts,
 } from "@/v4/composer/composerPromptContexts.js";
 import { WebElementContextAttachmentChip } from "@/v4/composer/WebElementContextAttachmentChip.js";
 import { ConversationSelectionReferenceChip } from "@/v4/composer/ConversationSelectionReferenceChip.js";
 import { PptxElementReferenceChip } from "@/v4/composer/PptxElementReferenceChip.js";
 import { useOpenPptxElementReference } from "@/v4/composer/useOpenPptxElementReference.js";
-import { ConversationFileRewindDialog } from "@/v4/ConversationFileRewindDialog.js";
+import { composerEditSessionKey, useComposerEditStore } from "@/composer-edit-mode/index.js";
 import { ConversationUserInputBody } from "@/v4/ConversationUserInputBody.js";
 import { ConversationUserInputContent } from "@/v4/ConversationUserInputContent.js";
 import {
@@ -200,12 +190,8 @@ const CopyRowAction = memo(function CopyRowAction({
   );
 });
 
-type UserInputEditHandler = (
-  target: ConversationRowTarget,
-  newText: string,
-  attachments?: readonly AttachmentRef[],
-  workspaceMode?: "preserve" | "rewind",
-) => Promise<CommandAck | boolean | void> | CommandAck | boolean | void;
+/** 编辑入口只发起 composer 编辑态（docs/ui/composer-edit-mode.md）；提交由 SessionPane 路由。 */
+type UserInputEditHandler = (target: ConversationRowTarget) => Promise<void> | void;
 
 type AssistantMessageFeedback = "like" | "dislike";
 
@@ -867,38 +853,6 @@ const UserInputRowView = memo(function UserInputRowView({
       }),
     [bodyText, context.workspaceIdentity, context.workspacePath],
   );
-  const [editing, setEditing] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [draft, setDraft] = useState(row.text);
-  const [editAttachments, setEditAttachments] = useState<AttachmentRef[]>(() => [
-    ...(row.attachments ?? []),
-  ]);
-  // 编辑态删除附件后，持久 FilePart 列表仍保留全部附件；序号数组把可见列表
-  // 映射回原 index，避免 video 预览等按 attachmentIndex 的读取指错分块。
-  const [editAttachmentIndices, setEditAttachmentIndices] = useState<number[]>(() =>
-    (row.attachments ?? []).map((_, index) => index),
-  );
-  const [editPromptContexts, setEditPromptContexts] = useState(() => parsedPrompt);
-  const [conflictPreview, setConflictPreview] =
-    useState<V4ConversationFileRewindPreviewResult | null>(null);
-  const [conflictOpen, setConflictOpen] = useState(false);
-  const inputApiRef = useRef<LexicalChatInputHandle | null>(null);
-  const editContextCount = countComposerPromptContexts(editPromptContexts);
-  const canSubmit = draft.trim().length > 0 || editAttachments.length > 0 || editContextCount > 0;
-  const submitLabel = intl.formatMessage({ id: "chat.send" });
-  const cancelLabel = intl.formatMessage({ id: "common.cancel" });
-  const rewindWorkspaceLabel = intl.formatMessage({
-    id: "chat.edit.resetConversationAndFiles",
-  });
-  const rewindWorkspaceTooltipTitle = intl.formatMessage({
-    id: "chat.edit.resetConversationAndFiles.tooltip",
-  });
-  const rewindWorkspaceTooltipDescription =
-    editWorkspaceRewindAvailability?.reason === "available"
-      ? undefined
-      : intl.formatMessage({
-          id: `chat.edit.resetConversationAndFiles.${editWorkspaceRewindAvailability?.reason ?? "noFiles"}`,
-        });
   const visibleText = parsedPrompt.visibleContent;
   const codeCommentContexts = parsedPrompt.codeComments;
   const webElementContexts = parsedPrompt.webElements;
@@ -931,252 +885,36 @@ const UserInputRowView = memo(function UserInputRowView({
     onOpenCodeViewer: context.onOpenCodeViewer,
   });
 
+  // 编辑入口直接进入底部 composer（docs/ui/composer-edit-mode.md）；本行只保留占位与状态条同步，
+  // 不再使用行内 ChatPromptEditor。
+  const editSessionKey = context.sessionId
+    ? composerEditSessionKey(
+        context.workspaceIdentity?.trim() || context.workspacePath,
+        context.sessionId,
+      )
+    : null;
+  // 只订阅本行是否为编辑目标，避免编辑态变化让整条时间线重渲染。
+  const editingInComposer = useComposerEditStore((state) => {
+    const target = editSessionKey ? state.sessions[editSessionKey]?.target : undefined;
+    return target?.kind === "userQuery" && target.rowId === row.rowId;
+  });
   useEffect(() => {
-    if (!editing) {
-      setDraft(parsedPrompt.visibleContent);
-      setEditAttachments([...(row.attachments ?? [])]);
-      setEditAttachmentIndices((row.attachments ?? []).map((_, index) => index));
-      setEditPromptContexts(parsedPrompt);
-      return;
-    }
-    const focusEditor = () => inputApiRef.current?.focus();
-    if (typeof requestAnimationFrame === "function") {
-      requestAnimationFrame(focusEditor);
-      return;
-    }
-    focusEditor();
-  }, [editing, parsedPrompt, row.attachments]);
-
-  useEffect(() => {
-    if (!onEdit) {
-      setEditing(false);
-      setSubmitting(false);
-    }
-  }, [onEdit]);
-
+    if (!editingInComposer || !editSessionKey || !editWorkspaceRewindAvailability) return;
+    // 「对话 + 文件重置」的可用性只有本行知道；编辑期间同步给 composer 状态条。
+    useComposerEditStore.getState().update(editSessionKey, {
+      workspaceRewind: {
+        enabled: editWorkspaceRewindAvailability.enabled,
+        reason: editWorkspaceRewindAvailability.reason,
+      },
+    });
+  }, [editSessionKey, editWorkspaceRewindAvailability, editingInComposer]);
   const handleOpenEdit = useCallback(() => {
-    // v4 迁移时把 user query 编辑误接成“直接读取主 composer 提交”，
-    // 主 composer 为空时点击只会 warn。这里恢复旧行内编辑态。
-    setDraft(parsedPrompt.visibleContent);
-    setEditAttachments([...(row.attachments ?? [])]);
-    setEditAttachmentIndices((row.attachments ?? []).map((_, index) => index));
-    setEditPromptContexts(parsedPrompt);
-    setEditing(true);
-  }, [parsedPrompt, row.attachments]);
-
-  const handleCancelEdit = useCallback(() => {
-    setDraft(parsedPrompt.visibleContent);
-    setEditAttachments([...(row.attachments ?? [])]);
-    setEditAttachmentIndices((row.attachments ?? []).map((_, index) => index));
-    setEditPromptContexts(parsedPrompt);
-    setEditing(false);
-  }, [parsedPrompt, row.attachments]);
-
-  const handleRemoveEditAttachment = useCallback((index: number) => {
-    setEditAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index));
-    setEditAttachmentIndices((current) => current.filter((_, itemIndex) => itemIndex !== index));
-  }, []);
-
-  const handleSubmitEdit = useCallback(
-    async (nextText: string, workspaceMode: "preserve" | "rewind" = "preserve") => {
-      if (!onEdit) return;
-      if (!nextText.trim() && editAttachments.length === 0 && editContextCount === 0) return;
-      setSubmitting(true);
-      try {
-        const result = await onEdit(
-          { rowId: row.rowId, entityId: row.entityId! },
-          serializeComposerPromptContexts(nextText, editPromptContexts),
-          // 省略空数组会让 CLI 按 attachments 缺省语义恢复 canonical 原附件，
-          // 因此 edit 必须始终提交当前完整列表，显式 [] 才能表达“删除全部”。
-          editAttachments,
-          workspaceMode,
-        );
-        if (
-          typeof result === "object" &&
-          result !== null &&
-          result.result?.type === "editUserQuery" &&
-          result.result.disposition === "blocked" &&
-          result.result.preview
-        ) {
-          setConflictPreview(result.result.preview);
-          setConflictOpen(true);
-          return;
-        }
-        if (result !== false) {
-          setEditing(false);
-          setConflictOpen(false);
-        }
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [editAttachments, editContextCount, editPromptContexts, onEdit, row.entityId, row.rowId],
-  );
-  const rewindWorkspaceDisabled = submitting || editWorkspaceRewindAvailability?.enabled !== true;
-  const rewindWorkspaceButton = (
-    <Button
-      type="button"
-      variant="outline"
-      size="icon-md"
-      disabled={rewindWorkspaceDisabled}
-      data-testid={testId(TID_V4_EDIT_REWIND_WORKSPACE, String(row.rowId))}
-      aria-label={rewindWorkspaceLabel}
-      onClick={() => {
-        void handleSubmitEdit(draft, "rewind");
-      }}
-    >
-      <FileClockIcon className="size-4" />
-    </Button>
-  );
-
-  if (editing) {
-    return (
-      <RowShell rowId={row.rowId} className="flex flex-col items-end">
-        <ChatPromptEditor
-          workspacePath={context.workspacePath}
-          taskId={context.sessionId ?? null}
-          initialValue={parsedPrompt.visibleContent}
-          submitting={submitting}
-          submitDisabled={!canSubmit || submitting}
-          allowSubmitWhenEmpty={editAttachments.length > 0 || editContextCount > 0}
-          submitLabel={submitLabel}
-          cancelLabel={cancelLabel}
-          showMentionButton
-          showSlashButton
-          enableWorkspaceFileDrop
-          topContent={
-            editAttachments.length > 0 || editContextCount > 0 ? (
-              <div className="flex max-w-full flex-col items-start gap-2">
-                {editAttachments.length > 0 ? (
-                  <UserInputAttachmentList
-                    attachments={editAttachments}
-                    attachmentIndices={editAttachmentIndices}
-                    entityId={row.entityId}
-                    rowId={row.rowId}
-                    onRemove={handleRemoveEditAttachment}
-                    sessionId={context.sessionId ?? undefined}
-                    readAttachment={context.readAttachment}
-                    readAttachmentRange={context.readAttachmentRange}
-                  />
-                ) : null}
-                {editContextCount > 0 ? (
-                  <div
-                    className="flex max-w-full flex-wrap items-center gap-2"
-                    data-v4-user-edit-context-attachments-row="true"
-                  >
-                    <CodeCommentAttachmentChip
-                      comments={editPromptContexts.codeComments}
-                      onRemove={(comment) =>
-                        setEditPromptContexts((current) => ({
-                          ...current,
-                          codeComments: current.codeComments.filter((item) => item !== comment),
-                        }))
-                      }
-                      onRemoveAll={() =>
-                        setEditPromptContexts((current) => ({
-                          ...current,
-                          codeComments: [],
-                        }))
-                      }
-                    />
-                    <WebElementContextAttachmentChip
-                      contexts={editPromptContexts.webElements}
-                      onRemove={(id) =>
-                        setEditPromptContexts((current) => ({
-                          ...current,
-                          webElements: current.webElements.filter((item) => item.id !== id),
-                        }))
-                      }
-                      onRemoveAll={() =>
-                        setEditPromptContexts((current) => ({
-                          ...current,
-                          webElements: [],
-                        }))
-                      }
-                    />
-                    <PptxElementReferenceChip
-                      references={editPromptContexts.pptxElements}
-                      onOpen={context.onOpenCodeViewer ? openPptxElementReference : undefined}
-                      onRemove={(id) =>
-                        setEditPromptContexts((current) => ({
-                          ...current,
-                          pptxElements: current.pptxElements.filter((item) => item.id !== id),
-                        }))
-                      }
-                      onRemoveAll={() =>
-                        setEditPromptContexts((current) => ({
-                          ...current,
-                          pptxElements: [],
-                        }))
-                      }
-                    />
-                    <ConversationSelectionReferenceChip
-                      references={editPromptContexts.conversationSelections}
-                      onRemove={(id) =>
-                        setEditPromptContexts((current) => ({
-                          ...current,
-                          conversationSelections: current.conversationSelections.filter(
-                            (item) => !("id" in item) || item.id !== id,
-                          ),
-                        }))
-                      }
-                      onRemoveAll={() =>
-                        setEditPromptContexts((current) => ({
-                          ...current,
-                          conversationSelections: [],
-                        }))
-                      }
-                    />
-                  </div>
-                ) : null}
-              </div>
-            ) : null
-          }
-          inputApiRef={inputApiRef}
-          inputTestId={testId(TID_V4_EDIT_INPUT, String(row.rowId))}
-          submitTestId={testId(TID_V4_EDIT_SUBMIT, String(row.rowId))}
-          cancelTestId={testId(TID_V4_EDIT_CANCEL, String(row.rowId))}
-          betweenCancelAndSubmitAction={
-            <ControlHintTooltip
-              title={rewindWorkspaceTooltipTitle}
-              description={rewindWorkspaceTooltipDescription}
-            >
-              {rewindWorkspaceDisabled ? (
-                // Button disabled 会应用 pointer-events-none，TooltipTrigger 直接落在
-                // 按钮上时收不到 hover。禁用态用外层 span 承接 hover，实际按钮仍保持 disabled。
-                <span className="inline-flex" data-disabled-tooltip-trigger="true">
-                  {rewindWorkspaceButton}
-                </span>
-              ) : (
-                rewindWorkspaceButton
-              )}
-            </ControlHintTooltip>
-          }
-          className="w-full max-w-xl"
-          shellClassName="min-h-32"
-          onChange={setDraft}
-          onSubmit={(nextText) => {
-            void handleSubmitEdit(nextText, "preserve");
-          }}
-          onCancel={handleCancelEdit}
-        />
-        <ConversationFileRewindDialog
-          variant="editConflict"
-          open={conflictOpen}
-          onOpenChange={setConflictOpen}
-          preview={conflictPreview}
-          previewLoading={false}
-          applying={submitting}
-          error={null}
-          onApply={() => {}}
-          onConversationOnly={() => {
-            void handleSubmitEdit(draft, "preserve");
-          }}
-        />
-      </RowShell>
-    );
-  }
-
+    if (!onEdit || !row.entityId) return;
+    void onEdit({ rowId: row.rowId, entityId: row.entityId });
+  }, [onEdit, row.entityId, row.rowId]);
+  const handleFocusComposerEdit = useCallback(() => {
+    if (editSessionKey) useComposerEditStore.getState().requestFocus(editSessionKey);
+  }, [editSessionKey]);
   return (
     <RowShell rowId={row.rowId} className="group/user-row flex flex-col items-end">
       {hasAttachmentArea ? (
@@ -1257,6 +995,28 @@ const UserInputRowView = memo(function UserInputRowView({
           {epilogue === undefined ? null : <ConversationUserInputEpilogue text={epilogue} />}
         </div>
       ) : null}
+      {row.source?.kind === "genUi" ? (
+        <div
+          className="mt-1 text-right text-ui-sm text-foreground-subtlest"
+          data-v4-user-input-source="genUi"
+        >
+          {intl.formatMessage({ id: "genUi.from" }, { name: row.source.title || "Gen UI" })}
+        </div>
+      ) : null}
+      {row.source?.kind === "pluginUi" || row.source?.kind === "extension" ? (
+        // 插件 UI 或扩展代发：来源来自 CLI 持久化的 intent.source，不由 renderer 推断。
+        // 两者同一句文案；名字取插件 id 的名字部分，桌面与手机一致。
+        <div
+          data-v4-user-input-source={row.source.pluginId}
+          data-v4-user-input-source-kind={row.source.kind}
+          className="mt-1 text-right text-ui-sm text-foreground-subtlest"
+        >
+          {intl.formatMessage(
+            { id: "pluginUi.fromPlugin" },
+            { name: formatPluginDisplayName(row.source.pluginId) },
+          )}
+        </div>
+      ) : null}
       {status ? (
         <div
           data-v4-user-input-status="true"
@@ -1279,7 +1039,7 @@ const UserInputRowView = memo(function UserInputRowView({
           rowId={row.rowId}
           label={intl.formatMessage({ id: "chat.message.copy" })}
         />
-        {onEdit && row.entityId ? (
+        {onEdit && row.entityId && !editingInComposer ? (
           <MessageAction
             label={intl.formatMessage({ id: "chat.message.edit" })}
             tooltip={intl.formatMessage({ id: "chat.message.edit" })}
@@ -1290,6 +1050,17 @@ const UserInputRowView = memo(function UserInputRowView({
           </MessageAction>
         ) : null}
       </MessageActions>
+      {editingInComposer ? (
+        <button
+          type="button"
+          data-testid={testId(TID_V4_EDIT_IN_COMPOSER_HINT, String(row.rowId))}
+          className="mt-1 inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-ui-sm text-foreground-subtle hover:bg-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-input-border-focused"
+          onClick={handleFocusComposerEdit}
+        >
+          <PencilIcon className="size-3.5" aria-hidden />
+          {intl.formatMessage({ id: "chat.composerEdit.inComposerHint" })}
+        </button>
+      ) : null}
     </RowShell>
   );
 });

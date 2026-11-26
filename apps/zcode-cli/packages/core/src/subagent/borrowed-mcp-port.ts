@@ -63,6 +63,20 @@ export function createBorrowedSubagentMcpAccess(
       async listTools() {
         return [...snapshot.tools];
       },
+      getToolSnapshot() {
+        return Object.fromEntries(
+          Object.entries(parentPort.getToolSnapshot()).filter(([serverName]) =>
+            isInScope(serverName),
+          ),
+        );
+      },
+      onSnapshotChanged(listener) {
+        return parentPort.onSnapshotChanged?.(listener) ?? (() => {});
+      },
+      async waitForServer(serverName, options) {
+        if (!isInScope(serverName)) return { timedOut: false };
+        return (await parentPort.waitForServer?.(serverName, options)) ?? { timedOut: false };
+      },
       async status() {
         return { ...snapshot.statuses };
       },

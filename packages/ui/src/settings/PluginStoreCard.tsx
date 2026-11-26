@@ -1,9 +1,12 @@
+/* eslint-disable max-lines -- 商店卡片聚合展示、信任、启停、更新与卸载动作，拆分会增加跨组件状态同步。 */
 import {
   Crown,
   Download,
   Loader2,
   MoreHorizontal,
   Power,
+  ShieldAlert,
+  ShieldCheck,
   TriangleAlert,
   Trash2,
 } from "lucide-react";
@@ -21,6 +24,8 @@ import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 import { PluginStoreAvatar } from "@/settings/PluginStoreAvatar.js";
 import {
   canUpdatePluginItem,
+  isPluginStoreUpdateBlocked,
+  isStoreItemInstallBlocked,
   resolveItemDescription,
   resolveItemDisplayName,
   type StorePluginItem,
@@ -35,6 +40,8 @@ export interface PluginStoreActions {
   onInstall: (item: StorePluginItem) => void;
   onUninstall: (pluginId: string) => void;
   onSetEnabled?: (pluginId: string, enabled: boolean) => void;
+  /** 项目目录插件信任；仅 workspace scope 提供。 */
+  onTrustWorkspacePlugin?: (pluginId: string) => void;
   /** 删除当前 Workspace scope 的显式配置，使其回退到 User。 */
   onResetConfig?: (pluginId: string) => void;
   onUpdate: (pluginId: string) => void;
@@ -42,8 +49,12 @@ export interface PluginStoreActions {
   togglingPluginId: string | null;
 }
 
-function isItemBusy(item: StorePluginItem, actions: PluginStoreActions): boolean {
-  return (
+/** pending 由服务端强制停用；UI 只锁住启停入口，授权按钮单独提供。 */
+function isWorkspaceTrustPending(item: Pick<StorePluginItem, "info"> | null | undefined): boolean {
+  return item?.info?.workspaceTrust?.state === "pending";
+}
+
+function isItemBusy(item: StorePluginItem, actions: PluginStoreActions): boolean {  return (
     actions.operationId === `plugin:install:${item.name}@${item.marketplace}` ||
     actions.operationId === `plugin:restore:${item.id}` ||
     actions.operationId === `plugin:uninstall:${item.id}` ||
@@ -95,7 +106,7 @@ export function PluginStoreEnabledControl({
         data-testid="plugin-store-enabled-switch"
         data-plugin-id={item.id}
         checked={enabled}
-        disabled={busy}
+        disabled={busy || isWorkspaceTrustPending(item)}
         aria-label={actionLabel}
         aria-busy={actions.togglingPluginId === item.id}
         onCheckedChange={(checked) => actions.onSetEnabled?.(item.id, checked)}
@@ -138,6 +149,73 @@ export function PluginStorePaidPlanBadge({
   );
 }
 
+/**
+ * 项目目录插件待信任标记：pending 插件由服务端强制停用，启用开关锁死。
+ * 完整说明在 Tooltip 中，徽标只表达“待确认”这一状态。
+ */
+export function PluginStoreTrustPendingBadge({
+  item,
+}: {
+  item: StorePluginItem | null | undefined;
+}) {
+  const { intl } = useKayingCodeIntl();
+  if (!isWorkspaceTrustPending(item)) return null;
+  const label = intl.formatMessage({ id: "settings.plugins.workspaceTrust.pending" });
+  return (
+    <ControlHintTooltip
+      title={intl.formatMessage({ id: "settings.plugins.workspaceTrust.pendingHint" })}
+    >
+      <span
+        data-testid="plugin-settings-trust-pending"
+        data-plugin-id={item?.id}
+        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-warning/14 px-1.5 py-0.5 text-ui-sm leading-none whitespace-nowrap text-warning dark:bg-warning/18"
+        aria-label={label}
+      >
+        <ShieldAlert className="size-3" aria-hidden="true" />
+        {label}
+      </span>
+    </ControlHintTooltip>
+  );
+}
+
+/** 待信任插件的授权按钮：仅项目目录插件（pending）出现。 */
+export function PluginStoreTrustButton({
+  item,
+  actions,
+  size = "sm",
+}: {
+  item: StorePluginItem | null | undefined;
+  actions: PluginStoreActions;
+  size?: "sm" | "default" | "lg";
+}) {
+  const { intl } = useKayingCodeIntl();
+  if (!item || !isWorkspaceTrustPending(item) || !actions.onTrustWorkspacePlugin) return null;
+  const trusting = actions.togglingPluginId === item.id;
+  return (
+    <Button
+      type="button"
+      data-testid="plugin-settings-trust"
+      data-plugin-id={item.id}
+      variant="secondary"
+      size={size}
+      className="rounded-full"
+      disabled={isItemBusy(item, actions)}
+      aria-busy={trusting}
+      onClick={(event) => {
+        event.stopPropagation();
+        actions.onTrustWorkspacePlugin?.(item.id);
+      }}
+    >
+      {trusting ? (
+        <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+      ) : (
+        <ShieldCheck className="size-3.5" aria-hidden="true" />
+      )}
+      {intl.formatMessage({ id: "settings.plugins.workspaceTrust.trust" })}
+    </Button>
+  );
+}
+
 /** 已安装条目的「…」菜单：启用/禁用、更新（有更新时）、卸载。卡片与详情页共用。 */
 export function PluginStoreItemMenu({
   item,
@@ -156,7 +234,7 @@ export function PluginStoreItemMenu({
   const enabled = item.info?.enabled ?? false;
   const updatePending = canUpdatePluginItem(item);
   const busy = isItemBusy(item, actions);
-  const canToggleEnabled = Boolean(item.info && actions.onSetEnabled);
+  const canToggleEnabled = Boolean(item.info && actions.onSetEnabled) && !isWorkspaceTrustPending(item);
   // 分隔线不应跟随 item.installed 无条件渲染；启停/更新/恢复配置都不出现时，
   // 菜单只剩「卸载」一项，上方却留下一条孤立横线。分隔线只在卸载前确有其他操作项时才有意义。
   const hasActionsBeforeUninstall =
@@ -251,6 +329,24 @@ export function PluginStoreInstallButton({
   size?: "sm" | "default" | "lg";
 }) {
   const { intl } = useKayingCodeIntl();
+  // 目录最新版要求更高的插件 API 版本（packages/ui/spec/plugin-store-extension-summary.md）：
+  // 同一位置换成不能点的提示按钮，理由由按钮文案直接表达。
+  if (isStoreItemInstallBlocked(item)) {
+    return (
+      <Button
+        type="button"
+        data-testid="plugin-store-install"
+        data-plugin-id={item.id}
+        data-install-blocked="requires-update"
+        variant="secondary"
+        size={size}
+        className="rounded-full"
+        disabled
+      >
+        {intl.formatMessage({ id: "settings.plugins.store.extension.requiresUpdate" })}
+      </Button>
+    );
+  }
   const installing =
     actions.operationId === `plugin:install:${item.name}@${item.marketplace}` ||
     actions.operationId === `plugin:restore:${item.id}`;
@@ -380,6 +476,7 @@ export function PluginStoreCard({
             {displayName}
           </span>
           <PluginStorePaidPlanBadge item={item} />
+          <PluginStoreTrustPendingBadge item={item} />
           <PluginStoreUpdateBadge item={item} />
         </div>
         {item.orphaned ? (
@@ -393,6 +490,18 @@ export function PluginStoreCard({
               {intl.formatMessage({ id: "settings.plugins.store.sourceMissing" })}
             </span>
           </div>
+        ) : isPluginStoreUpdateBlocked(item) ? (
+          // 最新版要求更高的插件 API 版本：更新入口按 canUpdatePluginItem 隐藏，这里说明原因。
+          <div
+            data-testid="plugin-store-extension-update-blocked"
+            data-plugin-id={item.id}
+            className="mt-0.5 flex items-center gap-1 truncate text-ui-sm text-warning"
+          >
+            <TriangleAlert className="size-3 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {intl.formatMessage({ id: "settings.plugins.store.extension.updateBlockedHint" })}
+            </span>
+          </div>
         ) : null}
         {description ? (
           <div className="mt-0.5 truncate text-ui-sm text-foreground-subtle">{description}</div>
@@ -401,6 +510,7 @@ export function PluginStoreCard({
       <div className="flex shrink-0 items-center gap-1.5">
         {item.installed ? (
           <>
+            <PluginStoreTrustButton item={item} actions={actions} />
             <PluginStoreEnabledControl item={item} actions={actions} />
             <PluginStoreUpdateButton item={item} actions={actions} />
             {/* 旧版误写 suppression 后可能只剩安装记录、没有运行时 info；

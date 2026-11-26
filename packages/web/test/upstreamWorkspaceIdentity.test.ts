@@ -6,13 +6,12 @@ import { stripTypeScriptTypes } from "node:module";
 import { promisify } from "node:util";
 import { expect, test } from "vitest";
 import { buildRemoteAgentWorkspaceIdentity, buildRemoteWorkspaceIdentity } from "@zcode/shared";
+import { readUpstreamBase } from "../../../scripts/upstream-version.mjs";
 import { applyWorkspaceIdentity } from "../scripts/apply-workspace-identity.mjs";
 
 test("the staged upstream Web uses the same workspace keys as its desktop Host", async () => {
   const repoRoot = resolve(import.meta.dirname, "../../..");
-  const { commit } = JSON.parse(
-    await readFile(resolve(repoRoot, "packages/web/upstream-web.json"), "utf8"),
-  );
+  const { commit } = readUpstreamBase(repoRoot);
   const stage = await mkdtemp(resolve(tmpdir(), "upstream-identity-"));
   const relative = "packages/shared/src/remote-workspace-identity.ts";
   const file = resolve(stage, relative);

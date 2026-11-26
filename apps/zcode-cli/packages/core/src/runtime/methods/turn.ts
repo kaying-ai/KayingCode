@@ -1,4 +1,8 @@
-import { beginLocalTurnPreparation, type LocalTtftDetail } from "@zcode/contracts";
+import {
+  PLUGIN_DISCOVERY_INPUT,
+  beginLocalTurnPreparation,
+  type LocalTtftDetail,
+} from "@zcode/contracts";
 import { runtimeInputMetadata } from "../../agent/runtime-input-presentation.js";
 import { refreshWorkspaceTrustAdmission } from "./mcp.js";
 import { withConversationQuotes } from "../helpers/conversation-quotes.js";
@@ -475,6 +479,8 @@ export async function executeTurnCommand(
       turnMachine = new TurnMachineImpl(turnMachine.start());
       phaseStartedAt = startTurnPhase("session_persistence");
       await this.ensureSessionPersisted(displayInput, turnTraceContext);
+      // 受管 worktree 的创建结果必须在 TurnStarted 之前落盘并投影（docs/git/worktree.md §6.6.4）。
+      await this.persistPendingWorktreeCreationTimeline(turnTraceContext);
       await ensureGroupTaskPermissionScope(this.sessionStore, this.sessionId, options?.intent);
       // execution-scoped 临时 Provider（例如闲时任务）拥有本轮自己的模型，不改写
       // Session Selection；普通 Submission 才在真正开跑时应用其原子选择。
@@ -801,13 +807,9 @@ export async function executeTurnCommand(
         // 根因：input 可能已经被自定义命令展开，解析它会让命令模板里的 plugin://
         // 凭空获得“用户引用”语义；这里只解析真实持久化的 canonical displayInput。
         // runtime 内部的 model-only continuation 不代表新的用户意图，不重复解析。
-        if (options?.inputVisibility !== "model-only") {
-          await this.injectPluginReferenceReminderFromTurn(
-            displayInput,
-            turnTraceContext,
-            options?.toolDisallowlist,
-          );
-        }
+        // 注入移到 turn loop 的新输入准备处，与本次 MCP 视图同源；文本只在这里冻结。
+        const pluginReferenceInput =
+          options?.inputVisibility !== "model-only" ? displayInput : undefined;
 
         this.messageHistory.setCacheMiss();
         const loopModel = submissionModel ?? admittedModel;
@@ -836,6 +838,7 @@ export async function executeTurnCommand(
           workflowResultConsumed: options?.workflowResultConsumed === true,
           completedRealToolResultBatch: false,
           inputAttachmentCollectionPending: "turn_input",
+          ...(pluginReferenceInput !== undefined ? { pluginReferenceInput } : {}),
           currentUserMessageId: userMessageId,
           events,
           input,
@@ -876,6 +879,8 @@ export async function executeTurnCommand(
             entries: [...this.messageHistory.borrowReadOnlyRuntimeEntries()],
             outputTokenContinuationCount: 0,
           },
+          // Host 仅在具备 pluginDiscoveryUi 能力时注入该意图；冷恢复不继承。
+          pluginDiscoveryUi: options?.intent?.[PLUGIN_DISCOVERY_INPUT] === true,
           toolDisallowlist: options?.toolDisallowlist,
           traceId,
           turnAbortSignal,

@@ -110,7 +110,7 @@ export const ListWorkflowRunsOutputJsonSchema = toToolJsonSchema(ListWorkflowRun
  * 死代码。语义强制转换走 preprocess 是既有惯例（task-output 的 semanticBoolean、bash 的
  * timeout）。
  */
-function clampedLimit(): z.ZodEffects<z.ZodDefault<z.ZodNumber>, number, unknown> {
+function clampedLimit() {
   return z.preprocess((value) => {
     if (typeof value !== "number" || !Number.isFinite(value)) return value;
     return Math.min(

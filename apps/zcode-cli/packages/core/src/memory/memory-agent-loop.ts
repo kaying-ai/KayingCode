@@ -1,6 +1,7 @@
 import { isAbsolute } from "node:path";
 
 import type {
+  ExecutionShellSelection,
   ModelInputMessage,
   Model,
   ModelRequest,
@@ -20,6 +21,10 @@ import {
   isBashCommandPermissionSafe,
 } from "../tool/handlers/bash-command-parser.js";
 import { isRuntimeReadOnlyBashCommand } from "../tool/handlers/bash-semantics.js";
+import {
+  isCmdShellReadOnlyCommand,
+  mayExecuteThroughCmd,
+} from "../tool/handlers/bash-cmd-readonly-policy.js";
 import type { ToolRegistry } from "../tool/registry.js";
 import type { ExecutableToolCall, ToolExecutionResult } from "../tool/types.js";
 import { resolveContainedMemoryFilePath, resolveSafeMemoryFilePath } from "./memory-file-path.js";
@@ -45,6 +50,7 @@ export interface MemoryAgentToolPolicyInput {
   tools: readonly ModelToolContract[];
   workingDirectory: string;
   workspaceRoot: string;
+  bashShellSelection?: ExecutionShellSelection;
 }
 
 export type MemoryAgentToolPolicyDecision = { allowed: true } | { allowed: false; reason: string };
@@ -75,6 +81,7 @@ export async function runMemoryAgentLoop(input: {
   rootDir: string;
   workingDirectory: string;
   workspaceRoot: string;
+  bashShellSelection?: ExecutionShellSelection;
 }): Promise<MemoryAgentLoopResult> {
   const entries = [...input.entries];
   let turns = 0;
@@ -115,6 +122,7 @@ export async function runMemoryAgentLoop(input: {
         tools: rendered.tools,
         workingDirectory: input.workingDirectory,
         workspaceRoot: input.workspaceRoot,
+        bashShellSelection: input.bashShellSelection,
       });
       if (decision.allowed) {
         allowedCalls.push({ id: toolCall.id, input: toolCall.input, name: toolCall.name });
@@ -175,13 +183,19 @@ export function evaluateMemoryAgentToolPolicy(
 
   if (input.toolCall.name === "Bash") {
     const command = stringProperty(input.toolCall.input, "command");
-    // Memory Agent 直接复用既有只读分类器，避免在此处二次收窄安全 env、redirect 和后台执行。
+    // Memory executor 以 yolo 执行，这里是唯一闸门；经 cmd.exe 时改用前台同一套 CMD 只读规则。
     if (
       command &&
-      (isRuntimeReadOnlyBashCommand(command, {
-        workingDirectory: input.workingDirectory,
-        workspaceRoot: input.workspaceRoot,
-      }) ||
+      ((mayExecuteThroughCmd(input.bashShellSelection)
+        ? isCmdShellReadOnlyCommand(command, {
+            bashShellSelection: input.bashShellSelection,
+            workingDirectory: input.workingDirectory,
+            workspaceRoot: input.workspaceRoot,
+          })
+        : isRuntimeReadOnlyBashCommand(command, {
+            workingDirectory: input.workingDirectory,
+            workspaceRoot: input.workspaceRoot,
+          })) ||
         isContainedMarkdownBashRemoval(command, input))
     ) {
       return { allowed: true };

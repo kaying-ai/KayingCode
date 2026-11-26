@@ -285,6 +285,8 @@ export interface AppSettings {
   shortcutBindings?: Record<string, string[]>;
   /** 界面语言偏好；locale 保存偏好解析后的实际语言，供 main/menu/远控等非浏览器上下文使用。 */
   localePreference?: LocalePreference;
+  /** Agent 回复语言；留空跟随对话语言。写入后由 Main 推送给 Host，CLI 每轮读取。 */
+  replyLanguage?: string;
   /** 是否尽量继承系统终端 profile、shell 环境和字体 */
   terminalInheritSystemProfile?: boolean;
   /** 用户显式覆盖的终端字体；为空时从系统终端配置自动探测 */
@@ -355,6 +357,11 @@ export interface AppSettings {
   kayingcodeInteractionBehavior?: KayingCodeInteractionBehavior;
   /** Agent 提问五分钟无人回答时是否允许自动继续；缺失按开启兼容旧配置。 */
   askUserQuestionAutoResolutionEnabled?: boolean;
+  /**
+   * 是否允许 Agent 在对话中搜索并推荐官方插件。默认关闭；开启后 Host 才为可信连接
+   * 注入插件发现工具面，安装仍由确认卡片决定。
+   */
+  pluginAutoRecommendationEnabled?: boolean;
   /** 是否完整保留 Model I/O；开启后不轮转、不限额重置、不压缩或裁剪，鉴权信息仍会脱敏。 */
   modelIoFullRetentionEnabled?: boolean;
   /**
@@ -376,8 +383,22 @@ export interface AppSettings {
   nativeSearchEnhancementsEnabled?: boolean;
   /** 新建或冷恢复时读取；已有 Runtime 保持原策略。 */
   toolSearchMode?: AppToolSearchMode;
+  /**
+   * 本机预装文档工具：启动后是否自动准备缺失/过期的资源。缺省按开启处理。
+   * 只由 Desktop 预装进程写入；spec 见 packages/shared/spec/preinstalled-tools.md。
+   */
+  preinstalledToolsAutoInstall?: boolean;
+  /** 本机预装文档工具：用户关闭的工具 ID 列表。缺省空数组（全部启用）。 */
+  preinstalledToolsAgentDisabled?: string[];
   /** 新建或冷恢复 Session 是否启用 Memory；默认关闭。 */
   memoryEnabled?: boolean;
+  /** 新建或冷恢复 Session 是否向模型提供总额度提醒；默认关闭。 */
+  totalTokensReminderEnabled?: boolean;
+  /**
+   * 新建或冷恢复 Session 的子代理是否总在后台运行；默认关闭。
+   * 关闭时保持模型自行选择（默认前台）的产品行为，不采用上游常开默认。
+   */
+  agentAlwaysBackgroundEnabled?: boolean;
   onboardingOccupation?:
     | "office"
     | "developer"

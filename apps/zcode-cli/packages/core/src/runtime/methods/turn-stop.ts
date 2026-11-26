@@ -9,6 +9,8 @@ import {
   appendTurnRequestEntries,
   commitAssistantToTurnRequest,
   commitTurnRequestEntries,
+  committedToolSearchDelivery,
+  markRepairedStep,
 } from "./turn-output-token-continuation.js";
 import { createRuntimeAssistantEntry } from "../../agent/message-history.js";
 
@@ -46,15 +48,23 @@ export async function persistCompletedAssistantStep(
   }
   let committed = commitAssistantToTurnRequest(runtime, state, options.result, undefined);
   if (!committed && options.includeEmptyAssistant) {
-    commitTurnRequestEntries(runtime, state.turnRequestState, [
-      createRuntimeAssistantEntry(
-        "",
-        undefined,
-        undefined,
-        model,
-        toTokenUsageInfo(options.result.usage),
+    // 签名修复后的空 usage 锚点同样要在第一条 assistant 上记标记，冷恢复才与 live 一致。
+    commitTurnRequestEntries(
+      runtime,
+      state.turnRequestState,
+      markRepairedStep(
+        [
+          createRuntimeAssistantEntry(
+            "",
+            undefined,
+            undefined,
+            model,
+            toTokenUsageInfo(options.result.usage),
+          ),
+        ],
+        options.result,
       ),
-    ]);
+    );
     committed = true;
   }
   if (!committed) {
@@ -93,9 +103,12 @@ export async function persistCompletedAssistantStep(
     state.currentUserMessageId,
     options.assistantCreatedAt,
     {
+      toolSearchDelivery: committedToolSearchDelivery(state.turnRequestState),
       completed: Date.now(),
       finish: options.result.finishReason,
       tokens: persistedTokens,
+      // 签名修复成功的那一步要落盘标记；冷恢复据此对同一条消息拆出的第一条 assistant 做同样处理。
+      signedReasoningReset: options.result.signedReasoningReset,
     },
     options.modelTraceContext,
     model,

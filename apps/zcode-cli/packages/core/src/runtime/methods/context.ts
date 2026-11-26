@@ -32,6 +32,7 @@ import {
   setReadFileStateEntry,
 } from "../../tool/read-file-state.js";
 import { resolveEnabledProjectMemoryRoot } from "../helpers/project-memory.js";
+import { isTotalTokensReminderEnabled } from "../helpers/total-tokens-budget.js";
 import { shouldUseMidConversationSystem } from "../helpers/runtime-provider-request-messages.js";
 import { buildContextHistoryEntries } from "./context-history-entries.js";
 import { resolveRuntimeEmbeddedSearchEnabled } from "./embedded-search-branch.js";
@@ -149,6 +150,7 @@ export function createContextBuilderFromSnapshot(
       skillMetadataBudget: this.config.skillMetadataBudget,
       skills: this.skillLoadOutcome,
       userInstructions: this.config.subagentContext.userInstructions,
+      totalTokensReminder: isTotalTokensReminderEnabled(this.config),
     });
   }
 
@@ -171,6 +173,7 @@ export function createContextBuilderFromSnapshot(
     agentProfiles: this.config.subagents?.profiles,
     embeddedSearchEnabled: resolveRuntimeEmbeddedSearchEnabled(this),
     skillMetadataBudget: this.config.skillMetadataBudget,
+    totalTokensReminder: isTotalTokensReminderEnabled(this.config),
     customSystemPrompt: this.config.systemPrompt,
     workflowActor: this.config.workflowActor,
     language: this.config.language,

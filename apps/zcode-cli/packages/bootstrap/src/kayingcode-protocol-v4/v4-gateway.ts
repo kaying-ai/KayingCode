@@ -295,6 +295,14 @@ export interface V4GatewayHost {
    * store 读取是异步的，故允许返回 Promise（gateway 订阅时 await；同步 stub 直接返回数组）。
    */
   getStoredSessionSummaries?(workspaceId: string): Promise<SessionSummary[]> | SessionSummary[];
+  /**
+   * 本地 workspace 下 cwd 位于受管 worktree 的会话摘要（docs/git/worktree.md §6.6.2）。
+   * id 由 Host 从 tasks-index 精确提供；只读，宿主校验归属后才返回。
+   */
+  getWorktreeSessionSummaries?(
+    workspaceId: string,
+    sessionIds: readonly string[],
+  ): Promise<SessionSummary[]> | SessionSummary[];
   reconcileSessions?(params: SessionsIndexReconcileParams): Promise<SessionsIndexReconcileResult>;
   /**
    * 3.3.6 远端历史兼容：用精确 task allowlist 幂等认领后返回严格 identity 摘要。
@@ -708,7 +716,9 @@ export class ConversationV4Gateway {
           !this.host.sessionExists(envelope.sessionId)
         ) {
           // 历史行的重命名 / 删除仍由 CLI 原命令写持久事实；只在真实命令 admission 后冷恢复。
-          await this.ensureColdReadyPublisher(envelope.sessionId);
+          // 身份取 Host 注入的 workspace（docs/git/worktree.md §9.3），否则 worktree 会话的 key
+          // 会按存储 cwd 重建为 worktree 路径。
+          await this.ensureColdReadyPublisher(envelope.sessionId, undefined, envelope.workspace);
         }
       },
       getRevision: (sessionId) => {
@@ -1296,7 +1306,11 @@ export class ConversationV4Gateway {
     if (workspaceId === null) {
       throw new Error(`Not a sessions-index topic: ${params.topic}`);
     }
-    const publisher = await this.ensureIndexPublisher(workspaceId, params.legacyTaskIds);
+    const publisher = await this.ensureIndexPublisher(
+      workspaceId,
+      params.legacyTaskIds,
+      params.worktreeSessionIds,
+    );
     // ensure 内部可能跨异步 store/claim；dispose 发生在 await 返回前时禁止继续登记订阅。
     this.indexPublishers.ensureActive();
     const result = publisher.subscribeReserved(params.connectionId, params.base);
@@ -1322,14 +1336,17 @@ export class ConversationV4Gateway {
   private async ensureIndexPublisher(
     workspaceId: string,
     legacyTaskIds?: readonly string[],
+    worktreeSessionIds?: readonly string[],
   ): Promise<SessionsIndexPublisher> {
     const existing = this.indexPublishers.get(workspaceId);
     const shouldRefreshLegacy =
       Boolean(legacyTaskIds?.length) && Boolean(this.host.refreshLegacySessionSummaries);
-    if (existing && !shouldRefreshLegacy) return existing;
+    const shouldLoadWorktree =
+      Boolean(worktreeSessionIds?.length) && Boolean(this.host.getWorktreeSessionSummaries);
+    if (existing && !shouldRefreshLegacy && !shouldLoadWorktree) return existing;
 
     return this.indexPublishers.runExclusive(workspaceId, () =>
-      this.ensureIndexPublisherExclusive(workspaceId, legacyTaskIds),
+      this.ensureIndexPublisherExclusive(workspaceId, legacyTaskIds, worktreeSessionIds),
     );
   }
 
@@ -1337,16 +1354,25 @@ export class ConversationV4Gateway {
   private async ensureIndexPublisherExclusive(
     workspaceId: string,
     legacyTaskIds?: readonly string[],
+    worktreeSessionIds?: readonly string[],
   ): Promise<SessionsIndexPublisher> {
     const refreshed =
       legacyTaskIds && legacyTaskIds.length > 0
         ? ((await this.host.refreshLegacySessionSummaries?.(workspaceId, legacyTaskIds)) ?? null)
         : null;
+    // 受管 worktree 会话不在目录扫描结果里；每次带 id 订阅都补读一次（只补缺失项）。
+    const worktreeSummaries =
+      worktreeSessionIds && worktreeSessionIds.length > 0
+        ? ((await this.host.getWorktreeSessionSummaries?.(workspaceId, worktreeSessionIds)) ?? [])
+        : [];
     const existing = this.indexPublishers.get(workspaceId);
     if (existing) {
       // claim 不能绑定到首次构造：空种子一旦进 Map 就永久挡住重试。
       // 重读只补缺失项，避免冷存储默认态覆盖已有 live projection。
-      if (refreshed && existing.mergeMissingStoredSummaries(refreshed)) {
+      const mergedLegacy = refreshed ? existing.mergeMissingStoredSummaries(refreshed) : false;
+      const mergedWorktree =
+        worktreeSummaries.length > 0 && existing.mergeMissingStoredSummaries(worktreeSummaries);
+      if (mergedLegacy || mergedWorktree) {
         this.flushIndex(workspaceId);
       }
       return existing;
@@ -1359,6 +1385,7 @@ export class ConversationV4Gateway {
     // 种子 1：store 里全部会话的轻量摘要（未加载的靠它进列表）。
     const stored = refreshed ?? (await this.host.getStoredSessionSummaries?.(workspaceId)) ?? [];
     for (const summary of stored) publisher.seed(summary);
+    for (const summary of worktreeSummaries) publisher.seed(summary);
     // 种子 2：已加载会话用 live 投影覆盖（更准的 phase/preview/backgroundWork）。
     const liveIds = this.host.listWorkspaceSessionIds?.(workspaceId) ?? [...this.publishers.keys()];
     for (const sessionId of liveIds) {
@@ -1561,6 +1588,7 @@ export class ConversationV4Gateway {
       deliveryProfile: profileName,
       // 与 clientMode 同族的可信注入：能力位来自该连接的 clientHello，缺席一律按旧消费者办
       // （整键 patch + 旧界裁剪）。resync / rehydrate 沿用订阅上已记下的这一位，不再重取。
+      pluginDiscoveryUi: params.pluginDiscoveryUi === true,
       workflowRunDeltas: params.workflowRunDeltas === true,
     });
     const routeKey = subscriptionRouteKey(
@@ -1756,7 +1784,7 @@ export class ConversationV4Gateway {
     const publisher = existingReady
       ? await existingReady
       : !this.hasLiveConversation(params.sessionId)
-        ? await this.ensureColdReadyPublisher(params.sessionId)
+        ? await this.ensureColdReadyPublisher(params.sessionId, undefined, params.workspace)
         : await this.hydratePublisher(params.sessionId);
     return publisher.getPlans();
   }
@@ -2788,6 +2816,7 @@ export class ConversationV4Gateway {
   getQueueHead(sessionId: string): {
     autoDrain: boolean;
     dispatchState: QueueItem["dispatch"]["state"];
+    editLocked: boolean;
     kind: QueueItem["kind"];
     queueItemId: string;
     text: string;
@@ -2798,6 +2827,7 @@ export class ConversationV4Gateway {
     return {
       autoDrain: snapshot.queue.autoDrain,
       dispatchState: item.dispatch.state,
+      editLocked: item.editLock !== undefined,
       kind: item.kind,
       queueItemId: item.queueItemId,
       text: item.text,

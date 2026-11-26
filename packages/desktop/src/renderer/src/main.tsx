@@ -327,6 +327,8 @@ function initializeBusinessRoot(port: MessagePort): void {
   const services = connectViaMessagePort(port, {
     sourceServerManagementService: true,
     extensionsService: true,
+    // 语音输入只走桌面本机 base 连接；远程 workspace / Web / 手机连接不声明该能力。
+    voiceInputService: true,
   });
   baseServicesForRemoteSessions = services;
   registerBaseWorkspaceServices(services);

@@ -107,6 +107,21 @@ export interface McpSseServerConfig extends McpServerConfigBase {
 
 export type McpServerConfig = McpStdioServerConfig | McpHttpServerConfig | McpSseServerConfig;
 
+/**
+ * MCP 配置的唯一身份：键排序、丢弃 undefined 字段后序列化。连接池 key、adapter 复用判断与
+ * 配置变化判断共用；避免 `{ timeoutMs: undefined }` 与 `{}` 被判成不同配置。
+ */
+export function mcpConfigKey(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(mcpConfigKey).join(",")}]`;
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .toSorted()
+    .filter((key) => record[key] !== undefined)
+    .map((key) => `${JSON.stringify(key)}:${mcpConfigKey(record[key])}`)
+    .join(",")}}`;
+}
+
 export type McpServerStatusKind =
   | "connecting"
   | "connected"
@@ -122,6 +137,8 @@ export interface McpServerStatus {
   toolCount: number;
   updatedAt: string;
   error?: string;
+  /** 连接失败的稳定错误码（适配器能给出时）；诊断文案按它区分失败类型。 */
+  errorCode?: string;
   failureKind?: McpServerFailureKind;
   serverRequestId?: string;
   protocolEra?: "legacy" | "modern";
@@ -130,6 +147,19 @@ export interface McpServerStatus {
     authorizationUrl: string;
     startedAt: string;
   };
+}
+
+/**
+ * 单个 server 的内存快照：只读当前连接层状态，不发起网络/进程 I/O。
+ * `tools` / `toolsVersion` 只在该 server 曾经成功拿到 tools/list 时出现；
+ * 空数组表示"已确认没有工具"，与"还没拿到列表"（undefined）严格区分。
+ * 断线后保留最后一次成功列表与版本，展示保留；执行前仍要重新取 live 连接。
+ */
+export interface McpServerToolSnapshot {
+  status: McpServerStatus;
+  tools?: McpToolDescriptor[];
+  /** 不透明版本号；同一 server 列表每次成功替换都会变化。 */
+  toolsVersion?: string;
 }
 
 export interface McpToolAnnotations {
@@ -183,6 +213,8 @@ export const KAYINGCODE_MCP_NODE_REPL_COMPUTER_USE_META_KEY = "kayingcode/nodeRe
 export const KAYINGCODE_MCP_SERVER_REQUEST_ID_META_KEY = "kayingcode/officialMcpServerRequestId";
 
 export interface McpToolDescriptor {
+  /** live discovery；展示缓存必须显式使用 catalogOnly:true 的投影。 */
+  catalogOnly?: false;
   alwaysLoad?: boolean;
   searchHint?: string;
   serverName: string;
@@ -319,6 +351,74 @@ export interface McpConnectionSnapshot {
   tools: McpToolDescriptor[];
 }
 
+export interface McpWaitForServerOptions {
+  signal?: AbortSignal;
+  timeoutMs: number;
+  /**
+   * 工具执行前检查与 MCP App 打开前：server 已断线时走与 callTool 相同的重连路径再等待。
+   * ToolSearch 不传，不触发自动重连。
+   */
+  reconnect?: boolean;
+  /**
+   * 仅供工具执行准入，与 reconnect 一起传：授权未完成就结束、保留了目录的 server 也重连，
+   * 仍需授权时发起交互授权。MCP App 打开不传，不发起授权。
+   */
+  reauthorize?: boolean;
+}
+
+export interface McpToolCatalogScope {
+  servers: Record<string, McpServerConfig>;
+  workingDirectory?: string;
+  /** 身份隔离使用 workspaceIdentity；本地缺省时才 fallback 到 workingDirectory。 */
+  workspaceIdentity?: string;
+}
+
+export type McpCatalogToolDescriptor = Pick<
+  McpToolDescriptor,
+  | "serverName"
+  | "toolName"
+  | "name"
+  | "description"
+  | "inputSchema"
+  | "outputSchema"
+  | "alwaysLoad"
+  | "searchHint"
+  | "visibility"
+>;
+
+/** 展示定义不能携带执行注解；消费方必须解析 live 定义。 */
+export type McpToolDefinition =
+  | McpToolDescriptor
+  | (McpCatalogToolDescriptor & {
+      catalogOnly: true;
+      annotations?: never;
+      timeoutMs?: never;
+      official?: never;
+      ui?: never;
+    });
+
+export interface McpToolCatalogLookupResult {
+  /** 按 server 命中的缓存；[] 是缓存过的合法空列表，缺 key 才是未命中。 */
+  byServer: Record<string, McpCatalogToolDescriptor[]>;
+  /** complete：所有启用的 server 都命中。 */
+  status: "complete" | "incomplete";
+}
+
+export interface McpToolCatalogPublication {
+  lookup: McpToolCatalogLookupResult;
+  /** 有效生产者发布；prepare/lookup 不撤销其他生产者，invalidate 后拒绝该来源迟到写入。 */
+  publish(snapshot: Readonly<Record<string, McpServerToolSnapshot>>): void;
+  invalidate?(serverNames?: readonly string[]): void;
+}
+
+/**
+ * 进程级 MCP tool catalog 只负责 provider advertisement 快路径。
+ * 它不持有 live client，也不能作为工具执行或权限判断的事实来源。
+ */
+export interface McpToolCatalogPort {
+  prepare(scope: McpToolCatalogScope): McpToolCatalogPublication;
+}
+
 export interface McpConnectOptions {
   /**
    * authorization_code OAuth callback 的等待上限。
@@ -448,9 +548,23 @@ export interface McpElicitationPort {
   ): Promise<McpElicitationResult>;
 }
 
+export interface McpConfigurationSnapshot {
+  enabled: boolean;
+  servers: Record<string, McpServerConfig>;
+  trustedOfficialCuaServerNames?: readonly string[];
+}
+
+export interface McpConfigurationSource {
+  getSnapshot(): McpConfigurationSnapshot;
+  subscribe(listener: () => void): () => void;
+  close(): void;
+}
+
 export interface McpPort {
   /** 只读重算工作区准入并通知会话投影，不连接、授权或重放工具。 */
   refreshWorkspaceTrustAdmission?(reannounce?: boolean): Promise<void>;
+  /** 内存目录或连接状态变化；订阅不发起 I/O。 */
+  onSnapshotChanged?(listener: () => void): () => void;
   /** 可信配置派生的稳定来源与现有连接代际。断线时不签发新页面凭证。 */
   onAppConnectionInvalidated?(serverName: string, listener: () => void): () => void;
   appConnectionSnapshot?(serverName: string): { identity: string; generation: number } | null;
@@ -476,6 +590,21 @@ export interface McpPort {
    */
   pingServer?(name: string, options?: { timeoutMs?: number }): Promise<boolean>;
   status(): Promise<Record<string, McpServerStatus>>;
+  /**
+   * 同步读取每个 server 的内存快照（请求准备阶段用，不等待任何 server）。
+   * 只读内存、不发起 I/O：list_changed 标脏的 server 由通知触发后台刷新，本次返回旧列表。
+   */
+  getToolSnapshot(): Record<string, McpServerToolSnapshot>;
+  /**
+   * 等待该 server 已有的启动任务结束（复用同一个启动 Promise，不新建连接、不重连）。
+   * 启动转为 OAuth 授权 pending 时也结束本次等待（不取消授权或共享连接）。
+   * 超时返回 `{ timedOut: true }` 且不取消启动；signal 中止时以 signal.reason 拒绝。
+   * 没有启动任务时立即返回 `{ timedOut: false }`，调用方再读 getToolSnapshot 得到结果。
+   */
+  waitForServer?(
+    serverName: string,
+    options: McpWaitForServerOptions,
+  ): Promise<{ timedOut: boolean }>;
   listTools(): Promise<McpToolDescriptor[]>;
   /**
    * 自端口创建以来收到 `notifications/tools/list_changed` 的累计次数。

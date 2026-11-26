@@ -23,6 +23,7 @@ export interface SubagentContextBuilderConfig {
   skillMetadataBudget?: number;
   skills?: ContextBuilderConfig["skills"];
   userInstructions?: ContextBuilderConfig["userInstructions"];
+  totalTokensReminder?: boolean;
 }
 
 const EPHEMERAL_CACHE_CONTROL = { type: "ephemeral" as const };
@@ -107,13 +108,17 @@ function buildSubagentContextSections(config: SubagentContextBuilderConfig): Con
       // 启动方消息段排在 Notes 之前。
       content: `\n\n${SUBAGENT_LAUNCHER_MESSAGES_NOTE}\n\n${buildSubagentCommonNotes()}`,
     }),
-    // 固定的 token 预算行紧跟 Notes，是子 agent system 的最后一段。
-    createSubagentSection({
-      name: "Total Tokens",
-      source: "total_tokens",
-      cacheHint: "stable",
-      content: `\n\n${TOTAL_TOKENS_SYSTEM_LINE}`,
-    }),
+    // 固定的 token 预算行紧跟 Notes，是子 agent system 的最后一段；开关关闭时不产出。
+    ...(config.totalTokensReminder === true
+      ? [
+          createSubagentSection({
+            name: "Total Tokens",
+            source: "total_tokens",
+            cacheHint: "stable",
+            content: `\n\n${TOTAL_TOKENS_SYSTEM_LINE}`,
+          }),
+        ]
+      : []),
     ...buildEnvironmentSections(config.envInfo, config.model),
   );
 
@@ -170,5 +175,6 @@ function toBaseContextBuilderConfig(config: SubagentContextBuilderConfig): Conte
     currentDate: config.currentDate,
     skillMetadataBudget: config.skillMetadataBudget,
     skills: config.skills,
+    totalTokensReminder: config.totalTokensReminder,
   };
 }

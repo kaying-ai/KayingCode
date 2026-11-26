@@ -73,7 +73,10 @@ import {
   editPendingInputById,
   emitModeChanged,
   emitModelSelected,
+  getPendingInputEditLock,
+  lockPendingInputEdit,
   markPendingInputPromoting,
+  releasePendingInputEdit,
   releasePendingInputReservation,
   removePendingInputById,
   reorderPendingInput,
@@ -88,7 +91,7 @@ import { createContextBuilderFromSnapshot } from "./context.js";
 import { loadProjectMemoryRoot } from "./context.js";
 import { logMemorySkipped } from "./context.js";
 import { injectPluginReferenceReminderFromTurn } from "./plugin-reference.js";
-import { initializeMcp, refreshMcpToolsIfChanged } from "./mcp.js";
+import { initializeMcp, reconcileMcpConfiguration } from "./mcp.js";
 import { startMcpStartup } from "./mcp.js";
 import { discoverSkillsForContext } from "./context.js";
 import { createConfigOnlyContextSnapshot } from "./context.js";
@@ -193,6 +196,8 @@ import { persistPart } from "./message-persistence.js";
 import { rebuildProjection } from "./message-persistence.js";
 import { recordPendingModelChange } from "./timeline-persistence.js";
 import { persistPendingModelChangeTimeline } from "./timeline-persistence.js";
+import { recordPendingWorktreeCreation } from "./timeline-persistence.js";
+import { persistPendingWorktreeCreationTimeline } from "./timeline-persistence.js";
 import { persistAssistantTimelinePartForSession } from "./timeline-persistence.js";
 import { generateWorkspaceText, testModelConnectivity } from "./workspace-generate-text.js";
 import { maybeStartGoalSummaryTitleGeneration } from "./goal-summary-title.js";
@@ -279,6 +284,9 @@ export function installAgentRuntimeMethods(ctor: AgentRuntimeConstructor): void 
   proto.markPendingInputPromoting = markPendingInputPromoting;
   proto.releasePendingInputReservation = releasePendingInputReservation;
   proto.editPendingInputById = editPendingInputById;
+  proto.lockPendingInputEdit = lockPendingInputEdit;
+  proto.releasePendingInputEdit = releasePendingInputEdit;
+  proto.getPendingInputEditLock = getPendingInputEditLock;
   proto.reorderPendingInput = reorderPendingInput;
   proto.setQueueAutoDrain = setQueueAutoDrain;
   proto.completeExternalQueueDrain = completeExternalQueueDrain;
@@ -296,7 +304,7 @@ export function installAgentRuntimeMethods(ctor: AgentRuntimeConstructor): void 
   proto.logMemorySkipped = logMemorySkipped;
   proto.injectPluginReferenceReminderFromTurn = injectPluginReferenceReminderFromTurn;
   proto.initializeMcp = initializeMcp;
-  proto.refreshMcpToolsIfChanged = refreshMcpToolsIfChanged;
+  proto.reconcileMcpConfiguration = reconcileMcpConfiguration;
   proto.startMcpStartup = startMcpStartup;
   proto.discoverSkillsForContext = discoverSkillsForContext;
   proto.createConfigOnlyContextSnapshot = createConfigOnlyContextSnapshot;
@@ -397,6 +405,8 @@ export function installAgentRuntimeMethods(ctor: AgentRuntimeConstructor): void 
   proto.persistUserPrompt = persistUserPrompt;
   proto.recordPendingModelChange = recordPendingModelChange;
   proto.persistPendingModelChangeTimeline = persistPendingModelChangeTimeline;
+  proto.recordPendingWorktreeCreation = recordPendingWorktreeCreation;
+  proto.persistPendingWorktreeCreationTimeline = persistPendingWorktreeCreationTimeline;
   proto.persistSyntheticUserNotice = persistSyntheticUserNotice;
   proto.persistSyntheticUserNoticeForSession = persistSyntheticUserNoticeForSession;
   proto.persistAssistantTimelinePartForSession = persistAssistantTimelinePartForSession;

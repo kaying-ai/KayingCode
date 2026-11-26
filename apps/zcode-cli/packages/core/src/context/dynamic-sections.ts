@@ -73,7 +73,8 @@ export function buildContextManagementSection(): ContextSection {
 }
 
 /** 固定的 token 预算行，是 system 的最后一段；倒数由每次请求的提醒附件表达。 */
-export function buildTotalTokensSection(): ContextSection {
+export function buildTotalTokensSection(enabled: boolean): ContextSection | null {
+  if (!enabled) return null;
   return createDynamicSection("Total Tokens", "total_tokens", TOTAL_TOKENS_SYSTEM_LINE);
 }
 

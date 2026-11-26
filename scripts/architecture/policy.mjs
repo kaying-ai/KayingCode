@@ -122,8 +122,8 @@ export function countPublicMethods(source) {
   return count;
 }
 
-export async function loadPolicy(cwd = process.cwd()) {
-  const filename = path.join(cwd, "architecture-policy.yaml");
+export async function loadPolicy(cwd = process.cwd(), policyPath = "architecture-policy.yaml") {
+  const filename = path.isAbsolute(policyPath) ? policyPath : path.join(cwd, policyPath);
   const content = await fs.readFile(filename, "utf8");
   return validatePolicy(parseYaml(content), cwd);
 }

@@ -71,7 +71,22 @@ export class ProjectAccessTokenError extends Error {
 export type ProjectAccessTokenRequestFailure =
   | { readonly kind: "network" }
   | { readonly kind: "timeout" }
-  | { readonly kind: "http"; readonly status: number };
+  | { readonly kind: "http"; readonly status: number; readonly retryAfterMs?: number };
+
+/** 只保留限流等待量，不把响应头原文带入错误或日志。 */
+export function projectAccessTokenRetryAfterMs(
+  value: string | null | undefined,
+  now = Date.now(),
+): number | undefined {
+  const text = value?.trim();
+  if (!text) return undefined;
+  if (/^\d+(?:\.\d+)?$/.test(text)) {
+    const milliseconds = Number(text) * SECOND_MS;
+    return Number.isFinite(milliseconds) ? milliseconds : undefined;
+  }
+  const timestamp = Date.parse(text);
+  return Number.isFinite(timestamp) ? Math.max(0, timestamp - now) : undefined;
+}
 
 /** I/O adapter 确认的临时故障；不携带原始响应、URL、Token 或 cause。 */
 export class ProjectAccessTokenTransientError extends Error {
@@ -92,6 +107,17 @@ export class ProjectAccessTokenHttpStatusError extends Error {
   }
 }
 
+export const PROJECT_TOKEN_NETWORK_ERROR_CODE = "project_token_network_error";
+export const PROJECT_TOKEN_TIMEOUT_CODE = "project_token_timeout";
+
+/**
+ * 仅这两个固定码代表“请求没有拿到 HTTP 响应”的临时传输故障，可交给模型重试预算；
+ * 429/5xx 等其他临时故障维持 PAT 签发层的既有规则。见 docs/model-provider-project-access-token.md。
+ */
+export function isProjectTokenTransportFailureCode(code: string): boolean {
+  return code === PROJECT_TOKEN_NETWORK_ERROR_CODE || code === PROJECT_TOKEN_TIMEOUT_CODE;
+}
+
 /**
  * Bug 原因：换证 catch 曾把网络、超时、401/403/5xx 全部压成 project_token_request_failed，
  * 远端反馈（ZCT-2111046389485834240）只能看到同一个码，无法区分代理/断网与鉴权拒绝。
@@ -100,8 +126,8 @@ export class ProjectAccessTokenHttpStatusError extends Error {
 export function projectAccessTokenRequestFailureCode(
   failure: ProjectAccessTokenRequestFailure | undefined,
 ): string {
-  if (failure?.kind === "network") return "project_token_network_error";
-  if (failure?.kind === "timeout") return "project_token_timeout";
+  if (failure?.kind === "network") return PROJECT_TOKEN_NETWORK_ERROR_CODE;
+  if (failure?.kind === "timeout") return PROJECT_TOKEN_TIMEOUT_CODE;
   if (
     failure?.kind === "http" &&
     Number.isInteger(failure.status) &&
@@ -139,7 +165,7 @@ export class ProjectAccessTokenCache {
 
   async resolve(
     scope: ProjectAccessTokenScope,
-    issue: () => Promise<unknown>,
+    issue: (hasValidFallback: () => boolean) => Promise<unknown>,
     rejectedFingerprint?: string,
   ): Promise<ProjectAccessTokenResult> {
     const key = scopeKey(scope);
@@ -166,7 +192,13 @@ export class ProjectAccessTokenCache {
         if (this.#entries.get(key) !== current) {
           throw new ProjectAccessTokenError("project_token_scope_invalidated");
         }
-        return issue();
+        // 是否能降级始终由缓存 owner 按当前有效期判断，不能冻结为请求开始时的布尔值。
+        return issue(
+          () =>
+            this.#entries.get(key) === current &&
+            current.value !== undefined &&
+            this.#now() < current.value.expiresAt,
+        );
       })
       .then(async (raw) => {
         if (this.#entries.get(key) !== current) {

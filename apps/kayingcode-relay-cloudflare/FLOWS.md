@@ -100,7 +100,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-  P[upstream-web.json 固定官方 commit] --> G[Git 导出到 .cache/upstream-web]
+  P[UPSTREAM_BASE.json 固定官方 commit] --> G[Git 导出到 .cache/upstream-web]
   G --> B[账号 adapter / bootstrap / 品牌适配 + 核心哈希核验]
   E[KAYINGCODE_REMOTE_ORIGIN 构建环境] --> B
   B --> V[Vite base=/remote/ → packages/web/dist]

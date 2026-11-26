@@ -1,4 +1,6 @@
 import { resolveToolSearchMode } from "../../tool/search/exposure.js";
+import { WAIT_FOR_MCP_SERVERS_TOOL_NAME } from "@zcode/contracts";
+import { isMcpServerWaitOffered } from "./mcp.js";
 import type {
   CollaborationMode,
   ExecutionShellSelection,
@@ -108,7 +110,8 @@ export function setSessionModelSelection(
 
 export function getProjectId(this: AgentRuntimeInternal): ProjectId {
   // Bash cd 会改变执行 cwd，但 project identity 不能随工具内 cwd 漂移。
-  return projectIdFromDirectory(this.workspaceRoot);
+  // 受管 worktree 会话按映射回源仓库的路径派生，与项目共用权限记录（docs/git/worktree.md §6.6.3）。
+  return projectIdFromDirectory(this.config.projectDirectory ?? this.workspaceRoot);
 }
 
 export function setWorkingDirectory(this: AgentRuntimeInternal, cwd: string): void {
@@ -146,6 +149,10 @@ export function getTools(this: AgentRuntimeInternal, model?: Model): ModelToolCo
         (tool.name !== "ToolSearch" && tool.name !== "DeferredToolCall") ||
         !model ||
         resolveToolSearchMode(model, this.config.toolSearch?.mode) !== "off",
+    )
+    // 与 MCP 会话同门（agent-runtime 在有 mcpPort 时创建会话）；本轮是否可见由这里统一决定。
+    .filter(
+      (tool) => tool.name !== WAIT_FOR_MCP_SERVERS_TOOL_NAME || isMcpServerWaitOffered(this, model),
     )
     .filter((tool) => tool.name !== "WebSearch" || shouldExposeWebSearch.call(this, model))
     .map((tool) =>

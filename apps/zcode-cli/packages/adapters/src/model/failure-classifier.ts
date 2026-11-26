@@ -91,7 +91,10 @@ export function classifyModelFailure(
 
   if (unwrapped instanceof RuntimeHeadersRefreshError && unwrapped.retryable) {
     return {
-      code: ModelErrorCode.ModelRequestVerificationConfigNetwork,
+      // 界面按该码选择“重新读取请求校验配置”文案；项目 Token 传输失败只用通用网络重连。
+      code: unwrapped.configNetwork
+        ? ModelErrorCode.ModelRequestVerificationConfigNetwork
+        : ModelErrorCode.ModelRequestFailed,
       message: unwrapped.message,
       reason: ModelFailureReasonValue.NetworkError,
       retryReason: ModelRetryReasonValue.NetworkError,

@@ -1,5 +1,9 @@
 import type { BackgroundBashOutputResult } from "@zcode/shared";
-import type { ModelToolContract, RuntimeInputPresentation } from "@zcode/contracts";
+import type {
+  ModelToolContract,
+  RuntimeInputPresentation,
+  ToolSearchDelivery,
+} from "@zcode/contracts";
 import type {
   CompactPhase,
   CompactReason,
@@ -367,6 +371,7 @@ export interface AgentRuntimeTurnMethods {
       operationId?: string;
       leadingReminderEntries?: readonly RuntimeMessageEntry[];
       postCompactReminderEntries?: readonly RuntimeMessageEntry[];
+      toolSearchDelivery?: ToolSearchDelivery;
     },
   ): Promise<void>;
   persistUserPrompt(
@@ -392,6 +397,9 @@ export interface AgentRuntimeTurnMethods {
     toModelLabel: string;
   }): void;
   persistPendingModelChangeTimeline(traceContext: TraceContext): Promise<void>;
+  /** 受管 worktree 新建会话：只记录一次；首轮落盘并发出 WorktreeCreated。 */
+  recordPendingWorktreeCreation(fact: import("@zcode/contracts").WorktreeCreationFact): void;
+  persistPendingWorktreeCreationTimeline(traceContext: TraceContext): Promise<void>;
   persistSyntheticUserNotice(
     messageID: MessageId,
     text: string,
@@ -423,9 +431,12 @@ export interface AgentRuntimeTurnMethods {
     created: number,
     update:
       | {
+          toolSearchDelivery?: ToolSearchDelivery;
           completed?: number;
           error?: { name: string; data?: Record<string, unknown> };
           finish?: string;
+          /** 签名修复成功的那一步；落盘后冷恢复对同一消息的第一条 assistant 做同样标记。 */
+          signedReasoningReset?: boolean;
           tokens?: unknown;
         }
       | undefined,

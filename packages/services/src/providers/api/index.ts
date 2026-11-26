@@ -4,6 +4,7 @@ export {
   resolveHostProxyForUrl,
   type HostApiNetworkOptions,
   type HostApiNetworkTransport,
+  type HostWebSocketConnection,
 } from "./nodeApiNetwork.js";
 export { readApiJson } from "./apiJson.js";
 export * from "./apiEndpoints.js";

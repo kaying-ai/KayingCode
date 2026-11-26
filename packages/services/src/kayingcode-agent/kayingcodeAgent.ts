@@ -48,6 +48,7 @@ import type {
   KayingCodePluginsDescribeResult,
   KayingCodePluginsValidateResult,
   KayingCodePluginsSetEnabledResult,
+  KayingCodePluginsWorkspaceTrustResult,
   KayingCodePluginsCancelOperationResult,
   KayingCodePluginOperationProgressNotification,
   KayingCodeProviderTestModelConnectivityParams,
@@ -104,6 +105,9 @@ import type {
   V4ConversationRowsRangeResult,
   V4ConversationResyncResult,
   V4ConversationSubscribeResult,
+  V4SessionDeletionPreview,
+  V4SessionDeletionPreviewBatchResult,
+  V4SessionDeletionResult,
   V4SessionsIndexSubscribeResult,
   V4WorkspaceConfigSubscribeResult,
   WorkspaceConfigTopicWireCandidate,
@@ -133,6 +137,7 @@ import type {
   KayingCodeAgentRemovePluginMarketplaceParams,
   KayingCodeAgentRestoreBuiltinPluginParams,
   KayingCodeAgentSetPluginEnabledParams,
+  KayingCodeAgentSetPluginWorkspaceTrustParams,
   KayingCodeAgentSetAutomationEnabledParams,
   KayingCodeAgentUninstallPluginParams,
   KayingCodeAgentUpdatePluginMarketplaceParams,
@@ -465,10 +470,18 @@ export interface KayingCodeAgentConversationFileRewindPreviewParams extends Kayi
   baseLogEpoch: string;
 }
 
+/**
+ * Host 进程内的受管 worktree 服务发送命令时设置的标记。只有带此标记的命令可以携带
+ * createSession.cwd / worktreeCreation 与 forkAssistant.targetCwd；Symbol 键无法经 RPC 序列化伪造。
+ */
+export const HOST_WORKTREE_COMMAND: unique symbol = Symbol("kayingcode.hostWorktreeCommand");
+
 export interface KayingCodeAgentConversationCommandParams extends KayingCodeAgentWorkspaceTarget {
   /** 仅 Host 消费；显式 NULL 表示全局任务，不向 CLI 发送项目概念。 */
   projectId?: string | null;
   envelope: CommandEnvelope;
+  /** 只有 Host 进程内的受管 worktree 服务设置（见 HOST_WORKTREE_COMMAND）。 */
+  [HOST_WORKTREE_COMMAND]?: true;
   /** 仅 host 内部用于 Browser Use runtime 边界，不进入 v4 wire envelope。 */
   clientMode?: KayingCodeTaskClientMode;
 }
@@ -571,6 +584,8 @@ export type KayingCodeAgentServiceEvent =
 export interface KayingCodeAgentAppRuntimePreferences {
   askUserQuestionAutoResolutionEnabled: boolean;
   modelIoFullRetentionEnabled?: boolean;
+  /** 插件自动推荐开关：决定下一次输入是否携带 plugin discovery 工具面。 */
+  pluginAutoRecommendationEnabled?: boolean;
 }
 
 export interface KayingCodeAgentLocalRuntimeChildProcesses {
@@ -625,6 +640,16 @@ export interface IKayingCodeAgentService {
   getTaskTokenUsage(
     params: KayingCodeAgentTaskTokenUsageParams,
   ): Promise<KayingCodeTaskTokenUsageResult>;
+  /** 归档永久删除的单根预检；旧 CLI 以 method-not-found 表示不支持。 */
+  previewSessionDeletion(params: KayingCodeAgentSessionTarget): Promise<V4SessionDeletionPreview>;
+  /** 归档永久删除的批量预检；整批共用一次 CLI 引用扫描。 */
+  previewSessionDeletions(
+    params: KayingCodeAgentWorkspaceTarget & { sessionIds: string[] },
+  ): Promise<V4SessionDeletionPreviewBatchResult>;
+  /** 永久删除单个根及其 owned tree；revision 来自同一目标的最近一次预检。 */
+  executeSessionDeletion(
+    params: KayingCodeAgentSessionTarget & { revision: string; operationId: string },
+  ): Promise<V4SessionDeletionResult>;
   readSession(params: KayingCodeAgentReadSessionParams): Promise<KayingCodeSessionStateSnapshot>;
   readSessionMessages(
     params: KayingCodeAgentReadSessionMessagesParams,
@@ -666,7 +691,11 @@ export interface IKayingCodeAgentService {
   getPluginMentionItems?(
     params: KayingCodeAgentPluginMentionItemsParams,
   ): Promise<KayingCodeAgentPluginMentionItemsResult>;
-  /** 扩展经 ctx.sessions.* 代发消息前确认 runtime 支持 extension 来源。 */
+  /**
+   * 该 workspace 的 CLI 是否在 runtime/capabilities 中声明 extensionInputSource（只供 Host 进程内调用）。
+   * 扩展经 ctx.sessions.* 代发消息前必须确认；false 时调用方报 unavailable，不去掉来源后发送
+   * （packages/services/spec/conversation-input-source.md）。
+   */
   supportsExtensionInputSource?(target: KayingCodeAgentWorkspaceTarget): Promise<boolean>;
   /** Composer Skill 引用 catalog；带 sessionId 时读取该 runtime 的冻结快照。 */
   getSkillReferenceCatalog(
@@ -770,6 +799,9 @@ export interface IKayingCodeAgentService {
   setPluginEnabled(
     params: KayingCodeAgentSetPluginEnabledParams,
   ): Promise<KayingCodePluginsSetEnabledResult>;
+  setWorkspacePluginTrust(
+    params: KayingCodeAgentSetPluginWorkspaceTrustParams,
+  ): Promise<KayingCodePluginsWorkspaceTrustResult>;
   // ---- 定时任务(automation)管理 ----
   listAutomations(params: KayingCodeAgentWorkspaceTarget): Promise<KayingCodeAutomation[]>;
   listAllAutomations(): Promise<KayingCodeAutomation[]>;
@@ -802,6 +834,31 @@ export interface IKayingCodeAgentService {
   closeSession(
     params: KayingCodeAgentSessionTarget & { expectedPersistence?: "deferred" | "immediate" },
   ): Promise<boolean>;
+  /**
+   * 卸载 cwd 位于 directory 内的全部驻留会话（session/releaseUnderDirectory）。会话选择与忙闲由 CLI
+   * 判断，任一会话忙时全部不卸载。只使用已存在的进程；没有进程时没有驻留会话。
+   * 传输/协议失败抛 `KayingCodeWorktreeReleaseFailedError`（typed），删除流程据此 fail closed。
+   */
+  releaseSessionsUnderDirectory?(
+    params: KayingCodeAgentWorkspaceTarget & { directory: string },
+  ): Promise<{ released: string[]; busy: string[] }>;
+  /**
+   * 按 commandId 查询 CLI 对一条命令的裁决（commands/query）；Host 内部用于确认失败的会话命令
+   * 是否实际执行。CLI 没有记录时返回 "unknown"。
+   */
+  queryCommandResult?(
+    params: KayingCodeAgentWorkspaceTarget & { key: CommandKey },
+  ): Promise<CommandAck | "unknown">;
+  /**
+   * 该 workspace 的物理 CLI 连接是否声明 runtime/capabilities.worktreeCwd（只供 Host 进程内调用）。
+   * 按连接缓存探测结果，只认严格 true；探测失败/连接不可用按 false 处理且失败不缓存。
+   */
+  supportsWorktreeCwd?(target: KayingCodeAgentWorkspaceTarget): Promise<boolean>;
+  /**
+   * 该 workspace 的 CLI 是否在 runtime/capabilities 中声明 conversationQuoteComment。
+   * 渲染层据此决定是否提供选区“批注”入口；未声明（旧 CLI / 远端探测失败）按不支持处理。
+   */
+  supportsConversationQuoteComment?(target: KayingCodeAgentWorkspaceTarget): Promise<boolean>;
   setModel(params: KayingCodeAgentSetModelParams): Promise<KayingCodeSessionStateSnapshot>;
   setThoughtLevel(
     params: KayingCodeAgentSetThoughtLevelParams,

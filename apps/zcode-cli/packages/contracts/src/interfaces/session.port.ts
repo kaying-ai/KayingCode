@@ -347,7 +347,10 @@ export type TurnInputSourceMetadata =
   | { kind: "genUi"; path: string; title?: string }
   | { kind: "extension"; pluginId: string };
 
+// 仅当前 CLI 实例内传递本次输入的能力。Symbol 键不进入 JSON 历史，冷恢复不能继承旧端的授权。
+export const PLUGIN_DISCOVERY_INPUT = Symbol("pluginDiscoveryInput");
 export interface TurnInputIntentMetadata {
+  [PLUGIN_DISCOVERY_INPUT]?: true;
   planEnabled?: boolean;
   conversationQuotes?: Array<{
     text: string;
@@ -356,6 +359,10 @@ export interface TurnInputIntentMetadata {
     senderId?: string;
     messageId?: string;
     sentAt?: string;
+    /** 用户对该选区的批注，随引用一起作为模型材料。 */
+    comment?: string;
+    /** 选区来自子 agent 输出时的 agent 类型。 */
+    agent?: string;
   }>;
   inputOrigin?: "desktop" | "mobile";
   botGroupSource?: {

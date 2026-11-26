@@ -1,8 +1,8 @@
 {
   "repo": "https://github.com/zai-org/ZCode",
-  "commit": "fec975905a2abd4c07e35c40d51fa097a2258ec9",
-  "version": "3.18.2",
-  "syncedAt": "2026-11-15",
+  "commit": "a4b4445141eb7d3b3e99eada9292775383bfc44e",
+  "version": "4.0.0",
+  "syncedAt": "2026-11-26",
   "strategy": "reviewed-product-merge",
-  "note": "Reviewed and adapted the 3.18.2 delta (plugin/extension host, session control, credential enc:v2, mobile web pin) while retaining KayingCode localrun, Host/Relay, account and product UI boundaries. Adoption and explicit exclusions: scripts/spec/upstream-sync-3-18-2.md."
+  "note": "Reviewed and adapted the 4.0.0 delta (plugin discovery/trust, MCP runtime, CLI storage/runtime, preinstalled tools, managed worktrees, voice input, selection comments) while retaining KayingCode localrun, Host/Relay, account and product UI boundaries. Baseline advanced by maintainer decision on 2026-11-26; stage 5 real-game E2E, three-platform regression and packaging acceptance remain open. Adoption and explicit exclusions: scripts/spec/upstream-sync-4-0-0.md."
 }

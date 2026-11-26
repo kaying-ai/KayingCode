@@ -6,7 +6,8 @@ export const WORKSPACE_IDENTITY_FILES = [
   "packages/shared/src/remote-workspace-identity.ts",
   "packages/shared/src/remoteAgentTarget.ts",
 ];
-const upstreamIdentitySha256 = "ba5775c8146d633861d683ca411f25014986822c18207f24f080a2257afe1766";
+// ZCode 4.0.0 仅新增 remoteWorkspaceTrustIdentity；产品 overlay 已包含该函数，可继续整体替换。
+const upstreamIdentitySha256 = "9d0cf82a6053a0f8ff3524a7509331b0d6d81e26774e7b8274678a416ab6c232";
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
 export async function applyWorkspaceIdentity({ stage, repoRoot }) {

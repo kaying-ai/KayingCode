@@ -165,6 +165,15 @@ declare global {
       printPageToPdf?(): Promise<import("@zcode/shared").PrintPageToPdfResult>;
       /** 从系统拖拽/文件输入得到的 Web File 解析真实本地路径 */
       getPathForFile?(file: File): string | null;
+      /**
+       * 麦克风系统权限（仅 Desktop preload；旧 preload 缺少任一项时
+       * platform.microphone 保持 undefined，UI 隐藏语音输入入口）。
+       */
+      ensureMicrophoneAccess?(): Promise<import("@zcode/shared").MicrophoneAccessResult>;
+      resetMicrophoneAccess?(): Promise<import("@zcode/shared").MicrophoneAccessResetResult>;
+      openMicrophoneSettings?(
+        target: import("@zcode/shared").MicrophoneSettingsTarget,
+      ): Promise<boolean>;
       /** dwf 产物「作为文件打开」：把某一版的字节落成本机副本，返回其路径 */
       materializeWorkflowArtifactFile(
         payload: import("@zcode/shared").MaterializeWorkflowArtifactFileRequest,

@@ -17,12 +17,18 @@ export function createDesktopHelpConfigReader(options: {
   const read = createHelpAppConfigReader({ fetchImpl: createDesktopTelemetryFetch(net) });
   return async () => {
     const endpointOrigin = await options.resolveEndpointOrigin();
+    const url = buildHelpAppConfigUrl(
+      endpointOrigin,
+      options.appVersion,
+      `${process.platform}-${process.arch}`,
+    );
+    // Bug 原因：KayingCode.localrun 没有官方端点，buildHelpAppConfigUrl 会返回空串；
+    // 空串进入 net.fetch 会抛 ERR_INVALID_URL，社区/反馈入口启动时出现失败日志。
+    // 无端点时直接返回 undefined，让调用方走本地 config/default.json 缺省。
+    if (!url) return undefined;
+
     return read(
-      buildHelpAppConfigUrl(
-        endpointOrigin,
-        options.appVersion,
-        `${process.platform}-${process.arch}`,
-      ),
+      url,
       buildKayingCodeSourceHeadersFromContext({
         endpointOrigin,
         appVersion: options.appVersion,

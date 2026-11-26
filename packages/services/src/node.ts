@@ -136,6 +136,10 @@ export {
 export { createCredentialService } from "./credential/credentialService.js";
 export { createBroadcastService } from "./broadcast/broadcastService.js";
 export { createKayingCodeAgentService } from "./kayingcode-agent/kayingcodeAgentService.js";
+export {
+  createSettingServiceReplyLanguageResolver,
+  type ReplyLanguageResolver,
+} from "./kayingcode-agent/replyLanguage.js";
 export { createKayingCodeTaskServiceAdapter } from "./kayingcode-agent/kayingcodeTaskServiceAdapter.js";
 export { createBotsService } from "./bots/botsService.js";
 export { createKayingCodeSessionService } from "./kayingcode-session/kayingcodeSessionService.js";
@@ -373,14 +377,21 @@ import {
 import { createMediaPreviewService } from "./media-preview/mediaPreview.js";
 import type { WorkspaceFileSearchFilter } from "./file/workspaceFileMentionFilter.js";
 import { createGitService } from "./git/gitService.js";
+import { createGitWorktreeRepo } from "./git/managed-worktree/index.js";
+import { createGitCommandProvider } from "./git/providers/gitCommandProvider.js";
+import { IVoiceInputService } from "./voice-input/contract.js";
+import { createVoiceInputService } from "./voice-input/voiceInputService.js";
+import {
+  createManagedWorktreeService,
+  createWorktreeRemovalGate,
+  IManagedWorktreeService,
+} from "./managed-worktree-tasks/index.js";
+import { HOST_WORKTREE_COMMAND } from "./kayingcode-agent/kayingcodeAgent.js";
 import { GitCommitMessageGenerator } from "./git/gitCommitMessageGenerator.js";
 import { createGitCheckpointService } from "./git/gitCheckpointService.js";
 import { createSystemService } from "./system/systemService.js";
 import { createTerminalService } from "./terminal/terminalService.js";
-import {
-  createSettingService,
-  createSettingServiceWithMigrations,
-} from "./setting/settingService.js";
+import { createSettingServiceWithMigrations } from "./setting/settingService.js";
 import { createOnboardingRecordService } from "./onboarding/onboardingRecordService.js";
 import { createLegacyTeamOrganizationResolver } from "./model-provider/legacyTeamOrganizationResolver.js";
 import { createObservableSettingService } from "./setting/observableSettingService.js";
@@ -392,6 +403,10 @@ import { IBotsService } from "./bots/bots.js";
 import { createBotProjectRuntime } from "./bot-project-runtime/index.js";
 import type { BotProjectConnection } from "./bot-project-runtime/contract.js";
 import { createKayingCodeAgentService } from "./kayingcode-agent/kayingcodeAgentService.js";
+import {
+  createSettingServiceReplyLanguageResolver,
+  type ReplyLanguageResolver,
+} from "./kayingcode-agent/replyLanguage.js";
 import type { KayingCodeAgentCommandResolver } from "./kayingcode-agent/kayingcodeAgentProcessManager.js";
 import { buildAgentTelemetrySpawnEnv } from "./kayingcode-agent/agentTelemetryEnv.js";
 import { resolveKayingCodeAgentPresentationSurface } from "./kayingcode-agent/kayingcodeAgentPresentationSurface.js";
@@ -407,6 +422,8 @@ import { createTaskGroupService, groupTaskKey, ITaskGroupService } from "./task-
 import { createRemoteProjectService, IRemoteProjectService } from "./remote-projects/index.js";
 import type { SessionMessageSendRequested } from "#src/session/sessionMailbox.js";
 import { createFileWatcherService } from "./fileWatcher/fileWatcherService.js";
+import { createOAuthProviderLogoutHandler } from "./oauth/oauthProviderLogout.js";
+import { OAuthCredentialRepo } from "./oauth/repo/oauthCredentialRepo.js";
 import { createOAuthService } from "./oauth/oauthService.js";
 import { readLegacyKayingCodeConfigProviders } from "./model-provider/legacyKayingCodeConfigProviderReader.js";
 import { createAccountProviderCredentialStore } from "./model-provider/accountProviderCredentialStore.js";
@@ -480,6 +497,7 @@ import {
   buildAgentRuntimeEnv,
 } from "./runtime-tools/agentProxyEnv.js";
 import { ensureAppCaCert } from "./runtime-tools/appCaCert.js";
+import { resolvePreinstalledToolsAgentEnv } from "./runtime-tools/preinstalledToolsAgentEnv.js";
 import { createServiceLogger } from "#src/logger/serviceLogger.js";
 import { ensureTelemetryDeviceMid } from "#src/telemetry/telemetryCore.js";
 import { IOffPeakTaskService } from "./session/offPeakTask.js";
@@ -629,11 +647,20 @@ export function createLocalServices(options: {
   hostApiNetworkTransport?: HostApiNetworkTransport;
   /** Desktop Host 请求 Main 登记 Agent 已授权的精确本地视频路径。 */
   authorizeLocalMediaPreviewPath?: (path: string) => Promise<string>;
+  /**
+   * Agent 回复语言（Host 级来源）；缺省回答 null，CLI 不产生语言公告。
+   * 本机 Host 同步读 Main 推送的内存值；Web/远端 Host 传 Setting 读取器。
+   */
+  resolveReplyLanguage?: ReplyLanguageResolver;
   feedback?: Partial<
     Omit<CreateFeedbackServiceOptions, "apiClient" | "credentialService" | "oauthService">
   >;
   processLifecycleReporter?: RuntimeProcessLifecycleReporter;
   taskRuntimeReporter?: RuntimeTaskReporter;
+  /** 阻止退出的事项变化（例如正在创建的 worktree）；桌面 Host 转发给 main 汇总确认。 */
+  quitBlockerReporter?: {
+    onQuitBlockersChanged(blockers: Array<{ kind: string; count: number }>): void;
+  };
   /** workspace 文件搜索默认使用内置过滤器；后续规则来源只需在 Host 装配时注入最终实现。 */
   workspaceFileSearchFilter?: WorkspaceFileSearchFilter;
   forwardSessionMessageSendRequested?: (
@@ -651,6 +678,11 @@ export function createLocalServices(options: {
   kayingcodeAgentCommandResolver?: KayingCodeAgentCommandResolver;
   /** Desktop Main 提前异步采集的本机 runtime 环境；Local Host 注入后不再同步启动 login shell。 */
   runtimeProcessEnvPatch?: Record<string, string>;
+  /**
+   * 仅桌面 Local Host 有本机发布目标时注入；安装前路径固定，仅定位程序，不下发给远端或 Web。
+   * 目录是否真正注入由 spawn 边界按“存在且含入口”判定，见 preinstalledToolsAgentEnv。
+   */
+  preinstalledToolsBinDir?: string;
   /** 本地桌面上次 workspace 缺失时，仅用于 Agent 子进程 spawn.cwd 兜底。 */
   kayingcodeAgentSpawnFallbackCwd?: string;
   /** desktop-attached remote server 从 Desktop Host 收到的一次性 Agent 网络配置。 */
@@ -761,8 +793,13 @@ export function createLocalServices(options: {
   const provisioningOAuthKeys = new Set<string>(PROVIDER_PROVISIONING_OAUTH_CREDENTIAL_KEYS);
   const credentialService = createCredentialService({
     cipherProvider: options.credentialCipherProvider,
-    onDidMutate: ({ key }) => {
-      if (provisioningOAuthKeys.has(key) || isProviderProvisioningAccountCredentialKey(key)) {
+    onDidMutate: ({ keys }) => {
+      if (
+        keys.some(
+          (key) =>
+            provisioningOAuthKeys.has(key) || isProviderProvisioningAccountCredentialKey(key),
+        )
+      ) {
         options.onProviderProvisioningSourceChanged?.("credential");
       }
     },
@@ -802,15 +839,10 @@ export function createLocalServices(options: {
     loadUserId: async () => (await oauthCredentialRepo.loadActiveUserProfile())?.id ?? null,
   });
   // KayingCode.localrun：无账号凭据仓库 / 登出清理。
-  let handleOAuthProviderLogout: ((provider: never) => Promise<void>) | null = null;
-  const oauthCredentialRepo = {
-    loadTokenSet: async (_providerId?: string) =>
-      null as { accessToken: string; kayingcodeJwtToken?: string | null } | null,
-    loadUserProfile: async (_providerId?: string) => null as { id?: string } | null,
-    loadActiveUserProfile: async () => null as { id?: string } | null,
-    loadLoginAttribution: async () => null as unknown,
-  };
-  void credentialService;
+  let handleOAuthProviderLogout:
+    | ((provider: string, accountIdentity?: string | null) => Promise<void>)
+    | null = null;
+  const oauthCredentialRepo = new OAuthCredentialRepo(credentialService);
   // KayingCode.localrun：无账号 API Key 自动获取；仅读本地缓存。
   const accountProviderCredentialService = createAccountProviderCredentialService({
     credentialStore: accountProviderCredentialStore,
@@ -986,7 +1018,10 @@ export function createLocalServices(options: {
       accountProviderConfigSource.dispose();
     },
   });
-  handleOAuthProviderLogout = async () => undefined;
+  handleOAuthProviderLogout = createOAuthProviderLogoutHandler({
+    accountProviderCredentialStore,
+    refreshAccountProviders: (reason: string) => accountProviderConfigSource.refresh(reason),
+  });
   // 官方 Server MCP 的凭证解析源。MCP 调用的身份头与 MCP 额度查询（/api/v1/mcp/usage）
   // 必须共用这一份实现，否则两处对"当前选中的 Coding Plan 连接"的判定会分叉。
   // 额度侧注入的是凭证解析而非 resolveHeaders：归属校验需要 providerFamily，
@@ -1093,10 +1128,27 @@ export function createLocalServices(options: {
     },
   });
   let appControlServiceForAgent: AppControlService | undefined;
+  // 受管 worktree 的删除租约：worktree 服务取得，Agent 服务与终端服务据此拒绝新操作。
+  // 租约只在本 Host 内生效，前提是一台机器只有一个本地 Host（单实例锁 + 复用主窗口）。
+  const worktreeRemovalGate = createWorktreeRemovalGate();
   const kayingcodeAgentService = createKayingCodeAgentService({
     resolveAppControlService: () => appControlServiceForAgent,
     credentialCipherProvider: options?.credentialCipherProvider,
     appControlSourceServerId: options?.projectStorageHostId ?? "local",
+    // 删除 worktree 期间拒绝其中会话的新命令与冷订阅；cwd 只经 tasks-index 同一行得到。
+    // 远端 workspace 不可能位于本地受管 worktree，返回 workspacePath 让闸门放行。
+    runSessionOperation: (target, operation) =>
+      worktreeRemovalGate.runSessionOperation(
+        target.sessionId,
+        async () => {
+          if (target.workspaceIdentity?.trim()) return target.workspacePath;
+          return (await taskIndexRepo.getProjectRepository()).readTaskCwd({
+            workspacePath: target.workspacePath,
+            taskId: target.sessionId,
+          });
+        },
+        operation,
+      ),
     // 新会话创建前原子预留项目归属：Host 是唯一写库方，CLI 只拿到稳定 sessionId
     // 与固化目录；预留失败直接冒泡，不能把项目任务降级成无归属会话。
     prepareSessionCreation: async (target) =>
@@ -1111,12 +1163,24 @@ export function createLocalServices(options: {
           ? { additionalDirectories: target.additionalDirectories }
           : {}),
       }).additionalDirectories,
+    // fork 提交后、ACK 返回前完成归属交接：父任务在受管 worktree 中时子行继承 cwd 与附加目录。
+    prepareForkCreation: async (target) => {
+      (await taskIndexRepo.getProjectRepository()).reserveCreatedTask({
+        task: {
+          workspacePath: target.workspacePath,
+          ...(target.workspaceIdentity ? { workspaceIdentity: target.workspaceIdentity } : {}),
+          taskId: target.sessionId,
+        },
+        parentTaskId: target.parentSessionId,
+      });
+    },
     ...(agentAccountProviderConfigSource
       ? { accountProviderConfigSource: agentAccountProviderConfigSource }
       : {}),
     accountRequestAuthService,
     ...(modelSelectionReadinessSource ? { modelSelectionReadinessSource } : {}),
     authorizeLocalMediaPreviewPath: options?.authorizeLocalMediaPreviewPath,
+    resolveReplyLanguage: options?.resolveReplyLanguage,
     ...offPeakToolWiring,
     // 动态工作流灰度：与 Off-Peak 不同，
     // 这里不按 serviceAuthorityMode 裁剪——SSH/WSL/Docker 的 desktop-attached-remote Host
@@ -1180,6 +1244,14 @@ export function createLocalServices(options: {
       // 先拿到尚不存在的 provider_config.json 并发布短暂空 Registry。
       await providerConfigRuntime.start();
       return {
+        // 预装工具入口只来自本机 Host：固定目录存在且有入口时才前置 PATH 并标 AVAILABLE。
+        // 远端/Web/attached-remote 不得继承桌面标记，也不能让 shell 或部署环境改写 Agent PATH。
+        ...(isDesktopAttachedRemote
+          ? {}
+          : resolvePreinstalledToolsAgentEnv({
+              binDir: options?.preinstalledToolsBinDir,
+              basePath: process.env.PATH,
+            })),
         ...buildAgentRuntimeEnv({
           httpProxy: agentNetwork.httpProxy,
           noProxy: agentNetwork.noProxy,
@@ -1217,6 +1289,9 @@ export function createLocalServices(options: {
               nativeSearchEnhancementsEnabled: settings.nativeSearchEnhancementsEnabled !== false,
               toolSearchMode: settings.toolSearchMode ?? "auto",
               memoryEnabled: settings.memoryEnabled === true,
+              // 两个开关都按产品默认关闭：缺失/旧设置不下发开启，保持现有前台与不提醒行为。
+              totalTokensReminderEnabled: settings.totalTokensReminderEnabled === true,
+              agentAlwaysBackgroundEnabled: settings.agentAlwaysBackgroundEnabled === true,
               modelContextBudgetStrategy,
               // user-execution 只消费 Shell；共享默认策略是统一 result schema 的兼容占位，
               // 不会覆盖 runtime-materialization 阶段已经固定的 strategy。
@@ -1265,6 +1340,52 @@ export function createLocalServices(options: {
   });
   const gitService = createGitService({
     commitMessageGenerator: gitCommitMessageGenerator,
+  });
+  // 终端实例同时注册给 renderer 和 worktree 删除前的占用检查，必须是同一个实例。
+  const terminalService = createTerminalService({
+    settingService,
+    isCwdBlocked: (cwd) => worktreeRemovalGate.isRemoving(cwd),
+  });
+  const isLocalProjectHost =
+    !options?.projectStorageHostId || options.projectStorageHostId === "local";
+  // 受管 worktree 的唯一执行者：worktree 事实来自 git worktree list + 受管布局，任务归属来自
+  // tasks-index worktree_root，创建记录与删除租约只在本 Host 内存中。远端 Source Server 一律拒绝。
+  const managedWorktreeService = createManagedWorktreeService({
+    isLocalHost: isLocalProjectHost,
+    repository: () => taskIndexRepo.getProjectRepository(),
+    git: createGitWorktreeRepo({
+      commandProvider: createGitCommandProvider(),
+      dataBaseDir: getDataBaseDir,
+    }),
+    removalGate: worktreeRemovalGate,
+    runtime: {
+      hasTerminalsUnder: async (path) =>
+        (await terminalService.listTerminalIdsUnderPath({ path })).length > 0,
+      releaseSessionsUnder: async (target) => {
+        if (!kayingcodeAgentService.releaseSessionsUnderDirectory)
+          throw new Error("worktree.release-unsupported");
+        return await kayingcodeAgentService.releaseSessionsUnderDirectory(target);
+      },
+    },
+    agent: {
+      supportsWorktreeCwd: async (target) =>
+        (await kayingcodeAgentService.supportsWorktreeCwd?.(target)) ?? false,
+      // HOST_WORKTREE_COMMAND 只有本服务能设置，渲染进程经 RPC 无法携带。
+      sendCommand: (command) =>
+        kayingcodeAgentService.sendConversationCommandV4({
+          ...command,
+          [HOST_WORKTREE_COMMAND]: true,
+        }),
+      queryCommandResult: async (target) => {
+        if (!kayingcodeAgentService.queryCommandResult) throw new Error("worktree.query-unsupported");
+        return await kayingcodeAgentService.queryCommandResult(target);
+      },
+    },
+    reportCreatingCount: (count) =>
+      options?.quitBlockerReporter?.onQuitBlockersChanged(
+        count > 0 ? [{ kind: "worktree-creating", count }] : [],
+      ),
+    afterChange: publishProjectChange,
   });
   // task wrapper 由 KayingCode task service adapter 提供；核心 session 状态由 KayingCode agent server 维护。
   const kayingcodeTaskService = createKayingCodeTaskServiceAdapter({
@@ -1315,6 +1436,7 @@ export function createLocalServices(options: {
           return {
             askUserQuestionAutoResolutionEnabled:
               settings.askUserQuestionAutoResolutionEnabled !== false,
+            pluginAutoRecommendationEnabled: settings.pluginAutoRecommendationEnabled === true,
             modelIoFullRetentionEnabled: settings.modelIoFullRetentionEnabled === true,
           };
         },
@@ -1322,6 +1444,7 @@ export function createLocalServices(options: {
       })
     : undefined;
   const oauthService = createOAuthService(credentialService, {
+    captureCredentialGuard: () => credentialService.captureRecoveryGuard(),
     apiClient,
     onProviderLogout: handleOAuthProviderLogout,
   });
@@ -1400,7 +1523,7 @@ export function createLocalServices(options: {
     .register(IGitService, gitService)
     .register(IGitCheckpointService, gitCheckpointService)
     .register(ISystemService, systemService)
-    .register(ITerminalService, createTerminalService({ settingService }))
+    .register(ITerminalService, terminalService)
     .register(ISettingService, settingService)
     .register(IOnboardingRecordService, onboardingRecordService)
     .register(ICredentialService, credentialService)
@@ -1408,6 +1531,7 @@ export function createLocalServices(options: {
     .register(IKayingCodeTaskService, kayingcodeTaskService)
     .register(IKayingCodeAgentService, kayingcodeAgentService)
     .register(IKayingCodeSessionService, kayingcodeSessionService)
+    .register(IManagedWorktreeService, managedWorktreeService)
     .register(
       IBotsService,
       createBotsService({
@@ -1429,6 +1553,17 @@ export function createLocalServices(options: {
       }),
     )
     .register(IConversationShareService, conversationShareService)
+    // 语音输入只服务桌面本机 Host：ticket 走官方 ASR 端点，WebSocket 与 fetch 共用代理/CA。
+    // KayingCode.localrun 端点 origin 为空，服务直接返回 unavailable（不构造无效 URL）。
+    .register(
+      IVoiceInputService,
+      createVoiceInputService({
+        apiClient,
+        getToken: () => credentialService.load("kayingcodejwttoken"),
+        resolveOrigin: resolveCurrentKayingCodeEndpointOrigin,
+        createSocket: (url) => hostApiNetworkTransport.createWebSocket(url),
+      }),
+    )
     .register(IFileWatcherService, createFileWatcherService())
     .register(IOAuthService, oauthService)
     .register(
@@ -1793,11 +1928,17 @@ export async function createServerHostServices(options: {
   providerProvisioningTargetEnabled?: boolean;
   /** 旧 Supervisor 托管的候选 Core 注入 v1-only cipher；正常 Server 缺省使用系统/文件密钥。 */
   credentialCipherProvider?: CredentialCipher;
+  /** Web/Server Host 的回复语言来源；缺省读取本 Host Setting（未设置回答 null）。 */
+  resolveReplyLanguage?: ReplyLanguageResolver;
 }) {
   const projectStorageHostId = remoteHostIdFromWorkspaceIdentity(
     buildServerRemoteWorkspaceIdentity({ serverId: options.sourceServerId, workspacePath: "/" }),
   );
   if (!projectStorageHostId) throw new Error("Invalid Source Server storage identity");
+  // Web/Server Host 同时也是其 Setting 权威：复用同一个实例做启动迁移与 Agent
+  // 回复语言读取，避免另建读实例与写队列分叉。
+  const { service: settingService, prepareLegacyAccountConnections } =
+    createSettingServiceWithMigrations();
   // Bug 原因：billing/balance 把 X-Device-Mid 当必填，而独立 Server 主机没有 Desktop main 写设备身份，
   // buildKayingCodeSourceHeaders() 又只读不生成。原修复只放在旧 stdio entry，SSH/WSL/Docker 的 Core 与
   // Lite HTTP 入口共用本装配却没有确保，首次 Start Plan 权益查询返回 400，Start 模型被判为不可用。
@@ -1809,7 +1950,7 @@ export async function createServerHostServices(options: {
       error instanceof Error ? error.message : String(error),
     );
   });
-  await migrateApplicationStorage(await createSettingService().get(), projectStorageHostId);
+  await migrateApplicationStorage(await settingService.get(), projectStorageHostId);
   const workspaceAliasRepo = new SourceServerWorkspaceAliasRepo();
   const workspaceIdentityMapper = new SourceServerWorkspaceIdentityMapper();
   const sourceServerWorkspaceService = createSourceServerWorkspaceService(workspaceAliasRepo, {
@@ -1839,6 +1980,10 @@ export async function createServerHostServices(options: {
     topicResourceRelayChannel: options.topicResourceRelayChannel,
     projectStorageHostId,
     sourceServerWorkspaceService,
+    settingService,
+    prepareLegacyAccountConnections,
+    resolveReplyLanguage:
+      options.resolveReplyLanguage ?? createSettingServiceReplyLanguageResolver(settingService),
   });
   return { services, workspaceIdentityMapper, migrationFailedPathCount };
 }

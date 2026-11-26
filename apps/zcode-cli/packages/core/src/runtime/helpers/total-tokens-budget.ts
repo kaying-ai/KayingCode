@@ -20,6 +20,13 @@ export function createTotalTokensBudgetState(): TotalTokensBudgetState {
   return { rolledOver: 0, anchor: 0, maxUsed: 0 };
 }
 
+/** 缺省关闭：只有 CLI 参数或 App 设置显式打开时才追加提醒。 */
+export function isTotalTokensReminderEnabled(config: {
+  totalTokensReminder?: { enabled?: boolean };
+}): boolean {
+  return config.totalTokensReminder?.enabled === true;
+}
+
 export function reanchorTotalTokensBudget(
   state: TotalTokensBudgetState,
   context: number,

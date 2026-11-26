@@ -82,6 +82,10 @@ export interface RunDependencies extends PluginsCommandOverrides {
   loadCustomCommand?: (
     options: InspectKayingCodeCustomCommandOptions,
   ) => ReturnType<typeof loadKayingCodeCustomCommand>;
+  loginKayingCodeCli?: BootstrapModule["loginKayingCodeCli"];
+  loginBigmodelCodingPlan?: BootstrapModule["loginBigmodelCodingPlan"];
+  configureCodingPlanApiKey?: BootstrapModule["configureCodingPlanApiKey"];
+  logoutKayingCodeCli?: BootstrapModule["logoutKayingCodeCli"];
   // headless slash 路由要和 app facade 的保留名 gate 用同一个判据；默认取 bootstrap 的，
   // 注入点只为让单测不必拉起整个 bootstrap 模块。见 prompt-command.ts。
   isReservedSlashCommandName?: BootstrapModule["isReservedKayingCodeSlashCommandName"];

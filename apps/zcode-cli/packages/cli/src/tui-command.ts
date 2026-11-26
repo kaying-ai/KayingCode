@@ -26,6 +26,8 @@ export const runTuiCommand = async (
   forceMcs = false,
   toolsearchMode: ToolSearchMode = "off",
   workflowMode: DynamicWorkflowMode = DEFAULT_CLI_WORKFLOW_MODE,
+  agentAlwaysBackground = false,
+  totalTokensReminder = false,
 ): Promise<number> => {
   try {
     const modeState = createCliModeState(mode);
@@ -51,7 +53,10 @@ export const runTuiCommand = async (
       toolsearchMode,
       options.browserUse,
       options.browserExecutable,
+      options.browserState,
       workflowMode,
+      agentAlwaysBackground,
+      totalTokensReminder,
     );
     const unregisterShutdownHandlers = registerCliShutdownHandlers({
       cleanup: async () => {

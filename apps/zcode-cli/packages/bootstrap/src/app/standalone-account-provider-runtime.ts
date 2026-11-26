@@ -85,6 +85,10 @@ export function standaloneAccountIdentityCredentialKey(providerId: string): stri
   return `account-provider:${normalized}:identity`;
 }
 
+export function standaloneAccountAuthSourceCredentialKey(providerId: string): string {
+  return `account-provider:${providerId}:auth-source`;
+}
+
 /** Standalone Credential Store 私有键；不得进入 Provider Config、Model 或 Protocol。 */
 export function standaloneAccountProviderCredentialKey(input: {
   readonly providerId: string;

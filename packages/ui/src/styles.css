@@ -164,6 +164,10 @@ body {
   --color-background-alt: color-mix(in oklab, var(--color-neutral-100) 60%, transparent);
   --color-background-win-alt: var(--color-neutral-200);
   --color-brand: var(--color-sky-400);
+  /* Composer 语音输入录音胶囊：按设计稿取 sky 色系十六进制值（浅色底色 Sky 100、波形 Sky 600）。
+     不引用 var(--color-sky-*)：Tailwind 4 的 sky 色板是 oklch，渲染值与设计稿有偏差（如 sky-600 为 #0084d1）。 */
+  --color-voice-input-surface: #e0f2fe;
+  --color-voice-input-wave: #0284c7;
   --color-icon-blue: var(--color-terminal-bright-blue);
   --color-trajectory-user: #2563eb;
   --color-trajectory-assistant: #0f766e;
@@ -317,6 +321,9 @@ body {
   --color-background-alt: color-mix(in oklab, var(--color-neutral-800) 60%, transparent);
   --color-background-win-alt: var(--color-neutral-800);
   --color-brand: var(--color-sky-500);
+  /* 深色主题：设计稿底色 Sky 950、波形 Sky 300 */
+  --color-voice-input-surface: #082f49;
+  --color-voice-input-wave: #7dd3fc;
   --color-trajectory-user: #60a5fa;
   --color-trajectory-assistant: #2dd4bf;
   --color-trajectory-reasoning: #a78bfa;

@@ -1,3 +1,7 @@
 # Current V2 service needs no bootstrap admin secret or legacy Relay variables.
 # Bindings and migration history are defined in wrangler.jsonc.
 # Set KAYINGCODE_REMOTE_ORIGIN in the build shell for a custom public origin.
+#
+# /api/v1/client/* staging/e2e entry. Leave both unset to keep the route closed (404).
+# KAYINGCODE_API_MODE=mock
+# KAYINGCODE_API_UPSTREAM_ORIGIN=https://your-test-origin.example

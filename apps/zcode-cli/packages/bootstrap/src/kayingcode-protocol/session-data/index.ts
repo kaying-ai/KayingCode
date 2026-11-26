@@ -187,3 +187,9 @@ export async function purgeSessionData(
   });
   return result;
 }
+
+export {
+  previewSessionDeletion,
+  previewSessionDeletions,
+  executeSessionDeletion,
+} from "./permanent-deletion.js";

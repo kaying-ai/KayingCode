@@ -22,6 +22,7 @@ import {
   resolveKayingCodeRuntimeEnv,
   sanitizeKayingCodeRuntimeEnv,
 } from "@zcode/shared";
+import { KAYINGCODE_PREINSTALLED_TOOLS_AVAILABLE_ENV } from "@zcode/shared/preinstalled-tools";
 import {
   findKayingCodeAgentRuntimeBinary,
   findKayingCodeAgentRuntimeNodeBundle,
@@ -1030,6 +1031,11 @@ export class KayingCodeAgentProcessManager {
         [KAYINGCODE_RUNTIME_ENV_KEY]: runtimeEnv,
         ...spawnEnv,
         ...effectiveCommand.env,
+        // 预装工具入口由执行端 Host 决定：显式覆盖继承自 shell/部署命令的同名变量，
+        // 且只有 AVAILABLE 为真时才采用 Host 组装的 PATH（远端/无工具时保持原 PATH 语义）。
+        [KAYINGCODE_PREINSTALLED_TOOLS_AVAILABLE_ENV]:
+          spawnEnv[KAYINGCODE_PREINSTALLED_TOOLS_AVAILABLE_ENV],
+        ...(spawnEnv[KAYINGCODE_PREINSTALLED_TOOLS_AVAILABLE_ENV] ? { PATH: spawnEnv.PATH } : {}),
         // 身份/隔离语义使用 workspaceIdentity；cwd 继续使用 workspacePath。
         ...buildAgentWorkspaceIdentityEnv(params.workspaceIdentity),
         ...buildE2EAgentCoverageEnv(),

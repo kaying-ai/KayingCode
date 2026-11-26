@@ -1,5 +1,15 @@
+/* eslint-disable max-lines -- 归档平铺列表的跨 workspace 查询、软删除与永久删除行操作属于同一 UI 边界。 */
 import { useMemo, useState } from "react";
-import { ArchiveX, Cloud, CloudDownload, Folder, Smartphone, Trash2 } from "lucide-react";
+import {
+  ArchiveX,
+  Cloud,
+  CloudDownload,
+  Eraser,
+  Folder,
+  LoaderIcon,
+  Smartphone,
+  Trash2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button.js";
 import { cn } from "@/components/lib/utils.js";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
@@ -20,6 +30,7 @@ import { TaskListRemoteSyncHint } from "@/TaskListRemoteSyncHint.js";
 import { TaskListLoadingHint } from "@/TaskListLoadingHint.js";
 import { buildWorkspaceServiceLookup } from "@/lib/workspaceServiceResolver.js";
 import { DeleteAllArchivedTasksButton } from "@/DeleteAllArchivedTasksButton.js";
+import { useArchivedTaskPermanentDeletion } from "@/hooks/useArchivedTaskPermanentDeletion.js";
 
 export function WorkspaceArchivedTasksFlatSection({
   workspaceTabs,
@@ -92,6 +103,19 @@ export function WorkspaceArchivedTasksFlatSection({
   });
   const canToggleExpanded = total > collapsedLimit;
 
+  const { permanentDeletingTaskKeys, permanentDeleteMessages, deletePermanently } =
+    useArchivedTaskPermanentDeletion({
+      intl,
+      resolveService: (workspacePath, workspaceIdentity) =>
+        workspaceServiceLookup.get(buildTaskWorkspaceKey(workspacePath, workspaceIdentity))
+          ?.services.kayingcodeTaskService ?? null,
+      resolveWorkspaceLabel: (workspacePath, workspaceIdentity) =>
+        workspaceLabelByKey.get(buildTaskWorkspaceKey(workspacePath, workspaceIdentity)) ??
+        getPathLeaf(workspacePath),
+      onDeleted: removeTaskFromTaskCaches,
+      refresh,
+    });
+
   return (
     <div>
       <DeleteAllArchivedTasksButton
@@ -144,6 +168,7 @@ export function WorkspaceArchivedTasksFlatSection({
           const isMobileActive = false;
           const taskKey = `${workspaceKey}:${task.taskId}`;
           const isDeleting = deletingTaskKeys.has(taskKey);
+          const isPermanentDeleting = permanentDeletingTaskKeys.has(taskKey);
 
           return (
             <li
@@ -328,7 +353,46 @@ export function WorkspaceArchivedTasksFlatSection({
                     </Button>
                   </span>
                 </ControlHintTooltip>
+                <ControlHintTooltip
+                  title={intl.formatMessage({ id: "taskList.permanentDelete" })}
+                  side="top"
+                >
+                  <span className="inline-flex shrink-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      disabled={isDeleting || isPermanentDeleting}
+                      className="shrink-0 text-destructive hover:text-destructive"
+                      aria-label={intl.formatMessage({ id: "taskList.permanentDelete" })}
+                      data-testid="permanently-delete-archived-task"
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        void deletePermanently(task, taskKey);
+                      }}
+                    >
+                      {isPermanentDeleting ? (
+                        <LoaderIcon className="size-3.5 animate-spin" />
+                      ) : (
+                        <Eraser className="size-3.5" />
+                      )}
+                    </Button>
+                  </span>
+                </ControlHintTooltip>
               </div>
+              {permanentDeleteMessages[taskKey] ? (
+                <p
+                  role="status"
+                  className="mt-1 whitespace-pre-line break-words text-ui-sm text-destructive"
+                >
+                  {permanentDeleteMessages[taskKey]}
+                </p>
+              ) : null}
             </li>
           );
         })}

@@ -13,7 +13,12 @@ export {
   enablePrivateFileKeyFallback,
   createLegacyCredentialCipher,
   migrateCredentialRecord,
+  writeCredentialRecordLocked,
 } from "./systemCredentialCipher.js";
+export {
+  KAYINGCODE_CREDENTIALS_FILE_ENV,
+  readAssignedCredentialsFile,
+} from "./credentialFile.js";
 export {
   createCredentialCipherBridge,
   executeCredentialCipherRequest,

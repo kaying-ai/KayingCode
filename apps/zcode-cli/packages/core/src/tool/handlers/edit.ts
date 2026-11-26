@@ -83,9 +83,14 @@ function formatEditModelContent(output: unknown): string {
 }
 
 export const editHandler: ToolHandler = async (input, context) => {
-  const { file_path, old_string, new_string, replace_all } = EditInputSchema.parse(
-    input,
-  ) as EditInput;
+  const {
+    file_path,
+    old_string,
+    new_string,
+    replace_all: parsedReplaceAll,
+  } = EditInputSchema.parse(input) as EditInput;
+  // zod 4 迁移后 replace_all 为可选字段；未提供按 false 处理，与原默认语义一致。
+  const replace_all = parsedReplaceAll ?? false;
   const fileSystemPort = context.fileSystemPort;
 
   if (!fileSystemPort) {

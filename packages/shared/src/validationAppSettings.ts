@@ -43,6 +43,9 @@ const nonEmptyStringSchema = z.string().trim().min(1);
 
 export const localeSchema = z.enum(["zh-CN", "en-US"]);
 export const localePreferenceSchema = z.enum(["system", "zh-CN", "en-US"]);
+/** Agent 回复语言：用户自由输入的语言名，见 docs/i18n/agent-reply-language.md。 */
+export const REPLY_LANGUAGE_MAX_LENGTH = 256;
+export const replyLanguageSchema = z.string().trim().min(1).max(REPLY_LANGUAGE_MAX_LENGTH);
 const kayingcodeInteractionBehaviorSchema = z.enum(["queue", "guide"]);
 // launch.md「The user's choice」：读文件时未知取值（降级后读到新版本写的值）按「跟随」处理，
 // 不能让一个偏好字段把整份设置读坏。
@@ -539,6 +542,7 @@ const appSettingsObjectSchema = z.object({
   // 快捷键用户覆盖（语义校验在 ui/src/shortcuts 生效表阶段容错，schema 只管形状）
   shortcutBindings: z.record(z.string(), z.array(z.string())).optional(),
   localePreference: localePreferenceSchema.default("system"),
+  replyLanguage: replyLanguageSchema.optional(),
   terminalInheritSystemProfile: z.boolean().default(true),
   terminalFontFamily: nonEmptyStringSchema.optional(),
   integratedTerminalShell: integratedTerminalShellSelectionSchema.optional(),
@@ -571,6 +575,8 @@ const appSettingsObjectSchema = z.object({
   toolGroupingChangesEnabled: z.boolean().default(false),
   kayingcodeInteractionBehavior: kayingcodeInteractionBehaviorSchema.default("queue"),
   askUserQuestionAutoResolutionEnabled: z.boolean().default(true),
+  // 新装与存量用户默认关闭：只有用户显式开启后，Host 才给下一条输入注入插件发现工具面。
+  pluginAutoRecommendationEnabled: z.boolean().default(false),
   modelIoFullRetentionEnabled: z.boolean().default(false),
   dynamicWorkflowMode: dynamicWorkflowModeSettingSchema,
   enabledBuiltinAgentCliProviders: enabledBuiltinAgentCliProvidersSchema.default([
@@ -583,9 +589,15 @@ const appSettingsObjectSchema = z.object({
   providerFamilyDomainMigrated: z.boolean().default(false),
   nativeSearchEnhancementsEnabled: z.boolean().default(true),
   toolSearchMode: appToolSearchModeSchema.default("off"),
+  // 预装文档工具的全局偏好；缺省由预装进程按「自动开启、全部工具启用」解释。
+  // 只有预装进程写这两项，设置页 UI 通过设置服务 patch；spec 见 packages/shared/spec/preinstalled-tools.md。
+  preinstalledToolsAutoInstall: z.boolean().optional(),
+  preinstalledToolsAgentDisabled: z.array(z.string().min(1)).optional(),
   onboardingOccupation: appSettingsOccupationSchema.nullish(),
   proactiveSuggestionsEnabled: z.boolean().optional(),
   memoryEnabled: z.boolean().default(false),
+  totalTokensReminderEnabled: z.boolean().default(false),
+  agentAlwaysBackgroundEnabled: z.boolean().default(false),
   lastWorkspaceSession: z.array(appWorkspaceSessionEntrySchema).default([]),
   lastActiveWorkspace: appWorkspaceSessionEntrySchema.nullable().optional(),
   remoteConversationWorkspaceBySourceServerId: z
@@ -641,6 +653,8 @@ export const appSettingsPatchSchema = z.object({
   locale: localeSchema.optional(),
   shortcutBindings: z.record(z.string(), z.array(z.string())).optional(),
   localePreference: localePreferenceSchema.optional(),
+  // 空串是「清除回复语言、跟随时对话语言」的哨兵；normalizeSettingsPatch 归一成删除。
+  replyLanguage: z.union([replyLanguageSchema, z.literal("")]).optional(),
   terminalInheritSystemProfile: z.boolean().optional(),
   terminalFontFamily: nonEmptyStringSchema.optional(),
   integratedTerminalShell: integratedTerminalShellSelectionSchema.optional(),
@@ -667,6 +681,7 @@ export const appSettingsPatchSchema = z.object({
   toolGroupingChangesEnabled: z.boolean().optional(),
   kayingcodeInteractionBehavior: kayingcodeInteractionBehaviorSchema.optional(),
   askUserQuestionAutoResolutionEnabled: z.boolean().optional(),
+  pluginAutoRecommendationEnabled: z.boolean().optional(),
   modelIoFullRetentionEnabled: z.boolean().optional(),
   // 空串是「删除选择、回到跟随」的哨兵：RPC 会吞掉 undefined，normalizeSettingsPatch 把它归一成删除。
   dynamicWorkflowMode: z.union([z.enum(DYNAMIC_WORKFLOW_MODES), z.literal("")]).optional(),
@@ -678,6 +693,8 @@ export const appSettingsPatchSchema = z.object({
   providerFamilyDomainMigrated: z.boolean().optional(),
   nativeSearchEnhancementsEnabled: z.boolean().optional(),
   toolSearchMode: appToolSearchModeSchema.optional(),
+  preinstalledToolsAutoInstall: z.boolean().optional(),
+  preinstalledToolsAgentDisabled: z.array(z.string().min(1)).optional(),
   onboardingOccupation: z
     .enum([
       "office",
@@ -698,6 +715,8 @@ export const appSettingsPatchSchema = z.object({
     .nullish(),
   proactiveSuggestionsEnabled: z.boolean().optional(),
   memoryEnabled: z.boolean().optional(),
+  totalTokensReminderEnabled: z.boolean().optional(),
+  agentAlwaysBackgroundEnabled: z.boolean().optional(),
   lastWorkspaceSession: z.array(appWorkspaceSessionEntrySchema).optional(),
   lastActiveWorkspace: appWorkspaceSessionEntrySchema.nullable().optional(),
   remoteConversationWorkspaceBySourceServerId: z

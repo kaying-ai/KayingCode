@@ -12,7 +12,7 @@ import { useMemo, useRef, useState } from "react";
 import { ControlHintTooltip } from "@/ControlHintTooltip.js";
 import { cn } from "@/components/lib/utils.js";
 import { Button } from "@/components/ui/button.js";
-import { Cloud, Ellipsis, Folder, GitBranch, LoaderIcon } from "lucide-react";
+import { Cloud, Ellipsis, Folder, FolderGit2, GitBranch, LoaderIcon } from "lucide-react";
 import { useConfirmDialog } from "@/hooks/useConfirmDialog.js";
 import { useGlobalTaskList } from "@/hooks/useGlobalTaskList.js";
 import { useBaseWorkspaceServices, useWorkspaceServices } from "@/hooks/useWorkspaceServices.js";
@@ -36,6 +36,12 @@ import { useFeedbackStore } from "@/feedback/feedbackStore.js";
 import { useModelTrajectoryStore } from "@/store/modelTrajectoryStore.js";
 import { buildTaskFeedbackDescription } from "@/lib/taskFeedbackDraft.js";
 import { resolveGitBranchTriggerLabel } from "@/git-branch-switcher/display.js";
+import {
+  formatWorktreeLabel,
+  managedWorktreeTestIds,
+  useOptionalManagedWorktreeContext,
+  useTaskWorktreeEntry,
+} from "@/managed-worktrees/index.js";
 import type {
   WorkspaceHeaderState,
   WorkspaceHeaderTitleSectionProps,
@@ -187,9 +193,21 @@ export function WorkspaceHeaderTitleSection({
   const showRemoteWorkspaceHostLabel = Boolean(
     remoteWorkspaceHostLabel && workspaceDisplayLabel === projectName,
   );
-  const workspaceContextLabel = showRemoteWorkspaceHostLabel
-    ? `${workspaceDisplayLabel} @ ${remoteWorkspaceHostLabel}`
-    : workspaceDisplayLabel;
+  // worktree 任务只按 tasks-index 的归属显示标识（managed-worktrees/CONTRACT.md §1）：
+  // 任务元数据没有 worktree_root，归属来自 listWorktrees 的 tasks，并带 workspaceIdentity 匹配。
+  const managedWorktreeEntry = useTaskWorktreeEntry({
+    workspacePath: workspaceAbsPath,
+    ...(workspaceIdentity ? { workspaceIdentity } : {}),
+    taskId: activeTaskId,
+  });
+  const managedWorktreeLabel = formatWorktreeLabel(intl, managedWorktreeEntry?.path);
+  const managedWorktree = managedWorktreeLabel !== null;
+  const managedWorktreeContext = useOptionalManagedWorktreeContext();
+  const workspaceContextLabel = managedWorktreeLabel
+    ? managedWorktreeLabel
+    : showRemoteWorkspaceHostLabel
+      ? `${workspaceDisplayLabel} @ ${remoteWorkspaceHostLabel}`
+      : workspaceDisplayLabel;
   const workspaceBranchLabel = gitSummary.isRepository
     ? resolveGitBranchTriggerLabel({
         headRefType: gitSummary.headRefType,
@@ -417,6 +435,8 @@ export function WorkspaceHeaderTitleSection({
               <span className="flex min-w-0 items-start gap-2">
                 {isRemoteWorkspace ? (
                   <Cloud className="size-4 shrink-0" />
+                ) : managedWorktree ? (
+                  <FolderGit2 className="size-4 shrink-0" />
                 ) : (
                   <Folder className="size-4 shrink-0" />
                 )}
@@ -426,7 +446,8 @@ export function WorkspaceHeaderTitleSection({
                   </span>
                   {workspaceContextOpen ? (
                     <WorkspaceContextPath
-                      workspacePath={workspaceAbsPath}
+                      // worktree 任务显示 worktree 根目录，而不是项目主目录。
+                      workspacePath={managedWorktreeEntry?.path ?? workspaceAbsPath}
                       workspaceIdentity={workspaceIdentity}
                       remoteSessionId={remoteSessionId}
                     />
@@ -459,9 +480,26 @@ export function WorkspaceHeaderTitleSection({
           >
             {isRemoteWorkspace ? (
               <Cloud className="size-4 text-foreground-subtle" />
+            ) : managedWorktree ? (
+              <FolderGit2 className="size-4 text-foreground-subtle" />
             ) : (
               <Folder className="size-4 text-foreground-subtle" />
             )}
+          </Button>
+        </ControlHintTooltip>
+      ) : null}
+      {/* 受管 worktree 管理入口：只有本机项目 Host 提供 service 时出现（CONTRACT.md §6）。 */}
+      {managedWorktreeContext?.projectId && managedWorktreeContext.service ? (
+        <ControlHintTooltip title={intl.formatMessage({ id: "managedWorktrees.manage.tooltip" })}>
+          <Button
+            type="button"
+            variant="ghost"
+            size={compact ? "icon-sm" : "icon-md"}
+            data-testid={managedWorktreeTestIds.manageButton}
+            aria-label={intl.formatMessage({ id: "managedWorktrees.manage" })}
+            onClick={() => managedWorktreeContext.openWorktrees()}
+          >
+            <FolderGit2 className="size-4 text-foreground-subtle" />
           </Button>
         </ControlHintTooltip>
       ) : null}

@@ -34,9 +34,12 @@ import {
 import {
   buildStoreItems,
   canUpdatePluginItem,
-  isPluginUpdatePending,
+  hasInstallableUpdate,
+  isPluginVisibleForStoreRegion,
+  isStoreItemInstallBlocked,
   resolveItemDisplayName,
   resolvePluginDisplayName,
+  resolvePluginStoreRegion,
   type StorePluginItem,
 } from "@/settings/pluginStoreListing.js";
 import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID } from "@zcode/shared";
@@ -145,6 +148,10 @@ export function PluginStorePage({
     void KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID;
   }, [marketplaces, pluginManagementService, updateMarketplace]);
 
+  // 商店浏览（分段、Featured、分类、游戏专区、搜索、详情定位）只看当前地区可见的条目；
+  // 已安装条目在 isPluginVisibleForStoreRegion 里保留，管理已安装视图用自己的全集不受影响。
+  // 地区暂由 locale 推导，见 packages/shared/spec/plugin-store-regions.md。
+  const storeRegion = resolvePluginStoreRegion(locale);
   const items = useMemo(
     () =>
       buildStoreItems({
@@ -154,7 +161,7 @@ export function PluginStorePage({
         installedPlugins,
         plugins,
         restorableBuiltins,
-      }),
+      }).filter((item) => isPluginVisibleForStoreRegion(item, storeRegion)),
     [
       availablePlugins,
       installedPlugins,
@@ -162,6 +169,7 @@ export function PluginStorePage({
       marketplaces,
       plugins,
       restorableBuiltins,
+      storeRegion,
     ],
   );
   const itemById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
@@ -285,6 +293,8 @@ export function PluginStorePage({
 
   const handleInstall = useCallback(
     async (item: StorePluginItem) => {
+      // 示例提示词对未安装条目也走这里：不兼容的版本不能装，按钮之外的入口同样挡住。
+      if (isStoreItemInstallBlocked(item)) return;
       if (item.restorable) {
         await restoreBuiltin(item.id, pluginManagementService);
       } else {
@@ -346,7 +356,7 @@ export function PluginStorePage({
     }
     const pendingCount = usePluginManagementStore
       .getState()
-      .installedPlugins.filter((item) => isPluginUpdatePending(item.updateStatus)).length;
+      .installedPlugins.filter(hasInstallableUpdate).length;
     if (pendingCount > 0) {
       toast(
         intl.formatMessage(

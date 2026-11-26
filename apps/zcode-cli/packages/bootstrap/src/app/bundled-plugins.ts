@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve, sep } from "node:path";
-import { writeBundledOfficialMarketplacePartitionSync } from "@zcode/adapters";
+import { writeBundledOfficialMarketplacePartition } from "@zcode/adapters";
 import { KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE, type Logger } from "@zcode/contracts";
 import {
   createOfficialPluginCacheRetryBudget,
@@ -75,16 +75,16 @@ interface SeaOfficialPluginManifest {
 
 type SeaModule = typeof import("node:sea");
 
-function seedBundledOfficialPlugins(input: {
+async function seedBundledOfficialPlugins(input: {
   logger?: Logger;
   storageRoot: string;
-}): OfficialPluginDefinition[] {
+}): Promise<OfficialPluginDefinition[]> {
   const source = resolveSeedSource();
   if (!source) return [];
 
   // Catalog/cache 是内置插件的不可变产品资产；Runtime 是否加载由 discovery 的抑制态决定，
   // 不能在 seed 阶段删除或过滤，否则卸载后详情页无法读取组件，也无法恢复。
-  writeOfficialMarketplace(input.storageRoot, source);
+  await writeOfficialMarketplace(input.storageRoot, source);
   const retryBudget = createOfficialPluginCacheRetryBudget();
   // 等锁超时降级后循环会继续；若每个插件独立重置 15s 等待预算，成组遗留的
   // 锁会让启动同步冻结 N×15s。全部插件共享同一截止时间：无争用的锁仍瞬时获取（mkdir
@@ -223,15 +223,15 @@ function tryWriteOfficialPluginRuntimeManifest(input: {
   }
 }
 
-export function resolveOfficialPluginRoots(input: {
+export async function resolveOfficialPluginRoots(input: {
   env?: NodeJS.ProcessEnv;
   extraRoots?: string[];
   logger?: Logger;
   storageRoot: string;
   suppressedBuiltins?: ReadonlySet<string>;
-}): string[] {
+}): Promise<string[]> {
   const suppressedBuiltins = new Set(input.suppressedBuiltins ?? []);
-  const failedSeeds = seedBundledOfficialPlugins({
+  const failedSeeds = await seedBundledOfficialPlugins({
     logger: input.logger,
     storageRoot: input.storageRoot,
   });
@@ -394,8 +394,11 @@ function readSeedFileBytes(
   );
 }
 
-function writeOfficialMarketplace(storageRoot: string, source: OfficialPluginSeedSource): void {
-  writeBundledOfficialMarketplacePartitionSync({
+async function writeOfficialMarketplace(
+  storageRoot: string,
+  source: OfficialPluginSeedSource,
+): Promise<void> {
+  await writeBundledOfficialMarketplacePartition({
     manifest: {
       name: OFFICIAL_PLUGIN_MARKETPLACE,
       plugins: source.plugins.map((plugin) => {

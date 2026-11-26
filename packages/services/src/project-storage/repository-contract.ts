@@ -31,6 +31,13 @@ export type ProjectTask = import("@zcode/shared").KayingCodeTaskMeta & {
   hostId: string;
   pinned: boolean;
   archived: boolean;
+  /**
+   * 受管 worktree 的根目录（tasks-index `worktree_root`）。产品适配：共享 KayingCodeTaskMeta 尚未声明
+   * 这两个字段，先在 services 的项目任务投影上暴露；普通任务缺省。
+   */
+  worktreeRoot?: string;
+  /** 任务 cwd（tasks-index `root_path`）；只在与 workspacePath 不同时出现。 */
+  cwd?: string;
 };
 export interface ProjectTree {
   legacySingleRoot?: true;
@@ -54,7 +61,10 @@ export interface SaveProjectInput {
   restoreProjectId?: string;
 }
 export interface ProjectDirectories {
+  /** 任务所属 workspace；worktree 任务是项目主目录，不是 cwd。 */
   workspacePath: string;
+  /** 任务 cwd；只在与 workspacePath 不同时出现（受管 worktree 任务）。 */
+  cwd?: string;
   /** 远端装配层登记后的 attachment 身份；执行仍使用 workspacePath。 */
   workspaceIdentity?: string;
   additionalDirectories: string[];
@@ -95,7 +105,29 @@ export interface ProjectRepositoryContract {
           creationCommand?: { clientId: string; commandId: string };
           /** Host 已固化的执行目录；首次预留持久化，重试不改。undefined 为普通新建。 */
           additionalDirectories?: string[];
+          /**
+           * worktree 任务的 cwd 与 worktree 根目录，必须同时出现；task.workspacePath 仍是项目 workspace。
+           * 只在首次预留时写入，之后不变。
+           */
+          cwd?: string;
+          worktreeRoot?: string;
+          /** 同目录 fork 的父任务 ID；父任务在受管 worktree 中时子行继承父行的 cwd 与附加目录。 */
+          forkedFromTaskId?: string;
         }
       | { task: ProjectTaskRef; parentTaskId: string },
   ): ProjectDirectories & { taskId: string };
+  /** 任务行记录的 cwd（`root_path`）；没有这一行时返回 null，不回退为 workspace 路径。 */
+  readTaskCwd(task: ProjectTaskRef): string | null;
+  /**
+   * 撤销一条尚无 CLI 事实的创建预留及其创建回执。released = 已撤销；absent = 没有这一行；
+   * kept = 行已有 CLI 事实（会话已存在），不删除。
+   */
+  releaseReservedTask(input: { task: ProjectTaskRef }): "released" | "absent" | "kept";
+  /**
+   * 只读：本 Host 上运行在指定受管 worktree 中的未删除任务（按 worktree_root 精确匹配），
+   * 用于管理弹窗的"使用它的任务"与删除前占用检查。
+   */
+  listTasksByWorktree(input: {
+    worktreeRoot: string;
+  }): Array<ProjectTaskRef & { projectId: string | null; title: string; archived: boolean }>;
 }

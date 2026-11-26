@@ -47,6 +47,7 @@ import type {
   TurnSteerDiscardedPayload,
   TurnSteerDispatchChangedPayload,
   TurnSteerDrainedPayload,
+  TurnSteerEditLockChangedPayload,
   TurnSteerQueuedPayload,
   UserInputAutoResolutionUpdatedPayload,
   WorkspaceHookAdmissionUpdatedPayload,
@@ -54,6 +55,7 @@ import type {
   WorkspaceHookReviewRequestedPayload,
   WorkspaceHookReviewSettledPayload,
   WorkspaceHookReviewSupersededPayload,
+  WorktreeCreatedPayload,
 } from "@zcode/contracts";
 import {
   DEFERRED_TOOL_CALL_NAME,
@@ -124,6 +126,7 @@ import {
   applyConversationDeltasMutable,
   createMutableConversationSnapshotAccumulator,
   diffWorkflowRunsState,
+  pluginInstallRequestPayloadSchema,
   reduceWorkflowRunsState,
   workspaceHookReviewRequestPayloadSchema,
 } from "@zcode/shared/kayingcode-protocol-v4";
@@ -460,6 +463,10 @@ export class ProductProjection {
   // resume SessionStart 没有 turnId；先保留在 CLI projection，下一条真实 user-intent
   // TurnStarted 到达后再分配 rowId/turnId。不得构造 session-hooks:* synthetic turn。
   private pendingSessionHookInvocations = new Map<string, PendingSessionHookInvocation>();
+  // 新建 worktree 会话：WorktreeCreated 先于首轮到达，暂存到首个 TurnStarted 时在轮顶落行
+  // （docs/git/worktree.md §6.6.4）。
+  private pendingWorktreeCreated: { event: SessionEvent; payload: WorktreeCreatedPayload } | null =
+    null;
   // rewind 后 async Hook 的 terminal 仍可能迟到；保留 invocation 墓碑，避免被删旧分支
   // 因找不到原 row 而被 terminal-only 兼容路径重新 append。
   private rewoundHookInvocationIds = new Set<string>();
@@ -1073,6 +1080,7 @@ export class ProductProjection {
         : (this.productTurnIdByRuntimeTurnId.get(runtimeTurnId) ?? runtimeTurnId);
     // 在归约前取，与 publisher 快路径（ingest）对同一状态判定“是否为已打开流式行的追加”。
     const streamingAppend = materializeActions && this.establishedStreamingAppend(event) !== null;
+    const firstNewRowId = this.nextRowId;
     const reduced =
       event.type === SessionEventType.AssistantFeedbackUpdated
         ? this.onAssistantFeedbackUpdated(event)
@@ -1088,6 +1096,37 @@ export class ProductProjection {
                 this.normalizationDiagnostics.push(...fact.diagnostics);
                 return this.reduce(fact);
               })();
+    // 只有真实输入被接纳才收起上一批活动结束明细；发送失败、草稿编辑和系统续跑不清除。
+    // 身份与计数仍留在各自权威投影里，这里只记录“上一批已收起”的边界（docs/ui/chat-summary-panel.md §8）。
+    const hasNewUserInput = reduced.some(
+      (delta) =>
+        (delta.op === "row.upserted" || delta.op === "row.appended") &&
+        delta.row.kind === "userInput" &&
+        delta.row.origin === "realUser" &&
+        delta.row.rowId >= firstNewRowId,
+    );
+    if (hasNewUserInput) {
+      const runningChildren = new Set(
+        this.snapshot.subagents?.running.map((item) => item.childSessionId),
+      );
+      reduced.push({
+        op: "state.updated",
+        patch: {
+          activitySummaryDismissed: {
+            at: this.ms(event),
+            workIds: this.snapshot.backgroundWorks
+              .filter((work) => work.status !== "running")
+              .map((work) => work.workId),
+            subagentIds: (this.snapshot.subagents?.childSessionIds ?? []).filter(
+              (id) => !runningChildren.has(id),
+            ),
+            workflowRunIds: (this.snapshot.workflowRuns?.runs ?? [])
+              .filter((run) => run.status !== "running" && run.status !== "pending")
+              .map((run) => run.runId),
+          },
+        },
+      });
+    }
     const subagentDeltas = this.shouldMaterializeSubagentProjection(reduced)
       ? this.materializeSubagentProjection(reduced)
       : [];
@@ -1162,6 +1201,7 @@ export class ProductProjection {
     );
     clone.subagentRowIdByAgentId = new Map(this.subagentRowIdByAgentId);
     clone.hookRowIdByInvocationId = new Map(this.hookRowIdByInvocationId);
+    clone.pendingWorktreeCreated = this.pendingWorktreeCreated;
     clone.pendingSessionHookInvocations = new Map(
       [...this.pendingSessionHookInvocations].map(([invocationId, pending]) => [
         invocationId,
@@ -1226,6 +1266,7 @@ export class ProductProjection {
     this.fileToolInputPreviewByCallId = candidate.fileToolInputPreviewByCallId;
     this.subagentRowIdByAgentId = candidate.subagentRowIdByAgentId;
     this.hookRowIdByInvocationId = candidate.hookRowIdByInvocationId;
+    this.pendingWorktreeCreated = candidate.pendingWorktreeCreated;
     this.pendingSessionHookInvocations = candidate.pendingSessionHookInvocations;
     this.rewoundHookInvocationIds = candidate.rewoundHookInvocationIds;
     this.invalidSubagentChildSessionIds = candidate.invalidSubagentChildSessionIds;
@@ -1479,6 +1520,16 @@ export class ProductProjection {
         return this.onToolCallError(event);
       case SessionEventType.PermissionRequested:
         return this.onPermissionRequested(event);
+      case SessionEventType.PluginInstallRequested:
+        return this.onPluginInstallRequested(event);
+      case SessionEventType.PluginInstallResolved:
+        // 卡片动作只改交互与工具行状态；插件安装本身由 Host 在 CLI 应答后执行。
+        return this.acceptsActiveModelEvent(event)
+          ? this.settlePermission(
+              String((event.payload as { toolCallId: string }).toolCallId),
+              "running",
+            )
+          : [];
       case SessionEventType.PermissionResolved:
         return this.onPermissionResolved(event);
       case SessionEventType.PermissionDenied:
@@ -1555,6 +1606,8 @@ export class ProductProjection {
         return this.onTurnSteerDeliveryChanged(event);
       case SessionEventType.TurnSteerDispatchChanged:
         return this.onTurnSteerDispatchChanged(event);
+      case SessionEventType.TurnSteerEditLockChanged:
+        return this.onTurnSteerEditLockChanged(event);
       case SessionEventType.TurnSteerDrained:
         return this.onTurnSteerDrained(event);
       case SessionEventType.TurnSteerDiscarded:
@@ -1581,6 +1634,8 @@ export class ProductProjection {
         return this.onTargetChanged(event);
       case SessionEventType.TargetCompletionVerification:
         return this.onTargetVerification(event);
+      case SessionEventType.WorktreeCreated:
+        return this.onWorktreeCreated(event);
       case SessionEventType.SessionForked:
         return this.onSessionForked(event);
       case SessionEventType.RewindTriggered:
@@ -1635,7 +1690,10 @@ export class ProductProjection {
       });
     }
     const pendingInteractions = this.snapshot.pendingInteractions.filter(
-      (interaction) => interaction.payload.kind !== "workspaceHookReview",
+      (interaction) =>
+        interaction.payload.kind !== "workspaceHookReview" &&
+        // 插件安装确认属于旧 Runtime 的卡片；新 epoch 不能再解析它。
+        interaction.payload.kind !== "pluginInstall",
     );
     if (pendingInteractions.length !== this.snapshot.pendingInteractions.length) {
       // reviewFlowId/generation 只在单个 Runtime controller 内单调。
@@ -2116,6 +2174,14 @@ export class ProductProjection {
     // 生成“正在使用”marker。思考深度变化只更新 config.thought，不是模型身份变化。
     // Bug 背景：旧实现在 onModelSelected（切换动作时）即落 marker，草稿态预热会话
     // 切一次模型就会在首条消息上方挂出 [modelChange]。
+    if (this.pendingWorktreeCreated) {
+      const pending = this.pendingWorktreeCreated;
+      this.pendingWorktreeCreated = null;
+      deltas.push({
+        op: "row.appended",
+        row: this.worktreeCreatedRow(pending.event, turnId, pending.payload, "lightBoundary"),
+      });
+    }
     const config = this.snapshot.config;
     const hasModel = config.provider !== "" && config.model !== "";
     if (hasModel && this.lastTurnModel.kind === "sourceLess") {
@@ -2983,7 +3049,9 @@ export class ProductProjection {
     const pendingInteractions = this.snapshot.pendingInteractions.filter(
       (interaction) =>
         !(
-          (interaction.payload.kind === "permission" || interaction.payload.kind === "userInput") &&
+          (interaction.payload.kind === "permission" ||
+            interaction.payload.kind === "userInput" ||
+            interaction.payload.kind === "pluginInstall") &&
           typeof interaction.payload.toolCallId === "string" &&
           closedToolCallIds.has(interaction.payload.toolCallId)
         ),
@@ -3417,6 +3485,46 @@ export class ProductProjection {
 
   // ── 权限交互（阻塞交互 → 状态）──
 
+  private onPluginInstallRequested(event: SessionEvent): ConversationDelta[] {
+    // 旧 turn 的异步目录解析/确认收尾不能覆盖新 turn 的交互投影。
+    if (!this.acceptsActiveModelEvent(event)) return [];
+    const payload = event.payload as { interactionId: string; request: unknown };
+    const request = pluginInstallRequestPayloadSchema.parse(payload.request);
+    const row = this.findToolRow(request.toolCallId);
+    const interaction: PendingInteraction = {
+      interactionId: payload.interactionId,
+      kind: "pluginInstall",
+      anchorRowId: row?.rowId ?? null,
+      createdAt: this.ms(event),
+      payload: request,
+    };
+    return [
+      ...(row
+        ? [
+            {
+              op: "row.upserted" as const,
+              row: {
+                ...row,
+                status: "pendingApproval" as const,
+                approvalInteractionId: interaction.interactionId,
+              },
+            },
+          ]
+        : []),
+      {
+        op: "state.updated",
+        patch: {
+          pendingInteractions: [
+            ...this.snapshot.pendingInteractions.filter(
+              (item) => item.interactionId !== interaction.interactionId,
+            ),
+            interaction,
+          ],
+        },
+      },
+    ];
+  }
+
   private onPermissionRequested(event: SessionEvent): ConversationDelta[] {
     const payload = event.payload as PermissionRequestedPayload;
     const toolCallId = String(payload.toolCallId);
@@ -3711,7 +3819,9 @@ export class ProductProjection {
     const remaining = this.snapshot.pendingInteractions.filter(
       (item) =>
         !(
-          (item.payload.kind === "permission" || item.payload.kind === "userInput") &&
+          (item.payload.kind === "permission" ||
+            item.payload.kind === "userInput" ||
+            item.payload.kind === "pluginInstall") &&
           item.payload.toolCallId === toolCallId
         ),
     );
@@ -3809,6 +3919,8 @@ export class ProductProjection {
               : { state: "notRequested" },
       dispatch: { state: "queued" },
       ...(highspeed ? { highspeed } : {}),
+      // 编辑锁由独立事件裁决；同 id 重发 queued（例如权限批量改写）不能顺带解锁。
+      ...(existing?.editLock ? { editLock: existing.editLock } : {}),
       automationId: payload.automationId ?? existing?.automationId,
       ...(payload.toolDisallowlist ? { toolDisallowlist: [...payload.toolDisallowlist] } : {}),
       admittedAt: payload.intent?.admittedAt ?? existing?.admittedAt ?? this.ms(event),
@@ -3856,6 +3968,26 @@ export class ProductProjection {
               ? { ...candidate, dispatch }
               : candidate,
           ),
+        }),
+      },
+    ];
+  }
+
+  private onTurnSteerEditLockChanged(event: SessionEvent): ConversationDelta[] {
+    const payload = event.payload as TurnSteerEditLockChangedPayload;
+    if (!this.snapshot.queue.items.some((item) => item.queueItemId === payload.pendingInputId)) {
+      return [];
+    }
+    return [
+      {
+        op: "state.updated",
+        patch: this.queuePatch({
+          ...this.snapshot.queue,
+          items: this.snapshot.queue.items.map((item) => {
+            if (item.queueItemId !== payload.pendingInputId) return item;
+            const { editLock: _released, ...unlocked } = item;
+            return payload.editLock ? { ...unlocked, editLock: { ...payload.editLock } } : unlocked;
+          }),
         }),
       },
     ];
@@ -4420,6 +4552,25 @@ export class ProductProjection {
     );
     const endedTotal = childSessionIds.length - running.length;
     const semanticState = { childSessionIds, running, endedTotal };
+    // 恢复只是重新运行，不是同一批结束结果的继续展示：把它移出已收起身份集合，
+    // 否则新一轮结束摘要会被上一批边界永久隐藏。运行态未变时也要单独发这一条。
+    const dismissed = this.snapshot.activitySummaryDismissed;
+    const resumedIds = new Set(running.map((item) => item.childSessionId));
+    const visibilityDeltas: ConversationDelta[] = dismissed?.subagentIds.some((id) =>
+      resumedIds.has(id),
+    )
+      ? [
+          {
+            op: "state.updated",
+            patch: {
+              activitySummaryDismissed: {
+                ...dismissed,
+                subagentIds: dismissed.subagentIds.filter((id) => !resumedIds.has(id)),
+              },
+            },
+          },
+        ]
+      : [];
     if (
       JSON.stringify(semanticState) ===
       JSON.stringify({
@@ -4428,9 +4579,10 @@ export class ProductProjection {
         endedTotal: previous.endedTotal,
       })
     ) {
-      return [];
+      return visibilityDeltas;
     }
     return [
+      ...visibilityDeltas,
       {
         op: "state.updated",
         patch: {
@@ -4753,7 +4905,26 @@ export class ProductProjection {
     const backgroundWorks = existing
       ? prev.map((work) => (work.workId === workId ? next : work))
       : [...prev, next];
-    return [{ op: "state.updated", patch: { backgroundWorks } }];
+    return [
+      {
+        op: "state.updated",
+        patch: {
+          backgroundWorks,
+          // 同一 workId 重新运行：不能沿用旧的收起标记，否则新一轮结束结果会被历史边界藏掉。
+          ...(status === "running" &&
+          this.snapshot.activitySummaryDismissed?.workIds.includes(workId)
+            ? {
+                activitySummaryDismissed: {
+                  ...this.snapshot.activitySummaryDismissed,
+                  workIds: this.snapshot.activitySummaryDismissed.workIds.filter(
+                    (id) => id !== workId,
+                  ),
+                },
+              }
+            : {}),
+        },
+      },
+    ];
   }
 
   // ── dwf 实时运行态：DynamicWorkflowRunProgress → workflowRuns 状态键 ──
@@ -4776,7 +4947,28 @@ export class ProductProjection {
     // 全程 O(N²)（workflow-runs-delta.ts 的文件头讲了这笔账怎么变成节点上界和 UI 卡死的）。
     // `applyAll(prior, diff(prior, next))` 与 next **逐字节**一致是被 property 测试钉住的契约，
     // 所以 applyEventInternal 把这串 delta 应用回去之后，this.snapshot.workflowRuns 仍是 next。
-    return diffWorkflowRunsState(prior, workflowRuns);
+    const deltas = diffWorkflowRunsState(prior, workflowRuns);
+    // 恢复沿用 runId：不清除旧的收起标记会让新一轮结束结果被上一批边界藏掉。
+    // 只认 pending/running 的有效状态，重复旧事件不能复活历史结果。
+    const dismissed = this.snapshot.activitySummaryDismissed;
+    const run = envelope.runId
+      ? workflowRuns.runs.find((item) => item.runId === envelope.runId)
+      : undefined;
+    if (
+      (run?.status === "running" || run?.status === "pending") &&
+      dismissed?.workflowRunIds.includes(run.runId)
+    ) {
+      deltas.push({
+        op: "state.updated",
+        patch: {
+          activitySummaryDismissed: {
+            ...dismissed,
+            workflowRunIds: dismissed.workflowRunIds.filter((id) => id !== run.runId),
+          },
+        },
+      });
+    }
+    return deltas;
   }
 
   private removeQueueItems(ids: readonly string[]): ConversationDelta[] {
@@ -5494,6 +5686,42 @@ export class ProductProjection {
     return [{ op: "row.appended", row }];
   }
 
+  // ── worktree marker（受管 worktree 创建结果，docs/git/worktree.md §6.6.4）──
+
+  private onWorktreeCreated(event: SessionEvent): ConversationDelta[] {
+    const payload = event.payload as WorktreeCreatedPayload;
+    if (this.turnHeaderRowIdByTurnId.size === 0) {
+      this.pendingWorktreeCreated = { event, payload };
+      return [];
+    }
+    return [
+      {
+        op: "row.appended",
+        row: this.worktreeCreatedRow(event, this.turnIdOf(event), payload, "turnTailBoundary"),
+      },
+    ];
+  }
+
+  private worktreeCreatedRow(
+    event: SessionEvent,
+    turnId: string,
+    payload: WorktreeCreatedPayload,
+    lane: "lightBoundary" | "turnTailBoundary",
+  ): TimelineMarkerRow {
+    return {
+      ...this.rowBase(event, turnId, `worktree-created:${payload.path}`),
+      kind: "timelineMarker",
+      lane,
+      marker: {
+        type: "worktreeCreated",
+        path: payload.path,
+        sha: payload.sha,
+        ref: payload.ref,
+        output: payload.output,
+      },
+    };
+  }
+
   // ── 内部工具 ──
 
   // goal 传 undefined = 不动 goal；传 null/对象 = 随本 patch 一并替换（availability 同源派生）。
@@ -5515,6 +5743,7 @@ export class ProductProjection {
       goalVerifying: next.activeWorks.some((work) => work.kind === "goalVerifier"),
       queueLength: nextQueue.items.length,
       autoDrain: nextQueue.autoDrain,
+      queueHeadEditLocked: nextQueue.items[0]?.editLock !== undefined,
     };
     return {
       control: next,
@@ -5556,6 +5785,7 @@ export class ProductProjection {
       goalVerifying: this.snapshot.control.activeWorks.some((work) => work.kind === "goalVerifier"),
       queueLength: queue.items.length,
       autoDrain: queue.autoDrain,
+      queueHeadEditLocked: queue.items[0]?.editLock !== undefined,
     };
   }
 

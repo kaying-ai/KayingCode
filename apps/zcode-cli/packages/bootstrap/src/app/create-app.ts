@@ -13,7 +13,11 @@ import {
   createNodeToolArtifactStore,
 } from "@zcode/adapters/storage";
 import { createNodeLoggerFactory } from "@zcode/adapters/logging";
-import { createConfig, resolvePath } from "@zcode/adapters/config";
+import {
+  createConfigWithPluginMigrations,
+  resolvePath,
+  resolveWorkspaceHookTrustIdentityForWorkspace,
+} from "@zcode/adapters/config";
 import {
   createNodeExecutionAdapter,
   resolveEffectiveBashShellSelection,
@@ -24,8 +28,11 @@ import { createJimpImageProcessorAdapter } from "@zcode/adapters/image";
 import { createPopplerPdfDocumentAdapter } from "@zcode/adapters/pdf";
 import { createNodeSessionMailboxAdapter } from "@zcode/adapters/mailbox";
 import { createNodeContextSourceAdapter } from "@zcode/adapters/context";
-import { createNodeSkillAdapter } from "@zcode/adapters/skills";
-import { createMcpAdapter } from "@zcode/adapters/mcp";
+import { createInMemoryMcpToolCatalog, createMcpAdapter } from "@zcode/adapters/mcp";
+import type { CatalogSkillPort } from "@zcode/adapters/skills/catalog";
+import type { McpConfigurationSource } from "@zcode/contracts";
+import { createAppSkillPort } from "./dynamic-skill-catalog.js";
+import { createAppMcpConfigurationSource } from "./dynamic-mcp-config.js";
 import {
   AgentRuntime,
   normalizeAgentProfiles,
@@ -85,7 +92,6 @@ import { createSessionFacade } from "./session-facade.js";
 import { resolveAppRuntimeConfig, runtimeConfigLogContext } from "./runtime-config.js";
 import { resolveBundledSkillRoots } from "./bundled-skills.js";
 import { resolveMcpNodeFallbackProvider } from "./mcp-node-fallback.js";
-import { collectDynamicWorkflowDisabledSkillPaths } from "./dynamic-workflow-gate.js";
 import { createWorkspaceHookRuntimeSecurity } from "./workspace-hook-trust.js";
 import { createScriptWorkflowBridge } from "./script-workflow-methods.js";
 import {
@@ -119,7 +125,6 @@ import { resolveBuiltInNodeReplMcpServers } from "./built-in-node-repl.js";
 import { resolveKayingCodeCustomCommandPrompt } from "../custom-command-prompt.js";
 import { resolveKayingCodeBuiltinPromptCommandInvocation } from "../builtin-prompt-command.js";
 import { BUILTIN_WORKFLOW_COMMAND_NAME } from "../builtin-workflow-command.js";
-import { collectDisabledPaths } from "../skill-command-overrides.js";
 import {
   loadPluginAgentTemplates,
   resolvePluginAgentProfiles,
@@ -177,6 +182,48 @@ function decodePromptAttachmentDataUrl(
   return { bytes, mediaType };
 }
 
+type SessionStoreLike = NonNullable<KayingCodeAppOptions["sessionStore"]>;
+
+/**
+ * 跨进程 in-use 的 runtime 归属登记。同一进程内可能有多个 app 共用同一个 sessionId
+ * （重启交界），按 store 计数，只有最后一个实例关闭后才注销 presence，避免旧实例提前放行删除。
+ * 用 WeakMap 以 store 为键：测试或多库场景下不同 store 的同名 session 不能互相吞掉登记。
+ */
+const sessionRuntimeRegistrationCounts = new WeakMap<object, Map<string, number>>();
+
+function runtimeRegistrationCountsOf(sessionStore: SessionStoreLike): Map<string, number> {
+  let counts = sessionRuntimeRegistrationCounts.get(sessionStore);
+  if (!counts) {
+    counts = new Map();
+    sessionRuntimeRegistrationCounts.set(sessionStore, counts);
+  }
+  return counts;
+}
+
+async function registerSessionRuntimePresence(
+  sessionStore: SessionStoreLike,
+  sessionId: SessionId,
+): Promise<void> {
+  const counts = runtimeRegistrationCountsOf(sessionStore);
+  const count = counts.get(sessionId) ?? 0;
+  if (count === 0) await sessionStore.registerSessionRuntime?.(sessionId);
+  counts.set(sessionId, count + 1);
+}
+
+async function unregisterSessionRuntimePresence(
+  sessionStore: SessionStoreLike,
+  sessionId: SessionId,
+): Promise<void> {
+  const counts = runtimeRegistrationCountsOf(sessionStore);
+  const count = counts.get(sessionId) ?? 0;
+  if (count > 1) {
+    counts.set(sessionId, count - 1);
+    return;
+  }
+  counts.delete(sessionId);
+  if (count === 1) await sessionStore.unregisterSessionRuntime?.(sessionId);
+}
+
 export async function createKayingCodeApp(options: KayingCodeAppOptions): Promise<KayingCodeApp> {
   if (!options?.providerRegistry) {
     throw new Error("createKayingCodeApp requires a Provider Registry");
@@ -186,12 +233,22 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
   const sessionId = options.sessionId ?? createSessionId();
   const traceContext = options.traceContext ?? createRootTraceContext({ sessionId });
   const workingDirectory = resolve(options.runtimeConfig?.workingDirectory ?? process.cwd());
+  // Hook Trust identity（D23）：受管 worktree 归一为源仓库路径，snapshot 与 Trust record 共用该键。
+  // createConfig 是同步函数，resolver 要异步读取 .git 链接，所以在这里先算好再传入。
+  const workspaceHookTrustIdentity = await resolveWorkspaceHookTrustIdentityForWorkspace({
+    workspacePath: workingDirectory,
+    ...(options.runtimeConfig?.memory?.workspaceIdentity?.trim()
+      ? { workspaceIdentity: options.runtimeConfig.memory.workspaceIdentity.trim() }
+      : {}),
+    ...(options.env ? { env: options.env } : {}),
+  });
   const configResult = resolveEffectiveConfigResult(
-    createConfig({
+    await createConfigWithPluginMigrations({
       env: options.env,
       projectConfigPath: options.projectConfigPath,
       workingDirectory,
       workspaceIdentity: options.runtimeConfig?.memory?.workspaceIdentity,
+      workspaceHookTrustIdentity,
       skipUserConfig: options.skipUserConfig,
       userConfigPath: options.userConfigPath,
       cliOverrides: createConfigCliOverrides(options),
@@ -232,6 +289,8 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
   let nodeReplBrowserBroker: NodeReplBrowserBroker | undefined;
   let ownedNodeReplBrowserBroker: NodeReplBrowserBroker | undefined;
   let providerModelRuntime: ApiProviderModelRuntime | undefined;
+  let catalogSkillPort: CatalogSkillPort | undefined;
+  let mcpConfigSource: McpConfigurationSource | undefined;
   try {
     const storageRoot = resolvePath(configResult.config.storage.dir);
     const cliStorageRoot = getCliStorageRoot(storageRoot);
@@ -253,7 +312,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
           additionalDirectories: options.additionalDirectories,
         });
     const kayingcodeSubagentProfiles = kayingcodeSubagentProfileOutcome.profiles;
-    const pluginOutcome = resolveStartupPlugins({
+    const pluginOutcome = await resolveStartupPlugins({
       cliStorageRoot,
       configResult,
       env: options.env,
@@ -283,6 +342,20 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       pluginOutcome,
       workingDirectory,
     });
+    // 配置源读取项目/用户配置、启用插件与私有选项；当前先取启动快照，实时 reconcile 随阶段 3 接入。
+    mcpConfigSource = await createAppMcpConfigurationSource({
+      options,
+      configResult,
+      runtimeFeatures: pluginRuntimeFeatures,
+      pluginOutcome,
+      builtInMcpServers,
+      cliStorageRoot,
+      workingDirectory,
+      getNodeReplBrowserBroker: () => nodeReplBrowserBroker,
+      logger,
+    });
+    const mcpToolCatalogPort =
+      options.mcpToolCatalogPort ?? createInMemoryMcpToolCatalog({ env: options.env });
     // 用户目录已在 loader 前完成原地迁移；不能给项目/插件旧身份加内存兼容旁路。
     const subagentProfiles = [...kayingcodeSubagentProfiles, ...pluginSubagentProfiles];
     const ownsSessionStore = options.sessionStore === undefined;
@@ -329,6 +402,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
             configuredDefaultModelSelection: options.configuredDefaultModelSelection,
             providerEndpointRoutingPort: options.providerEndpointRoutingPort,
             providerRuntimeHeadersPort: options.providerRuntimeHeadersPort,
+            readReplyLanguage: options.readReplyLanguage,
             modelAdapter: options.modelAdapter,
             env: options.env,
             skipUserConfig: options.skipUserConfig,
@@ -354,7 +428,15 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       sessionControl = bindRoot(sessionId);
     }
     const localSettingStore = asLocalSettingStore(sessionStore);
-    const projectID = projectIdFromDirectory(workingDirectory);
+    // 受管 worktree 会话的项目身份（权限 project_id、项目记忆）映射回源仓库路径，与 Hook Trust
+    // 继承同一 resolver（docs/git/worktree.md §6.6.3）。远程 workspace 的 Trust identity 是
+    // 不透明身份而不是目录，保持按工作目录派生；映射失败时 resolver 已退回工作目录。
+    const projectDirectory =
+      !options.runtimeConfig?.memory?.workspaceIdentity?.trim() &&
+      workspaceHookTrustIdentity !== workingDirectory
+        ? workspaceHookTrustIdentity
+        : undefined;
+    const projectID = projectIdFromDirectory(projectDirectory ?? workingDirectory);
     const persistedMode = options.runtimeConfig?.mode
       ? undefined
       : readProjectPermissionMode(localSettingStore, projectID);
@@ -376,6 +458,16 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
         workingDirectory,
         workspaceIdentity: options.runtimeConfig?.memory?.workspaceIdentity,
       });
+    // 实时配置源已按项目/用户/插件/私有选项合并；启动时以它的快照为准。
+    if (mcpConfigSource) {
+      const snapshot = mcpConfigSource.getSnapshot();
+      configuredMcpServers = snapshot.servers;
+      runtimeConfig.mcp = snapshot;
+    }
+    if (projectDirectory) runtimeConfig.projectDirectory = projectDirectory;
+    // 协议入口给出会话所属 workspace 的 key（受管 worktree 会话 = 项目）；MCP 工具调用与官方 MCP
+    // 授权头以它为身份，不按工作目录重算（docs/git/worktree.md §9.3）。
+    if (options.workspaceKey) runtimeConfig.workspaceKey = options.workspaceKey;
     if (process.env.KAYINGCODE_REVIEW_WORKSPACE_ROOT) {
       // 根因：仅在工具调用处禁止写入仍会让 SessionStart hooks 和 MCP 启动进程
       // 在连接审核设备前执行。专用 Bot 必须在 runtime 装配时整体去除这些能力。
@@ -437,6 +529,12 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       policy: options.workspaceHookPolicy,
       policyProvider: options.workspaceHookPolicyProvider,
       reviewHost: options.workspaceHookReviewHost,
+      ...(options.env ? { env: options.env } : {}),
+      // 对外 workspaceKey：协议入口传入会话所属 workspace 的 key（受管 worktree 会话 = 项目）；
+      // 独立 CLI 缺省同旧规则：远程 identity 优先，否则工作目录。
+      workspaceKey:
+        options.workspaceKey ??
+        (options.runtimeConfig?.memory?.workspaceIdentity?.trim() || workingDirectory),
       workspaceHookTrustEnabled: options.workspaceHookTrustEnabled,
       runtimeRoot: configResult.sources.project.workspaceHookRuntimeRoot ?? {
         // Fallback 只在 config-factory 未导出时生效（理论上不会发生）。
@@ -962,6 +1060,22 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
           workflowConcurrencyGovernor.observer(),
         )
       : undefined;
+    const catalogSkillPortEnabled =
+      configResult.config.features.skill &&
+      configResult.config.skills.enabled &&
+      !options.skillPort;
+    // 注入 skillPort（测试）时不建实时目录；否则读取配置、启用插件与 skill 文件的实时快照。
+    if (catalogSkillPortEnabled) {
+      catalogSkillPort = await createAppSkillPort({
+        options,
+        configResult,
+        pluginOutcome,
+        bundledSkillRoots,
+        cliStorageRoot,
+        workingDirectory,
+        logger,
+      });
+    }
     runtime = new AgentRuntime(sessionId, runtimeConfig, {
       ...(options.readSubagentRuntimeConfig
         ? {
@@ -1037,22 +1151,13 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
         options.contextSourcePort ?? createNodeContextSourceAdapter({ env: options.env }),
       skillPort:
         configResult.config.features.skill && configResult.config.skills.enabled
-          ? (options.skillPort ??
-            createNodeSkillAdapter({
-              additionalDirectories: options.additionalDirectories,
-              extraRoots: configResult.config.skills.roots,
-              extraResolvedRoots: [...pluginOutcome.skillRoots, ...bundledSkillRoots],
-              disabledPaths: [
-                ...collectDisabledPaths(configResult.config.skillOverrides),
-                // 动态工作流关闭时不提供 dynamic-workflows 技能：
-                // 十个工具都不在场，再让模型读到「怎么写工作流脚本」只会诱导它去调不存在的工具。
-                ...(runtimeConfig.dynamicWorkflowEnabled === false
-                  ? collectDynamicWorkflowDisabledSkillPaths(bundledSkillRoots)
-                  : []),
-              ],
-            }))
+          ? (options.skillPort ?? catalogSkillPort)
           : undefined,
       mcpPort,
+      mcpConfigurationSource: mcpConfigSource,
+      mcpToolCatalogPort,
+      // MCP 启动策略由入口显式传入；交互入口传 background，缺省 blocking 保持既有行为。
+      mcpStartupPolicy: options.mcpStartupPolicy,
       eventSink: options.eventSink,
       onOffPeakLifecycleEvent: options.onOffPeakLifecycleEvent
         ? (event) => options.onOffPeakLifecycleEvent!({ ...event, sessionId })
@@ -1060,6 +1165,7 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       modelFactory,
       modelIoDir,
       providerRuntimeHeadersPort: options.providerRuntimeHeadersPort,
+      readReplyLanguage: options.readReplyLanguage,
       resolveEffectiveModelSelection: options.resolveEffectiveModelSelection,
       isRemoteWorkspace: () =>
         isRemoteWorkspaceIdentity(runtimeConfig.memory?.workspaceIdentity ?? ""),
@@ -1207,6 +1313,8 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       logger,
       loggerFactory,
       mcpPort,
+      closeMcpConfigSource: () => mcpConfigSource?.close(),
+      closeSkillCatalog: () => catalogSkillPort?.close(),
       ownsExecutionPort,
       ownsMcpPort,
       closeNodeReplBrowserBroker: async () => {
@@ -1473,6 +1581,15 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
                   event: "session.telemetry_shutdown.failed",
                   error: error instanceof Error ? error.message : String(error),
                 });
+              } finally {
+                // runtime 已释放后才能注销 presence，否则其它进程可能在 close 仍进行时删除会话。
+                await unregisterSessionRuntimePresence(sessionStore, sessionId).catch((error) => {
+                  logger.warn("Session runtime presence unregister failed", {
+                    event: "session.runtime_presence.unregister_failed",
+                    sessionId,
+                    error: error instanceof Error ? error.message : String(error),
+                  });
+                });
               }
             }
           }
@@ -1645,8 +1762,18 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       ...inputFacade,
     };
     standaloneSessionControl?.attachRoot(app, standaloneRootProvenance);
+    try {
+      // 删除凭据存在时 registerSessionRuntime 由存储层触发器拒绝：此时会话已进入写屏障，
+      // 不能再物化 runtime；关闭刚构造的 app，避免留下半个实例。
+      await registerSessionRuntimePresence(sessionStore, sessionId);
+    } catch (error) {
+      await app.close?.();
+      throw error;
+    }
     return app;
   } catch (error) {
+    mcpConfigSource?.close();
+    catalogSkillPort?.close();
     providerModelRuntime?.dispose();
     void modelTelemetry.shutdown().catch(() => undefined);
     void ownedNodeReplBrowserBroker?.close();

@@ -31,6 +31,9 @@ Options:
   --browser-use <mode> Enable Browser Use backend (supported: headless)
   --surface <surface>  Presentation surface for headless prompts/app-server: terminal or desktop
   --browser-executable <path> Chrome/Chromium executable for headless Browser Use
+  --browser-state <path> Playwright storage state injected into headless Browser Use sessions
+  --no-browser-state Skip the default browser state file (~/.kayingcode/cli/browser-state.json)
+  --agent-always-background <on|off> Always run subagents in the background for --prompt, --target, or TUI (default: off; this launch only)
   --attach <path>  Attach a local file to --prompt; repeat for multiple files
   --cwd <path>     Run this command from the given directory
   --disallowed-tools, --disallowedTools <tools...>
@@ -38,6 +41,7 @@ Options:
     Comma or space-separated tool names, e.g. "Bash Edit".
     "Bash(git *)" removes all of Bash; command patterns are not matched.
   --toolsearch-mode <auto|native|local|off> ToolSearch mode (default: off; this launch only)
+  --total-tokens-reminder <on|off> Append the total-token countdown reminder to requests (default: off; this launch only)
   --force-mcs      Force mid-conversation system projection for Anthropic providers
   --locale <locale>  UI locale: en-US, zh-CN, or auto
   --mode <mode>    Permission mode for prompts: build, edit, plan, yolo, or guarded (default: yolo for --prompt)

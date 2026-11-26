@@ -7,16 +7,22 @@ import {
   registerBuiltInTools,
   traceContextToLogContext,
 } from "../deps.js";
-import type { HookRunner, SessionId, ToolExecutor, TraceContext } from "../deps.js";
+import type { HookRunner, Model, SessionId, ToolExecutor, TraceContext } from "../deps.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import type { AgentRuntimeDeps } from "../types.js";
 import { resolveRuntimeEmbeddedSearchEnabled } from "../methods/embedded-search-branch.js";
+import {
+  createMcpServerWaitPort,
+  describeUnavailableMcpTool,
+  resolveUnregisteredMcpTool,
+} from "../methods/mcp.js";
 import { getSessionShellSelectionFromConfig } from "../methods/session-shell-environment.js";
 import { createRuntimeSessionModePort } from "../session-mode-port.js";
 import { sessionControlForRuntime } from "../../tool/session-control/contract.js";
 import { shouldSuppressSealedSubagentBashNotification } from "../../runtime-task/notification-policy.js";
 import {
   resolveBuiltInToolAllowlist,
+  resolveRuntimeAgentAlwaysBackground,
   resolveRuntimeDisallowedTools,
   resolveRuntimeDynamicWorkflowToolsIncluded,
 } from "./tool-allowlist.js";
@@ -81,6 +87,9 @@ function registerRuntimeBuiltInTools(runtime: AgentRuntimeInternal, deps: AgentR
     // 修复原因：browserControlPort 只是宿主能力，不应隐式暴露高权限 node_repl。
     // node_repl/browser-use 由 KayingCode 官方 browser-use 插件启停推导出的 runtimeFeatures 控制。
     includeNodeRepl: nodeReplEnabled,
+    agentAlwaysBackground: resolveRuntimeAgentAlwaysBackground(runtime.config),
+    includeWaitForMcpServers: Boolean(deps.mcpPort),
+    includeTopicResource: Boolean(deps.topicResourcePort),
     includeBrowserUse: browserUseEnabled,
     embeddedSearchEnabled: resolveRuntimeEmbeddedSearchEnabled(runtime),
     allowedTools: resolveBuiltInToolAllowlist(runtime.config),
@@ -208,6 +217,17 @@ function createRuntimeToolExecutor(
     dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort,
     dynamicWorkflowSnippetPort: deps.dynamicWorkflowSnippetPort,
     modelCatalogPort: deps.modelCatalogPort,
+    ...(deps.mcpPort === undefined
+      ? {}
+      : {
+          mcpServerWaitPort: createMcpServerWaitPort(runtime),
+          // 未注册工具报错只解释本会话 MCP 工具所属 server 的当前状态。
+          describeUnavailableTool: (toolName: string, model?: Model) =>
+            describeUnavailableMcpTool(runtime, toolName, model),
+          // 晚到解析只从当前 McpSessionView 解析本会话提供过的 MCP 工具，不发起新连接。
+          resolveUnregisteredTool: (toolName, options) =>
+            resolveUnregisteredMcpTool(runtime, toolName, options),
+        }),
     runtimeTaskRegistry: runtime.runtimeTaskRegistry,
     registerResidencyBlockingWork: (work) => {
       void runtime.trackResidencyBlockingWork(work).catch(() => undefined);

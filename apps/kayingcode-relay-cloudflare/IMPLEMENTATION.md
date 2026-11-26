@@ -38,8 +38,8 @@ owner/terminal 是账号权限，device/terminal 是 WS 角色。owner 只能申
 
 ## 3. 存储与有效期
 
-| key / attachment       | 内容                                                    | 当前时效                              |
-| ---------------------- | ------------------------------------------------------- | ------------------------------------- |
+| key / attachment       | 内容                                                    | 当前时效                                  |
+| ---------------------- | ------------------------------------------------------- | ----------------------------------------- |
 | `credential:<SHA-256>` | userId、owner/terminal、expiresAt                       | owner 使用远期到期值；terminal 默认 30 天 |
 | `invitation:<SHA-256>` | userId、expiresAt、remainingClaims                      | 默认 5 分钟；成功 claim 扣减或删除        |
 | `device:<device_sid>`  | SID、MID、userId、created_at、meta                      | owner 删除前保留                          |
@@ -96,7 +96,7 @@ payload 必须为 JSON，Relay 不解释业务 RPC。另一角色不在线时返
 
 仅开放 /remote、/remote/_、/material-icons/_、/pdfjs/\*，仅 GET/HEAD；/remote 308 到 /remote/。无扩展名的 remote 页面资源 404 时回落 /remote/，保留浏览器路由；带扩展名的丢失文件不回落 HTML。
 
-[Web 构建](../../packages/web/scripts/build-upstream.mjs) 由 upstream-web.json 固定官方 Git 提交，必要时从官方获取对象，使用本仓锁定依赖。仅覆盖两个账号 adapter、bootstrap 和受哈希审计的品牌资产；关键工作台源码核对哈希。产物写 packages/web/dist，copy-web.mjs 清理本应用 public 后复制至 public/remote，排除 .map。public 是生成目录，不存放手工文档。
+[Web 构建](../../packages/web/scripts/build-upstream.mjs) 由根 `UPSTREAM_BASE.json` 固定官方 Git 提交（`upstream-web.json` 只保留 Web 专属 relayOrigin/overrides），必要时从官方获取对象，使用本仓锁定依赖。仅覆盖两个账号 adapter、bootstrap 和受哈希审计的品牌资产；关键工作台源码核对哈希。产物写 packages/web/dist，copy-web.mjs 清理本应用 public 后复制至 public/remote，排除 .map。public 是生成目录，不存放手工文档。
 
 manifest 记录来源、relayOrigin 和审计哈希。当前产品 THIRD-PARTY-NOTICES.md 与上游原文 UPSTREAM-THIRD-PARTY-NOTICES.md 一起交付，HTML 有两个 license 链接。构建读取已有声明，不自动执行全仓 strict；见 [许可规则](../../third-party/SPEC.md)。
 

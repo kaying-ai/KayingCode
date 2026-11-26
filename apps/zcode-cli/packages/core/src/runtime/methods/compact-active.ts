@@ -5,7 +5,11 @@ import {
   shouldFoldRemindersIntoToolResults,
   shouldUseMidConversationSystem,
 } from "../helpers/runtime-provider-request-messages.js";
-import { collectDiscoveredTools, compactDiscoveryMetadata } from "../../tool/search/history.js";
+import {
+  collectDiscoveredTools,
+  compactDiscoveryMetadata,
+  compactToolSearchDelivery,
+} from "../../tool/search/history.js";
 import { collectRuntimeAgentListing } from "../helpers/agent-listing.js";
 import {
   CompactPhase,
@@ -276,7 +280,8 @@ async function compactActiveConversationImpl(
     turnTraceContext,
     events,
   );
-  await this.initializeMcp(turnTraceContext);
+  // 自动/超窗压缩重发已有输入，不能消费后台已更新的能力快照。
+  if (trigger === CompactTrigger.Manual) await this.initializeMcp(turnTraceContext);
   throwIfTurnAborted(options.abortSignal);
   // 与主循环同一份工具目录（含本轮禁用规则），由同一个请求准备入口投影。
   // 修复原因：摘要请求另选工具（只带 ToolSearch 相关工具，或超过 100 个时发空列表）时，
@@ -551,13 +556,24 @@ async function compactActiveConversationImpl(
         preCompactDiscoveredTools: [...preCompactDiscoveredTools],
       });
       // 新检查点尚未提交；公告使用同一候选分类，避免把即将提升的工具重新公告为待加载。
+      // 已交付定义跨 compact 只携带仍被保留引用使用的部分；撤销事实与目录变化一起重算。
+      const toolSearchDelivery = compactToolSearchDelivery(
+        activeEntries,
+        preservedEntries,
+        (name) => registry.get(name) !== undefined,
+      );
+      const deliveryCarrier = {
+        message: { role: "user" as const, content: "" },
+        toolSearchDelivery,
+      };
       const toolAnnouncement = buildToolSearchAnnouncement(
         {
           model: compactModel,
           mode: this.config.toolSearch?.mode,
           tools: options.getContinuationTools?.() ?? this.getTools(compactModel),
           registry,
-          entries: preservedEntries,
+          entries: [...preservedEntries, deliveryCarrier],
+          mcp: this.mcpServerStatusFacts,
         },
         preCompactDiscoveredTools,
       );
@@ -645,6 +661,8 @@ async function compactActiveConversationImpl(
       const summaryEntry = {
         message: { role: "user" as const, content: summaryMessageContent },
         metadata: { ...legacySyntheticRuntimeMetadata(), compactBoundary: discovery },
+        // 保留引用的已交付定义跟随 summary 进入 live 历史，冷恢复后首个请求不需要重发。
+        ...(toolSearchDelivery ? { toolSearchDelivery } : {}),
       };
       const postCompactEntries = buildPostCompactRuntimeEntries(activeEntries, summaryEntry, {
         leadingReminderEntries,
@@ -693,6 +711,7 @@ async function compactActiveConversationImpl(
           operationId: compactTimeline.operationId,
           leadingReminderEntries,
           postCompactReminderEntries,
+          toolSearchDelivery,
         },
       );
 

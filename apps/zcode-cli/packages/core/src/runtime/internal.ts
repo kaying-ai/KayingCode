@@ -1,5 +1,5 @@
 import { PermissionService, ToolScheduler } from "./deps.js";
-import type { ModelRequestSessionFeature } from "@zcode/contracts";
+import type { ModelRequestSessionFeature, ToolSearchMcpState } from "@zcode/contracts";
 import type { PromptSnapshot } from "./helpers/prompt-snapshot.js";
 import type { TotalTokensBudgetState } from "./helpers/total-tokens-budget.js";
 import type { InstructionRefreshReason } from "../context/types.js";
@@ -10,6 +10,7 @@ import type {
   MessageId,
   TurnId,
   ModelToolContract,
+  PendingInputEditLock,
   PermissionBrokerPort,
   SessionEventSink,
   SessionEventStorePort,
@@ -24,6 +25,7 @@ import type {
   ImageProcessorPort,
   PdfDocumentPort,
   McpConnectionSnapshot,
+  McpConfigurationSource,
   SkillLoadOutcome,
   SkillPort,
   McpPort,
@@ -47,6 +49,7 @@ import type {
   AgentRuntimeConfig,
   AgentRuntimeDeps,
   BackgroundTaskNotificationSealReason,
+  McpStartupPolicy,
   PendingModelChangeTimeline,
   ProviderRuntimeHeadersPort,
   MainTurnCacheHitAggregate,
@@ -66,6 +69,14 @@ import type { ProjectMemoryExtractionScheduler } from "./helpers/project-memory-
 import type { ProjectMemoryUpdate } from "./helpers/project-memory-dream.js";
 import type { RuntimeTelemetryFacade } from "../telemetry/runtime-telemetry.js";
 import type { WorkspaceHookRuntimeAdmissionPort } from "../hooks/workspace-hook-runtime-admission.js";
+import type { McpSession, McpServerClass } from "../mcp/runtime/session.js";
+
+/** 最近一次应用 MCP 快照时的 server 状态分类；WaitForMcpServers 与 ToolSearch 诊断读它。 */
+export type McpServerStatusFacts = ToolSearchMcpState & {
+  needsAuth: string[];
+  sources: Record<string, McpServerClass>;
+  deniedTools?: string[];
+};
 
 export interface AgentRuntimeInternal
   extends AgentRuntimeCoreMethods, AgentRuntimeTurnMethods, AgentRuntimeHookMethods {
@@ -90,6 +101,7 @@ export interface AgentRuntimeInternal
   modelFactory: AgentRuntimeDeps["modelFactory"];
   modelIoDir?: string;
   providerRuntimeHeadersPort?: ProviderRuntimeHeadersPort;
+  readReplyLanguage?: AgentRuntimeDeps["readReplyLanguage"];
   browserControlPort?: AgentRuntimeDeps["browserControlPort"];
   modelRequestAdmission?: AgentRuntimeDeps["modelRequestAdmission"];
   sessionModelSelection: ModelSelection | undefined;
@@ -131,15 +143,31 @@ export interface AgentRuntimeInternal
   contextSourcePort?: ContextSourcePort;
   skillPort?: SkillPort;
   mcpPort?: McpPort;
+  /** 配置订阅、连接收敛与视图投影的唯一所有者。 */
+  mcpSession?: McpSession;
+  mcpConfigurationSource?: McpConfigurationSource;
+  /** 入口显式传入；turn loop 据此决定首个正常请求是否等全部 server 启动结束。 */
+  mcpStartupPolicy: McpStartupPolicy;
   mcpStartupPromise?: Promise<McpConnectionSnapshot>;
   residencyBlockingWorkCount: number;
   residencyBlockingWork: Set<Promise<unknown>>;
   mcpInitialized: boolean;
+  /** 首输入的 workspace trust admission 只读取一次。 */
+  mcpTrustAdmissionRead: boolean;
   mcpToolsRegistered: boolean;
   /** 初始化 / 上次刷新时注册的 MCP 工具名与集合签名。 */
   registeredMcpToolNames?: string[];
+  /** 本会话曾向模型提供过的 MCP 工具名 → server 名；工具离开目录后用于说明原因。 */
+  offeredMcpTools: Map<string, string>;
+  /** 主 agent 请求已发送过 WaitForMcpServers：之后一直提供（锁存，只在内存）。 */
+  mcpServerWaitDeclared: boolean;
+  /** assistant 回复 id → 未注册工具已用的等待毫秒数；同一回复内的调用共用预算。 */
+  mcpPendingToolWaitByResponse: Map<string, number>;
+  /** server 名 → 已等满预算的那次连接（连接状态的 updatedAt）；同一次连接不再等待。 */
+  mcpPendingToolWaitExhausted: Map<string, string>;
   mcpToolsSignature?: string;
-  mcpToolListRevision?: number;
+  /** 最近一次应用快照时的 server 状态分类；ToolSearch 诊断与 WaitForMcpServers 曝光读它。 */
+  mcpServerStatusFacts?: McpServerStatusFacts;
   subagentPort?: SubagentPort;
   getAgentDefinitions: NonNullable<AgentRuntimeDeps["getAgentDefinitions"]>;
   prepareAgentDefinitions: (input: {
@@ -185,6 +213,7 @@ export interface AgentRuntimeInternal
   activeTurnStartReservation?: ActiveTurnStartReservation;
   pendingInputSequence: number;
   pendingInputReservations: Map<string, string>;
+  pendingInputEditLocks: Map<string, PendingInputEditLock>;
   permissionFullAccessPending?: boolean;
   pendingInputDrains?: number;
   lastPermissionGrantId?: string;
@@ -196,6 +225,7 @@ export interface AgentRuntimeInternal
   backgroundTaskNotificationsSealed: boolean;
   backgroundTaskNotificationSealReason?: BackgroundTaskNotificationSealReason;
   pendingModelChangeTimeline?: PendingModelChangeTimeline;
+  pendingWorktreeCreation?: import("@zcode/contracts").WorktreeCreationFact;
   sessionStartHookRan: boolean;
   sessionTitleGenerationAttempted: boolean;
   agentTelemetry: RuntimeTelemetryFacade;

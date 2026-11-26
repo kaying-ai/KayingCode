@@ -47,6 +47,7 @@ import {
   ISettingsSyncService,
   IFeedbackService,
   IPromptAttachmentTransferService,
+  IVoiceInputService,
   IWindowControllerService,
   IProjectService,
   IRemoteProjectService,
@@ -97,6 +98,11 @@ export interface RemoteServiceAccessOptions {
   sourceServerManagementService?: boolean;
   /** 桌面本机 Window Host 的扩展门面（静态表/命令/日志/视图/授权）；Web 与手机不打开。 */
   extensionsService?: boolean;
+  /**
+   * 语音输入（仅桌面本机 base 连接）。远程 workspace 与 Web / 手机连接不声明，
+   * 让 UI 的可用条件 fail-closed；services 侧只在 Local Host 注册该 channel。
+   */
+  voiceInputService?: boolean;
   windowProjectDirectory?: boolean;
   projectService?: boolean;
   remoteProjectService?: boolean;
@@ -169,6 +175,8 @@ export class RemoteServiceAccess implements IServiceAccessor {
   readonly pluginUiBridgeService: IPluginUiBridgeService;
   readonly pluginUiSamplingService: IPluginUiSamplingService;
   readonly pluginUiAppToolsService: IPluginUiAppToolsService;
+  /** 仅桌面本机 base 连接声明；其他 scope 必须按可选能力消费。 */
+  readonly voiceInputService?: IVoiceInputService;
   readonly subagentsService: ISubagentsService;
   readonly commandsService: ICommandsService;
   readonly hooksService: IHooksService;
@@ -348,6 +356,13 @@ export class RemoteServiceAccess implements IServiceAccessor {
     this.extensionGrantsService = options.extensionsService
       ? ProxyChannel.toService<IExtensionGrantsService>(
           channelClient.getChannel(IExtensionGrantsService.channelName),
+        )
+      : undefined;
+    // 语音输入只连接本机 Host：与扩展门面同一开关模式，只在桌面 base 连接创建代理，
+    // Web / 手机远控 / 远程 workspace 连接保持 undefined，UI 据此隐藏入口。
+    this.voiceInputService = options.voiceInputService
+      ? ProxyChannel.toService<IVoiceInputService>(
+          channelClient.getChannel(IVoiceInputService.channelName),
         )
       : undefined;
     this.pluginUiBridgeService = ProxyChannel.toService<IPluginUiBridgeService>(

@@ -60,6 +60,7 @@ type SessionFacade = Pick<
   | "getMcpAppConnectionSnapshot"
   | "waitForMcpAppConnection"
   | "onMcpAppConnectionInvalidated"
+  | "reconnectMcpAppConnection"
   | "replaceMcpAppProvidedTools"
   | "connectMcpServer"
   | "disconnectMcpServer"
@@ -101,13 +102,18 @@ type SessionFacade = Pick<
   | "updateTargetStatus"
 >;
 
+/** 打开 MCP App 时重连断开连接的等待上限，与 MCP 默认请求超时一致。 */
+const MCP_APP_OPEN_RECONNECT_BUDGET_MS = 30_000;
+
 interface SessionResourceCloseInput {
   beginShutdown: () => void;
   closeBrowserSession: () => Promise<void>;
   closeExecution?: () => Promise<void> | void;
   closeMcp?: () => Promise<void> | void;
+  closeMcpConfigSource?: () => void;
   closeNodeReplBrowserBroker?: () => Promise<void> | void;
   closeSessionStore?: () => void;
+  closeSkillCatalog?: () => void;
   logger: Logger;
 }
 
@@ -120,6 +126,8 @@ interface CreateSessionFacadeDeps {
   closeDynamicWorkflowRuns?: () => Promise<void>;
   closeScriptWorkflowRuns?: () => Promise<void>;
   closeNodeReplBrowserBroker?: () => Promise<void> | undefined;
+  closeMcpConfigSource?: () => void;
+  closeSkillCatalog?: () => void;
   configResult: ConfigResult;
   configuredMcpServers: Record<string, McpServerConfig>;
   configuredDefaultModelSelection?: ModelSelection;
@@ -312,10 +320,12 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
                 ? () => deps.executionPort.close?.()
                 : undefined,
             closeMcp: deps.ownsMcpPort && deps.mcpPort ? () => deps.mcpPort?.close() : undefined,
+            closeMcpConfigSource: deps.closeMcpConfigSource,
             closeNodeReplBrowserBroker: deps.closeNodeReplBrowserBroker,
             closeSessionStore: closableSessionStore
               ? () => closableSessionStore.close()
               : undefined,
+            closeSkillCatalog: deps.closeSkillCatalog,
             logger: deps.logger,
           });
         } catch (error) {
@@ -466,6 +476,12 @@ export function createSessionFacade(deps: CreateSessionFacadeDeps): SessionFacad
       deps.mcpPort?.waitForAppConnection
         ? deps.mcpPort.waitForAppConnection(name)
         : (deps.mcpPort?.appConnectionSnapshot?.(name) ?? null),
+    reconnectMcpAppConnection: async (name) => {
+      await deps.mcpPort?.waitForServer?.(name, {
+        reconnect: true,
+        timeoutMs: MCP_APP_OPEN_RECONNECT_BUDGET_MS,
+      });
+    },
     callMcpToolForUi: async (serverName, toolName, args, options) => {
       if (!deps.mcpPort) {
         throw new Error("MCP is disabled");
@@ -823,7 +839,9 @@ export async function closeSessionResources(input: SessionResourceCloseInput): P
     ["browser_session", input.closeBrowserSession],
     ["execution", input.closeExecution],
     ["mcp", input.closeMcp],
+    ["mcp_config_source", input.closeMcpConfigSource],
     ["node_repl_browser_broker", input.closeNodeReplBrowserBroker],
+    ["skill_catalog", input.closeSkillCatalog],
   ];
 
   // 独立资源并行释放；外部超时不能让仍在收尾的借用者碰到已关闭的 store。

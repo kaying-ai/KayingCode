@@ -36,6 +36,12 @@ export const hostCapabilitiesSchema = z.object({
    * `state.updated`，并且先经 `clampWorkflowRunsForLegacy` 裁到旧界。
    */
   workflowRunDeltas: z.boolean().optional(),
+  /**
+   * 本 Host 会按连接能力转发插件发现工具面与 `pluginInstall` 卡片。客户端只有在
+   * hello 里见到这个位时才能回声明 `pluginDiscoveryUi`（clientHello schema 是 strict 的，
+   * 向旧 Host 发未知键会让整条握手失败）。缺失等价于 false。
+   */
+  pluginDiscovery: z.boolean().optional(),
   historyFirst: z.boolean().optional(),
   /**
    * 本 Host 开启并转发 `v4/conversation/inputPrediction`。旧 Host 缺失等价于 false，
@@ -91,6 +97,7 @@ export const clientHelloSchema = z
          * 是 `.strict()` 的，老 Host 见到不认识的键会整条 clientHello 解析失败、连接握不上手。
          */
         workflowRunDeltas: z.boolean().optional(),
+        pluginDiscoveryUi: z.boolean().optional(),
         historyFirst: z.boolean().optional(),
       })
       .strict()
@@ -389,6 +396,11 @@ export const V4_METHODS = {
   // 新方法偏斜安全：旧 CLI 返回 method-not-found，Host 据此不显示「删除数据」选项。
   sessionDataMeasure: "v4/storage/sessionData/measure",
   sessionDataPurge: "v4/storage/sessionData/purge",
+  sessionDeletionPreview: "v4/storage/sessionData/deletionPreview",
+  // 归档永久删除批量预检：整批共用一次引用扫描，结果按顺序逐项返回。旧 CLI 返回 method-not-found，
+  // Host 据此回退逐项调用 deletionPreview。
+  sessionDeletionPreviewBatch: "v4/storage/sessionData/deletionPreviewBatch",
+  sessionDeletionExecute: "v4/storage/sessionData/deletionExecute",
   // 附件事务：禁止 full-data RPC。每个 chunk 的 decoded bytes <=512KiB，
   // renderer->host Channel 与 host->CLI NDJSON 都必须逐 request 证明 <=1MiB。
   attachmentBegin: "v4/attachment/begin",
@@ -455,6 +467,11 @@ export const v4ConversationSubscribeParamsSchema = subscribeParamsSchema.extend(
   workspace: kayingcodeWorkspaceRefSchema.optional(),
   /** host 从当前 remote workspace 的 tasks-index 精确读取的旧任务归属 allowlist。 */
   legacyTaskIds: z.array(z.string().min(1)).max(MAX_LEGACY_TASK_IDS_PER_SUBSCRIBE).optional(),
+  /**
+   * 本地 workspace 下 cwd 位于受管 worktree 的会话 id（目录扫描看不到）。
+   * Host 从 tasks-index 精确提供；CLI 只读校验归属后补入摘要（docs/git/worktree.md §6.6.2）。
+   */
+  worktreeSessionIds: z.array(z.string().min(1)).max(MAX_LEGACY_TASK_IDS_PER_SUBSCRIBE).optional(),
   // 仅供 host→CLI cold resume 使用；live conversation 不消费该 hint。
   resumeThoughtLevel: z.string().trim().min(1).optional(),
   /**
@@ -463,6 +480,7 @@ export const v4ConversationSubscribeParamsSchema = subscribeParamsSchema.extend(
    * 不是某一次订阅可以自选的口味。缺席 = 按旧消费者处理（整键 patch + 旧界裁剪）。
    */
   workflowRunDeltas: z.boolean().optional(),
+  pluginDiscoveryUi: z.boolean().optional(),
   historyFirst: z.boolean().optional(),
 });
 export type V4ConversationSubscribeParams = z.infer<typeof v4ConversationSubscribeParamsSchema>;
@@ -570,6 +588,8 @@ export type V4ConversationRowsRangeResult = z.infer<typeof v4ConversationRowsRan
 export const v4ConversationPlansParamsSchema = z
   .object({
     sessionId: z.string().min(1),
+    /** 可信 attachment 的 workspace：冷恢复按它取项目身份、按存储 cwd 执行。 */
+    workspace: kayingcodeWorkspaceRefSchema.optional(),
   })
   .strict();
 export type V4ConversationPlansParams = z.infer<typeof v4ConversationPlansParamsSchema>;

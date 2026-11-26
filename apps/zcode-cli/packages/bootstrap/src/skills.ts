@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { createConfig, resolvePath } from "@zcode/adapters/config";
+import { createConfigWithPluginMigrations, resolvePath } from "@zcode/adapters/config";
 import { createNodeSkillAdapter } from "@zcode/adapters/skills";
 import type { Logger, SkillContent, SkillDiagnostic, SkillLoadOutcome } from "@zcode/contracts";
 import { resolveBundledSkillRoots } from "./app/bundled-skills.js";
@@ -31,7 +31,7 @@ export interface KayingCodeSkillInspection {
 export async function listKayingCodeSkills(
   options: ListKayingCodeSkillsOptions = {},
 ): Promise<SkillLoadOutcome> {
-  const discovery = createSkillDiscovery(options);
+  const discovery = await createSkillDiscovery(options);
   if (!discovery.enabled) {
     return {
       diagnostics: [],
@@ -48,7 +48,7 @@ export async function listKayingCodeSkills(
 export async function inspectKayingCodeSkill(
   options: InspectKayingCodeSkillOptions,
 ): Promise<KayingCodeSkillInspection> {
-  const discovery = createSkillDiscovery(options);
+  const discovery = await createSkillDiscovery(options);
   if (!discovery.enabled) {
     throw new Error("Skills are disabled.");
   }
@@ -75,7 +75,7 @@ export async function inspectKayingCodeSkill(
   };
 }
 
-function createSkillDiscovery(options: ListKayingCodeSkillsOptions):
+async function createSkillDiscovery(options: ListKayingCodeSkillsOptions): Promise<
   | {
       enabled: false;
       workingDirectory: string;
@@ -84,9 +84,10 @@ function createSkillDiscovery(options: ListKayingCodeSkillsOptions):
       enabled: true;
       skillPort: ReturnType<typeof createNodeSkillAdapter>;
       workingDirectory: string;
-    } {
+    }
+> {
   const workingDirectory = resolve(options.workingDirectory ?? process.cwd());
-  const configResult = createConfig({
+  const configResult = await createConfigWithPluginMigrations({
     env: options.env,
     projectConfigPath: options.projectConfigPath,
     workingDirectory,
@@ -100,7 +101,7 @@ function createSkillDiscovery(options: ListKayingCodeSkillsOptions):
       workingDirectory,
     };
   }
-  const pluginOutcome = resolveKayingCodePlugins({
+  const pluginOutcome = await resolveKayingCodePlugins({
     configResult,
     env: options.env,
     logger: options.logger,

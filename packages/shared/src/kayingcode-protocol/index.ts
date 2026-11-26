@@ -102,7 +102,10 @@ import {
 import { browserClientModeSchema, browserCommandSchema } from "../browser-use/commands.js";
 import { browserCommandResultSchema } from "../browser-use/result.js";
 import { appToolSearchModeSchema } from "../app-runtime-preferences.js";
-import { integratedTerminalShellSelectionSchema } from "../validationAppSettings.js";
+import {
+  integratedTerminalShellSelectionSchema,
+  replyLanguageSchema,
+} from "../validationAppSettings.js";
 import { kayingcodeTaskModeSchema } from "../kayingcode-task-mode-schema.js";
 import {
   OFFICIAL_AUTH_CONSUMER_KINDS,
@@ -153,6 +156,7 @@ export const KAYINGCODE_PROTOCOL_VERSION = 1 as const;
 export const KAYINGCODE_PROTOCOL_V4_WIRE_VERSION = 3 as const;
 export const kayingcodeRuntimeCapabilitiesSchema = z.object({
   sessionLifecycleWorkspace: z.boolean().optional(),
+  pluginDiscoveryUi: z.boolean().optional(),
   sessionDirectorySource: z.boolean().optional(),
   sessionWorkspaceRouting: z.boolean().optional(),
   genUiContext: z.boolean().optional(),
@@ -160,6 +164,29 @@ export const kayingcodeRuntimeCapabilitiesSchema = z.object({
   independentPlanState: z.boolean().optional(),
   /** CLI 认识 rowsRange 的 residency 参数；旧 CLI 会剥掉它并冷恢复，Host 据此拒绝转发。 */
   residentRowsRange: z.boolean().optional(),
+  /**
+   * CLI 支持"会话 cwd 与 workspace 不同"：createSession.cwd / worktreeCreation、
+   * forkAssistant.targetCwd、按 Host 请求的 workspace key 冷恢复（docs/git/worktree.md §9.3）。
+   * 旧 CLI 会静默丢弃这些字段，Host 据此决定是否开放 worktree 入口。
+   */
+  worktreeCwd: z.boolean().optional(),
+  /**
+   * CLI 认识 `{kind:"extension"}` 输入来源（sendText.source、createSession.firstInput.source）。
+   * 旧 CLI 对 sendText 整条拒绝、对 firstInput 静默剥掉来源，Host 据此决定能否代扩展发消息
+   * （packages/shared/spec/conversation-input-source.md §7）。
+   */
+  extensionInputSource: z.boolean().optional(),
+  /**
+   * CLI 认识对话引用上的 comment / agent 字段（选区批注）。旧 CLI 的 quote schema 非 strict，
+   * 会静默剥掉这两个字段：用户看到批注而模型收不到，所以 App 据此决定是否提供“批注”入口。
+   */
+  conversationQuoteComment: z.boolean().optional(),
+  /**
+   * CLI 认识 plugins/overview 的 includeExtensionSummary 参数，并按它在商店信息里带 extensionSummary
+   * （packages/shared/spec/plugin-extension-summary.md）。参数与结果的 schema 都是 strict：旧 CLI 拒绝
+   * 新参数，旧 services 拒绝新字段，所以 services 只在看到这一位时才要这个字段。
+   */
+  pluginExtensionSummary: z.boolean().optional(),
 });
 export const kayingcodeRuntimeCapabilitiesParamsSchema = z
   .object({
@@ -2217,6 +2244,16 @@ export const kayingcodeSubagentsReadRuntimeConfigParamsSchema = z
   .object({ sessionId: nonEmptyString, workspace: kayingcodeWorkspaceRefSchema.optional() })
   .strict();
 
+// session/readReplyLanguage：CLI 收集输入附件时读取 Agent 回复语言设置（docs/i18n/agent-reply-language.md）。
+// Host 从内存同步应答；没有设置或不支持该设置的 Host（远端、Web）回答 null。值是 Host 级的，不带 workspace。
+export const KAYINGCODE_REPLY_LANGUAGE_REQUEST_TIMEOUT_MS = 2_000;
+export const kayingcodeSessionReadReplyLanguageParamsSchema = z
+  .object({ sessionId: nonEmptyString })
+  .strict();
+export const kayingcodeSessionReadReplyLanguageResultSchema = z
+  .object({ language: replyLanguageSchema.nullable() })
+  .strict();
+
 export const KAYINGCODE_SESSION_RUNTIME_PREFERENCES_REQUEST_TIMEOUT_MS = 15_000;
 
 export const kayingcodeSessionRequestRuntimePreferencesParamsSchema = z
@@ -2247,6 +2284,9 @@ export const kayingcodeSessionRuntimePreferencesResultSchema = z
     toolSearchMode: appToolSearchModeSchema.default("off"),
     subagentRuntimeConfigEnabled: z.boolean().optional(),
     memoryEnabled: z.boolean().default(false),
+    // 兼容旧 Host：缺失时按产品默认关闭，避免旧版本把未声明能力当作已开启。
+    totalTokensReminderEnabled: z.boolean().default(false),
+    agentAlwaysBackgroundEnabled: z.boolean().default(false),
     askUserQuestionAutoResolutionEnabled: z.boolean().default(true),
     integratedTerminalShell: integratedTerminalShellSelectionSchema.optional(),
     // 兼容旧 Host：缺少字段时在协议解析边界使用当前默认策略。
@@ -2538,6 +2578,22 @@ export const kayingcodeSessionCloseResultSchema = z
   })
   .strict();
 export type KayingCodeSessionCloseResult = z.infer<typeof kayingcodeSessionCloseResultSchema>;
+/**
+ * 卸载 cwd 位于 directory 内的全部驻留会话；任一会话忙时全部不卸载（docs/git/worktree.md §8.3）。
+ * 随 worktreeCwd 能力提供。
+ */
+export const kayingcodeSessionReleaseUnderDirectoryParamsSchema = z
+  .object({ directory: nonEmptyString })
+  .strict();
+export type KayingCodeSessionReleaseUnderDirectoryParams = z.infer<
+  typeof kayingcodeSessionReleaseUnderDirectoryParamsSchema
+>;
+export const kayingcodeSessionReleaseUnderDirectoryResultSchema = z
+  .object({ released: z.array(nonEmptyString), busy: z.array(nonEmptyString) })
+  .strict();
+export type KayingCodeSessionReleaseUnderDirectoryResult = z.infer<
+  typeof kayingcodeSessionReleaseUnderDirectoryResultSchema
+>;
 export const kayingcodeWorkspaceReadPresentationParamsSchema = z
   .object({ workspace: kayingcodeWorkspaceRefSchema })
   .strict();
@@ -2988,6 +3044,8 @@ export type KayingCodeProviderRuntimeHeadersCancelled = z.infer<
 
 // 标准 JSON-RPC error 保留旧版 schema 兼容，不向严格校验的 response 增加字段。
 export const KAYINGCODE_PROVIDER_CONFIG_NETWORK_ERROR = -32032;
+// 项目 Token 换证只抛出固定传输故障码时用该错误应答，Agent 才能并入 network_error 重试预算。
+export const KAYINGCODE_PROVIDER_PROJECT_TOKEN_NETWORK_ERROR = -32033;
 
 export const kayingcodeProviderRuntimeHeadersErrorCode = {
   configNetwork: "request_verification_config_network",
@@ -3131,6 +3189,19 @@ export type KayingCodePluginUserConfigOption = z.infer<
   typeof kayingcodePluginUserConfigOptionSchema
 >;
 
+/**
+ * 项目目录插件的信任状态。pending 时插件强制停用、不解析任何组件；
+ * trusted 表示用户域记录命中当前声明摘要，启停回到配置。
+ */
+export const kayingcodePluginWorkspaceTrustSchema = z
+  .object({
+    state: z.enum(["pending", "trusted"]),
+    pluginRoot: nonEmptyString,
+    declarationDigest: z.string().regex(/^[a-f0-9]{64}$/u),
+  })
+  .strict();
+export type KayingCodePluginWorkspaceTrust = z.infer<typeof kayingcodePluginWorkspaceTrustSchema>;
+
 // 组件类型与详情弹窗/市场详情共用的分组顺序保持一致：agent / command / skill / hook / mcp。
 // 注意：这三个 schema 必须定义在 kayingcodePluginInfoSchema 之前，因为后者（.strict()）的 components 字段引用了它们。
 export const kayingcodePluginComponentKindSchema = z.enum([
@@ -3247,6 +3318,8 @@ export const kayingcodePluginInfoSchema = z
     dataPath: z.string().optional(),
     userConfig: z.record(z.string(), kayingcodePluginUserConfigOptionSchema).optional(),
     configuredOptions: z.record(z.string(), kayingcodePluginOptionValueSchema).optional(),
+    // 只有项目配置 plugins.dirs 声明的目录插件才有；pending 时 enabled 恒为 false。
+    workspaceTrust: kayingcodePluginWorkspaceTrustSchema.optional(),
     // 缺省表示 package 可用；missing 用于保留已声明但目标 Host 尚未物化的配置行。
     packageStatus: z.literal("missing").optional(),
     rootSource: kayingcodePluginScopeSchema.optional(),
@@ -3285,6 +3358,30 @@ export const kayingcodePluginsListResultSchema = z
   })
   .strict();
 export type KayingCodePluginsListResult = z.infer<typeof kayingcodePluginsListResultSchema>;
+
+// 项目目录插件信任：写入用户域记录；只影响之后新建的会话。
+export const kayingcodePluginsWorkspaceTrustParamsSchema = z
+  .object({
+    workspace: kayingcodeWorkspaceRefSchema,
+    pluginRoot: nonEmptyString,
+    declarationDigest: z.string().regex(/^[a-f0-9]{64}$/u),
+    trusted: z.boolean(),
+  })
+  .strict();
+export type KayingCodePluginsWorkspaceTrustParams = z.infer<
+  typeof kayingcodePluginsWorkspaceTrustParamsSchema
+>;
+export const kayingcodePluginsWorkspaceTrustResultSchema = z
+  .object({
+    accepted: z.boolean(),
+    reasonCode: z
+      .enum(["workspace_plugin_declaration_changed", "workspace_plugin_trust_unavailable"])
+      .optional(),
+  })
+  .strict();
+export type KayingCodePluginsWorkspaceTrustResult = z.infer<
+  typeof kayingcodePluginsWorkspaceTrustResultSchema
+>;
 
 // ── 插件 UI 面板入口──
 // 工作区级只读投影：已启用插件清单 `ui.surfaces[]` 的合法条目；插件启停后 host 重新拉取。
@@ -3819,6 +3916,25 @@ export type KayingCodePluginsSetEnabledResult = z.infer<
   typeof kayingcodePluginsSetEnabledResultSchema
 >;
 
+/**
+ * 目录条目的扩展摘要（packages/shared/spec/plugin-extension-summary.md）：插件要求的插件 API 版本范围与
+ * 扩展申请的权限档位。CLI 只透传、只留这两个键；App 用 isExtensionEngineCompatible 判断。
+ * grants 是开放的字符串数组：以后新增的档位不能让旧 App 整页解析失败。
+ */
+export const kayingcodePluginExtensionSummarySchema = z
+  .object({
+    engines: z.object({ zcode: z.string().min(1) }).strict(),
+    grants: z.array(z.string()),
+  })
+  .strict();
+export type KayingCodePluginExtensionSummary = z.infer<
+  typeof kayingcodePluginExtensionSummarySchema
+>;
+
+/** 插件商店定向展示的区域：`cn` 国内、`global` 海外（packages/shared/spec/plugin-store-regions.md）。 */
+export const kayingcodePluginStoreRegionSchema = z.enum(["cn", "global"]);
+export type KayingCodePluginStoreRegion = z.infer<typeof kayingcodePluginStoreRegionSchema>;
+
 // 商店信息（Store Listing）：目录条目携带的展示性元数据（显示名/icon/分类/作者/链接/hero/
 // 示例提示词），全部可选，UI 缺失时按降级矩阵处理（字母头像/隐藏区块/省略信息行）。
 // i18n 采用 `<字段>I18n` map，locale 解析复用 shared 的 plugin-display-name helper。
@@ -3846,6 +3962,18 @@ export const kayingcodePluginStoreListingSchema = z
      * 不参与安装门禁与计费，命名也不绑定具体套餐商品名。
      */
     requiresPaidPlan: z.boolean().optional(),
+    /**
+     * 带扩展的插件：只在 plugins/overview 带 includeExtensionSummary 时出现（能力位见
+     * packages/shared/spec/plugin-extension-summary.md）。已装插件的 listing 来自目录最新版条目，
+     * 所以这里是最新版的摘要。
+     */
+    extensionSummary: kayingcodePluginExtensionSummarySchema.optional(),
+    /**
+     * 目录条目声明的可见区域：`cn` 国内、`global` 海外；缺省表示所有区域可见。
+     * CLI 读目录时只透传这两个值（未知值丢弃，strict 协议才不会整页解析失败），
+     * UI 按当前地区过滤商店浏览列表；只影响展示，不限制安装与运行。
+     */
+    regions: z.array(kayingcodePluginStoreRegionSchema).optional(),
   })
   .strict();
 export type KayingCodePluginStoreListing = z.infer<typeof kayingcodePluginStoreListingSchema>;
@@ -3945,6 +4073,8 @@ export const kayingcodePluginsOverviewParamsSchema = z
   .object({
     workspace: kayingcodeWorkspaceRefSchema,
     configScope: kayingcodePluginScopeSchema.optional(),
+    /** 要商店信息里的 extensionSummary。只发给声明了 pluginExtensionSummary 的 CLI。 */
+    includeExtensionSummary: z.boolean().optional(),
   })
   .strict();
 export const kayingcodePluginsOverviewResultSchema = z
@@ -4523,6 +4653,7 @@ export const kayingcodeProtocolMethods = {
   sessionList: "session/list",
   sessionSubagents: "session/subagents",
   sessionRequestRuntimePreferences: "session/requestRuntimePreferences",
+  sessionReadReplyLanguage: "session/readReplyLanguage",
   subagentsReadRuntimeConfig: "subagents/readRuntimeConfig",
   sessionRead: "session/read",
   sessionMessages: "session/messages",
@@ -4545,6 +4676,7 @@ export const kayingcodeProtocolMethods = {
   sessionCompact: "session/compact",
   sessionGoal: "session/goal",
   sessionClose: "session/close",
+  sessionReleaseUnderDirectory: "session/releaseUnderDirectory",
   // setModel 仍被 kayingcodeSessionService 的 desktop 旧链路消费；replayable
   // switchModelConfig 已直接由目标 Environment Registry 解析 Selection。
   sessionSetModel: "session/setModel",
@@ -4609,6 +4741,7 @@ export const kayingcodeProtocolMethods = {
   workflowsForRun: "workflows/forRun",
   pluginsResolveSuggestedReference: "plugins/resolveSuggestedReference",
   pluginsSetEnabled: "plugins/setEnabled",
+  pluginsWorkspaceTrust: "plugins/workspaceTrust",
   pluginsOverview: "plugins/overview",
   pluginsLocalSourceAdd: "plugins/local-source/add",
   pluginsLocalSourceRemove: "plugins/local-source/remove",

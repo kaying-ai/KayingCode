@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { parseEntryStoreListing } from "../src/plugins/marketplace.js";
 
 test("marketplace listing keeps valid game metadata and drops only malformed extensions", () => {

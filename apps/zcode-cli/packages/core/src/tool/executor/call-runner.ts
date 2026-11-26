@@ -42,6 +42,7 @@ import { createMcpToolDisplay, createToolResultDisplay } from "./result-display.
 import { serializeOutput } from "./result-serialization.js";
 import {
   ToolDeadline,
+  createInputPreemptionSlot,
   executeWithTimeout,
   linkAbortSignal,
   observeToolAdmissionClock,
@@ -61,6 +62,7 @@ import { validateInitialModelToolInput, validateInput, validateOutput } from "./
 import type { ExecutableToolCall } from "../types.js";
 import { resolveEmbeddedSearchBranchCapability } from "../../embedded-search/capability.js";
 import { resolveToolEntryModelContract } from "../model-contract.js";
+import { isEmptyToolName, lookupToolEntry, resolveLiveToolEntry } from "./live-entry-resolution.js";
 
 const UNDISCOVERED_TOOL_SCHEMA_EXPLANATION =
   "\n\nThis tool's schema was not sent to the API — it was not in the discovered-tool set derived from message history. " +
@@ -118,12 +120,12 @@ async function executeToolCallImpl(
     deps.traceContext ??
     createRootTraceContext({ sessionId: deps.sessionId, turnId: deps.turnId });
   const emptyToolName = isEmptyToolName(toolCall.name);
-  const registeredEntry = emptyToolName ? undefined : deps.registry.get(toolCall.name);
+  const lookup = await lookupToolEntry(deps, toolCall, options, parentTraceContext, telemetry);
+  if (lookup.cancelled) return lookup.cancelled;
   const model = options?.model ?? deps.model;
-  const entry = registeredEntry
-    ? resolveToolEntryModelContract(registeredEntry, {
-        model,
-      })
+  const modelContractContext = { model };
+  let entry = lookup.entry
+    ? resolveToolEntryModelContract(lookup.entry, modelContractContext)
     : undefined;
   const pluginId = entry?.metadata.mcpPresentation?.pluginId;
   const canonicalToolCall =
@@ -158,7 +160,9 @@ async function executeToolCallImpl(
     // 空名在 admission 阶段停止会让模型永远收不到配对结果。复用
     // registry-miss 生命周期，provider 内容严格保留模型返回的原始名称（含空白名称）。
     // 修复原因：非空的未知工具名只发 `Tool not found: X` 时没有 tool_use_error 包装。
-    result.modelContent = `<tool_use_error>Error: No such tool available: ${toolCall.name}</tool_use_error>`;
+    // MCP 工具附上所属 server 的状态（仍在连接时指向 WaitForMcpServers），模型据此决定等待还是放弃。
+    const reason = deps.describeUnavailableTool?.(toolCall.name, model) ?? "";
+    result.modelContent = `<tool_use_error>Error: No such tool available: ${toolCall.name}${reason}</tool_use_error>`;
     // registry miss 发生在 handler/ToolCallStarted 之前；旧代码只把失败
     // 返回给 provider，没有发布 ToolCallError，V4 tool row 因而永久停在 inputStreaming。
     await emitToolCallError(
@@ -221,6 +225,38 @@ async function executeToolCallImpl(
       );
       telemetry?.finishCancelled("abort_signal");
       return result;
+    }
+
+    if (entry.resolveForExecution) {
+      const resolution = await resolveLiveToolEntry(
+        entry.resolveForExecution,
+        canonicalToolCall,
+        options?.signal,
+      );
+      if (resolution.status === "failed") {
+        const result = createErrorResult(canonicalToolCall, resolution.error);
+        await emitToolCallError(
+          deps,
+          canonicalToolCall.id,
+          traceContext,
+          turnId,
+          result.error,
+          undefined,
+          pluginId,
+        );
+        if (resolution.cancelled) {
+          telemetry?.finishCancelled("abort_signal");
+        } else {
+          telemetry?.finishFailed(
+            "lookup",
+            "configuration",
+            resolution.cause ?? result.error,
+          );
+        }
+        return result;
+      }
+      // 切换为 live entry 后必须重新套用本轮模型契约投影，否则会绕过 resolveModelContract。
+      entry = resolveToolEntryModelContract(resolution.entry, modelContractContext);
     }
 
     const preparedInitialInput = prepareInitialToolExecutionInput({
@@ -488,7 +524,9 @@ async function executeToolCallImpl(
       const embeddedSearchDecision = resolveEmbeddedSearchBranchCapability({
         bashAvailable: deps.registry.has("Bash"),
       });
+      const inputPreemption = createInputPreemptionSlot();
       const context: ToolExecutionContext = {
+        inputPreemption,
         toolCallId: canonicalToolCall.id,
         toolSearch: options?.toolSearch,
         telemetry,
@@ -536,6 +574,7 @@ async function executeToolCallImpl(
         dynamicWorkflowRunPort: deps.dynamicWorkflowRunPort,
         dynamicWorkflowSnippetPort: deps.dynamicWorkflowSnippetPort,
         modelCatalogPort: deps.modelCatalogPort,
+        mcpServerWaitPort: deps.mcpServerWaitPort,
         runtimeTaskRegistry: deps.runtimeTaskRegistry,
         readFileState: deps.readFileState,
         recordReadFileStateMetadata: (metadata) => {
@@ -575,6 +614,7 @@ async function executeToolCallImpl(
         deadline,
         executionAbortController,
         entry,
+        inputPreemption,
       );
       const durationMs = Date.now() - startTime;
       if (isToolHandlerFailure(output)) {
@@ -768,10 +808,6 @@ async function executeToolCallImpl(
   } finally {
     lifetime?.release();
   }
-}
-
-function isEmptyToolName(toolName: string): boolean {
-  return toolName.trim().length === 0;
 }
 
 function errorCategoryForToolError(type: string | undefined): AgentTelemetryErrorCategory {

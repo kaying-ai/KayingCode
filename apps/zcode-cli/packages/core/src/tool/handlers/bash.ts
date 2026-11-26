@@ -73,6 +73,7 @@ import {
   type BashPermissionMatcher,
 } from "./bash-semantics.js";
 import { isBashAutoBackgroundEligible } from "./bash-background-policy.js";
+import { isCmdShellReadOnlyCommand } from "./bash-cmd-readonly-policy.js";
 import { supportsBashBackgroundLifecycle } from "./bash-background-lifecycle.js";
 import { resolveBashPermissionRulePolicy } from "./bash-command-permission-policy.js";
 import {
@@ -129,7 +130,13 @@ export function resolveBashPermissionCapability(
     );
     if (match.status === "matched") return { userApprovalRule: match.ruleId };
   }
-  if (!command || !isRuntimeReadOnlyBashCommand(command, context)) return undefined;
+  // Bash 会把 # 后的 CMD 命令当注释；实际经 cmd.exe 执行时改按 CMD 语法做保守判定。
+  const dialect = context?.bashShellSelection?.dialect;
+  if (dialect === "cmd" || dialect === "legacy-shell") {
+    if (!command || !isCmdShellReadOnlyCommand(command, context)) return undefined;
+  } else if (!command || !isRuntimeReadOnlyBashCommand(command, context)) {
+    return undefined;
+  }
   return {
     destructive: false,
     needsApproval: false,

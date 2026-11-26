@@ -9,6 +9,7 @@ import type {
   ModelToolCall,
   ModelToolContract,
   MessageId,
+  PendingInputEditLock,
   ProjectId,
   SessionEvent,
   SessionEventSink,
@@ -43,6 +44,8 @@ import type {
 import type { ContextCompositionQuery } from "./context-composition/query.js";
 import type { ContextUsageSnapshot } from "./methods/context-usage.js";
 import type { RuntimeMessageEntry } from "../agent/message-history.js";
+import type { McpSessionView } from "../mcp/runtime/session.js";
+import type { TurnRequestState } from "./methods/turn-loop-state.js";
 import type {
   ActiveTurnInfo,
   AcquireForegroundPromotionLeaseResult,
@@ -58,6 +61,9 @@ import type {
   ContextUsageToolDetail,
   ContinueActiveTargetLoopOptions,
   DrainedPendingInputDiagnostics,
+  EditPendingInputOptions,
+  EditPendingInputResult,
+  LockPendingInputEditResult,
   ForegroundPromotionLeaseMode,
   EnqueueSubagentMessageInput,
   ResumeSessionOptions,
@@ -213,11 +219,19 @@ export interface AgentRuntimeCoreMethods {
     reservationId: string;
     traceContext: TraceContext;
   }): Promise<boolean>;
-  editPendingInputById(options: {
+  editPendingInputById(
+    options: EditPendingInputOptions & { traceContext: TraceContext },
+  ): Promise<EditPendingInputResult>;
+  lockPendingInputEdit(options: {
     pendingInputId: string;
-    newText: string;
+    editLock: PendingInputEditLock;
+    traceContext: TraceContext;
+  }): Promise<LockPendingInputEditResult>;
+  releasePendingInputEdit(options: {
+    pendingInputId: string;
     traceContext: TraceContext;
   }): Promise<boolean>;
+  getPendingInputEditLock(pendingInputId: string): PendingInputEditLock | undefined;
   reorderPendingInput(options: {
     pendingInputId: string;
     beforePendingInputId: string | null;
@@ -273,11 +287,16 @@ export interface AgentRuntimeCoreMethods {
   injectPluginReferenceReminderFromTurn(
     userInput: string,
     traceContext: TraceContext,
+    requestState: TurnRequestState,
+    mcpView: McpSessionView | undefined,
     toolDisallowlist?: readonly string[],
   ): Promise<void>;
   startMcpStartup(traceContext: TraceContext): Promise<McpConnectionSnapshot> | undefined;
-  initializeMcp(traceContext: TraceContext): Promise<void>;
-  refreshMcpToolsIfChanged(traceContext: TraceContext): Promise<void>;
+  initializeMcp(
+    traceContext: TraceContext,
+    options?: { background?: boolean },
+  ): Promise<McpSessionView | undefined>;
+  reconcileMcpConfiguration(traceContext: TraceContext): Promise<void>;
   discoverSkillsForContext(traceContext: TraceContext): Promise<SkillLoadOutcome | undefined>;
   createConfigOnlyContextSnapshot(workingDirectory: string): ContextSourceSnapshot;
   initializeMessageHistoryFromContext(

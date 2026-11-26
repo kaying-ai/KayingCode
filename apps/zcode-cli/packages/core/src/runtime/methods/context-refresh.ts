@@ -25,13 +25,15 @@ import {
 } from "../../agent/message-history.js";
 import {
   buildDateChangeReminderBody,
+  buildLanguageReminderBody,
   buildOutputStyleInstructionsBody,
+  LANGUAGE_CLEARED_REMINDER,
   OUTPUT_STYLE_RESET_REMINDER,
 } from "../helpers/runtime-reminders.js";
 import { querySourceForTask } from "./turn-model-step-usage.js";
 import { commitTurnRequestEntries } from "./turn-output-token-continuation.js";
 import type { TurnRequestState } from "./turn-loop-state.js";
-import { countContextPrefixMessages } from "../deps.js";
+import { countContextPrefixMessages, traceContextToLogContext } from "../deps.js";
 import type { Model, OutputStylePromptConfig } from "../deps.js";
 import type { RuntimeMessageEntry } from "../../agent/message-history.js";
 import type { AgentRuntimeInternal } from "../internal.js";
@@ -105,6 +107,8 @@ export async function appendRuntimeContextAnnouncements(
   signal?: AbortSignal,
 ): Promise<void> {
   const contextResult = runtime.latestContextBuildResult;
+  // 回复语言与环境互不依赖，先发出拉取再读环境，两者的等待重叠。
+  const replyLanguage = readCurrentReplyLanguage(runtime, traceContext, signal);
   const environment = announcesEnvironment(contextResult)
     ? await resolveCurrentEnvironment(
         runtime,
@@ -118,6 +122,7 @@ export async function appendRuntimeContextAnnouncements(
     environment,
     model,
     outputStyle,
+    replyLanguage: await replyLanguage,
   });
   throwIfTurnAborted(signal);
   await persistAnnouncements(runtime, state, attachments, traceContext);
@@ -128,7 +133,33 @@ function announcesEnvironment(contextResult: ContextBuildResult | undefined): bo
 }
 
 /**
- * 环境、模型与 output style 指令公告的纯计算部分；当前环境由调用方先读好传入。
+ * 回复语言只对主线程宣告，每次收集都向 Host 读当前设置（不推送、不缓存）。
+ * null 是没有设置；undefined 是不读或读取失败，只跳过本次公告，不影响本轮。
+ */
+async function readCurrentReplyLanguage(
+  runtime: AgentRuntimeInternal,
+  traceContext: TraceContext,
+  signal?: AbortSignal,
+): Promise<string | null | undefined> {
+  const read = runtime.readReplyLanguage;
+  if (!read || querySourceForTask(runtime.config.taskType) !== "main_turn") return undefined;
+  try {
+    // await 同时接住端口的同步 throw 与 reject。
+    return await read({ sessionId: runtime.sessionId, signal, traceContext });
+  } catch (error) {
+    // 每次收集输入附件都会读一次，与消息流同量级：只记 debug，生产不落盘。
+    runtime.logger?.debug("Reply language read skipped", {
+      ...traceContextToLogContext(traceContext),
+      event: "reply_language.read_skipped",
+      module: "core.runtime",
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+    return undefined;
+  }
+}
+
+/**
+ * 环境、模型、output style 指令与回复语言公告的纯计算部分；当前环境与回复语言由调用方先读好传入。
  * 输入附件收集（读当前环境）与 context 组成预演（只用历史或启动快照）共用，二者产出同一组公告。
  */
 export function buildRuntimeContextAnnouncements(
@@ -139,6 +170,8 @@ export function buildRuntimeContextAnnouncements(
     environment: EnvironmentSnapshot | undefined;
     model: Model;
     outputStyle: OutputStylePromptConfig | undefined;
+    /** Host 的回复语言设置；null 是没有设置；缺省（不读、读取失败、context 组成预演）时不改变。 */
+    replyLanguage?: string | null;
   },
 ): RuntimeAttachmentEntry[] {
   if (!announcesEnvironment(input.contextResult)) return [];
@@ -163,6 +196,17 @@ export function buildRuntimeContextAnnouncements(
       (previousStyle === undefined ? undefined : OUTPUT_STYLE_RESET_REMINDER);
     if (instructions !== undefined && instructions !== previousStyle) {
       attachments.push(systemReminderAttachmentEntry("output_style_instructions", instructions));
+    }
+    // 回复语言同理：与最近一次宣告不同时再宣告；没有设置（null）时，若最近一次宣告的是
+    // 某个语言，宣告一次清除。读取失败是暂时的，不当作清除，否则下次读到同一语言会再公告一次。
+    const previousLanguage = last.get("language")?.content;
+    const language = input.replyLanguage
+      ? buildLanguageReminderBody(input.replyLanguage)
+      : input.replyLanguage === null && previousLanguage !== undefined
+        ? LANGUAGE_CLEARED_REMINDER
+        : undefined;
+    if (language !== undefined && language !== previousLanguage) {
+      attachments.push(systemReminderAttachmentEntry("language", language));
     }
   }
   return attachments;
@@ -483,7 +527,7 @@ export function restateContextAfterCompact(
     ...(runtime.latestContextBuildResult?.sections.some((section) => section.source === "env_info")
       ? restateEnvironmentAndModel(preCompactEntries, keptEntries)
       : []),
-    ...restateOutputStyle(preCompactEntries, keptEntries),
+    ...restateLatestAnnouncements(preCompactEntries, keptEntries),
   ];
 }
 
@@ -527,15 +571,25 @@ function environmentAttachment(
   };
 }
 
-function restateOutputStyle(
+// output style 指令与回复语言：保留段没有同类公告时，按顺序重述 compact 前最近一次；
+// 最近一次是该来源自己的重置 / 清除公告时不重述。
+const RESTATED_SOURCES = [
+  ["output_style_instructions", OUTPUT_STYLE_RESET_REMINDER],
+  ["language", LANGUAGE_CLEARED_REMINDER],
+] as const;
+
+function restateLatestAnnouncements(
   preCompactEntries: readonly RuntimeMessageEntry[],
   keptEntries: readonly RuntimeMessageEntry[],
 ): RuntimeAttachmentEntry[] {
-  if (lastAnnouncedAttachments(keptEntries).has("output_style_instructions")) return [];
-  const latest = lastAnnouncedAttachments(preCompactEntries).get("output_style_instructions");
-  return latest && latest.content !== OUTPUT_STYLE_RESET_REMINDER
-    ? [systemReminderAttachmentEntry("output_style_instructions", latest.content)]
-    : [];
+  const kept = lastAnnouncedAttachments(keptEntries);
+  const previous = lastAnnouncedAttachments(preCompactEntries);
+  return RESTATED_SOURCES.flatMap(([source, sentinel]) => {
+    const latest = previous.get(source);
+    return latest && !kept.has(source) && latest.content !== sentinel
+      ? [systemReminderAttachmentEntry(source, latest.content)]
+      : [];
+  });
 }
 
 /**

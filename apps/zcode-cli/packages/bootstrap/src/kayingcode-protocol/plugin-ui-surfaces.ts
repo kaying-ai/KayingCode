@@ -38,9 +38,10 @@ export async function listPluginUiSurfaces(
   rawParams: unknown,
 ): Promise<KayingCodePluginsListUiSurfacesResult> {
   const params = parseParams(kayingcodePluginsListUiSurfacesParamsSchema, rawParams);
-  const outcome = resolveKayingCodePlugins({
+  const outcome = await resolveKayingCodePlugins({
     logger: context.logger,
     workingDirectory: params.workspace.workspacePath,
+    workspaceIdentity: params.workspace.workspaceIdentity,
   });
   return { surfaces: listPluginUiSurfacesFromPlugins(outcome.plugins) };
 }

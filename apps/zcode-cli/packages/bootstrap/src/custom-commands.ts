@@ -1,5 +1,5 @@
 import { resolve } from "node:path";
-import { createConfig } from "@zcode/adapters/config";
+import { createConfigWithPluginMigrations } from "@zcode/adapters/config";
 import { createNodeCustomCommandAdapter } from "@zcode/adapters/commands";
 import type {
   CustomCommandContent,
@@ -33,7 +33,7 @@ export interface KayingCodeCustomCommandInspection {
 export async function listKayingCodeCustomCommands(
   options: ListKayingCodeCustomCommandsOptions = {},
 ): Promise<CustomCommandLoadOutcome> {
-  const discovery = createCustomCommandDiscovery(options);
+  const discovery = await createCustomCommandDiscovery(options);
   return await discovery.adapter.discoverCommands({
     workingDirectory: discovery.workingDirectory,
   });
@@ -42,7 +42,7 @@ export async function listKayingCodeCustomCommands(
 export async function inspectKayingCodeCustomCommand(
   options: InspectKayingCodeCustomCommandOptions,
 ): Promise<KayingCodeCustomCommandInspection> {
-  const discovery = createCustomCommandDiscovery(options);
+  const discovery = await createCustomCommandDiscovery(options);
   const workingDirectory = discovery.workingDirectory;
   const adapter = discovery.adapter;
   const outcome = await adapter.discoverCommands({ workingDirectory });
@@ -63,23 +63,23 @@ export async function inspectKayingCodeCustomCommand(
 export async function loadKayingCodeCustomCommand(
   options: InspectKayingCodeCustomCommandOptions,
 ): Promise<CustomCommandContent> {
-  const discovery = createCustomCommandDiscovery(options);
+  const discovery = await createCustomCommandDiscovery(options);
   return await discovery.adapter.loadCommand({
     name: normalizeCommandName(options.name),
     workingDirectory: discovery.workingDirectory,
   });
 }
 
-function createCustomCommandDiscovery(options: ListKayingCodeCustomCommandsOptions) {
+async function createCustomCommandDiscovery(options: ListKayingCodeCustomCommandsOptions) {
   const workingDirectory = resolve(options.workingDirectory ?? process.cwd());
-  const configResult = createConfig({
+  const configResult = await createConfigWithPluginMigrations({
     env: options.env,
     projectConfigPath: options.projectConfigPath,
     workingDirectory,
     skipUserConfig: options.skipUserConfig,
     userConfigPath: options.userConfigPath,
   });
-  const pluginOutcome = resolveKayingCodePlugins({
+  const pluginOutcome = await resolveKayingCodePlugins({
     configResult,
     env: options.env,
     logger: options.logger,

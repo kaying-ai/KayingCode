@@ -125,7 +125,9 @@ export function createRemoteWorkspaceServiceCollection(params: {
   });
   const localBroadcastService = createBroadcastService(params.parentPort);
   // KayingCode.localrun：无账号凭据仓库 / 登出清理。
-  let handleOAuthProviderLogout: ((provider: never) => Promise<void>) | null = null;
+  let handleOAuthProviderLogout:
+    | ((provider: string, accountIdentity?: string | null) => Promise<void>)
+    | null = null;
   const localOAuthCredentialRepo = {
     loadTokenSet: async (_providerId?: string) =>
       null as { accessToken: string; kayingcodeJwtToken?: string | null } | null,
@@ -256,6 +258,10 @@ export function createRemoteWorkspaceServiceCollection(params: {
               nativeSearchEnhancementsEnabled: settings.nativeSearchEnhancementsEnabled !== false,
               toolSearchMode: settings.toolSearchMode ?? "auto",
               memoryEnabled: settings.memoryEnabled === true,
+              // 远端会话与本地 Host 共用产品默认：两个开关缺失时按关闭处理，
+              // 不把上游 subagents.alwaysBackground 的常开默认带到产品。
+              totalTokensReminderEnabled: settings.totalTokensReminderEnabled === true,
+              agentAlwaysBackgroundEnabled: settings.agentAlwaysBackgroundEnabled === true,
               modelContextBudgetStrategy,
               // remote workspace 与本地 Host 保持同一 scope 边界，首次执行不得再次等待 client config。
               ...(request.scope === "user-execution" && settings.integratedTerminalShell
@@ -316,6 +322,7 @@ export function createRemoteWorkspaceServiceCollection(params: {
     .register(
       IOAuthService,
       createOAuthService(localCredentialService, {
+        captureCredentialGuard: () => localCredentialService.captureRecoveryGuard(),
         apiClient: localApiClient,
         onProviderLogout: handleOAuthProviderLogout,
       }),

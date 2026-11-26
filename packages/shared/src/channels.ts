@@ -68,6 +68,9 @@ import type {
   SaveFileRequest,
   SaveFileResult,
   PrintPageToPdfResult,
+  MicrophoneAccessResetResult,
+  MicrophoneAccessResult,
+  MicrophoneSettingsTarget,
   OpenInEditorOptions,
   PostUpdateReleaseNotesPayload,
   RemoteSessionClosedEvent,
@@ -117,6 +120,8 @@ export const ServiceChannels = {
   ZCodeSession: "kayingcode-session",
   /** 会话分享服务描述符（localrun 仅保留 unsupported 门禁实现） */
   Project: "project",
+  /** 受管 worktree 任务管理（列表、删除、起点、fork 到新 worktree），仅本地桌面 Host。 */
+  ManagedWorktrees: "managed-worktrees",
   TaskGroups: "task-groups",
   RemoteProjects: "remote-projects",
   WindowProject: "window-project",
@@ -150,6 +155,8 @@ export const ServiceChannels = {
   ClientScenes: "client-scenes",
   CloudContent: "cloud-content",
   MarketingTouch: "marketing-touch",
+  /** 桌面 Host 的语音输入：连接 ASR 服务（packages/desktop/spec/composer-voice-input.md，仅本机 base 连接） */
+  VoiceInput: "voice-input",
   /** Skills 管理服务 */
   Skills: "skills",
   /** SSH 远程 skills 同步服务 */
@@ -209,6 +216,12 @@ export type ServiceChannelName = (typeof ServiceChannels)[keyof typeof ServiceCh
 /** Electron IPC 频道名。仅在 preload ↔ main 之间使用。 */
 export const PlatformChannels = {
   WebRemoteControlRendererAction: "kayingcode:web-remote-control-renderer-action",
+  /** renderer → main：执行预装工具命令（Prepare/Cancel/Delete/开关）；Desktop 独占 */
+  ExecutePreinstalledToolsCommand: "kayingcode:preinstalled-tools:command",
+  /** renderer → main：读取当前预装工具快照 */
+  GetPreinstalledToolsState: "kayingcode:preinstalled-tools:get-state",
+  /** main → renderer：推送预装工具快照（子进程唯一状态投影） */
+  PreinstalledToolsState: "kayingcode:preinstalled-tools:state",
   /** renderer → main：释放插件 UI 沙箱（关闭 ports、撤 protocol handler、清 partition） */
   PluginSandboxDispose: "zcode:plugin-sandbox-dispose",
   PluginSandboxCopyImage: "zcode:plugin-sandbox-copy-image",
@@ -229,6 +242,12 @@ export const PlatformChannels = {
   SaveFile: "kayingcode:save-file",
   /** Renderer → Main：用 Chromium 打印引擎把当前页面 print 媒体版面导出为 PDF */
   PrintToPdf: "kayingcode:print-to-pdf",
+  /** Renderer → Main：检查并按需请求系统麦克风权限 */
+  MicrophoneAccess: "kayingcode:microphone-access",
+  /** Renderer → Main：macOS 重置本 App 的麦克风授权记录并重新请求 */
+  ResetMicrophoneAccess: "kayingcode:reset-microphone-access",
+  /** Renderer → Main：打开系统麦克风权限 / 声音输入设置页 */
+  OpenMicrophoneSettings: "kayingcode:open-microphone-settings",
   /** Main → Renderer：转发远程连接过程日志 */
   RemoteConnectionLog: "kayingcode:remote-connection-log",
   /** Main → Renderer：远程 workspace session 已关闭 */
@@ -653,6 +672,8 @@ export const HostMessageTypes = {
   NetworkCapture: "network-capture",
   /** main → host：Main 的实时界面语言变化（Host 用于 ZCode endpoint 的 X-Client-Language） */
   ApplicationLocaleChanged: "application-locale-changed",
+  /** main → host：Agent 回复语言变化（Host 内存持有，应答 CLI 的 session/readReplyLanguage） */
+  ReplyLanguageChanged: "reply-language-changed",
 } as const;
 
 /** host process → main process 的反馈消息类型 */
@@ -802,6 +823,18 @@ export interface PlatformChannelMap {
   [PlatformChannels.PrintToPdf]: {
     request: void;
     response: PrintPageToPdfResult;
+  };
+  [PlatformChannels.MicrophoneAccess]: {
+    request: void;
+    response: MicrophoneAccessResult;
+  };
+  [PlatformChannels.ResetMicrophoneAccess]: {
+    request: void;
+    response: MicrophoneAccessResetResult;
+  };
+  [PlatformChannels.OpenMicrophoneSettings]: {
+    request: MicrophoneSettingsTarget;
+    response: boolean;
   };
   [PlatformChannels.RemoteConnectionLog]: {
     request: {

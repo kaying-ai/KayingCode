@@ -1,4 +1,9 @@
-import { BIGMODEL_PROVIDER_ID, type OAuthProviderId, ZAI_PROVIDER_ID } from "./oauth.js";
+import {
+  BIGMODEL_PROVIDER_ID,
+  type OAuthProviderId,
+  ZAI_CN_PROVIDER_ID,
+  ZAI_PROVIDER_ID,
+} from "./oauth.js";
 import { BUILTIN_MODEL_PROVIDER_IDS, type BuiltinModelProviderId } from "./model-provider-types.js";
 import { KAYINGCODE_ENV } from "./env.js";
 
@@ -119,6 +124,18 @@ export function resolveProviderFamilyDomainFromOAuthProvider(
     return "bigmodel";
   }
   return null;
+}
+
+/**
+ * 当前登录渠道对应的 Start Plan 家族；Host 与设置页共用这一份映射。
+ * 国内 Z.ai 登录的 Start 固定属于 BigModel，与 v3.17.2 国内入口一致。
+ */
+export function resolveStartPlanFamilyFromOAuthProvider(
+  provider: OAuthProviderId | string | null | undefined,
+): ProviderFamilyDomain | null {
+  return provider === ZAI_CN_PROVIDER_ID
+    ? "bigmodel"
+    : resolveProviderFamilyDomainFromOAuthProvider(provider);
 }
 
 export function shouldShowModelProviderFamilyForDomain(params: {

@@ -88,6 +88,7 @@ export function ChatPromptEditor({
   excludedSlashCommandNames,
   appSlashCommands,
   enableMentionPanel,
+  onUserInputStart,
 }: {
   workspacePath: string;
   workspaceIdentity?: string;
@@ -148,6 +149,11 @@ export function ChatPromptEditor({
   appSlashCommands?: readonly AppSlashCommand[];
   /** mention 面板开关（透传 LexicalChatInput）。 */
   enableMentionPanel?: boolean;
+  /**
+   * 用户开始修改输入框（透传 LexicalChatInput）：语音输入据此结束录音并等待最终结果，
+   * 避免识别结果与用户输入同时改编辑器。
+   */
+  onUserInputStart?: () => void;
 }) {
   const { intl } = useKayingCodeIntl();
   const toolbarRef = useComposerToolbarFit();
@@ -369,6 +375,7 @@ export function ChatPromptEditor({
           onSubmit={handleEditorSubmit}
           onModifiedSubmit={onModifiedSubmit}
           onChange={handleTextChange}
+          onUserInputStart={onUserInputStart}
           onFocus={onFocus}
           triggerPanelContainer={resolvedTriggerPanelContainer}
           workspacePath={workspacePath}

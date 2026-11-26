@@ -11,8 +11,6 @@ import {
 } from "@zcode/shared";
 import type {
   ApiRetryState,
-  AttachmentRef,
-  CommandAck,
   ConversationRowTarget,
   WorkflowNotificationMeta,
 } from "@zcode/shared/kayingcode-protocol-v4";
@@ -92,12 +90,7 @@ interface ConversationTurnGroupProps {
   onFork?: (target: ConversationRowTarget) => void;
   onRetry?: (target: ConversationRowTarget) => void;
   onFeedbackChange?: AssistantFeedbackHandler;
-  onEdit?: (
-    target: ConversationRowTarget,
-    newText: string,
-    attachments?: readonly AttachmentRef[],
-    workspaceMode?: "preserve" | "rewind",
-  ) => Promise<CommandAck | boolean | void> | CommandAck | boolean | void;
+  onEdit?: (target: ConversationRowTarget) => Promise<void> | void;
 }
 
 interface CronAutomationTurnCard {

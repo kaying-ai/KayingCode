@@ -190,6 +190,10 @@ const desktopTsupBundleSecurityOptions = resolveDesktopTsupBundleSecurityOptions
 
 function createSharedDefines() {
   return {
+    // 预装工具 E2E 构建开关：只有显式开启时才加载故障注入分支，生产构建整段常量折叠。
+    __KAYINGCODE_PREINSTALL_TEST_BUILD__: JSON.stringify(
+      process.env.KAYINGCODE_E2E_PREINSTALLED_TOOLS === "1",
+    ),
     __KAYINGCODE_VERSION__: JSON.stringify(buildMetadata.appVersion),
     __ZCODE_UPSTREAM_VERSION__: JSON.stringify(
       readUpstreamBaseVersion(resolve(import.meta.dirname, "../..")),
@@ -248,6 +252,8 @@ export default defineConfig([
     name: "main",
     entry: {
       "main/index": "src/main/index.ts",
+      // 预装文档工具的 utilityProcess 入口；Main 按 out/preinstalled-tools/process.js fork。
+      "preinstalled-tools/process": "src/preinstalled-tools/process.ts",
       "main/browserWebmRecorder": "src/main/browserView/electronBrowserWebmRecorder.ts",
       "main/kayingcodeDataSizeWorker": "src/main/kayingcodeDataSizeWorker.ts",
       // 资源管理器「存储」tab 的扫描 Worker：main 持有 StorageService，遍历放独立线程，供 new Worker(new URL()) 解析。

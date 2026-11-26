@@ -9,6 +9,7 @@ export const ASK_USER_QUESTION_E2E_CLOCK_SCALE_ENV = "KAYINGCODE_E2E_ASK_USER_QU
 export const appRuntimePreferencesChangedBroadcastPayloadSchema = z
   .object({
     askUserQuestionAutoResolutionEnabled: z.boolean(),
+    pluginAutoRecommendationEnabled: z.boolean().default(false),
     modelIoFullRetentionEnabled: z.boolean().default(false),
   })
   .strict();

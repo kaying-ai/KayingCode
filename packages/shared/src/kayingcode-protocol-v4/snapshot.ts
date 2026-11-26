@@ -16,6 +16,7 @@ import { conversationRowSchema } from "./rows.js";
 import { toolCallDisplaySchema } from "./toolDisplay.js";
 
 import { workspaceHookReviewRequestPayloadSchema } from "./workspace-hook-review.js";
+import { pluginInstallRequestPayloadSchema } from "./pluginInstall.js";
 import { workflowRunsStateSchema } from "./workflow-runs.js";
 import { sessionConfigStateSchema, sessionModelTransitionSchema } from "./session-config.js";
 export {
@@ -211,6 +212,15 @@ export const sessionUsageStateSchema = z.object({
 export type SessionUsageState = z.infer<typeof sessionUsageStateSchema>;
 
 // ── queue（不持久化，裁决：CLI 进程死亡即丢，客户端对账后由用户决定重发）──
+export const queueItemEditLockSchema = z
+  .object({
+    editorId: z.string().min(1),
+    clientId: z.string().min(1),
+    inputOrigin: z.enum(["desktop", "mobile"]).optional(),
+  })
+  .strict();
+export type QueueItemEditLock = z.infer<typeof queueItemEditLockSchema>;
+
 export const queueItemSchema = conversationInputIntentSchema.extend({
   dispatch: conversationInputDispatchSchema.extend({
     state: z.enum(["queued", "reserved", "promoting"]),
@@ -218,6 +228,11 @@ export const queueItemSchema = conversationInputIntentSchema.extend({
   /** Host 准入注入的可信 automation 身份；只允许队列提升原样回放。 */
   automationId: z.string().min(1).optional(),
   toolDisallowlist: z.array(z.string().min(1)).optional(),
+  /**
+   * 底部 composer 正在编辑该项（docs/ui/composer-edit-mode.md）：CLI 内存权威，冻结期间
+   * 自动续跑停在该项前，且不能删除、重排或立即发送。缺省 = 未锁。
+   */
+  editLock: queueItemEditLockSchema.optional(),
 });
 export type QueueItem = z.infer<typeof queueItemSchema>;
 
@@ -317,7 +332,7 @@ export type InteractionAutoResolution = z.infer<typeof interactionAutoResolution
 export const pendingInteractionSchema = z
   .object({
     interactionId: z.string(),
-    kind: z.enum(["permission", "userInput", "workspaceHookReview"]),
+    kind: z.enum(["permission", "userInput", "workspaceHookReview", "pluginInstall"]),
     // null = 会话级（如 provider 交互和 workspace Hook review）。
     anchorRowId: z.number().nullable(),
     createdAt: timestampSchema,
@@ -326,6 +341,7 @@ export const pendingInteractionSchema = z
       permissionRequestPayloadSchema,
       userInputRequestPayloadSchema,
       workspaceHookReviewRequestPayloadSchema,
+      pluginInstallRequestPayloadSchema,
     ]),
   })
   .superRefine((interaction, context) => {
@@ -336,7 +352,10 @@ export const pendingInteractionSchema = z
         message: "pending interaction kind must match payload kind",
       });
     }
-    if (interaction.kind === "workspaceHookReview" && interaction.autoResolution) {
+    if (
+      (interaction.kind === "workspaceHookReview" || interaction.kind === "pluginInstall") &&
+      interaction.autoResolution
+    ) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["autoResolution"],
@@ -385,6 +404,23 @@ export const backgroundWorkSummarySchema = z.object({
   childSessionId: z.string().optional(),
 });
 export type BackgroundWorkSummary = z.infer<typeof backgroundWorkSummarySchema>;
+
+/**
+ * 上一批活动结果的收起水位（docs/ui/chat-summary-panel.md §8）。
+ *
+ * 真实用户输入被接纳时由 CLI 权威投影写入：`at` 是输入接纳时刻，三个 id 列表是本批已结束
+ * 的工作身份。客户端据此收起旧结束明细与失败计数；身份重新运行（同一 workId / child /
+ * runId 恢复）时只用新批次边界，不等价于删除历史记录。
+ *
+ * optional 只服务旧快照/旧发送端 wire 兼容：缺席 = 从未收起过任何批次。
+ */
+export const activitySummaryDismissedSchema = z.object({
+  at: timestampSchema,
+  workIds: z.array(z.string()),
+  subagentIds: z.array(z.string()),
+  workflowRunIds: z.array(z.string()),
+});
+export type ActivitySummaryDismissed = z.infer<typeof activitySummaryDismissedSchema>;
 
 // subagent 运行态属于 conversation 权威投影，而不是 renderer 查询缓存。
 // ended 详情保持 cursor query；snapshot 只携带目录总数，避免运行中并发数量依赖查询时序。
@@ -520,6 +556,8 @@ export const conversationSnapshotSchema = z.object({
   pendingInteractions: z.array(pendingInteractionSchema),
   pendingCommands: z.array(commandStateSummarySchema),
   backgroundWorks: z.array(backgroundWorkSummarySchema),
+  // Additive：旧 CLI/旧快照不带该字段时仍按「本批未收起」处理。
+  activitySummaryDismissed: activitySummaryDismissedSchema.optional(),
   // optional 只服务旧快照 wire 兼容；新 CLI 的初始态和每次投影都始终携带该字段。
   subagents: subagentProjectionStateSchema.optional(),
   // 冷快照必须携带 workflowRuns：漏这一处，刷新/重连后正在跑的 run 会静默消失

@@ -14,6 +14,7 @@ import type { ModelExecutionContext } from "../types.js";
 import { rebuildContextPrefix } from "./context-refresh.js";
 import { recordModelHistoryRound, type RegularTurnLoopState } from "./turn-loop-state.js";
 import { createTurnModel, sameModelSelection } from "./turn-model.js";
+import { committedToolSearchDelivery } from "./turn-output-token-continuation.js";
 
 type SelectionFallbackDeclaration = NonNullable<ModelExecutionContext["selectionFallback"]>;
 
@@ -249,6 +250,7 @@ export async function applyExecutionSelectionFallback(
     state.userMessageId,
     input.assistantCreatedAt,
     {
+      toolSearchDelivery: committedToolSearchDelivery(state.turnRequestState),
       completed: Date.now(),
       // Bug 根因：仅写 completed 会让进程在退回答案落盘前退出时，被冷恢复误判为成功。
       // 复用统一 discarded 契约，表示该 attempt 已作废但整个用户请求仍等待后续 assistant。

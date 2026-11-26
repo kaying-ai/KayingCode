@@ -17,6 +17,9 @@ import {
   type ModelReasoningContentBlock,
   type ModelTextContentBlock,
   type TokenUsageInfo,
+  type ToolSearchAnnouncement,
+  type ToolSearchDelivery,
+  type ToolSearchMcpDelta,
 } from "@zcode/contracts";
 import {
   buildPromptAttachmentReminderBodies,
@@ -85,17 +88,14 @@ export const INTERRUPT_MARKER_SOURCE = "interrupt_marker" satisfies RuntimeMessa
 
 export interface RuntimeMessageMetadata {
   compactBoundary?: { boundaryId: string; preCompactDiscoveredTools?: readonly string[] };
-  toolSearchAnnouncement?: {
-    addedNames: readonly string[];
-    removedNames: readonly string[];
-    readdedNames: readonly string[];
-  };
+  toolSearchAnnouncement?: ToolSearchAnnouncement;
   /**
    * 公告 removedNames 中仍在 registry、只因本轮限制隐藏的名称；请求投影据此渲染中性删除文案。
    * 放在 toolSearchAnnouncement 之外：那个对象按严格 schema 校验，旧版本读到新键会丢掉整条公告事实；
    * 这里是宽松字段，旧版本忽略它。
    */
   toolSearchHiddenNames?: readonly string[];
+  toolSearchMcpDelta?: ToolSearchMcpDelta;
   source: RuntimeMessageSource;
   agentListingDelta?: AgentListingDelta;
   environment?: EnvironmentAnnouncement;
@@ -107,6 +107,8 @@ export interface RuntimeMessageMetadata {
 }
 
 export interface RuntimeMessageMessageEntry {
+  /** 实际交付定义的内部记录，仅随有效 assistant 提交，不进入 provider 消息。 */
+  toolSearchDelivery?: ToolSearchDelivery;
   kind?: "message";
   message: ModelInputMessage;
   metadata?: RuntimeMessageMetadata;
@@ -161,6 +163,7 @@ export interface MessageHistory {
     reasoning?: ReasoningContentInput[],
     model?: Pick<Model, "providerId" | "modelId">,
     tokens?: TokenUsageInfo,
+    delivery?: ToolSearchDelivery,
   ): void;
 
   // Add tool result
@@ -248,6 +251,7 @@ export class MessageHistoryImpl implements MessageHistory {
     reasoning?: ReasoningContentInput[],
     model?: Pick<Model, "providerId" | "modelId">,
     tokens?: TokenUsageInfo,
+    delivery?: ToolSearchDelivery,
   ): void {
     const reasoningBlocks = reasoning?.map((block) => cloneReasoningBlock(block)) ?? [];
     this.entries.push({
@@ -269,6 +273,7 @@ export class MessageHistoryImpl implements MessageHistory {
         ...(model ? { providerId: model.providerId, modelId: model.modelId } : {}),
       },
       ...(tokens ? { tokens: cloneTokenUsageInfo(tokens) } : {}),
+      ...(delivery ? { toolSearchDelivery: structuredClone(delivery) } : {}),
     });
     this.cacheStats.totalMessages = this.entries.length;
   }
@@ -649,6 +654,9 @@ export function cloneRuntimeMessageEntry(entry: RuntimeMessageEntry): RuntimeMes
     metadata: cloneRuntimeMessageMetadata(entry.metadata),
     ...(entry.tokens ? { tokens: cloneTokenUsageInfo(entry.tokens) } : {}),
     ...(entry.queryScope ? { queryScope: entry.queryScope } : {}),
+    ...(entry.toolSearchDelivery
+      ? { toolSearchDelivery: structuredClone(entry.toolSearchDelivery) }
+      : {}),
     ...(entry.compactGroupKey ? { compactGroupKey: entry.compactGroupKey } : {}),
   };
 }
@@ -703,13 +711,12 @@ export function cloneRuntimeMessageMetadata(
           },
         }
       : {}),
+    ...(metadata.toolSearchMcpDelta
+      ? { toolSearchMcpDelta: structuredClone(metadata.toolSearchMcpDelta) }
+      : {}),
     ...(metadata.toolSearchAnnouncement
       ? {
-          toolSearchAnnouncement: {
-            addedNames: [...metadata.toolSearchAnnouncement.addedNames],
-            removedNames: [...metadata.toolSearchAnnouncement.removedNames],
-            readdedNames: [...metadata.toolSearchAnnouncement.readdedNames],
-          },
+          toolSearchAnnouncement: structuredClone(metadata.toolSearchAnnouncement),
         }
       : {}),
     ...(metadata.toolSearchHiddenNames

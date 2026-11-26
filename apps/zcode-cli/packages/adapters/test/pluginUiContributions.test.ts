@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import test from "node:test";
+import { test } from "vitest";
 import type { PluginConfig } from "@zcode/contracts";
-import { discoverNodePluginsSync } from "../src/plugins/index.js";
+import { discoverNodePlugins } from "../src/plugins/index.js";
 
 const pluginName = "browser-compare-fixture";
 
@@ -46,19 +46,19 @@ function config(dirs: string[], enabledPlugins: Record<string, boolean> = {}): P
   };
 }
 
-test("projects only validated contributions from an enabled plugin", () => {
+test("projects only validated contributions from an enabled plugin", async () => {
   const root = mkdtempSync(join(tmpdir(), "kayingcode-plugin-ui-"));
   const storageRoot = mkdtempSync(join(tmpdir(), "kayingcode-plugin-storage-"));
   try {
     writePlugin(root);
-    const enabled = discoverNodePluginsSync({
+    const enabled = await discoverNodePlugins({
       config: config([root]),
       storageRoot,
       workingDirectory: root,
     });
     assert.equal(enabled.plugins[0]?.uiContributions?.sidePanes.length, 1);
 
-    const disabled = discoverNodePluginsSync({
+    const disabled = await discoverNodePlugins({
       config: config([root], { [`${pluginName}@inline`]: false }),
       storageRoot,
       workingDirectory: root,
@@ -70,7 +70,7 @@ test("projects only validated contributions from an enabled plugin", () => {
   }
 });
 
-test("fails closed when two enabled plugin identities share one manifest name", () => {
+test("fails closed when two enabled plugin identities share one manifest name", async () => {
   const inlineRoot = mkdtempSync(join(tmpdir(), "kayingcode-plugin-ui-inline-"));
   const storageRoot = mkdtempSync(join(tmpdir(), "kayingcode-plugin-storage-"));
   const cachedRoot = join(storageRoot, "cache", "fixture-marketplace", pluginName, "1.0.0");
@@ -92,7 +92,7 @@ test("fails closed when two enabled plugin identities share one manifest name", 
         },
       ],
     });
-    const outcome = discoverNodePluginsSync({
+    const outcome = await discoverNodePlugins({
       config: config([inlineRoot], {
         [`${pluginName}@fixture-marketplace`]: true,
       }),

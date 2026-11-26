@@ -16,6 +16,7 @@ import {
   RESUME_WORKFLOW_RUN_TOOL_NAME,
   SAVE_WORKFLOW_TOOL_NAME,
   SUBMIT_RESULT_TOOL_NAME,
+  WAIT_FOR_MCP_SERVERS_TOOL_NAME,
   type JsonSchema,
 } from "@zcode/contracts";
 import type { ToolEntry } from "../types.js";
@@ -62,6 +63,8 @@ import { resolveWorkflowQuestionToolEntry } from "./resolve-workflow-question.js
 import { fillWorkflowHoleToolEntry } from "./fill-workflow-hole.js";
 import { taskOutputToolEntry } from "./task-output.js";
 import { taskStopToolEntry } from "./task-stop.js";
+import { readTopicResourceToolEntry } from "./read-topic-resource.js";
+import { waitForMcpServersToolEntry } from "./wait-for-mcp-servers.js";
 import { readSessionContextToolEntry } from "./read-session-context.js";
 import { amendWorkflowToolEntry } from "./amend-workflow.js";
 import { createWorkflowToolEntry } from "./create-workflow.js";
@@ -115,6 +118,8 @@ export const builtInTools: ToolEntry[] = [
   escalateToolEntry,
   taskOutputToolEntry,
   taskStopToolEntry,
+  readTopicResourceToolEntry,
+  waitForMcpServersToolEntry,
   readSessionContextToolEntry,
   // 渠道回复等待插件入口接入；仅注释默认注册，保留完整实现。
   // replyToChannelToolEntry,
@@ -199,6 +204,10 @@ interface RegisterBuiltInToolsOptions {
   includeAutomation?: boolean;
   /** Off-Peak 会话内创建工具面；由 host 的 offPeakToolEnabled flag（灰度/远程门）驱动。 */
   includeOffPeak?: boolean;
+  /** 注入了 topicResourcePort（App 托管会话）才注册 ReadTopicResource；机器人授权在调用时校验。 */
+  includeTopicResource?: boolean;
+  /** Agent 是否总在后台运行；缺省 true。 */
+  agentAlwaysBackground?: boolean;
   /**
    * 动态工作流灰度门。**只有显式 false
    * 才下架** DYNAMIC_WORKFLOW_TOOL_NAMES：缺席代表调用方不参与灰度（TUI、headless、
@@ -210,6 +219,8 @@ interface RegisterBuiltInToolsOptions {
   sessionControlKind?: "cli" | "app";
   /** node_repl（js）默认关闭，由官方 browser-use 插件启用。 */
   includeNodeRepl?: boolean;
+  /** WaitForMcpServers 只在会话有 MCP 端口时注册。 */
+  includeWaitForMcpServers?: boolean;
   /** browser-use 说明和 agent.browsers 注入由官方 browser-use 插件 + 宿主 browser bridge 共同启用。 */
   includeBrowserUse?: boolean;
   embeddedSearchEnabled?: boolean;
@@ -259,6 +270,18 @@ export function registerBuiltInTools(
       continue;
     }
     if (entry.metadata.name === "Skill" && options.includeSkill === false) {
+      continue;
+    }
+    if (
+      entry.metadata.name === WAIT_FOR_MCP_SERVERS_TOOL_NAME &&
+      options.includeWaitForMcpServers !== true
+    ) {
+      continue;
+    }
+    if (
+      entry.metadata.name === readTopicResourceToolEntry.metadata.name &&
+      options.includeTopicResource !== true
+    ) {
       continue;
     }
     if (entry.metadata.name === "SendMessage" && options.includeSendMessage !== true) {
@@ -335,11 +358,13 @@ function resolveBuiltInToolEntryForBranch(
   // options.includeDynamicWorkflow，所以首次装配与分支刷新产出的描述必然一致。
   if (entry.metadata.name === "Agent") {
     return createAgentToolEntry({
+      alwaysBackground: options.agentAlwaysBackground,
       dynamicWorkflowEnabled: options.includeDynamicWorkflow !== false,
     });
   }
   if (entry.metadata.name === "Task") {
     return createTaskToolEntry({
+      alwaysBackground: options.agentAlwaysBackground,
       dynamicWorkflowEnabled: options.includeDynamicWorkflow !== false,
     });
   }

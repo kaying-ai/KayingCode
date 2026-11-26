@@ -16,7 +16,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-it("工作区直接 MCP 不得被当作用户可信配置", async () => {
+it("CLI/headless 装配按产品边界开箱即用工作区 MCP，不进入待信任集合", async () => {
   const root = await mkdtemp(join(tmpdir(), "workspace-mcp-trust-"));
   roots.push(root);
   await mkdir(join(root, ".kayingcode"));
@@ -37,7 +37,11 @@ it("工作区直接 MCP 不得被当作用户可信配置", async () => {
     subagentOutputRootDir: join(root, "output"),
     workingDirectory: root,
   });
-  expect(result.untrustedProjectMcpServers.has("probe")).toBe(true);
+  // 产品边界见 src/app/runtime-config.ts：workspace MCP 开箱即用，project 声明默认 trusted 并自动连接。
+  // 需要逐项审核的信任模型由 protocol 装配（kayingcode-protocol/mcp.ts）与 createWorkspaceMcpTrust 承担。
+  expect(result.configuredMcpServers.probe).toBeDefined();
+  expect(result.untrustedProjectMcpServers.size).toBe(0);
+  expect(result.runtimeConfig.mcp?.servers?.probe).toEqual(result.configuredMcpServers.probe);
 });
 
 import { access, readFile } from "node:fs/promises";
@@ -565,7 +569,7 @@ it("空项目 MCP map 使用 fallback；坏邻项不阻止有效声明审核", a
   expect(await f.authority.allows("probe", f.config)).toBe(false);
 });
 
-it("项目配置损坏时保留 headless 用户来源，工作区声明仍拒绝", async () => {
+it("项目配置损坏时保留 headless 用户 MCP 配置，工作区声明仍拒绝", async () => {
   const f = await fixture();
   await writeFile(
     f.options.userConfigPath,
@@ -582,10 +586,16 @@ it("项目配置损坏时保留 headless 用户来源，工作区声明仍拒绝
     subagentOutputRootDir: join(f.root, "output"),
     workingDirectory: f.workspace,
   });
-  expect(runtime.configuredMcpServers.user_probe?.source).toEqual({ kind: "user" });
-  expect(await f.authority.allows("user_probe", runtime.configuredMcpServers.user_probe!)).toBe(
-    true,
+  // CLI/headless 装配不写 source 元数据（那是 protocol 信任模型的一部分），也不经过
+  // createWorkspaceMcpTrust 的 allows：用户配置在项目配置损坏时仍进入自动连接的 server 列表即可。
+  expect(runtime.configuredMcpServers.user_probe).toMatchObject({
+    type: "stdio",
+    command: "fake",
+  });
+  expect(runtime.runtimeConfig.mcp?.servers?.user_probe).toEqual(
+    runtime.configuredMcpServers.user_probe,
   );
+  expect(runtime.untrustedProjectMcpServers.size).toBe(0);
   expect(await f.authority.inspect()).toEqual({});
   expect(await f.authority.allows("probe", f.config)).toBe(false);
 });

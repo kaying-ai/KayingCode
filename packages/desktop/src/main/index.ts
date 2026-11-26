@@ -2,6 +2,12 @@ import {
   BROWSER_LOCAL_PREVIEW_PRIVILEGES,
   installBrowserLocalPreview,
 } from "@desktop/main/browser-local-preview/index.js";
+import { resolvePreinstalledToolsRelease } from "@zcode/shared/preinstalled-tools";
+import {
+  spawnPreinstalledToolsProcess,
+  loadPreinstalledToolsCatalog,
+  type PreinstalledToolsProcessHandle,
+} from "@desktop/preinstalled-tools/index.js";
 import { createRemoteConversationTelemetryDispatcher } from "@zcode/shared/conversation-telemetry";
 import { installRequestSecurityDiagnostics } from "./request-security-edition/index.js";
 import { createLocalTtftExporter } from "./localTtftExporter.js";
@@ -186,6 +192,7 @@ import {
   resolveBundledGlmBinaryPath,
   resolveRemoteAssetDirs,
   resolveKayingCodeEndpointEnvBaseOrigin,
+  resolvePreinstalledEntryShimPath,
   desktopRuntimeEnv,
   runtimeApplicationName,
   runtimeHomePath,
@@ -356,6 +363,8 @@ const linuxDesktopIntegrationIconPath =
       : join(import.meta.dirname, "../../build/icons/512x512.png")
     : iconPath;
 let currentApplicationLocale: Locale = DEFAULT_LOCALE;
+/** Host 级 Agent 回复语言；null 为未设置。只由设置 patch 更新并同步到所有窗口 Host。 */
+let currentReplyLanguage: string | null = null;
 let closeToTrayOnWindows = true;
 // CR-01：托盘实例创建结果（模块级，关窗分支读取）。DBus 能力探测通过不等于 Electron
 // Tray 创建成功；隐藏窗口前必须确认最终用户入口真实存在，否则隐藏即失联。
@@ -570,6 +579,7 @@ async function runBrowserCommandOnView(params: {
     const result = await browserGuestManager.execute(
       {
         requestId: params.requestId,
+        controlScopeId: params.controlScopeId,
         browserId: params.browserId ?? "legacy-iab",
         browserGeneration: params.browserGeneration ?? 0,
         windowId: params.win.id,
@@ -695,6 +705,8 @@ const hostRunningTaskCountMap = new Map<ElectronUtilityProcess, number>();
 
 // 常驻 cron scheduler 进程句柄；app ready 后拉起，退出前销毁。
 let cronScheduler: CronSchedulerHandle | null = null;
+// 预装文档工具的 utilityProcess；Main 只持有句柄，业务状态由子进程查询/推送。
+let preinstalledToolsProcess: PreinstalledToolsProcessHandle | undefined;
 // host → main 的定时任务派发结果，转交给 scheduler 结算。经模块变量转发以避免 spawn 顺序耦合。
 function forwardCronRunResult(
   result: Parameters<CronSchedulerHandle["handleCronRunResult"]>[0],
@@ -1254,6 +1266,17 @@ function syncImmediateAppSettings(patch: ReturnType<typeof appSettingsPatchSchem
       logger.warn("[settings] suspend web remote control after relay origin change failed", error);
     });
   }
+
+  if ("replyLanguage" in patch) {
+    // 落盘已完成；Host 只持内存值，变更消息与 InitLocal 同端口按序到达。
+    currentReplyLanguage = patch.replyLanguage ?? null;
+    for (const child of windowHostProcessMap.values()) {
+      child.postMessage({
+        type: HostMessageTypes.ReplyLanguageChanged,
+        replyLanguage: currentReplyLanguage,
+      });
+    }
+  }
 }
 
 async function getAutoUpdatePreferences() {
@@ -1316,6 +1339,8 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
   cronScheduler = null;
   const extensionHostToDispose = extensionHostSupervisor;
   extensionHostSupervisor = null;
+  const preinstalledToolsToDispose = preinstalledToolsProcess;
+  preinstalledToolsProcess = undefined;
 
   const hostProcesses = [
     ...new Set([...windowHostProcessMap.values(), ...listDisposingHostProcesses()]),
@@ -1349,6 +1374,13 @@ async function prepareAppQuit(reason: string, kind: AppShutdownKind = "normal"):
         await extensionHostToDispose?.dispose();
       } catch (error) {
         logger.warn(`[app-quit] extension host dispose failed (${reason}):`, error);
+      }
+    })(),
+    (async () => {
+      try {
+        await preinstalledToolsToDispose?.dispose();
+      } catch (error) {
+        logger.warn(`[app-quit] preinstalled tools dispose failed (${reason}):`, error);
       }
     })(),
     // remote session、attachment 和 transport 都由窗口 Host 持有；这里先清理
@@ -2020,6 +2052,8 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
       const host = windowHostProcessMap.get(windowKey);
       if (host) extensionHostSupervisor?.trackWindowHost(host);
     },
+    // browser 资源身份与作用域属于 Main owner；窗口销毁后必须同步释放，不能让新窗口沿用。
+    onWindowClosed: (windowId) => browserGuestManager.closeWindow(windowId),
     awaitFirstHostSpawnDecision,
     spawnHostProcess: (win, label, initMessage) =>
       spawnHostProcess(
@@ -2027,6 +2061,7 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
         label,
         {
           ...initMessage,
+          browserBackendIdentity: browserGuestManager.getBackendIdentity(win.id),
           kayingcodeBuiltinProviderConfigFilePath: resolveKayingCodeBuiltinProviderConfigFilePath(),
         },
         {
@@ -2119,6 +2154,7 @@ function createWindowInstance(startupBootstrap: StartupWindowBootstrap = {}) {
     initialDesktopZoomLevel: currentDesktopZoomLevel,
     initialWindowSize: currentDesktopWindowSize,
     currentApplicationLocale: () => currentApplicationLocale,
+    currentReplyLanguage: () => currentReplyLanguage,
     resolveBrowserViewOwner: (webContentsId) =>
       browserGuestManager.getTabOwnerByWebContentsId(webContentsId) ?? undefined,
     persistWindowSize: async (state) => {
@@ -2234,6 +2270,7 @@ app.whenReady().then(async () => {
       loadedBootstrapLocale = true;
       currentApplicationLocale = bootstrapSettings.locale;
     }
+    currentReplyLanguage = bootstrapSettings.replyLanguage?.trim() || null;
     // Linux 默认值归位迁移（spec：docs/desktop/linux-close-to-tray.md）：shared 迁移无平台
     // 概念、曾把存量 Linux 用户归为 true，但 Linux 此前无设置入口，存量 true 非用户显式
     // 选择；首次启动强制归位为默认关并落标记，之后尊重用户选择。
@@ -2310,6 +2347,32 @@ app.whenReady().then(async () => {
   if (!loadedBootstrapLocale) {
     currentApplicationLocale = resolveSystemApplicationLocale();
   }
+
+  // 清单只属于预装进程；异步读取不能成为 Host 或聊天的启动屏障。
+  // 必须在 bootstrap 的 setDataBaseDir 之后取数据根，安装根才跟随用户自定义数据目录。
+  const windowsEntryShim = resolvePreinstalledEntryShimPath();
+  if (process.platform === "win32" && !windowsEntryShim) {
+    // 入口 shim 尚未接入打包流程时，Windows 上安装会被拒绝；先记录明确原因，避免静默失败。
+    logger.warn(
+      "[preinstalled-tools] Windows entry shim is missing; prepare:preinstalled-entry-shim must run before packaging",
+    );
+  }
+  const preinstalledToolsConfiguration = loadPreinstalledToolsCatalog(logger).then((tools) => ({
+    dataRoot: getKayingCodeDataRootDir(),
+    release: resolvePreinstalledToolsRelease({
+      runtimeEnv: desktopRuntimeEnv,
+      productFlavor: KAYINGCODE_PRODUCT_FLAVOR,
+    }),
+    tools,
+    windowsEntryShim,
+  }));
+  preinstalledToolsProcess = spawnPreinstalledToolsProcess({
+    configuration: preinstalledToolsConfiguration,
+    hostProcessLocalEnv,
+    logger,
+    windows: getApplicationWindows,
+  });
+
   // Electron 的 net.request 只能在 app ready 后使用；灰度请求仍是旁路预热，不阻塞首个 Host。
   // 预热曾在读取持久化语言之前启动，X-Client-Language 会带默认语言并进入 1 小时缓存；
   // 必须在 currentApplicationLocale 确定之后再启动。

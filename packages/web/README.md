@@ -1,6 +1,6 @@
 # 官方 Web 制品
 
-本包的工作台直接来自官方 [zai-org/ZCode](https://github.com/zai-org/ZCode)，固定提交见 `upstream-web.json`。构建会导出固定源码到根 `.cache/upstream-web/<commit>`，工作台、Root、共享 UI 和连接逻辑均使用该导出，不解析到本仓裁剪后的 UI。上游依赖使用本仓 pnpm 锁定的浏览器依赖，补充的构建依赖在本包登记。
+本包的工作台直接来自官方 [zai-org/ZCode](https://github.com/zai-org/ZCode)，固定 repo/commit/version 统一来自根 `UPSTREAM_BASE.json`，Web 专属配置见 `upstream-web.json`。构建会导出固定源码到根 `.cache/upstream-web/<commit>`，工作台、Root、共享 UI 和连接逻辑均使用该导出，不解析到本仓裁剪后的 UI。上游依赖使用本仓 pnpm 锁定的浏览器依赖，补充的构建依赖在本包登记。
 
 账号适配为 `src/auth/webAuthService.ts`、`src/auth/WebLoginPage.tsx` 和加载它们的 HTML bootstrap。品牌适配由 `scripts/apply-upstream-branding.mjs` 将明确列出的纯 Logo 函数、资产、页头和标题字面量替换为 KayingCode；复用现有品牌派生文件，manifest 记录前后哈希。账号由自建 Cloudflare 服务提供，扫码换取独立终端凭据；不接官方 OAuth。禁止覆盖工作台业务行为、composer 或上游连接逻辑。源码不复制入产品目录。
 

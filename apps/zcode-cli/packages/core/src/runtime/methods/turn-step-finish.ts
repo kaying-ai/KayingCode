@@ -4,6 +4,7 @@ import { toTokenUsageInfo } from "../helpers/index.js";
 import type { AgentRuntimeInternal } from "../internal.js";
 import type { RuntimeModelTextResult } from "../types.js";
 import type { RegularTurnLoopState } from "./turn-loop-state.js";
+import { committedToolSearchDelivery } from "./turn-output-token-continuation.js";
 
 export async function persistToolModelStepFinish(
   runtime: AgentRuntimeInternal,
@@ -36,9 +37,12 @@ export async function persistToolModelStepFinish(
     state.currentUserMessageId,
     options.assistantCreatedAt,
     {
+      toolSearchDelivery: committedToolSearchDelivery(state.turnRequestState),
       completed: Date.now(),
       finish: options.result.finishReason,
       tokens: toTokenUsageInfo(options.result.usage),
+      // 签名修复成功的那一步要落盘标记；冷恢复据此对同一条消息拆出的第一条 assistant 做同样处理。
+      signedReasoningReset: options.result.signedReasoningReset,
     },
     options.modelTraceContext,
     model,

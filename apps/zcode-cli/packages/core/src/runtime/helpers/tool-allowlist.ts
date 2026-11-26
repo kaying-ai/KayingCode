@@ -111,6 +111,11 @@ export function resolveRuntimeDynamicWorkflowToolsIncluded(runtime: {
   return runtime.config.dynamicWorkflowEnabled !== false && runtime.dynamicWorkflowToolsActivated;
 }
 
+/** Agent 总在后台：产品默认前台；显式 true 才启用上游 4.0 的总后台形态。 */
+export function resolveRuntimeAgentAlwaysBackground(config: AgentRuntimeConfig): boolean {
+  return config.subagents?.alwaysBackground === true;
+}
+
 export function resolveBuiltInToolAllowlist(
   config: AgentRuntimeConfig,
 ): readonly string[] | undefined {

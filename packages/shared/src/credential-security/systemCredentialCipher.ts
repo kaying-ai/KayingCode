@@ -5,6 +5,7 @@ import { link, lstat, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { CREDENTIAL_DECRYPT_ERROR_CODE, CREDENTIAL_DECRYPT_ERROR_PREFIX } from "../oauth.js";
 import { atomicWritePrivateTextFile, withFileLock } from "../node/privateFilePersistence.js";
+import { readOptionalBytes, recordValues } from "./credentialFileState.js";
 import type {
   CredentialCipher,
   CredentialKeyStore,
@@ -585,4 +586,22 @@ export async function migrateCredentialRecord(
     changed = true;
   }
   return changed ? next : null;
+}
+
+/**
+ * 凭据文件唯一写入入口（调用方须持有文件锁）。
+ * 新产生的 os 密文要求目录已固定 os 来源，防止自动重置后旧密钥密文覆盖新登录。
+ */
+export async function writeCredentialRecordLocked(
+  filePath: string,
+  record: Readonly<Record<string, string>>,
+): Promise<void> {
+  const osValues = Object.values(record).filter((value) => value.startsWith(OS_CIPHERTEXT_PREFIX));
+  if (osValues.length > 0 && !(await isOsSourcePinned(resolve(filePath)))) {
+    const existing = new Set(recordValues(await readOptionalBytes(filePath)));
+    if (osValues.some((value) => !existing.has(value))) {
+      throw new Error("Credential secure storage is unavailable");
+    }
+  }
+  await atomicWritePrivateTextFile(filePath, `${JSON.stringify(record, null, 2)}\n`);
 }

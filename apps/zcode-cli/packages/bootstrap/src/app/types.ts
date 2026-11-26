@@ -1,4 +1,7 @@
 import type { AiSdkModelAdapter } from "@zcode/adapters/model";
+import type { McpConfigSourceRegistry } from "@zcode/adapters/mcp";
+import type { McpToolCatalogPort } from "@zcode/contracts";
+import type { SkillCatalogSourceRegistry } from "@zcode/adapters/skills/catalog";
 import type { SessionControlBinding } from "@zcode/core/session-control";
 import type {
   AgentTelemetryRuntimeOwner,
@@ -45,9 +48,11 @@ import type {
   PermissionBrokerPort,
   PluginLoadOutcome,
   PluginMetadata,
+  PluginPort,
   PluginReferenceCatalog,
   ProviderEndpointRoutingPort,
   QueryId,
+  PendingInputEditLock,
   SessionEvent,
   SessionEventSink,
   SessionEventStorePort,
@@ -74,12 +79,17 @@ import type {
 import type {
   AgentRuntime,
   AgentRuntimeConfig,
+  AgentRuntimeDeps,
   AmendWorkflowRunSettingsInput,
   AmendWorkflowRunSettingsResult,
+  EditPendingInputOptions,
+  EditPendingInputResult,
   ExecuteTurnOptions,
   ExpertWorkflowCommandResult,
+  LockPendingInputEditResult,
   McpAppProvidedToolDefinition,
   McpAppProvidedToolExecutor,
+  McpStartupPolicy,
   ModelExecutionContext,
   PresentationSurface,
   ProviderRuntimeHeadersPort,
@@ -142,6 +152,12 @@ export interface KayingCodeAppOptions {
   modelSelectionMode?: "cli-default";
   /** Host 在运行实例创建时传入，运行中不刷新。 */
   additionalDirectories?: readonly string[];
+  /**
+   * 会话所属 workspace 的对外 key（Hook Trust admission、审核 request 等）。受管 worktree 会话
+   * 属于项目 workspace，key 与工作目录不同（docs/git/worktree.md §7.3）；缺省按远程 identity
+   * 优先、否则工作目录。
+   */
+  workspaceKey?: string;
   sessionId?: SessionId;
   resume?: boolean;
   version?: string;
@@ -180,9 +196,19 @@ export interface KayingCodeAppOptions {
    * runtime 取派生实例。
    */
   providerRuntimeHeadersPort?: ProviderRuntimeHeadersPort;
+  /** 回复语言来源：协议 Host 注入，只给主线程读；缺省时不产生语言公告。 */
+  readReplyLanguage?: AgentRuntimeDeps["readReplyLanguage"];
   loggerFactory?: LoggerFactory;
   officialPluginRoots?: string[];
+  /** 测试/Host 注入的插件发现端口；缺省用 adapter 的 Node 实现。 */
+  pluginDiscovery?: PluginPort;
   pluginStorageRoot?: string;
+  /** 宿主注入的进程级 MCP 配置源 registry；缺省时每个 App 各建一份私有配置源。 */
+  mcpConfigSourceRegistry?: McpConfigSourceRegistry;
+  /** 宿主注入的进程级 MCP 工具目录；缺省时每个 App 建一份内存目录。 */
+  mcpToolCatalogPort?: McpToolCatalogPort;
+  /** 宿主注入的进程级 Skill 实时目录 registry；缺省时每个 App 各建一份私有目录。 */
+  skillCatalogSourceRegistry?: SkillCatalogSourceRegistry;
   executionPort?: ExecutionPort;
   /**
    * 官方命令端点（技术方案 5.8）：返回本 session 的 Bash/tool 子进程要带的端点地址与 token。
@@ -211,6 +237,8 @@ export interface KayingCodeAppOptions {
   mcpPort?: McpPort;
   /** 由宿主提供 per-app lease；产出的端口归 app 所有。 */
   mcpPortFactory?: (input: { workingDirectory?: string }) => McpPort;
+  /** MCP 启动策略，入口显式传入；缺省 blocking。交互入口传 background。 */
+  mcpStartupPolicy?: McpStartupPolicy;
   permissionBroker?: PermissionBrokerPort;
   eventSink?: SessionEventSink;
   onOffPeakLifecycleEvent?: (event: import("@zcode/shared").OffPeakLifecycleNotification) => void;
@@ -455,6 +483,8 @@ export interface KayingCodeApp {
   waitForMcpAppConnection(
     serverName: string,
   ): Promise<{ identity: string; generation: number } | null>;
+  /** 打开 MCP App 前连接不可用（如 stdio 进程崩溃）时重连一次，在预算内等待；结果由调用方读快照。 */
+  reconnectMcpAppConnection(serverName: string): Promise<void>;
   callMcpToolForUi(
     serverName: string,
     toolName: string,
@@ -807,10 +837,27 @@ export interface KayingCodeApp {
     reservationId: string,
     options?: { traceContext?: TraceContext },
   ): Promise<boolean>;
-  /** v4 queue 单项编辑：按 pendingInputId 替换排队输入文本（保位）。返回是否命中。 */
+  /**
+   * v4 queue 单项编辑：按 pendingInputId 原地替换排队输入（保位）。携带 editorId 时必须持有
+   * composer 编辑锁，成功后同一调用释放锁（docs/ui/composer-edit-mode.md）。
+   */
   editQueueItem(
     pendingInputId: string,
-    newText: string,
+    /** undefined = 保留原输入，只改配置。 */
+    newText: string | undefined,
+    options?: Omit<EditPendingInputOptions, "pendingInputId" | "newText"> & {
+      traceContext?: TraceContext;
+    },
+  ): Promise<EditPendingInputResult>;
+  /** composer 编辑态冻结排队项；锁与 sendQueuedNow reservation 互斥。 */
+  lockQueueItemEdit(
+    pendingInputId: string,
+    editLock: PendingInputEditLock,
+    options?: { traceContext?: TraceContext },
+  ): Promise<LockPendingInputEditResult>;
+  /** 释放编辑锁；无锁返回 false。 */
+  releaseQueueItemEdit(
+    pendingInputId: string,
     options?: { traceContext?: TraceContext },
   ): Promise<boolean>;
   /** v4 queue 重排：移动 pendingInputId 到 beforePendingInputId 之前（null=队尾）。 */

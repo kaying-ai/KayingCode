@@ -1,4 +1,5 @@
 import type { McpAppsResourcePermission } from "@zcode/shared/mcp-apps";
+import { buildPluginSandboxPluginOrigin } from "./contract.js";
 import type { PluginSandboxRecord, PluginSandboxRegistryPort } from "./contract.js";
 import {
   decidePluginSandboxPermission,
@@ -57,8 +58,11 @@ export function createPluginSandboxPermissionGate(deps: {
       if (
         !record ||
         guestUrl !== record.shellUrl ||
+        // 修复原因：这里曾写死上游 `zcode-sandbox://plugin-<appIdentity>`，与产品
+        // buildPluginSandboxPluginOrigin 的 `kayingcode-sandbox://` scheme 不一致，
+        // 导致真正的 camera / microphone 请求在来源校验阶段被拒。统一从 contract 构造。
         `${new URL(url).protocol}//${new URL(url).host}` !==
-          `zcode-sandbox://plugin-${record.instance.appIdentity}`
+          buildPluginSandboxPluginOrigin(record.instance.appIdentity)
       )
         return null;
       return record;

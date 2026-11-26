@@ -614,3 +614,32 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isNodeError(value: unknown): value is NodeJS.ErrnoException {
   return value instanceof Error && "code" in value;
 }
+
+/**
+ * 读取单个配置文件里某个插件的原始选项（不合并其它层）。
+ * 敏感选项迁移需要知道当前 scope 的 config.json 里有哪些旧明文值。
+ */
+export async function readPluginOptionsFromFileConfig(
+  filePath: string,
+  pluginId: string,
+): Promise<Record<string, string | number | boolean>> {
+  const parsed = await readJsonConfigFileOrEmpty(resolvePath(filePath));
+  const plugins = isRecord(parsed.plugins) ? parsed.plugins : {};
+  const options = isRecord(plugins.options) ? plugins.options : {};
+  const canonicalPluginId = canonicalizePluginId(pluginId);
+  const aliases = pluginIdAliases(canonicalPluginId);
+  const legacyPluginId = aliases.length > 1 ? aliases[1] : undefined;
+  const pluginOptions = isRecord(options[canonicalPluginId])
+    ? options[canonicalPluginId]
+    : legacyPluginId && isRecord(options[legacyPluginId])
+      ? options[legacyPluginId]
+      : {};
+  return Object.fromEntries(
+    Object.entries(pluginOptions).filter(
+      (entry): entry is [string, string | number | boolean] =>
+        typeof entry[1] === "string" ||
+        typeof entry[1] === "number" ||
+        typeof entry[1] === "boolean",
+    ),
+  );
+}

@@ -94,6 +94,11 @@ export type {
 export { IKayingCodeTaskService } from "./session/kayingcodeTaskService.js";
 export type {
   KayingCodeArchivedTaskDeletionResult,
+  KayingCodeArchivedTaskDeletionPreview,
+  KayingCodeArchivedTaskDeletionPreviewBatchResult,
+  KayingCodeArchivedTaskDeletionPreviewItem,
+  KayingCodeArchivedTaskDeletionPreviewReason,
+  KayingCodeArchivedTaskPermanentDeletionResult,
   KayingCodeModelTrajectory,
   KayingCodeModelTrajectoryCallSource,
   KayingCodeModelTrajectoryCallSourceKind,
@@ -277,6 +282,9 @@ export { ISettingsSyncService } from "./settings-sync/settingsSync.js";
 
 export { IFeedbackService } from "./feedback/feedback.js";
 export type { FeedbackUploadProgress } from "./feedback/feedback.js";
+// 语音输入：契约可进 renderer，实现只从 @zcode/services/node 装配（services/node.ts）。
+export { IVoiceInputService } from "./voice-input/index.js";
+export type { VoiceInputErrorCode, VoiceInputEvent } from "./voice-input/index.js";
 export { IPromptAttachmentTransferService } from "./prompt-attachment-transfer/promptAttachmentTransfer.js";
 export type {
   PromptAttachmentStageParams,
@@ -346,6 +354,14 @@ export type {
   ProjectMigrationContext,
   ProjectStorageContract,
 } from "./project-storage/contract.js";
+
+// 受管 worktree 任务服务；只导出 descriptor 与契约，实现由本地桌面 Host 的 node.ts 装配。
+export {
+  IManagedWorktreeService,
+  type ManagedWorktreeGroup,
+  type ManagedWorktreeWorkspace,
+  type StartManagedWorktreeCreationResult,
+} from "./managed-worktree-tasks/contract.js";
 
 export { ISourceServerWorkspaceService } from "./source-server-workspace/sourceServerWorkspace.js";
 // OutputStyle service — IOutputStyleService 同时是类型（interface）与值（descriptor）。

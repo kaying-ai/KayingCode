@@ -78,8 +78,12 @@ async function readBaseline(cwd) {
   }
 }
 
-export async function checkArchitecture({ cwd = process.cwd(), changedFiles = null } = {}) {
-  const policy = await loadPolicy(cwd);
+export async function checkArchitecture({
+  cwd = process.cwd(),
+  changedFiles = null,
+  policyPath = "architecture-policy.yaml",
+} = {}) {
+  const policy = await loadPolicy(cwd, policyPath);
   const files = await discoverFiles(policy);
   const knownFiles = new Set(files);
   const modulesByFile = new Map(files.map((file) => [file, moduleForFile(file, policy)]));

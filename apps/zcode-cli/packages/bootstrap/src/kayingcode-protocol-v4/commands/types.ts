@@ -102,6 +102,8 @@ export interface V4CommandCoreHost {
   /** guide eligibility：只阻止已有 ordinary queue；已有 guide 仍允许继续按 FIFO admission。 */
   hasQueuedDelivery?(sessionId: string, delivery: "guide" | "queue"): boolean;
   getQueueLength?(sessionId: string): number;
+  /** 队首正被 composer 编辑态冻结（投影 queue.items[0].editLock）。 */
+  isQueueHeadEditLocked?(sessionId: string): boolean;
   /** Highspeed queue 的执行材料含凭据，只允许驻留内存，禁止进入 queue event/snapshot。 */
   retainQueuedTurnExecution?(
     sessionId: string,
@@ -276,6 +278,8 @@ export interface V4CommandCoreHost {
     sessionId?: string;
     additionalDirectories?: string[];
     workspaceId: string;
+    /** 会话 cwd 与 workspace 不同（受管 worktree）；只允许本地 workspace。 */
+    cwd?: string;
     permissionScope?: "session";
     mcpServers?: CommandPayloadMap["createSession"]["mcpServers"];
     /** host 判定的 Off-Peak 工具面门禁；缺省不注册工具。 */
@@ -307,6 +311,8 @@ export interface V4CommandCoreHost {
       goalBoundary: StableForkGoalBoundaryMetadata;
       sourceCommandId: string;
       revisionAtDecision: number;
+      /** 协议原样透传；校验（仅本地）与项目身份派生由宿主负责。 */
+      targetCwd?: CommandPayloadMap["forkAssistant"]["targetCwd"];
     },
   ): Promise<{ forkedSessionId: string }>;
   /** @deprecated 仅旧宿主结构兼容；新 editUserQuery 永不调用，显式 forkAssistant 不受影响。 */

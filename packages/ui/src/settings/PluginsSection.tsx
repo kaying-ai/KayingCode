@@ -208,6 +208,7 @@ function PluginList({
   const currentWorkspaceIdentity = usePluginManagementStore((state) => state.workspaceIdentity);
   const initialize = usePluginManagementStore((state) => state.initialize);
   const setEnabled = usePluginManagementStore((state) => state.setEnabled);
+  const trustWorkspacePlugin = usePluginManagementStore((state) => state.trustWorkspacePlugin);
   const updatePlugin = usePluginManagementStore((state) => state.updatePlugin);
   const configurePlugin = usePluginManagementStore((state) => state.configurePlugin);
   const currentConfigScope = usePluginManagementStore((state) => state.configScope);
@@ -390,8 +391,37 @@ function PluginList({
     },
     [configScope, intl, locale, pluginManagementService, plugins, setEnabled, storeItemById],
   );
-  const handleResetPluginConfig = useCallback(
+  const handleTrustWorkspacePlugin = useCallback(
     async (pluginId: string) => {
+      const plugin = plugins.find((candidate) => candidate.id === pluginId);
+      const pluginLabel = plugin
+        ? resolveManagedPluginDisplay(plugin, storeItemById.get(plugin.id), locale).name
+        : pluginId;
+      const outcome = await trustWorkspacePlugin(pluginId, pluginManagementService);
+      if (outcome === "accepted") {
+        toast(
+          intl.formatMessage({ id: "settings.plugins.workspaceTrust.trusted" }, {
+            plugin: pluginLabel,
+          }),
+        );
+        return;
+      }
+      toast(
+        intl.formatMessage(
+          {
+            id:
+              outcome === "declaration_changed"
+                ? "settings.plugins.workspaceTrust.changed"
+                : "settings.plugins.workspaceTrust.failed",
+          },
+          { plugin: pluginLabel },
+        ),
+        { variant: "warning" },
+      );
+    },
+    [intl, locale, pluginManagementService, plugins, storeItemById, trustWorkspacePlugin],
+  );
+  const handleResetPluginConfig = useCallback(    async (pluginId: string) => {
       const plugin = plugins.find((candidate) => candidate.id === pluginId);
       const pluginLabel = plugin
         ? resolveManagedPluginDisplay(plugin, storeItemById.get(plugin.id), locale).name
@@ -498,6 +528,10 @@ function PluginList({
       onInstall: () => onOpenPluginStore(),
       onUninstall: uninstall.requestUninstall,
       onSetEnabled: (pluginId, enabled) => void handleSetEnabled(pluginId, enabled),
+      onTrustWorkspacePlugin:
+        configScope === "workspace"
+          ? (pluginId) => void handleTrustWorkspacePlugin(pluginId)
+          : undefined,
       onResetConfig:
         configScope === "workspace"
           ? (pluginId) => void handleResetPluginConfig(pluginId)
@@ -510,6 +544,7 @@ function PluginList({
       configScope,
       handleResetPluginConfig,
       handleSetEnabled,
+      handleTrustWorkspacePlugin,
       handleUpdatePlugin,
       onDetailOpenChange,
       onOpenPluginStore,

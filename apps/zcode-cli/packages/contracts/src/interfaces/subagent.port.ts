@@ -3,6 +3,7 @@
 // ============================================================
 
 import type { AgentBackgroundedOutput, AgentOutput } from "../tools/agent.js";
+import type { InputPreemptionControl } from "../tools/contract.js";
 import type { Model, ModelSelection } from "../model/index.js";
 import type { ModelRequestDependencies } from "../model/invocation-context.js";
 import type { SessionId, ToolCallId, TurnId } from "./shared.js";
@@ -31,10 +32,14 @@ export interface SubagentRunOptions {
     requestDependencies?: ModelRequestDependencies;
     background: "deny" | "allow";
   };
+  /** 父工具工具调用的输入抢占接管点；缺省时父级 abort 一律取消 child。 */
+  inputPreemption?: InputPreemptionControl;
 }
 
 export interface SubagentLaunchRequest extends SubagentRunRequest {
   runInBackground?: boolean;
+  /** Agent 总在后台运行：不看 runInBackground 与 profile；禁止后台时改为前台运行。 */
+  alwaysBackground?: boolean;
 }
 
 export type SubagentLaunchOptions = SubagentRunOptions;

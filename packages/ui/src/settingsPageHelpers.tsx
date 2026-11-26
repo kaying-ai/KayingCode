@@ -31,6 +31,7 @@ import { DataBaseDirControl } from "@/settings/DataBaseDirControl.js";
 import { useKayingCodeIntl } from "@/i18n/IntlProvider.js";
 import { useOptionalServices } from "@/hooks/useServices.js";
 import { ProactiveSuggestionsSetting } from "@/settings/ProactiveSuggestionsSetting.js";
+import { PluginAutoRecommendationSetting } from "@/settings/PluginAutoRecommendationSetting.js";
 import { normalizeInterfaceMode, type InterfaceMode } from "@/lib/interfaceMode.js";
 import {
   createSettingsPageConfig,
@@ -67,6 +68,7 @@ export function GeneralSectionContent({
   httpProxy = "",
   httpProxyNoProxy = "",
   httpProxyCaCertPath = "",
+  replyLanguage = "",
   defaultHomeDir,
   isDesktop,
   isWindowsDesktop,
@@ -79,6 +81,8 @@ export function GeneralSectionContent({
   taskAutoArchiveOlderThanDays,
   messageStreamShowReasoning,
   messageStreamShowTodos,
+  totalTokensReminderEnabled = false,
+  agentAlwaysBackgroundEnabled = false,
   toolGroupingExploreEnabled,
   toolGroupingTerminalEnabled,
   toolGroupingChangesEnabled,
@@ -94,6 +98,7 @@ export function GeneralSectionContent({
   onHttpProxyChange = async () => {},
   onHttpProxyNoProxyChange = async () => {},
   onHttpProxyCaCertPathChange = async () => {},
+  onReplyLanguageChange = async () => {},
   onTaskAutoArchiveEnabledChange,
   onTaskAutoArchiveOlderThanDaysChange,
   onCloseToTrayOnWindowsChange,
@@ -103,6 +108,8 @@ export function GeneralSectionContent({
   onAutoDownloadAndInstallUpdatesChange,
   onMessageStreamShowReasoningChange,
   onMessageStreamShowTodosChange,
+  onTotalTokensReminderEnabledChange = async () => {},
+  onAgentAlwaysBackgroundEnabledChange = async () => {},
   onToolGroupingExploreEnabledChange,
   onToolGroupingTerminalEnabledChange,
   onToolGroupingChangesEnabledChange,
@@ -131,6 +138,7 @@ export function GeneralSectionContent({
   httpProxy?: string;
   httpProxyNoProxy?: string;
   httpProxyCaCertPath?: string;
+  replyLanguage?: string;
   defaultHomeDir: string;
   isDesktop?: boolean;
   isWindowsDesktop?: boolean;
@@ -144,6 +152,8 @@ export function GeneralSectionContent({
   taskAutoArchiveOlderThanDays: number;
   messageStreamShowReasoning: boolean;
   messageStreamShowTodos: boolean;
+  totalTokensReminderEnabled?: boolean;
+  agentAlwaysBackgroundEnabled?: boolean;
   toolGroupingExploreEnabled: boolean;
   toolGroupingTerminalEnabled: boolean;
   toolGroupingChangesEnabled: boolean;
@@ -159,6 +169,7 @@ export function GeneralSectionContent({
   onHttpProxyChange?: (httpProxy: string) => Promise<void>;
   onHttpProxyNoProxyChange?: (noProxy: string) => Promise<void>;
   onHttpProxyCaCertPathChange?: (caCertPath: string) => Promise<void>;
+  onReplyLanguageChange?: (language: string) => Promise<void>;
   onTaskAutoArchiveEnabledChange: (enabled: boolean) => Promise<void>;
   onTaskAutoArchiveOlderThanDaysChange: (days: number) => Promise<void>;
   onCloseToTrayOnWindowsChange: (enabled: boolean) => Promise<void>;
@@ -168,6 +179,8 @@ export function GeneralSectionContent({
   onAutoDownloadAndInstallUpdatesChange: (enabled: boolean) => Promise<void>;
   onMessageStreamShowReasoningChange: (enabled: boolean) => Promise<void>;
   onMessageStreamShowTodosChange: (enabled: boolean) => Promise<void>;
+  onTotalTokensReminderEnabledChange?: (enabled: boolean) => Promise<void>;
+  onAgentAlwaysBackgroundEnabledChange?: (enabled: boolean) => Promise<void>;
   onToolGroupingExploreEnabledChange: (enabled: boolean) => Promise<void>;
   onToolGroupingTerminalEnabledChange: (enabled: boolean) => Promise<void>;
   onToolGroupingChangesEnabledChange: (enabled: boolean) => Promise<void>;
@@ -281,10 +294,24 @@ export function GeneralSectionContent({
     await onHttpProxyCaCertPathChange(normalizedHttpProxyCaCertPath);
   }, [normalizedHttpProxyCaCertPath, onHttpProxyCaCertPathChange]);
 
+  const [localReplyLanguage, setLocalReplyLanguage] = useState(replyLanguage);
+
+  useEffect(() => {
+    setLocalReplyLanguage(replyLanguage);
+  }, [replyLanguage]);
+
+  const normalizedReplyLanguage = localReplyLanguage.trim();
+  const isReplyLanguageDirty = normalizedReplyLanguage !== replyLanguage.trim();
+
+  const handleReplyLanguageSave = useCallback(async () => {
+    await onReplyLanguageChange(normalizedReplyLanguage);
+  }, [normalizedReplyLanguage, onReplyLanguageChange]);
+
   return (
     <div className="space-y-4">
       <SettingsGroupCard>
         <SettingsRow
+          searchId="settings.locale"
           label={intl.formatMessage({ id: "settings.locale" })}
           description={intl.formatMessage({ id: "settings.localeDescription" })}
           control={
@@ -322,10 +349,42 @@ export function GeneralSectionContent({
             </Select>
           }
         />
+        <SettingsRow
+          searchId="settings.replyLanguage"
+          label={intl.formatMessage({ id: "settings.replyLanguage" })}
+          description={intl.formatMessage({ id: "settings.replyLanguageDescription" })}
+          control={
+            <Button
+              type="button"
+              size="lg"
+              disabled={!isReplyLanguageDirty}
+              onClick={() => void handleReplyLanguageSave()}
+            >
+              {intl.formatMessage({ id: "settings.dataBaseDirSave" })}
+            </Button>
+          }
+          detail={
+            <Input
+              size="lg"
+              value={localReplyLanguage}
+              placeholder={intl.formatMessage({ id: "settings.replyLanguagePlaceholder" })}
+              onChange={(event) => {
+                setLocalReplyLanguage(event.currentTarget.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && isReplyLanguageDirty) {
+                  void handleReplyLanguageSave();
+                }
+              }}
+              className="max-w-[520px]"
+            />
+          }
+        />
       </SettingsGroupCard>
 
       <SettingsGroupCard>
         <SettingsRow
+          searchId="settings.interfaceMode"
           controlLayout="wide"
           label={intl.formatMessage({ id: "settings.interfaceMode" })}
           description={intl.formatMessage({ id: "settings.interfaceMode.description" })}
@@ -357,6 +416,7 @@ export function GeneralSectionContent({
 
       <SettingsGroupCard>
         <SettingsRow
+          searchId="settings.terminalProfile"
           label={intl.formatMessage({ id: "settings.terminalProfile" })}
           description={intl.formatMessage({ id: "settings.terminalProfileDescription" })}
           control={
@@ -369,6 +429,7 @@ export function GeneralSectionContent({
           }
         />
         <SettingsRow
+          searchId="settings.terminalFontFamily"
           label={intl.formatMessage({ id: "settings.terminalFontFamily" })}
           description={intl.formatMessage({ id: "settings.terminalFontFamilyDescription" })}
           control={
@@ -402,6 +463,7 @@ export function GeneralSectionContent({
         />
         {showIntegratedTerminalShell ? (
           <SettingsRow
+            searchId="settings.integratedTerminalShell"
             label={intl.formatMessage({ id: "settings.integratedTerminalShell" })}
             description={intl.formatMessage({
               id: "settings.integratedTerminalShellDescription",
@@ -431,6 +493,7 @@ export function GeneralSectionContent({
           />
         ) : null}
         <SettingsRow
+          searchId="settings.nativeSearchEnhancements"
           label={intl.formatMessage({
             id: "settings.nativeSearchEnhancements",
           })}
@@ -454,6 +517,7 @@ export function GeneralSectionContent({
 
       <SettingsGroupCard>
         <SettingsRow
+          searchId="settings.httpProxy"
           label={intl.formatMessage({ id: "settings.httpProxy" })}
           description={intl.formatMessage({ id: "settings.httpProxyDescription" })}
           control={
@@ -487,6 +551,7 @@ export function GeneralSectionContent({
         />
         {/* No Proxy 与 HTTP 代理共同决定同一出口策略，必须贴在代理地址下面。*/}
         <SettingsRow
+          searchId="settings.httpProxyNoProxy"
           label={intl.formatMessage({ id: "settings.httpProxyNoProxy" })}
           description={intl.formatMessage({
             id: "settings.httpProxyNoProxyDescription",
@@ -522,6 +587,7 @@ export function GeneralSectionContent({
         />
         {/* 自定义 CA 属于 HTTP 代理的同一网络出口策略，必须跟代理输入放在同一卡片里。*/}
         <SettingsRow
+          searchId="settings.httpProxyCaCertPath"
           label={intl.formatMessage({ id: "settings.httpProxyCaCertPath" })}
           description={intl.formatMessage({
             id: "settings.httpProxyCaCertPathDescription",
@@ -561,6 +627,7 @@ export function GeneralSectionContent({
         {isDesktop ? (
           <>
             <SettingsRow
+              searchId="settings.desktopChromiumHardwareAcceleration"
               label={intl.formatMessage({
                 id: "settings.desktopChromiumHardwareAcceleration",
               })}
@@ -580,6 +647,7 @@ export function GeneralSectionContent({
               }
             />
             <SettingsRow
+              searchId="settings.receivePreviewUpdates"
               label={intl.formatMessage({ id: "settings.receivePreviewUpdates" })}
               description={intl.formatMessage({
                 id: "settings.receivePreviewUpdatesDescription",
@@ -595,6 +663,7 @@ export function GeneralSectionContent({
               }
             />
             <SettingsRow
+              searchId="settings.autoDownloadAndInstallUpdates"
               label={intl.formatMessage({
                 id: "settings.autoDownloadAndInstallUpdates",
               })}
@@ -616,6 +685,7 @@ export function GeneralSectionContent({
           </>
         ) : null}
         <SettingsRow
+          searchId="settings.notification"
           label={intl.formatMessage({ id: "settings.notification" })}
           description={intl.formatMessage({
             id: "settings.notificationDescription",
@@ -625,6 +695,7 @@ export function GeneralSectionContent({
           }
         />
         <SettingsRow
+          searchId="settings.notificationSound"
           label={intl.formatMessage({ id: "settings.notificationSound" })}
           description={intl.formatMessage({
             id: "settings.notificationSoundDescription",
@@ -639,6 +710,7 @@ export function GeneralSectionContent({
         />
         {isDesktop ? (
           <SettingsRow
+            searchId="settings.taskUnreadBadge"
             label={intl.formatMessage({ id: "settings.taskUnreadBadge" })}
             description={intl.formatMessage({
               id: "settings.taskUnreadBadgeDescription",
@@ -655,6 +727,7 @@ export function GeneralSectionContent({
         ) : null}
         {isWindowsDesktop ? (
           <SettingsRow
+            searchId="settings.closeToTrayOnWindows"
             label={intl.formatMessage({ id: "settings.closeToTrayOnWindows" })}
             description={intl.formatMessage({
               id: "settings.closeToTrayOnWindowsDescription",
@@ -671,6 +744,7 @@ export function GeneralSectionContent({
         ) : null}
         {isDesktop ? (
           <SettingsRow
+            searchId="settings.keepAwakeWhileRunning"
             label={intl.formatMessage({ id: "settings.keepAwakeWhileRunning" })}
             description={intl.formatMessage({
               id: "settings.keepAwakeWhileRunningDescription",
@@ -692,6 +766,7 @@ export function GeneralSectionContent({
 
       <SettingsGroupCard>
         <SettingsRow
+          searchId="settings.kayingcodeInteractionBehavior"
           label={intl.formatMessage({ id: "settings.kayingcodeInteractionBehavior" })}
           description={intl.formatMessage({
             id: "settings.kayingcodeInteractionBehaviorDescription",
@@ -719,6 +794,7 @@ export function GeneralSectionContent({
           }
         />
         <SettingsRow
+          searchId="settings.askUserQuestionAutoResolution"
           label={intl.formatMessage({
             id: "settings.askUserQuestionAutoResolution",
           })}
@@ -738,7 +814,10 @@ export function GeneralSectionContent({
             />
           }
         />
+        {/* 无 services 的精简 SSR 渲染不引入设置读写依赖。 */}
+        {hasServices ? <PluginAutoRecommendationSetting /> : null}
         <SettingsRow
+          searchId="settings.modelIoFullRetention"
           label={intl.formatMessage({ id: "settings.modelIoFullRetention" })}
           description={intl.formatMessage({
             id: "settings.modelIoFullRetentionDescription",
@@ -754,6 +833,7 @@ export function GeneralSectionContent({
           }
         />
         <SettingsRow
+          searchId="settings.messageStreamShowReasoning"
           label={intl.formatMessage({ id: "settings.messageStreamShowReasoning" })}
           description={intl.formatMessage({
             id: "settings.messageStreamShowReasoningDescription",
@@ -769,6 +849,7 @@ export function GeneralSectionContent({
           }
         />
         <SettingsRow
+          searchId="settings.messageStreamShowTodos"
           label={intl.formatMessage({ id: "settings.messageStreamShowTodos" })}
           description={intl.formatMessage({
             id: "settings.messageStreamShowTodosDescription",
@@ -784,6 +865,39 @@ export function GeneralSectionContent({
           }
         />
         <SettingsRow
+          searchId="settings.totalTokensReminder"
+          label={intl.formatMessage({ id: "settings.totalTokensReminder" })}
+          description={intl.formatMessage({
+            id: "settings.totalTokensReminderDescription",
+          })}
+          control={
+            <Switch
+              aria-label={intl.formatMessage({ id: "settings.totalTokensReminder" })}
+              checked={totalTokensReminderEnabled}
+              onCheckedChange={(checked) => {
+                void onTotalTokensReminderEnabledChange(checked);
+              }}
+            />
+          }
+        />
+        <SettingsRow
+          searchId="settings.agentAlwaysBackground"
+          label={intl.formatMessage({ id: "settings.agentAlwaysBackground" })}
+          description={intl.formatMessage({
+            id: "settings.agentAlwaysBackgroundDescription",
+          })}
+          control={
+            <Switch
+              aria-label={intl.formatMessage({ id: "settings.agentAlwaysBackground" })}
+              checked={agentAlwaysBackgroundEnabled}
+              onCheckedChange={(checked) => {
+                void onAgentAlwaysBackgroundEnabledChange(checked);
+              }}
+            />
+          }
+        />
+        <SettingsRow
+          searchId="settings.toolGroupingExplore"
           label={intl.formatMessage({ id: "settings.toolGroupingExplore" })}
           description={intl.formatMessage({
             id: "settings.toolGroupingExploreDescription",
@@ -799,6 +913,7 @@ export function GeneralSectionContent({
           }
         />
         <SettingsRow
+          searchId="settings.toolGroupingTerminal"
           label={intl.formatMessage({ id: "settings.toolGroupingTerminal" })}
           description={intl.formatMessage({
             id: "settings.toolGroupingTerminalDescription",
@@ -814,6 +929,7 @@ export function GeneralSectionContent({
           }
         />
         <SettingsRow
+          searchId="settings.toolGroupingChanges"
           label={intl.formatMessage({ id: "settings.toolGroupingChanges" })}
           description={intl.formatMessage({
             id: "settings.toolGroupingChangesDescription",
@@ -832,6 +948,7 @@ export function GeneralSectionContent({
 
       <SettingsGroupCard>
         <SettingsRow
+          searchId="settings.taskAutoArchive"
           label={intl.formatMessage({ id: "settings.taskAutoArchive" })}
           description={intl.formatMessage({
             id: "settings.taskAutoArchiveDescription",
@@ -846,6 +963,7 @@ export function GeneralSectionContent({
           }
         />
         <SettingsRow
+          searchId="settings.taskAutoArchiveDays"
           label={intl.formatMessage({ id: "settings.taskAutoArchiveDays" })}
           description={intl.formatMessage({
             id: "settings.taskAutoArchiveDaysDescription",
@@ -877,6 +995,7 @@ export function GeneralSectionContent({
 
       <SettingsGroupCard>
         <SettingsRow
+          searchId="settings.dataBaseDir"
           label={intl.formatMessage({ id: "settings.dataBaseDir" })}
           description={intl.formatMessage({
             id: "settings.dataBaseDirDescription",
@@ -894,6 +1013,7 @@ export function GeneralSectionContent({
 
       <SettingsGroupCard>
         <SettingsRow
+          searchId="settings.onboarding"
           label={intl.formatMessage({ id: "settings.onboarding" })}
           description={intl.formatMessage({
             id: "settings.onboardingDescription",

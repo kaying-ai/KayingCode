@@ -10,6 +10,7 @@ import {
 } from "@zcode/shared";
 import type { BackgroundBashOutputResult } from "@zcode/shared";
 import type { ModelRequestSessionFeature } from "@zcode/contracts";
+import { createMcpSession, type McpSession } from "../mcp/runtime/session.js";
 import {
   createDenyPermissionBroker,
   createRootTraceContext,
@@ -50,11 +51,13 @@ import type {
   ImageProcessorPort,
   PdfDocumentPort,
   McpConnectionSnapshot,
+  McpConfigurationSource,
   SkillLoadOutcome,
   SkillPort,
   McpPort,
   DynamicWorkflowRunPort,
   ModelCatalogPort,
+  PendingInputEditLock,
   SubagentPort,
   ToolArtifactStorePort,
   ToolCallId,
@@ -109,6 +112,9 @@ import type {
   ContinueActiveTargetLoopOptions,
   ConversationBeforeInputForkOptions,
   ConversationRewindResult,
+  EditPendingInputOptions,
+  EditPendingInputResult,
+  LockPendingInputEditResult,
   ExecuteToolsOptions,
   ExecuteToolsResult,
   ExecuteTurnOptions,
@@ -119,6 +125,7 @@ import type {
   PendingModelChangeTimeline,
   PermissionDecisionResult,
   MainTurnCacheHitAggregate,
+  McpStartupPolicy,
   RuntimeTurnFileChangeMap,
   ResumeSessionOptions,
   ResumeSessionResult,
@@ -132,7 +139,7 @@ import type {
   WorkspaceFileRewindPreview,
   WorkspaceForkResult,
 } from "./types.js";
-import type { AgentRuntimeInternal } from "./internal.js";
+import type { AgentRuntimeInternal, McpServerStatusFacts } from "./internal.js";
 import { InMemoryRuntimeTaskRegistry, type RuntimeTaskRegistry } from "../runtime-task/registry.js";
 import type { WorkflowBlockedReminderClock } from "../runtime-task/workflow-blocked-reminder.js";
 import type { BackgroundSubagentStallClock } from "../subagent/background-stall.js";
@@ -153,6 +160,9 @@ import { RuntimeTelemetryFacade } from "../telemetry/runtime-telemetry.js";
 import type { WorkspaceHookRuntimeAdmissionPort } from "../hooks/workspace-hook-runtime-admission.js";
 import { disposeNodeReplSession } from "../tool/handlers/node-repl.js";
 import { cloneModelSelection } from "./model-selection.js";
+
+/** session 启动等待 OAuth 授权的上限；设置页授权入口不受此预算限制。 */
+const MCP_SESSION_OAUTH_WAIT_MS = 15_000;
 
 // oxlint-disable typescript-eslint/no-unsafe-declaration-merging
 export class AgentRuntime {
@@ -185,6 +195,7 @@ export class AgentRuntime {
   private modelFactory: AgentRuntimeDeps["modelFactory"];
   private modelIoDir?: string;
   private providerRuntimeHeadersPort?: AgentRuntimeDeps["providerRuntimeHeadersPort"];
+  private readReplyLanguage?: AgentRuntimeDeps["readReplyLanguage"];
   private browserControlPort?: AgentRuntimeDeps["browserControlPort"];
   /** 模型请求准入端口；随每次模型请求进调用上下文。 */
   private modelRequestAdmission?: AgentRuntimeDeps["modelRequestAdmission"];
@@ -212,6 +223,10 @@ export class AgentRuntime {
   private contextSourcePort?: ContextSourcePort;
   private skillPort?: SkillPort;
   private mcpPort?: McpPort;
+  private mcpSession?: McpSession;
+  private mcpConfigurationSource?: McpConfigurationSource;
+  private mcpConfigUnsubscribe?: () => void;
+  private mcpStartupPolicy: McpStartupPolicy;
   private mcpStartupPromise?: Promise<McpConnectionSnapshot>;
   private residencyBlockingWorkCount = 0;
   private readonly residencyBlockingWork = new Set<Promise<unknown>>();
@@ -221,10 +236,15 @@ export class AgentRuntime {
   private retirement?: Promise<void>;
   private readonly workChanged = new Set<() => void>();
   private mcpInitialized = false;
+  private mcpTrustAdmissionRead = false;
   private mcpToolsRegistered = false;
   private registeredMcpToolNames?: string[];
+  private readonly offeredMcpTools = new Map<string, string>();
+  private mcpServerWaitDeclared = false;
+  private readonly mcpPendingToolWaitByResponse = new Map<string, number>();
+  private readonly mcpPendingToolWaitExhausted = new Map<string, string>();
   private mcpToolsSignature?: string;
-  private mcpToolListRevision?: number;
+  private mcpServerStatusFacts?: McpServerStatusFacts;
   private subagentPort?: SubagentPort;
   private readonly getAgentDefinitions: GetAgentDefinitions;
   private readonly prepareAgentDefinitions: ReturnType<
@@ -271,6 +291,8 @@ export class AgentRuntime {
   private pendingInputSequence = 0;
   /** sendQueuedNow reservation；只活在当前 CLI 进程，防 drain/多端重复提升。 */
   private pendingInputReservations = new Map<string, string>();
+  /** composer 编辑态冻结锁；只活在当前 CLI 进程，锁归属在投影中只读（docs/ui/composer-edit-mode.md）。 */
+  private pendingInputEditLocks = new Map<string, PendingInputEditLock>();
   // v4 setAutoDrain：false 时排队输入不自动消费
   // （turn-stop 不续跑、roundtrip 间不 drain），保留成 held 供显式消费。
   private queueAutoDrain = true;
@@ -341,6 +363,7 @@ export class AgentRuntime {
     this.modelFactory = deps.modelFactory;
     this.modelIoDir = deps.modelIoDir;
     this.providerRuntimeHeadersPort = deps.providerRuntimeHeadersPort;
+    this.readReplyLanguage = deps.readReplyLanguage;
     this.browserControlPort = deps.browserControlPort;
     this.modelRequestAdmission = deps.modelRequestAdmission;
     configureOffPeakRuntime(
@@ -358,6 +381,7 @@ export class AgentRuntime {
     this.contextSourcePort = deps.contextSourcePort;
     this.skillPort = deps.skillPort;
     this.mcpPort = deps.mcpPort;
+    this.mcpStartupPolicy = deps.mcpStartupPolicy ?? "blocking";
     this.runtimeTaskRegistry = deps.runtimeTaskRegistry ?? new InMemoryRuntimeTaskRegistry();
     this.runtimeTaskRegistry.setActiveBranchGeneration?.(this.branchGeneration);
     this.workflowBlockedReminder = createWorkflowBlockedReminder(runtime);
@@ -385,7 +409,40 @@ export class AgentRuntime {
       runtime.initializeMessageHistoryFromContext(this.contextBuilder, this.rootTraceContext);
       this.contextInitialized = true;
     }
+    if (deps.mcpPort)
+      this.mcpSession = createMcpSession({
+        port: deps.mcpPort,
+        // 借用端口（子代理）由 config.mcp.servers 缺席自动识别为只读已有连接；这里不设置 borrowed。
+        configuration: this.config.mcp,
+        source: deps.mcpConfigurationSource,
+        // 配置订阅由 runtime 持有并只调用一次 reconcileConfiguration，避免同一变化两条 reconcile 路径。
+        subscribeToSource: false,
+        catalog: runtime.isRemoteWorkspace() ? undefined : deps.mcpToolCatalogPort,
+        connectOptions: {
+          // 会话关闭只取消本会话的 MCP 等待与调用，共享连接仍由 pool 与其余 lease 持有。
+          signal: this.shutdownSignal,
+          oauthAuthorizationTimeoutMs: MCP_SESSION_OAUTH_WAIT_MS,
+          trace: this.rootTraceContext,
+          workingDirectory: this.workingDirectory,
+          workspaceIdentity: this.config.workspaceIdentity?.toString(),
+        },
+        trackStartup: (promise) => runtime.trackResidencyBlockingWork(promise),
+      });
     runtime.startMcpStartup(this.rootTraceContext);
+    // 配置订阅由 runtime 持有并只调用一次 reconcileConfiguration；会话据此收敛连接与目录，
+    // 这个订阅同时让 runtime.config.mcp 跟随同一份配置源，避免读取 config.mcp 的路径看到过期集合。
+    this.mcpConfigurationSource = deps.mcpConfigurationSource;
+    if (this.mcpConfigurationSource) {
+      this.mcpConfigUnsubscribe = this.mcpConfigurationSource.subscribe(() => {
+        if (this.shuttingDown) return;
+        void runtime.reconcileMcpConfiguration(this.rootTraceContext).catch((error: unknown) => {
+          this.logger?.warn("MCP configuration reconcile failed", {
+            error: error instanceof Error ? error.message : String(error),
+            event: "mcp.configuration.reconcile.failed",
+          });
+        });
+      });
+    }
   }
 
   get shutdownSignal(): AbortSignal {
@@ -480,6 +537,10 @@ export class AgentRuntime {
   }
 
   beginShutdown(): void {
+    this.mcpConfigUnsubscribe?.();
+    this.mcpConfigUnsubscribe = undefined;
+    // session 是配置订阅与 reconcile 的所有者：关闭后不再投影新视图或发布目录。
+    this.mcpSession?.close();
     // ExecutionPort.close() 会把后台 Bash 收口为 cancelled；若允许
     // teardown terminal event 再唤醒模型，并与随后关闭的 session store 竞态。
     this.shuttingDown = true;
@@ -547,6 +608,11 @@ export interface AgentRuntime {
     toModel: ModelSelection;
     toModelLabel: string;
   }): void;
+  /**
+   * 受管 worktree 新建会话：记录 "已创建 worktree"，首轮持久化会话后、TurnStarted 之前
+   * 写成 timeline part 并发出 WorktreeCreated（docs/git/worktree.md §6.6.4）。只记录一次。
+   */
+  recordPendingWorktreeCreation(fact: import("@zcode/contracts").WorktreeCreationFact): void;
   getActiveTurnInfo(): ActiveTurnInfo | undefined;
   admitPrompt(
     input: string,
@@ -607,12 +673,22 @@ export interface AgentRuntime {
     reservationId: string;
     traceContext?: TraceContext;
   }): Promise<boolean>;
-  /** v4 queue 单项编辑：按 pendingInputId 替换排队输入文本（保位）。 */
-  editPendingInputById(options: {
+  /** v4 queue 单项编辑：按 pendingInputId 原地替换排队输入（保位），并释放编辑锁。 */
+  editPendingInputById(
+    options: EditPendingInputOptions & { traceContext?: TraceContext },
+  ): Promise<EditPendingInputResult>;
+  /** composer 编辑态冻结：只对未 reserve 且无他人锁的排队项生效。 */
+  lockPendingInputEdit(options: {
     pendingInputId: string;
-    newText: string;
+    editLock: PendingInputEditLock;
+    traceContext?: TraceContext;
+  }): Promise<LockPendingInputEditResult>;
+  /** 释放编辑锁（发起端取消、刷新自愈或任意端手动解除）；无锁返回 false。 */
+  releasePendingInputEdit(options: {
+    pendingInputId: string;
     traceContext?: TraceContext;
   }): Promise<boolean>;
+  getPendingInputEditLock(pendingInputId: string): PendingInputEditLock | undefined;
   /** v4 queue 重排：移动 pendingInputId 到 beforePendingInputId 之前（null=队尾）。 */
   reorderPendingInput(options: {
     pendingInputId: string;

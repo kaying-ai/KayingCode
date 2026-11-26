@@ -5,6 +5,7 @@ import type {
   KayingCodePluginInfo,
   KayingCodePluginMarketplaceSummary,
   KayingCodePluginStoreListing,
+  KayingCodePluginStoreRegion,
 } from "@zcode/shared";
 import {
   sortPluginStoreEntries,
@@ -15,6 +16,7 @@ import {
   resolvePluginDisplayName,
   KAYINGCODE_OFFICIAL_PLUGIN_MARKETPLACE_ID,
 } from "@zcode/shared";
+import { isExtensionEngineCompatible } from "@zcode/shared/extension-host";
 import { pluginSearchMatches } from "@/settings/pluginSearch.js";
 
 export {
@@ -75,13 +77,58 @@ export function isPluginUpdatePending(
 }
 
 /**
+ * 目录里的这一版带扩展，且本 App 的插件 API 版本跑不了它（packages/ui/spec/plugin-store-extension-summary.md）。
+ * 用扩展进程加载清单时的同一个判断：`engines.zcode` 是插件 API 版本（EXTENSION_API_VERSION），
+ * 不是产品版本，所以直接复用 shared 的 isExtensionEngineCompatible 与其默认宿主版本。
+ * 范围写法不认识时也算不兼容（新版 App 可能认识）。没有扩展摘要（不带扩展，或旧 CLI 没给）时不挡，
+ * 装上后由扩展进程判「版本不兼容」。
+ */
+export function isExtensionIncompatible(
+  listing: Pick<KayingCodePluginStoreListing, "extensionSummary"> | undefined,
+): boolean {
+  const range = listing?.extensionSummary?.engines.zcode;
+  return range !== undefined && !isExtensionEngineCompatible(range);
+}
+
+/** 未安装条目要先更新 KayingCode 才能装。卡片、详情页按钮与 handleInstall 共用这一个判断。 */
+export function isStoreItemInstallBlocked(
+  item: Pick<StorePluginItem, "installed" | "restorable" | "listing">,
+): boolean {
+  return !item.installed && !item.restorable && isExtensionIncompatible(item.listing);
+}
+
+/**
+ * CLI 只按版本号报更新；目录最新版不兼容时 App 不提示更新。已装插件的 listing 来自目录最新版条目，
+ * 所以这里看的是最新版的扩展摘要。
+ */
+export function hasInstallableUpdate(
+  summary: Pick<KayingCodeInstalledPluginSummary, "updateStatus" | "listing"> | undefined,
+): boolean {
+  return isPluginUpdatePending(summary?.updateStatus) && !isExtensionIncompatible(summary?.listing);
+}
+
+/**
+ * 已安装、CLI 报了更新，但最新版要求更高的插件 API 版本：更新入口全部隐藏（与 upstream 一致），
+ * 本产品额外在卡片/详情页说明原因，避免用户以为「没有更新」（spec 的拦截矩阵）。
+ */
+export function isPluginStoreUpdateBlocked(
+  item: Pick<StorePluginItem, "installed" | "installedMeta"> | null | undefined,
+): boolean {
+  return Boolean(
+    item?.installed &&
+      isPluginUpdatePending(item.installedMeta?.updateStatus) &&
+      isExtensionIncompatible(item.installedMeta?.listing),
+  );
+}
+
+/**
  * 孤立插件可能保留删除来源前的 updateStatus；若各入口只判断该缓存状态，
- * 详情页会在菜单已禁用更新时仍显示更新按钮。更新能力必须同时满足“来源存在”和“有更新”。
+ * 详情页会在菜单已禁用更新时仍显示更新按钮。更新能力必须同时满足“来源存在”和“有可装的更新”。
  */
 export function canUpdatePluginItem(
   item: Pick<StorePluginItem, "installedMeta" | "orphaned"> | null | undefined,
 ): boolean {
-  return Boolean(item && !item.orphaned && isPluginUpdatePending(item.installedMeta?.updateStatus));
+  return Boolean(item && !item.orphaned && hasInstallableUpdate(item.installedMeta));
 }
 
 /**
@@ -90,7 +137,10 @@ export function canUpdatePluginItem(
  */
 export function needsPluginUpdate(
   state: {
-    installedPlugins: readonly Pick<KayingCodeInstalledPluginSummary, "id" | "updateStatus">[];
+    installedPlugins: readonly Pick<
+      KayingCodeInstalledPluginSummary,
+      "id" | "updateStatus" | "listing"
+    >[];
     activeOperations: readonly { id: string }[];
   },
   pluginId: string,
@@ -98,9 +148,7 @@ export function needsPluginUpdate(
   if (state.activeOperations.some((operation) => operation.id === `plugin:update:${pluginId}`)) {
     return false;
   }
-  return isPluginUpdatePending(
-    state.installedPlugins.find((plugin) => plugin.id === pluginId)?.updateStatus,
-  );
+  return hasInstallableUpdate(state.installedPlugins.find((plugin) => plugin.id === pluginId));
 }
 
 /**
@@ -426,4 +474,30 @@ export type PluginStoreSegment = "public" | "community" | "personal";
 export function resolvePluginStoreSegment(item: StorePluginItem): PluginStoreSegment {
   if (!isPublicStoreMarketplaceId(item.marketplace)) return "personal";
   return item.listing?.publisherType === "community" ? "community" : "public";
+}
+
+/**
+ * 商店浏览列表的地区（packages/shared/spec/plugin-store-regions.md）。
+ *
+ * 产品暂时没有「登录区域」事实源：按 locale 推导，`zh*` 国内、其余海外。这与
+ * `LoginApiKeyForm` 按 locale 预选 BigModel / Z.ai 登录入口的既有约定一致，也不新增设置项。
+ * 将来接入真实登录区域时只替换本函数的输入，过滤规则与数据层不变。
+ */
+export function resolvePluginStoreRegion(locale: string): KayingCodePluginStoreRegion {
+  return locale.toLowerCase().startsWith("zh") ? "cn" : "global";
+}
+
+/**
+ * 商店浏览列表是否显示该条目：已安装（或有运行时 info）始终显示，避免已装插件从商店消失；
+ * 个人 marketplace 不参与官方区域定向；条目没声明 regions 时所有区域可见。
+ */
+export function isPluginVisibleForStoreRegion(
+  item: Pick<StorePluginItem, "installed" | "info" | "marketplace" | "listing">,
+  region: KayingCodePluginStoreRegion,
+): boolean {
+  if (item.installed || item.info) return true;
+  if (!isPublicStoreMarketplaceId(item.marketplace)) return true;
+  const regions = item.listing?.regions;
+  if (!regions || regions.length === 0) return true;
+  return regions.includes(region);
 }

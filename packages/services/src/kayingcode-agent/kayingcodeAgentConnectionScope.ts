@@ -31,6 +31,7 @@ export interface KayingCodeAgentV4ConnectionContext {
   role?: "terminal-client" | "trusted-host-relay";
   /** 下游 clientHello 的增量声明；relay 只搬运，不自行消费帧。 */
   workflowRunDeltas?: boolean;
+  pluginDiscoveryUi?: boolean;
   historyFirst?: boolean;
 }
 
@@ -82,6 +83,7 @@ export function readTrustedKayingCodeAgentV4Connection(
     clientMode: context.clientMode,
     // 只认 true：缺席与 false 都是「旧消费者」，键在场与否是下游读端的判据。
     ...(context.workflowRunDeltas === true ? { workflowRunDeltas: true } : {}),
+    ...(context.pluginDiscoveryUi === true ? { pluginDiscoveryUi: true } : {}),
     ...(context.historyFirst === true ? { historyFirst: true } : {}),
   };
 }
@@ -100,6 +102,8 @@ export function withTrustedConnection<T extends object>(
   delete forwarded["clientMode"];
   delete forwarded["deliveryProfile"];
   delete forwarded["subscriberScope"];
+  // 与 clientMode 同族的可信位：UI 面的 subscribe 不能自己挑插件发现工具面。
+  delete forwarded["pluginDiscoveryUi"];
   forwarded[TRUSTED_CONNECTION_FIELD] = context;
   return forwarded as T;
 }
@@ -220,6 +224,9 @@ function createHello(context: KayingCodeAgentV4ConnectionContext): HelloMessage 
       // CLI 已在 runtime/capabilities 中声明支持，Host 只负责转发。
       genUiContext: true,
       workflowRunDeltas: true,
+      // 本 Host 会按连接能力转发插件发现工具面与 pluginInstall 卡片；客户端见到该位
+      // 才能在 clientHello 里回声明（README: 该对象 strict，向旧 Host 发未知键会握手失败）。
+      pluginDiscovery: true,
       historyFirst: true,
     },
     auth: {},
@@ -254,6 +261,7 @@ export function createKayingCodeAgentConnectionScope(
   let boundClientId: string | null = null;
   /** clientHello 的增量声明；trusted relay 没有自己的 clientHello，只搬运下游声明。 */
   let clientWorkflowRunDeltas = false;
+  let pluginDiscoveryUiSupported = false;
   let clientHistoryFirst = false;
   let commandQueryWorkspaceKey: string | null = null;
   let currentTransportFlowState: V4ConnectionFlowState = "drained";
@@ -272,6 +280,7 @@ export function createKayingCodeAgentConnectionScope(
         clientMode: downstream.clientMode,
         // 增量位属于下游那一端：relay 不消费帧，只把下游 clientHello 的声明带上去。
         ...(downstream.workflowRunDeltas === true ? { workflowRunDeltas: true } : {}),
+        ...(downstream.pluginDiscoveryUi === true ? { pluginDiscoveryUi: true } : {}),
         ...(downstream.historyFirst === true ? { historyFirst: true } : {}),
       };
     }
@@ -279,6 +288,10 @@ export function createKayingCodeAgentConnectionScope(
       connectionId: context.connectionId,
       clientMode: context.clientMode,
       ...(clientWorkflowRunDeltas ? { workflowRunDeltas: true } : {}),
+      // 插件发现工具面只由终端连接自己的 clientHello 声明；trusted relay 不代下游作主。
+      ...(role === "terminal-client" && pluginDiscoveryUiSupported
+        ? { pluginDiscoveryUi: true }
+        : {}),
       ...(clientHistoryFirst ? { historyFirst: true } : {}),
     };
   };
@@ -689,6 +702,7 @@ export function createKayingCodeAgentConnectionScope(
       }
       boundClientId = parsed.clientId;
       clientWorkflowRunDeltas = clientSupportsWorkflowRunDeltas(parsed);
+      pluginDiscoveryUiSupported = parsed.capabilities?.pluginDiscoveryUi === true;
       clientHistoryFirst = parsed.capabilities?.historyFirst === true;
       handshakeComplete = true;
     },

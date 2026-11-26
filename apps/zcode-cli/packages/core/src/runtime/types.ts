@@ -17,10 +17,14 @@ import type {
   ModelRequestAuth,
   ModelRequestDependencies,
   ModelSelection,
+  PendingTurnAttachment,
+  PermissionRuleset,
   PluginReferenceCatalog,
+  ProjectId,
   ResolvedUserInstructions,
   StableForkGoalBoundaryMetadata,
   StableForkTargetMetadata,
+  WorktreeCreationFact,
   WorkspaceHookBundleSnapshot,
   WorkspaceId,
 } from "@zcode/contracts";
@@ -85,7 +89,9 @@ import type {
   PdfDocumentPort,
   HooksRuntimeConfig,
   SkillPort,
+  McpConfigurationSource,
   McpPort,
+  McpToolCatalogPort,
   McpServerConfig,
   SubagentPort,
   ToolArtifactStorePort,
@@ -142,6 +148,8 @@ export interface AgentRuntimeConfig {
   permissionTimeoutMs?: number;
   compact?: AutoCompactPolicyConfig;
   targetCompletionVerification?: { enabled?: boolean };
+  /** 是否在请求中追加总额度倒数提醒；缺省关闭（由 CLI 参数或 App 设置在创建 runtime 时决定）。 */
+  totalTokensReminder?: { enabled?: boolean };
   midConversationSystem?: {
     mode?: "auto" | "force";
   };
@@ -151,6 +159,8 @@ export interface AgentRuntimeConfig {
     inactivityTimeoutMs?: number;
     autoBackgroundMs?: number;
     backgroundBashMaxMs?: number;
+    /** Agent 是否总在后台运行；缺省 true（上游 4.0 行为）。 */
+    alwaysBackground?: boolean;
     /** 后台 Agent 无进展多久后第一次提醒父会话；之后每次间隔加倍。默认 15 分钟。 */
     backgroundStallNotifyMs?: number;
     /** 无进展提醒的最大间隔。默认 4 小时。 */
@@ -265,6 +275,17 @@ export interface AgentRuntimeConfig {
   workspacePath?: string;
   /** 仅用于持久化隔离；文件与命令执行仍使用 workingDirectory。 */
   workspaceIdentity?: WorkspaceId;
+  /**
+   * 会话所属 workspace 的 key：MCP 工具调用的 `workspace_key`、官方 MCP 授权头等发往 Host 的
+   * 请求都以它为身份。受管 worktree 会话 = 项目，不等于工作目录（docs/git/worktree.md §9.3）；
+   * 缺省按 workspaceIdentity || 工作目录。
+   */
+  workspaceKey?: string;
+  /**
+   * 派生项目身份（权限 project_id、项目记忆目录）使用的目录。受管 worktree 会话映射回
+   * 源仓库中对应路径，与 Hook Trust 继承同一规则（docs/git/worktree.md §6.6.3）；缺省 = 工作区根。
+   */
+  projectDirectory?: string;
   envInfo?: EnvInfo; // Optional, will be auto-detected if not provided
   /**
    * YYYY-MM-DD，缺省由 adapter 解析。只用于 ContextBuilder 日期段的用量统计；
@@ -339,6 +360,9 @@ export interface MemoryRuntimeConfig {
   workspaceIdentity?: string;
 }
 
+/** blocking：首个请求等全部 server 启动结束；background：先交付已就绪与缓存工具，后来者在下一个正常请求生效。 */
+export type McpStartupPolicy = "blocking" | "background";
+
 export interface AgentRuntimeDeps {
   /** 只读目录入口；必须同步读取内存，不在请求收集阶段进行 I/O。 */
   getAgentDefinitions?: GetAgentDefinitions;
@@ -356,6 +380,15 @@ export interface AgentRuntimeDeps {
   resolveEffectiveModelSelection?: (selection: ModelSelection) => EffectiveModelSelectionResult;
   modelIoDir?: string;
   providerRuntimeHeadersPort?: ProviderRuntimeHeadersPort;
+  /**
+   * 回复语言来源：Host 的回复语言设置，只给主线程注入；没有设置时为 null（runtime 发清除公告），
+   * 读取失败时 reject（runtime 跳过本次公告）。见 docs/i18n/agent-reply-language.md。
+   */
+  readReplyLanguage?: (input: {
+    sessionId: SessionId;
+    signal?: AbortSignal;
+    traceContext: TraceContext;
+  }) => Promise<string | null>;
   permissionService?: PermissionService;
   permissionBroker?: PermissionBrokerPort;
   toolScheduler?: ToolScheduler;
@@ -373,6 +406,15 @@ export interface AgentRuntimeDeps {
   pdfDocumentPort?: PdfDocumentPort;
   skillPort?: SkillPort;
   mcpPort?: McpPort;
+  /** 进程级 MCP 工具目录；用于连接期间复用其他会话已发布的工具声明。 */
+  mcpToolCatalogPort?: McpToolCatalogPort;
+  /** 宿主注入的实时 MCP 配置源；变化时 runtime 重连并重注册工具。 */
+  mcpConfigurationSource?: McpConfigurationSource;
+  /**
+   * MCP 启动策略，由入口显式传入，默认 blocking：首个请求等全部 server 启动结束。
+   * background 只用缓存命中与已就绪 server 的工具，其余 server 就绪后在下一次正常请求生效。
+   */
+  mcpStartupPolicy?: McpStartupPolicy;
   subagentPort?: SubagentPort;
   coordinatorResponsePort?: CoordinatorResponsePort;
   /** 工作流 actor 提交终态结果的端口；存在即作为 submit_result 工具的注册门。 */
@@ -563,6 +605,31 @@ export type PromptAdmissionOptions = ExecuteTurnOptions & {
   requireIdle?: boolean;
 };
 
+/** composer 编辑态写回排队项（docs/ui/composer-edit-mode.md）；可选字段缺省 = 保留原值。 */
+export interface EditPendingInputOptions {
+  pendingInputId: string;
+  /**
+   * 缺省 = 保留原输入，只改配置（applyQueueItemsConfig）。不能由调用方用投影 text 回填：
+   * 投影 text 经过 genUi 归一化，写回会丢掉输入里的上下文。
+   */
+  newText?: string;
+  /** 携带时必须持有该编辑器的锁；成功后同一调用释放锁。 */
+  editorId?: string;
+  attachmentRefs?: NonNullable<TurnInputIntentMetadata["attachmentRefs"]>;
+  attachments?: PendingTurnAttachment[];
+  conversationQuotes?: TurnInputIntentMetadata["conversationQuotes"];
+  modelSelection?: ModelSelection;
+  mode?: TurnInputIntentMetadata["mode"];
+  planEnabled?: boolean;
+  /** 用户改了模型：入队时冻结的 Highspeed 卡不能再覆盖用户的新选择。 */
+  dropHighspeed?: boolean;
+}
+
+/** editLocked = 该项被他人锁定且调用方未持锁；lockLost = 调用方声明的锁已不在。 */
+export type EditPendingInputResult = "edited" | "missing" | "editLocked" | "lockLost";
+
+export type LockPendingInputEditResult = "locked" | "missing" | "reserved" | "lockedByOther";
+
 export type PromptAdmissionReceipt =
   | {
       kind: "started";
@@ -711,8 +778,19 @@ export type StableConversationForkGoalBoundary = StableForkGoalBoundaryMetadata;
 
 export type StableConversationForkChildMetadata = ForkChildSessionMetadata;
 
+export interface StableConversationForkTargetCwd {
+  /** 子会话 cwd，同时写入 session.directory / path。workspaceID 沿用父会话（本地为空）。 */
+  directory: string;
+  /** 权限与记忆使用的项目 ID：由 cwd 映射回源仓库路径派生（§6.6.3），映射失败时按 cwd。 */
+  projectID: ProjectId;
+  /** 追加在复制历史之后的 "已创建 worktree" 时间线事实。 */
+  worktreeCreation: WorktreeCreationFact;
+}
+
 export interface StableConversationForkOptions {
   forkedSessionId?: SessionId;
+  /** 缺省 = 父会话 cwd（原行为）。 */
+  targetCwd?: StableConversationForkTargetCwd;
   modelSelection?: ModelSelection;
   goalBoundary: StableConversationForkGoalBoundary;
   sourceCommandId: string;
@@ -802,6 +880,8 @@ export interface PermissionDecisionResult {
 export interface ExecuteToolsOptions {
   toolSearch?: ToolSearchExecutionContext;
   pluginDiscoveryUi?: boolean;
+  /** 产生这批调用的 assistant 回复；未注册 MCP 工具的等待预算按它共享。 */
+  responseId?: string;
   automationTurn?: boolean;
   automationId?: string;
   offPeakTurn?: boolean;
@@ -864,6 +944,7 @@ export interface ActiveTurnStartReservation {
 }
 
 export interface DrainedPendingInputDiagnostics {
+  pluginDiscoveryUi?: boolean;
   injectedMessageIds: MessageId[];
   /** 行内 Guide 本身携带的原子 Submission 配置；由下一次 model-step 边界消费。 */
   intent?: TurnInputIntentMetadata;

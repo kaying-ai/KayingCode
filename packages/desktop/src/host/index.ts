@@ -85,6 +85,7 @@ import {
   createWindowHostExtensions,
   getPluginUserOptionsReader,
   getAppConfigDir,
+  getKayingCodeDataRootDir,
   type AppControlServiceHandle,
   type WindowHostExtensions,
   OffPeakModelUnavailableError,
@@ -131,7 +132,11 @@ import {
   type WorkspaceConnectionTarget,
   REMOTE_BIND_CANCELED_ERROR_CODE,
   REMOTE_WORKSPACE_BIND_SESSION_MISSING_ERROR_CODE,
+  KAYINGCODE_PRODUCT_FLAVOR,
+  resolveKayingCodeRuntimeEnv,
 } from "@zcode/shared";
+import { resolvePreinstalledToolsRelease } from "@zcode/shared/preinstalled-tools";
+import { resolvePreinstalledToolsBinDir } from "@zcode/shared/preinstalled-tools/node";
 import { createCredentialCipherBridge } from "@zcode/shared/credential-security";
 import {
   parseHostIncomingMessageEvent,
@@ -587,7 +592,10 @@ function shareCredentialKeyWithDataRoot(targetBaseDir: string): Promise<void> {
   });
 }
 
+// 资源身份由 Main 的窗口级 owner 持有；Host 只保存 InitLocal 下发的事实并原样转发。
+let browserBackendIdentity: { id: string; generation: number } | undefined;
 const browserControlMainBridge = createBrowserControlMainBridge({
+  getBackendIdentity: () => browserBackendIdentity,
   postToMain: (message) => {
     if (!parentPort) {
       throw new Error("parentPort unavailable");
@@ -1920,6 +1928,8 @@ console.error = (...args: unknown[]) => {
 let databaseStartup: ReturnType<typeof createHostDatabaseStartup> | undefined;
 const pendingStartupAttachments = new Map<string, () => void>();
 let activeServices: ServiceCollection | null = null;
+/** Agent 回复语言（null 为未设置），应答 CLI 的 session/readReplyLanguage；由 Main 推送。 */
+let replyLanguage: string | null = null;
 let activeHostApiNetworkTransport: HostApiNetworkTransport | null = null;
 /** 桌面本机 Host 的扩展门面；只在本机 Host 注册，不进远程合同与手机白名单。 */
 let windowHostExtensions: WindowHostExtensions | null = null;
@@ -2706,6 +2716,47 @@ function createControllerRoutedTaskService(
             }),
           });
       }
+      if (property === "previewArchivedTaskDeletion") {
+        return async (
+          params: Parameters<IKayingCodeTaskService["previewArchivedTaskDeletion"]>[0],
+        ) =>
+          windowHostControllerRuntime.service.previewArchivedTaskDeletion({
+            address: await windowHostControllerRuntime.resolveTaskAddress({
+              ...params,
+              attachmentScope,
+              allowMissingTask: true,
+            }),
+          });
+      }
+      if (property === "previewArchivedTaskDeletions") {
+        return async (
+          params: Parameters<IKayingCodeTaskService["previewArchivedTaskDeletions"]>[0],
+        ) =>
+          windowHostControllerRuntime.service.previewArchivedTaskDeletions({
+            address: await windowHostControllerRuntime.resolveTaskAddress({
+              workspacePath: params.workspacePath,
+              workspaceIdentity: params.workspaceIdentity,
+              taskId: params.taskIds[0]!,
+              attachmentScope,
+              allowMissingTask: true,
+            }),
+            taskIds: params.taskIds,
+          });
+      }
+      if (property === "permanentlyDeleteArchivedTask") {
+        return async (
+          params: Parameters<IKayingCodeTaskService["permanentlyDeleteArchivedTask"]>[0],
+        ) =>
+          windowHostControllerRuntime.service.permanentlyDeleteArchivedTask({
+            address: await windowHostControllerRuntime.resolveTaskAddress({
+              ...params,
+              attachmentScope,
+              allowMissingTask: true,
+            }),
+            revision: params.revision,
+            ...(params.operationId ? { operationId: params.operationId } : {}),
+          });
+      }
       if (property === "setTaskUnread") {
         return async (params: Parameters<IKayingCodeTaskService["setTaskUnread"]>[0]) => {
           const meta = await route(
@@ -3163,6 +3214,14 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
   }
 
   const msg = result.data;
+  // InitLocal 与变更消息同端口按序到达：先同步赋值，初值不会覆盖较新的变更。
+  if (msg.type === HostMessageTypes.InitLocal) {
+    replyLanguage = msg.replyLanguage ?? null;
+  }
+  if (msg.type === HostMessageTypes.ReplyLanguageChanged) {
+    replyLanguage = msg.replyLanguage;
+    return;
+  }
   const port = e.ports[0];
   // 私有凭据回复先结束等待；其余消息继续走原 port 守卫。
   if (msg.type === HostMessageTypes.CredentialCipherResult) {
@@ -3863,6 +3922,7 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
   }
 
   if (msg.type === HostMessageTypes.InitLocal) {
+    browserBackendIdentity = msg.browserBackendIdentity;
     if (!port) {
       logger.error("init-local message missing MessagePort");
       return;
@@ -3921,12 +3981,22 @@ parentPort.on("message", async (e: Electron.MessageEvent) => {
           log: (message, details) => logger.warn(message, details),
           establishOwner: () => {
             const initializedServices = createLocalServices({
+              // 固定目录与发布目标无关；准备完成后，既有会话下一条命令即可找到入口。
+              // 不读取安装记录、不等待预装进程：是否有入口由 services 的 spawn 边界判定。
+              preinstalledToolsBinDir: resolvePreinstalledToolsBinDir({
+                dataRoot: getKayingCodeDataRootDir(),
+                release: resolvePreinstalledToolsRelease({
+                  runtimeEnv: resolveKayingCodeRuntimeEnv(process.env),
+                  productFlavor: KAYINGCODE_PRODUCT_FLAVOR,
+                }),
+              }),
               parentPort,
               credentialCipherProvider: credentialCipherBridge.cipher,
               settingService,
               prepareLegacyAccountConnections,
               hostApiNetworkTransport,
               authorizeLocalMediaPreviewPath,
+              resolveReplyLanguage: () => replyLanguage,
               runtimeProcessEnvPatch: msg.runtimeProcessEnvPatch,
               agentRuntimeContext: {
                 getDeviceMid: () => msg.deviceMid,

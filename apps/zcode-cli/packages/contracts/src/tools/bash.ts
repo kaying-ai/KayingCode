@@ -79,7 +79,7 @@ export type BashInput = z.infer<typeof BashInputSchema>;
 
 export const BashInputJsonSchema = toToolJsonSchema(BashInputSchema);
 
-function semanticNumber(schema: z.ZodNumber): z.ZodEffects<z.ZodNumber, number, unknown> {
+function semanticNumber(schema: z.ZodNumber): z.ZodPreprocess<z.ZodNumber> {
   return z.preprocess((value) => {
     if (typeof value !== "string") return value;
     const trimmed = value.trim();
@@ -89,7 +89,7 @@ function semanticNumber(schema: z.ZodNumber): z.ZodEffects<z.ZodNumber, number, 
   }, schema);
 }
 
-function semanticBoolean(): z.ZodEffects<z.ZodBoolean, boolean, unknown> {
+function semanticBoolean(): z.ZodPreprocess<z.ZodBoolean> {
   return z.preprocess((value) => {
     if (typeof value === "boolean") return value;
     if (typeof value === "number") {

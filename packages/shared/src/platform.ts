@@ -35,6 +35,10 @@ import type {
 } from "#src/web-remote-relay/index.js";
 import type { AppSettings, Locale } from "./protocol.js";
 import type {
+  PreinstalledToolsCommand,
+  PreinstalledToolsState,
+} from "./preinstalled-tools/contract.js";
+import type {
   ArmsCustomEventPayload,
   RendererTelemetryEventPayload,
   TelemetryRendererContext,
@@ -350,6 +354,26 @@ export interface PrintPageToPdfResult {
   /** "print_in_progress" | "print_failed" */
   error?: string;
 }
+
+/**
+ * 系统麦克风权限检查结果（packages/desktop/spec/composer-voice-input.md「权限所有者与顺序」）。
+ * - granted：可以调用 getUserMedia
+ * - denied：系统拒绝，需要用户到系统设置开启
+ * - unsupported：系统没有权限接口（Linux），由 getUserMedia 的错误决定
+ */
+export type MicrophoneAccessResult = "granted" | "denied" | "unsupported";
+
+/**
+ * macOS「重新授权」结果（同 spec「拒绝语义」）。
+ * - granted：已获得权限
+ * - denied：重置后系统弹框中用户仍选择拒绝
+ * - restart-required：重置后当前进程仍读到 denied，重启 KayingCode 后才会弹框
+ * - failed：不能重置（非 macOS、MDM 限制、tccutil 失败），改由系统设置页开启
+ */
+export type MicrophoneAccessResetResult = "granted" | "denied" | "restart-required" | "failed";
+
+/** privacy：系统麦克风隐私页；sound：系统声音输入设备页 */
+export type MicrophoneSettingsTarget = "privacy" | "sound";
 
 export function createOpenInEditorRemoteTarget(
   target: RemoteTarget,
@@ -778,6 +802,18 @@ export interface IPlatformService {
   printPageToPdf?(): Promise<PrintPageToPdfResult>;
 
   /**
+   * 麦克风系统权限（仅 Desktop 实现）。macOS 未询问过时弹出系统授权；
+   * openSettings 只打开固定的系统设置地址，返回 false 表示当前系统没有可跳转的页面。
+   * Web / 手机远控 / 旧 preload 缺席，UI 据此隐藏语音输入入口。
+   */
+  microphone?: {
+    ensureAccess(): Promise<MicrophoneAccessResult>;
+    /** macOS：重置 KayingCode 自己的麦克风授权记录并重新请求；其他系统返回 failed */
+    resetAccess(): Promise<MicrophoneAccessResetResult>;
+    openSettings(target: MicrophoneSettingsTarget): Promise<boolean>;
+  };
+
+  /**
    * 从浏览器 File 对象解析宿主本地路径；只有 Desktop preload 能安全实现。
    * Web/手机端返回 null，避免 UI 层依赖 Electron 的非标准 File.path。
    */
@@ -801,6 +837,19 @@ export interface IPlatformService {
   materializeWorkflowArtifactFile?(
     payload: MaterializeWorkflowArtifactFileRequest,
   ): Promise<MaterializeWorkflowArtifactFileResult>;
+
+  /**
+   * 本机预装文档工具（Python/LibreOffice/Pandoc/Poppler/QPDF）的快照。
+   * 仅 Desktop Main 实现；Web 与手机远控没有本机安装能力，缺席即不展示入口。
+   * 快照由预装进程唯一发布，renderer 不维护第二份已接受状态。
+   */
+  getPreinstalledToolsState?(): Promise<PreinstalledToolsState>;
+
+  /** 提交预装工具命令；回执只表示请求完成，不携带新状态。 */
+  executePreinstalledToolsCommand?(command: PreinstalledToolsCommand): Promise<void>;
+
+  /** 订阅预装工具快照推送，返回 disposer。 */
+  onPreinstalledToolsState?(callback: (state: PreinstalledToolsState) => void): () => void;
 
   /** 订阅当前窗口内远程连接过程日志，返回 disposer */
   onRemoteConnectionLog(handler: (entry: RemoteConnectionRuntimeLog) => void): () => void;
@@ -948,7 +997,9 @@ export interface IPlatformService {
   showTaskNotification(payload: TaskNotificationPayload): void;
 
   /** 扩展 notifications.show 能力；Web/手机可不实现，缺失时返回 unsupported。 */
-  showExtensionNotification?(payload: ExtensionNotificationPayload): Promise<NotificationsShowResult>;
+  showExtensionNotification?(
+    payload: ExtensionNotificationPayload,
+  ): Promise<NotificationsShowResult>;
 
   /** 同步当前 UI 上下文，供宿主启动/日活事件使用；Web 可不实现。 */
   syncTelemetryContext?(context: TelemetryRendererContext): void;
