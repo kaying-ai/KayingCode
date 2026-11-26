@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.1](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.3.0...kaying-code-v0.3.1) (2026-11-26)
+
+### Features
+
+* **game:** add plugin catalog placeholders and AI highlights tab ([4aecca2](https://github.com/kaying-ai/KayingCode/commit/4aecca29522f7afd148563254a5ba158ff52fd92))
+  * add game plugin installer catalog with Agent-driven local install and kayingcode CLI shim
+  * show community plugin cards with source tiers, installed controls and support QR
+  * remove lifecycle stage tags from game development cards
+  * add Game AI highlights as the second Game Center tab
+
 ## [0.3.0](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.2.4...kaying-code-v0.3.0) (2026-11-26)
 
 ### Features
