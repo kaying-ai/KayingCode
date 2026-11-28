@@ -2649,6 +2649,11 @@ export function createKayingCodeAgentService(
           const executor = options?.browserControlExecutor;
           if (!executor) {
             void client.respond(request.id, {
+              // 修复原因：openScope 必须带回同一 id 的 rejected。agent 侧 broker 只有看到它才会
+              // 删除未确认的连接并换新 scope；缺这个标记会把同一个 scope 重试到永久失败。
+              ...(parsed.data.command.method === "openScope" && parsed.data.controlScopeId
+                ? { scope: { id: parsed.data.controlScopeId, state: "rejected" as const } }
+                : {}),
               ok: false,
               error: {
                 code: "backend_unavailable",
@@ -2661,6 +2666,10 @@ export function createKayingCodeAgentService(
           void executor
             .execute({
               requestId: parsed.data.requestId,
+              // 修复原因：controlScopeId 是 Main BrowserGuestManager 的作用域句柄，Host 只做中继。
+              // 丢弃后 openScope 被 Main 以 "Browser control scope is required" 拒绝，标签控制
+              // 整体不可用（只有 visibility 等无 scope 命令还能命中兼容路径）。
+              controlScopeId: parsed.data.controlScopeId,
               ...(parsed.data.browserId ? { browserId: parsed.data.browserId } : {}),
               ...(parsed.data.browserGeneration !== undefined
                 ? { browserGeneration: parsed.data.browserGeneration }

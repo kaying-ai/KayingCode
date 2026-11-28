@@ -31,6 +31,10 @@ export function resolveBuiltInNodeReplMcpServers(input: {
     env: {
       // 领域 root 各自注入，且只在对应能力启用时注入：宿主据此决定哪一半文档可用。
       KAYINGCODE_PLUGIN_ROOT: browserUsePackage.rootPath,
+      // 兼容官方 browser-use skill 的 bootstrap：它按 ZCODE_PLUGIN_ROOT（CLAUDE_PLUGIN_ROOT
+      // 兜底）解析插件根；只注入品牌化变量会让 skill 在 node_repl 里报
+      // "Browser plugin root is unavailable in the node_repl host"。
+      ZCODE_PLUGIN_ROOT: browserUsePackage.rootPath,
     },
     rootPath: hostPackage.rootPath,
     timeoutMs: 600_000,

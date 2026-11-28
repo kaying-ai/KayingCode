@@ -548,8 +548,18 @@ async function runBrowserCommandOnView(params: {
   command: unknown;
 }): Promise<{ ok: boolean; [k: string]: unknown }> {
   const endDialogAutomation = embeddedBrowserDialogController.beginAutomation(params.win.id);
-  const command = params.command as { method?: string; tabId?: unknown } | null;
+  const command = params.command as {
+    method?: string;
+    tabId?: unknown;
+    action?: { name?: unknown };
+  } | null;
   const method = command?.method ?? "?";
+  // playwright 是聚合命令；把 action 名一并记下，崩溃/超时才定位得到具体等待或交互。
+  const actionName =
+    method === "playwright" && typeof command?.action?.name === "string"
+      ? `:${command.action.name}`
+      : "";
+  const methodLabel = `${method}${actionName}`;
   const workspaceKey =
     params.workspaceIdentity?.trim() ||
     params.workspaceKey ||
@@ -573,7 +583,7 @@ async function runBrowserCommandOnView(params: {
   // newTab / default-tab 兼容调用要等 manager 返回真实 meta.tabId 后再补发，避免猜 tab identity。
   if (requestedTabId) sendOperation(requestedTabId);
   logger.debug(
-    `[browser-use] execute start browserId=${params.browserId ?? "legacy-iab"} sessionId=${params.sessionId} method=${method}`,
+    `[browser-use] execute start browserId=${params.browserId ?? "legacy-iab"} sessionId=${params.sessionId} method=${methodLabel}`,
   );
   try {
     const result = await browserGuestManager.execute(
@@ -592,7 +602,7 @@ async function runBrowserCommandOnView(params: {
       params.command as Parameters<typeof browserGuestManager.execute>[1],
     );
     logger.debug(
-      `[browser-use] execute done sessionId=${params.sessionId} method=${method} ok=${result.ok} elapsedMs=${(result as { elapsedMs?: number }).elapsedMs ?? "?"}`,
+      `[browser-use] execute done sessionId=${params.sessionId} method=${methodLabel} ok=${result.ok} elapsedMs=${(result as { elapsedMs?: number }).elapsedMs ?? "?"}`,
     );
     if (!requestedTabId) {
       const resolvedTabId = resolveBrowserOperationTabId(command, result);
@@ -601,7 +611,7 @@ async function runBrowserCommandOnView(params: {
     return result;
   } catch (error) {
     logger.error(
-      `[browser-use] execute threw sessionId=${params.sessionId} method=${method}:`,
+      `[browser-use] execute threw sessionId=${params.sessionId} method=${methodLabel}:`,
       error,
     );
     throw error;
