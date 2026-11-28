@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.2](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.3.1...kaying-code-v0.3.2) (2026-11-28)
+
+### Bug Fixes
+
+* **browser:** relay control scope and stage node_repl broker before MCP snapshot ([b9d8a2f](https://github.com/kaying-ai/KayingCode/commit/b9d8a2f4d51a1d642212513421e1b3ce7013ec50))
+  * kayingcodeAgentService 中继 interaction/browserExecute 时丢弃 controlScopeId，
+  * create-app 在 App MCP 配置源快照之后才创建 node_repl browser broker，
+
+* **ui:** collapse side pane by workspace width with hysteresis ([6889739](https://github.com/kaying-ai/KayingCode/commit/6889739ed6f8a38ecb8b8f2876642af2d5627535))
+
 ## [0.3.1](https://github.com/kaying-ai/KayingCode/compare/kaying-code-v0.3.0...kaying-code-v0.3.1) (2026-11-26)
 
 ### Features
