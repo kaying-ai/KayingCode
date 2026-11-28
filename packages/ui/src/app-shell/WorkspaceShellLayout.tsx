@@ -64,6 +64,12 @@ import {
 } from "@/browser-use/useBrowserScreenshotSurfaceRequest.js";
 import { AnimatedTerminalPanel } from "@/app-shell/AnimatedTerminalPanel.js";
 import { SIDE_PANE_DEFAULT_EXPANDED_SIZE } from "@/app-shell/sidePaneLayout.js";
+import {
+  resolveWorkspaceAutoCollapse,
+  WORKSPACE_AUTO_COLLAPSE_HYSTERESIS_PX,
+  WORKSPACE_AUTO_COLLAPSE_SIDE_PANE_WIDTH_PX,
+  WORKSPACE_AUTO_COLLAPSE_SIDEBAR_WIDTH_PX,
+} from "@/app-shell/workspaceAutoCollapse.js";
 import { useAnimatedResizablePanel } from "@/app-shell/useAnimatedResizablePanel.js";
 import { ensureTaskNavigationWorkspace } from "@/app-shell/taskNavigationWorkspace.js";
 
@@ -124,7 +130,9 @@ const LEGACY_WORKSPACE_SHELL_LAYOUT_STORAGE_KEY =
 const WORKSPACE_SIDEBAR_RESIZE_KEYBOARD_STEP_PX = 16;
 const WORKSPACE_SIDEBAR_PANEL_WIDTH_CSS_VAR = "--workspace-sidebar-panel-width";
 const WORKSPACE_SIDEBAR_WIDTH_CSS_VAR = "--workspace-sidebar-width";
-const CONVERSATION_AUTO_COLLAPSE_SIDE_PANE_WIDTH_PX = 480;
+// 自动收起只看 window resize 后的整个工作区宽度：面板自身开合、拖拽分割条都不会触发 resize，
+// 避免“打开面板 → conversation 变窄 → 被策略关回去”的反馈。阈值与滞回见 workspaceAutoCollapse。
+const WORKSPACE_AUTO_COLLAPSE_RESIZE_IDLE_MS = 300;
 // WorkspaceShellLayout 是 memo 组件，默认 []/{} 会在缺省调用时每次创建新引用；
 // 入口缺省这些集合时复用常量，避免浅比较误判 props 变化。
 const EMPTY_RECONNECTING_REMOTE_WORKSPACE_LOGS_BY_WORKSPACE_KEY: NonNullable<
@@ -133,8 +141,6 @@ const EMPTY_RECONNECTING_REMOTE_WORKSPACE_LOGS_BY_WORKSPACE_KEY: NonNullable<
 const EMPTY_REMOTE_WORKSPACE_SESSIONS: NonNullable<
   WorkspaceShellLayoutProps["remoteWorkspaceSessions"]
 > = [];
-const CONVERSATION_AUTO_COLLAPSE_SIDEBAR_WIDTH_PX = 360;
-const CONVERSATION_AUTO_COLLAPSE_RESIZE_IDLE_MS = 300;
 // 性能修复：ResizablePanelGroup 收到深相等的新 panelIds 数组，
 // 会跟随 chat streaming render 重算布局上下文；固定数组语义上不会随消息变化。
 const WORKSPACE_BODY_PANEL_IDS = ["conversation-column", "browser"];
@@ -417,15 +423,16 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutContent({
   });
   const workspaceShellRef = useRef<HTMLDivElement | null>(null);
   const workspaceSidebarPanelElementRef = useRef<HTMLDivElement | null>(null);
-  const conversationPanelElementRef = useRef<HTMLDivElement | null>(null);
-  const conversationAutoCollapseStateRef = useRef({
+  const workspaceAutoCollapseStateRef = useRef({
     handleToggleSidebar,
     handleToggleSidePane,
     isSidebarVisible,
     isSidePaneOpen,
+    sidePaneAutoCollapsed: false,
+    sidebarAutoCollapsed: false,
     workspaceKey,
   });
-  const conversationAutoCollapseResizeTimerRef = useRef<number | null>(null);
+  const workspaceAutoCollapseResizeTimerRef = useRef<number | null>(null);
   const workspaceSidebarResizeSessionRef = useRef<WorkspaceSidebarResizeSession | null>(null);
   const [workspaceSidebarPanelWidthPx, setWorkspaceSidebarPanelWidthPx] = useState(
     () => readStoredWorkspaceSidebarWidthPx() ?? WORKSPACE_SIDEBAR_DEFAULT_WIDTH_PX,
@@ -478,14 +485,33 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutContent({
   });
 
   useEffect(() => {
-    conversationAutoCollapseStateRef.current = {
-      handleToggleSidebar,
-      handleToggleSidePane,
-      isSidebarVisible,
-      isSidePaneOpen,
-      workspaceKey,
-    };
+    // 保留自动收起归属：这里只同步最新的 props/状态，不能用整对象覆盖把 ref 里的标记清掉。
+    const state = workspaceAutoCollapseStateRef.current;
+    state.handleToggleSidebar = handleToggleSidebar;
+    state.handleToggleSidePane = handleToggleSidePane;
+    state.isSidebarVisible = isSidebarVisible;
+    state.isSidePaneOpen = isSidePaneOpen;
+    state.workspaceKey = workspaceKey;
   }, [handleToggleSidebar, handleToggleSidePane, isSidebarVisible, isSidePaneOpen, workspaceKey]);
+
+  // 用户手动打开面板即接管控制权：清除“自动收起”归属，变宽后不再替用户自动展开。
+  useEffect(() => {
+    if (isSidePaneOpen) {
+      workspaceAutoCollapseStateRef.current.sidePaneAutoCollapsed = false;
+    }
+  }, [isSidePaneOpen]);
+
+  useEffect(() => {
+    if (isSidebarVisible) {
+      workspaceAutoCollapseStateRef.current.sidebarAutoCollapsed = false;
+    }
+  }, [isSidebarVisible]);
+
+  useEffect(() => {
+    // 自动收起标记属于具体 workspace：切换工作区后旧归属失效，避免把面板自动展开。
+    workspaceAutoCollapseStateRef.current.sidePaneAutoCollapsed = false;
+    workspaceAutoCollapseStateRef.current.sidebarAutoCollapsed = false;
+  }, [workspaceKey]);
 
   useEffect(() => {
     if (workspaceMainView !== "chat") {
@@ -496,80 +522,86 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutContent({
       return;
     }
 
-    const readConversationWidthPx = () =>
-      conversationPanelElementRef.current?.getBoundingClientRect().width ?? null;
-
-    const collapseSidebarIfStillNarrow = () => {
-      const widthPx = readConversationWidthPx();
-      if (widthPx === null) {
-        return;
-      }
-
-      const {
-        handleToggleSidebar: collapseSidebar,
-        isSidebarVisible: latestIsSidebarVisible,
-        workspaceKey: latestWorkspaceKey,
-      } = conversationAutoCollapseStateRef.current;
-
-      if (latestIsSidebarVisible && widthPx < CONVERSATION_AUTO_COLLAPSE_SIDEBAR_WIDTH_PX) {
-        logger.info("[WorkspaceShellLayout] conversation 过窄，自动收起左侧栏", {
-          widthPx: Math.round(widthPx),
-          thresholdPx: CONVERSATION_AUTO_COLLAPSE_SIDEBAR_WIDTH_PX,
-          workspaceKey: latestWorkspaceKey,
-        });
-        collapseSidebar();
-      }
-    };
+    const readWorkspaceWidthPx = () =>
+      workspaceShellRef.current?.getBoundingClientRect().width ?? null;
 
     const runAutoCollapseForWindowResize = () => {
-      const widthPx = readConversationWidthPx();
+      const widthPx = readWorkspaceWidthPx();
       if (widthPx === null) {
         return;
       }
 
-      const {
-        handleToggleSidePane: collapseSidePane,
-        isSidePaneOpen: latestIsSidePaneOpen,
-        workspaceKey: latestWorkspaceKey,
-      } = conversationAutoCollapseStateRef.current;
+      const state = workspaceAutoCollapseStateRef.current;
+      // 判定只看整个工作区宽度与迟滞区间；不读 conversation 面板宽度，也不链式等待布局。
+      const decision = resolveWorkspaceAutoCollapse({
+        widthPx,
+        isSidePaneOpen: state.isSidePaneOpen,
+        isSidebarVisible: state.isSidebarVisible,
+        sidePaneAutoCollapsed: state.sidePaneAutoCollapsed,
+        sidebarAutoCollapsed: state.sidebarAutoCollapsed,
+      });
+      state.sidePaneAutoCollapsed = decision.nextSidePaneAutoCollapsed;
+      state.sidebarAutoCollapsed = decision.nextSidebarAutoCollapsed;
 
-      // 功能说明：自动收起只响应用户改变窗口尺寸后的 conversation 实际宽度。
-      // 不监听 conversation 自身 ResizeObserver，避免用户手动打开面板时又被策略关回去。
-      if (latestIsSidePaneOpen && widthPx < CONVERSATION_AUTO_COLLAPSE_SIDE_PANE_WIDTH_PX) {
-        logger.info("[WorkspaceShellLayout] conversation 过窄，自动收起右侧面板", {
+      if (decision.collapseSidePane) {
+        logger.info("[WorkspaceShellLayout] 工作区过窄，自动收起右侧面板", {
           widthPx: Math.round(widthPx),
-          thresholdPx: CONVERSATION_AUTO_COLLAPSE_SIDE_PANE_WIDTH_PX,
-          workspaceKey: latestWorkspaceKey,
+          thresholdPx: WORKSPACE_AUTO_COLLAPSE_SIDE_PANE_WIDTH_PX,
+          workspaceKey: state.workspaceKey,
         });
-        collapseSidePane();
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(collapseSidebarIfStillNarrow);
+        // toggle 只异步更新 React state；同步 ref 防止同一 idle 窗口内再次 resize 造成重复开合。
+        state.isSidePaneOpen = false;
+        state.handleToggleSidePane();
+      } else if (decision.restoreSidePane) {
+        logger.info("[WorkspaceShellLayout] 工作区恢复宽度，自动展开右侧面板", {
+          widthPx: Math.round(widthPx),
+          restoreThresholdPx:
+            WORKSPACE_AUTO_COLLAPSE_SIDE_PANE_WIDTH_PX + WORKSPACE_AUTO_COLLAPSE_HYSTERESIS_PX,
+          workspaceKey: state.workspaceKey,
         });
-        return;
+        state.isSidePaneOpen = true;
+        state.handleToggleSidePane();
       }
 
-      collapseSidebarIfStillNarrow();
+      if (decision.collapseSidebar) {
+        logger.info("[WorkspaceShellLayout] 工作区过窄，自动收起左侧栏", {
+          widthPx: Math.round(widthPx),
+          thresholdPx: WORKSPACE_AUTO_COLLAPSE_SIDEBAR_WIDTH_PX,
+          workspaceKey: state.workspaceKey,
+        });
+        state.isSidebarVisible = false;
+        state.handleToggleSidebar();
+      } else if (decision.restoreSidebar) {
+        logger.info("[WorkspaceShellLayout] 工作区恢复宽度，自动展开左侧栏", {
+          widthPx: Math.round(widthPx),
+          restoreThresholdPx:
+            WORKSPACE_AUTO_COLLAPSE_SIDEBAR_WIDTH_PX + WORKSPACE_AUTO_COLLAPSE_HYSTERESIS_PX,
+          workspaceKey: state.workspaceKey,
+        });
+        state.isSidebarVisible = true;
+        state.handleToggleSidebar();
+      }
     };
 
     const handleWindowResize = () => {
-      if (conversationAutoCollapseResizeTimerRef.current !== null) {
-        window.clearTimeout(conversationAutoCollapseResizeTimerRef.current);
+      if (workspaceAutoCollapseResizeTimerRef.current !== null) {
+        window.clearTimeout(workspaceAutoCollapseResizeTimerRef.current);
       }
 
       // 大会话 resize trace 显示自动收起侧栏会触发 WorkspaceSidebar
-      // 和大量 tooltip/menu 子树重渲染；拖拽窗口过程中先等 resize idle，再保留原收起语义。
-      conversationAutoCollapseResizeTimerRef.current = window.setTimeout(() => {
-        conversationAutoCollapseResizeTimerRef.current = null;
+      // 和大量 tooltip/menu 子树重渲染；拖拽窗口过程中先等 resize idle，再统一判定。
+      workspaceAutoCollapseResizeTimerRef.current = window.setTimeout(() => {
+        workspaceAutoCollapseResizeTimerRef.current = null;
         runAutoCollapseForWindowResize();
-      }, CONVERSATION_AUTO_COLLAPSE_RESIZE_IDLE_MS);
+      }, WORKSPACE_AUTO_COLLAPSE_RESIZE_IDLE_MS);
     };
 
     window.addEventListener("resize", handleWindowResize);
 
     return () => {
-      if (conversationAutoCollapseResizeTimerRef.current !== null) {
-        window.clearTimeout(conversationAutoCollapseResizeTimerRef.current);
-        conversationAutoCollapseResizeTimerRef.current = null;
+      if (workspaceAutoCollapseResizeTimerRef.current !== null) {
+        window.clearTimeout(workspaceAutoCollapseResizeTimerRef.current);
+        workspaceAutoCollapseResizeTimerRef.current = null;
       }
       window.removeEventListener("resize", handleWindowResize);
     };
@@ -1895,11 +1927,7 @@ const WorkspaceShellLayoutContent = memo(function WorkspaceShellLayoutContent({
                   panelIds={WORKSPACE_CONVERSATION_PANEL_IDS}
                   className="h-full min-h-0"
                 >
-                  <ResizablePanel
-                    id="conversation"
-                    elementRef={conversationPanelElementRef}
-                    minSize="35%"
-                  >
+                  <ResizablePanel id="conversation" minSize="35%">
                     <section
                       data-workspace-conversation-frame="true"
                       className={cn(
