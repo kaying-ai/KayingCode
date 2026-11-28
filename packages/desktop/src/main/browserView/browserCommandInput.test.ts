@@ -17,6 +17,10 @@ function controlledView(commands: Array<{ method: string; params: unknown }>): C
       goForward: () => undefined,
       reload: () => undefined,
       executeJavaScript: async () => undefined,
+      isLoadingMainFrame: () => false,
+      isDestroyed: () => false,
+      on: () => undefined,
+      removeListener: () => undefined,
     },
     cdp: {
       send: async (method, params) => {

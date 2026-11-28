@@ -16,6 +16,14 @@ export interface ControlledViewWebContents {
    * 由 browserGuestManager wire 到 `guest.executeJavaScript(script, true)`（userGesture=true，与 element-picker 一致）。
    */
   executeJavaScript(script: string): Promise<unknown>;
+  /** 主 frame 是否仍在加载；waitForLoadState 用它判断是否已经到达目标状态。 */
+  isLoadingMainFrame(): boolean;
+  isDestroyed(): boolean;
+  /** renderer 是否已崩溃；崩溃后 isLoadingMainFrame 会变 false，不能误判为加载完成。 */
+  isCrashed?(): boolean;
+  /** 加载生命周期事件；只接 waitForLoadState 需要的少量事件。 */
+  on(event: string, listener: (...args: unknown[]) => void): void;
+  removeListener(event: string, listener: (...args: unknown[]) => void): void;
 }
 
 export interface ControlledViewCdp {

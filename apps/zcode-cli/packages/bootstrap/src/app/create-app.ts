@@ -118,10 +118,12 @@ import { startWorkflowQuotaAutoResume } from "./dynamic-workflow-quota-resume.js
 import { workflowActorToolPolicy } from "./workflow-actor-tools.js";
 import {
   createNodeReplBrowserBroker,
-  injectNodeReplBrowserBroker,
   type NodeReplBrowserBroker,
 } from "./node-repl-browser-broker.js";
-import { resolveBuiltInNodeReplMcpServers } from "./built-in-node-repl.js";
+import {
+  BUILT_IN_NODE_REPL_SERVER_NAME,
+  resolveBuiltInNodeReplMcpServers,
+} from "./built-in-node-repl.js";
 import { resolveKayingCodeCustomCommandPrompt } from "../custom-command-prompt.js";
 import { resolveKayingCodeBuiltinPromptCommandInvocation } from "../builtin-prompt-command.js";
 import { BUILTIN_WORKFLOW_COMMAND_NAME } from "../builtin-workflow-command.js";
@@ -342,6 +344,29 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       pluginOutcome,
       workingDirectory,
     });
+    // 修复原因：App MCP 配置源在创建时执行一次 prepare 并缓存快照，core 的 McpSession 优先使用
+    // 该快照而不是随后注入过的 runtimeConfig.mcp。broker 必须在这之前就绪，否则 node_repl 首连
+    // 拿不到 KAYINGCODE_NODE_REPL_BROWSER_BROKER_*，agent.browsers.* 会一直报 unavailable，
+    // 直到下一次 MCP 配置事件触发 prepare 才自愈。
+    const browserControlPort = options.browserControlPort;
+    const nodeReplUsesStdio =
+      builtInMcpServers[BUILT_IN_NODE_REPL_SERVER_NAME]?.type === "stdio" ||
+      options.runtimeConfig?.mcp?.servers?.node_repl?.type === "stdio";
+    if (
+      browserControlPort &&
+      pluginRuntimeFeatures.browserUse === true &&
+      nodeReplUsesStdio &&
+      // 审核 workspace 整体禁用 MCP，不能仅为 broker 留下监听管道。
+      !process.env.KAYINGCODE_REVIEW_WORKSPACE_ROOT
+    ) {
+      nodeReplBrowserBroker =
+        options.nodeReplBrowserBroker ??
+        (ownedNodeReplBrowserBroker = createNodeReplBrowserBroker({
+          browserControlPort,
+          logger,
+          platform: options.platform,
+        }));
+    }
     // 配置源读取项目/用户配置、启用插件与私有选项；当前先取启动快照，实时 reconcile 随阶段 3 接入。
     mcpConfigSource = await createAppMcpConfigurationSource({
       options,
@@ -482,31 +507,6 @@ export async function createKayingCodeApp(options: KayingCodeAppOptions): Promis
       };
       runtimeConfig.toolAllowlist = ["Read"];
       runtimeConfig.runtimeFeatures = {};
-    }
-    const browserControlPort = options.browserControlPort;
-    if (
-      browserControlPort &&
-      pluginRuntimeFeatures.browserUse === true &&
-      runtimeConfig.mcp?.servers?.node_repl?.type === "stdio"
-    ) {
-      nodeReplBrowserBroker =
-        options.nodeReplBrowserBroker ??
-        (ownedNodeReplBrowserBroker = createNodeReplBrowserBroker({
-          browserControlPort,
-          logger,
-          platform: options.platform,
-        }));
-      configuredMcpServers = injectNodeReplBrowserBroker(
-        configuredMcpServers,
-        nodeReplBrowserBroker,
-      );
-      runtimeConfig.mcp = {
-        ...runtimeConfig.mcp,
-        servers: injectNodeReplBrowserBroker(
-          runtimeConfig.mcp.servers ?? {},
-          nodeReplBrowserBroker,
-        ),
-      };
     }
     startupTimer.mark("KayingCode runtime configuration resolved", {
       context: runtimeConfigLogContext(runtimeConfig, workingDirectory),

@@ -37,6 +37,7 @@ import {
 } from "./browserCommandInput.js";
 import { resolveBrowserInputTarget } from "./browserInputTarget.js";
 import { dispatchClickAt, dispatchTouchTapAt } from "./browserPointerInput.js";
+import { waitForDocumentState } from "./browserPlaywrightExecutor.js";
 import { executeIabPlaywrightLocator } from "./browserPlaywrightLocatorExecutor.js";
 import { recordBrowserVideo, type BrowserWebmRecorderFactory } from "./browserVideoRecorder.js";
 import { normalizePlaywrightTimeout } from "./browserPlaywrightTimeout.js";
@@ -75,6 +76,8 @@ interface GuestWebContents {
   getZoomFactor(): number;
   setZoomFactor(factor: number): void;
   isDestroyed(): boolean;
+  isLoadingMainFrame(): boolean;
+  isCrashed(): boolean;
   loadURL(url: string): Promise<void>;
   getURL(): string;
   getTitle(): string;
@@ -285,6 +288,8 @@ interface DownloadWaiter {
 }
 
 const DEFAULT_ATTACH_TIMEOUT_MS = 10_000;
+// 新建 guest 的初始 about:blank 就绪门；只等 Electron 加载事件，不向 guest 注入脚本。
+const GUEST_INITIAL_DOCUMENT_TIMEOUT_MS = 3_000;
 // 透明 presentation 已就位时整幅 capture 的硬上限；正常应在数百 ms 内完成。
 const HIDDEN_WINDOW_CAPTURE_DEADLINE_MS = 5_000;
 // 单个 tab 上"已放弃等待但底层 CDP capture 仍未结算"的硬上限。CDP 截图没有单请求
@@ -1467,6 +1472,21 @@ export class BrowserGuestManager {
         // 会把一次已取消的创建误当成仍存活的 tab。close 同时给 renderer 发卸载请求并留下 tombstone。
         await this.closeTabDurably(tab);
         return this.withMeta(result, context, tab, "closed");
+      }
+      // 修复原因：newTab 返回时 guest 可能仍在加载初始 about:blank；调用方立刻 loadURL
+      // 会在 Electron 44.7.0 dev 运行时触发 renderer 原生崩溃（0xC0000005，日志为
+      // render-process-gone / about:blank）。先等初始文档离开 loading，再放开后续导航。
+      const initialDocument = await this.waitForGuestInitialDocument(
+        guest,
+        running.controller.signal,
+      );
+      if (initialDocument === "cancelled") {
+        const result = this.cancelledOrUnavailable(context, running, startedAt, tab);
+        await this.closeTabDurably(tab);
+        return this.withMeta(result, context, tab, "closed");
+      }
+      if (initialDocument === "timeout") {
+        this.log?.(`[browser-use] newTab initial document not ready tabId=${tab.tabId}`);
       }
       return this.withMeta(
         {
@@ -3097,6 +3117,41 @@ export class BrowserGuestManager {
     return null;
   }
 
+  /**
+   * guest 初始文档就绪门：只观察 Electron 加载事件，不向 guest 注入脚本。
+   * 已停止加载的 guest 立即命中；崩溃/销毁明确返回 cancelled，超时由调用方决定是否放行。
+   */
+  private async waitForGuestInitialDocument(
+    guest: GuestWebContents,
+    signal: AbortSignal,
+  ): Promise<"matched" | "timeout" | "cancelled"> {
+    const view: ControlledView = {
+      webContents: {
+        loadURL: (url) => guest.loadURL(url),
+        getURL: () => guest.getURL(),
+        getTitle: () => guest.getTitle(),
+        canGoBack: () => guest.navigationHistory.canGoBack(),
+        canGoForward: () => guest.navigationHistory.canGoForward(),
+        goBack: () => guest.navigationHistory.goBack(),
+        goForward: () => guest.navigationHistory.goForward(),
+        reload: () => guest.reload(),
+        executeJavaScript: (script) => guest.executeJavaScript(script, true),
+        isLoadingMainFrame: () => guest.isLoadingMainFrame(),
+        isDestroyed: () => safeBool(() => guest.isDestroyed(), true),
+        isCrashed: () => safeBool(() => guest.isCrashed(), false),
+        on: (event, listener) => guest.on?.(event, listener),
+        removeListener: (event, listener) => guest.removeListener?.(event, listener),
+      },
+      cdp: { send: async () => undefined },
+    };
+    return await waitForDocumentState(
+      view,
+      "domcontentloaded",
+      GUEST_INITIAL_DOCUMENT_TIMEOUT_MS,
+      signal,
+    );
+  }
+
   private ownedTabs(context: InternalExecutionContext, sessionView = false): ManagedTab[] {
     return [...this.tabs.values()].filter(
       (tab) =>
@@ -4243,6 +4298,18 @@ export class BrowserGuestManager {
         executeJavaScript: (script) => {
           assertCurrent();
           return guest.executeJavaScript(script, true);
+        },
+        isLoadingMainFrame: () => {
+          assertCurrent();
+          return guest.isLoadingMainFrame();
+        },
+        isDestroyed: () => safeBool(() => guest.isDestroyed(), true),
+        isCrashed: () => safeBool(() => guest.isCrashed(), false),
+        on: (event, listener) => {
+          guest.on?.(event, listener);
+        },
+        removeListener: (event, listener) => {
+          guest.removeListener?.(event, listener);
         },
       },
       cdp: {

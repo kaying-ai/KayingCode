@@ -159,7 +159,24 @@ function urlMatches(pattern: string, url: string): boolean {
   return new RegExp(`^${escaped}$`).test(url);
 }
 
-async function waitForDocumentState(
+type DocumentLoadState = "load" | "domcontentloaded";
+
+/**
+ * Playwright 的目标状态对应的 Electron 加载事件。
+ * did-stop-loading 是 DOMContentLoaded 已被错过时的兜底：主 frame 停止加载必然晚于它。
+ */
+const DOCUMENT_LOAD_EVENTS: Record<DocumentLoadState, readonly string[]> = {
+  domcontentloaded: ["dom-ready", "did-stop-loading"],
+  load: ["did-finish-load", "did-stop-loading"],
+};
+
+/**
+ * 只用 Electron 的加载事实判断状态，不再轮询 executeJavaScript。
+ * 修复原因：开发态观察到新建 guest 后 200ms 内 renderer 原生崩溃（0xC0000005），
+ * 崩溃窗口与 50ms 一次的脚本注入轮询一致；ref-null / guest 重建都是崩溃后的结果。
+ * 已停止加载的页面直接命中，其余状态等事件；guest 崩溃/销毁时明确返回 cancelled。
+ */
+export async function waitForDocumentState(
   view: ControlledView,
   state: "load" | "domcontentloaded" | "networkidle",
   timeoutMs: number,
@@ -168,21 +185,66 @@ async function waitForDocumentState(
   if (state === "networkidle") {
     throw new Error("playwright_wait_for_load_state does not support networkidle");
   }
-  return poll(
-    async () => {
-      const pageState = (await view.webContents.executeJavaScript(`(() => ({
-        readyState: document.readyState,
-        resourceCount: 0
-      }))()`)) as { readyState?: string; resourceCount?: number };
-      const ready =
-        state === "domcontentloaded"
-          ? pageState.readyState !== "loading"
-          : pageState.readyState === "complete";
-      return ready;
-    },
-    timeoutMs,
-    signal,
-  );
+  if (signal?.aborted) return "cancelled";
+
+  const webContents = view.webContents;
+  const isDestroyed = () => {
+    try {
+      return webContents.isDestroyed();
+    } catch {
+      return true;
+    }
+  };
+  const isCrashed = () => {
+    try {
+      return webContents.isCrashed?.() === true;
+    } catch {
+      return false;
+    }
+  };
+  const isLoadingMainFrame = () => {
+    try {
+      return webContents.isLoadingMainFrame();
+    } catch {
+      return false;
+    }
+  };
+
+  if (isDestroyed() || isCrashed()) return "cancelled";
+  // 主 frame 已停止加载：DOMContentLoaded 与 load 都必然已经发生。
+  if (!isLoadingMainFrame()) return "matched";
+
+  return await new Promise<"matched" | "timeout" | "cancelled">((resolve) => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const events = DOCUMENT_LOAD_EVENTS[state];
+    const onEvent = () => finish("matched");
+    const onGone = () => finish("cancelled");
+    const onAbort = () => finish("cancelled");
+    const cleanup = () => {
+      if (timer !== undefined) clearTimeout(timer);
+      for (const event of events) webContents.removeListener(event, onEvent);
+      webContents.removeListener("render-process-gone", onGone);
+      webContents.removeListener("destroyed", onGone);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    function finish(result: "matched" | "timeout" | "cancelled"): void {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(result);
+    }
+
+    timer = setTimeout(() => finish("timeout"), Math.max(0, timeoutMs));
+    for (const event of events) webContents.on(event, onEvent);
+    webContents.on("render-process-gone", onGone);
+    webContents.on("destroyed", onGone);
+    signal?.addEventListener("abort", onAbort, { once: true });
+
+    // 监听注册后再复查一次：事件可能在首次检查与注册之间到达，错过它只能等超时。
+    if (isDestroyed() || isCrashed()) finish("cancelled");
+    else if (!isLoadingMainFrame()) finish("matched");
+  });
 }
 
 async function evaluateWithCdp(
